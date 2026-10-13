@@ -73,10 +73,11 @@ public final class StubURLProtocol: URLProtocol {
         state.withLock { $0[""] = Table() }
     }
 
+    /// Every request seen since `reset()`.
+    ///
     /// A request is recorded when URLSession starts loading it, which can be after a cancelled
     /// `data(for:)` has already thrown. A test that counts requests after a cancel must hold the
     /// request in flight (`delay`) or make the next one impossible (a long interval), not sleep.
-    /// Every request seen since `reset()`.
     public static var recorded: [RecordedRequest] {
         state.withLock { $0[""]?.recorded ?? [] }
     }
