@@ -21,3 +21,6 @@ xcuserdata/
 
 # Xcode removes Package.resolved from local packages; the app project owns resolution
 /Packages/*/Package.resolved
+
+# Downloaded skins
+Skins/
