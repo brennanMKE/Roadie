@@ -24,6 +24,9 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
     @ObservationIgnored private let connectionTest: PlexConnectionTest
     @ObservationIgnored private var connectionTask: Task<Void, Never>?
     @ObservationIgnored private var loaded = false
+    /// The field was edited since the last successful load or commit. Only then does closing the
+    /// window or testing write to the store; a failed read must never turn into a delete.
+    @ObservationIgnored private var tokenDirty = false
 
     private var selection = PlexServerSelection()
     private var enteredToken = ""
@@ -61,6 +64,7 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         set {
             guard newValue != enteredToken else { return }
             enteredToken = newValue
+            tokenDirty = true
             invalidate()
         }
     }
@@ -112,20 +116,24 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
 
     // MARK: Lifecycle
 
-    /// Defaults to selection, store to `tokenText`. Idempotent.
+    /// Defaults to selection, store to `tokenText`. Idempotent after a successful read; a failed
+    /// Keychain read is retried by the next call (the next time Settings appears) unless the user
+    /// has already typed a token, which is never overwritten.
     public func load() {
         guard !loaded else { return }
-        loaded = true
         if let data = defaults.data(forKey: Self.selectionDefaultsKey),
            let saved = try? JSONDecoder().decode(PlexServerSelection.self, from: data) {
             selection = saved
         }
+        guard !tokenDirty else { return }
         do {
             if let token = try tokenStore.load() {
                 enteredToken = token.rawValue
                 hasStoredToken = true
             }
             tokenStoreError = nil
+            tokenDirty = false
+            loaded = true
         } catch {
             tokenStoreError = error.localizedDescription
         }
@@ -138,11 +146,12 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
     }
 
     public func disappeared() {
-        commitToken()
+        if tokenDirty { commitToken() }
         cancelTest()
     }
 
-    /// Trimmed `tokenText` to the store; empty deletes the item.
+    /// Trimmed `tokenText` to the store; empty deletes the item. Explicit callers (Forget, Return)
+    /// commit regardless of the dirty flag.
     public func commitToken() {
         let text = trimmedToken
         do {
@@ -156,6 +165,7 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
                 log.info("token saved")
             }
             tokenStoreError = nil
+            tokenDirty = false
         } catch {
             tokenStoreError = error.localizedDescription
             if let storeError = error as? PlexTokenStoreError, case .keychain(let code) = storeError {
@@ -171,7 +181,7 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
 
     public func testConnection() {
         cancelTest()
-        commitToken()
+        if tokenDirty { commitToken() }
         let text = trimmedToken
         guard tokenStoreError == nil, !text.isEmpty else { return }
         status = .testing

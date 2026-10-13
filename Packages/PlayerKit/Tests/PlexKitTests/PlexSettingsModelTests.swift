@@ -137,6 +137,33 @@ struct PlexSettingsModelTests {
         #expect(!g.model.hasStoredToken)
     }
 
+    @Test func failedLoadThenCloseDoesNotDeleteTheToken() {
+        let h = make(token: Self.secret)
+        defer { h.cleanup() }
+        h.store.failure = .keychain(-128)
+        h.model.load()
+        #expect(h.model.tokenStoreError != nil)
+        h.store.failure = nil
+        h.model.disappeared()
+        #expect(h.store.deletes == 0)
+        #expect(h.store.saves == 0)
+        #expect(h.store.token == PlexToken(Self.secret))
+        // A later appearance retries the read.
+        h.model.load()
+        #expect(h.model.tokenText == Self.secret)
+        #expect(h.model.tokenStoreError == nil)
+    }
+
+    @Test func closeWithoutEditsDoesNotWrite() {
+        let h = make(token: Self.secret)
+        defer { h.cleanup() }
+        h.model.load()
+        h.model.disappeared()
+        #expect(h.store.saves == 0)
+        #expect(h.store.deletes == 0)
+        #expect(h.store.token == PlexToken(Self.secret))
+    }
+
     @Test func tokenStoreFailureIsShownNotThrown() {
         let h = make()
         defer { h.cleanup() }
@@ -274,7 +301,7 @@ struct PlexSettingsModelTests {
         #expect(h.model.status == .testing)
         h.model.disappeared()
         #expect(h.model.status == .idle)
-        #expect(h.store.saves == 3)
+        #expect(h.store.saves == 1)
         try await Task.sleep(for: .seconds(0.7))
         #expect(h.model.status == .idle)
     }
