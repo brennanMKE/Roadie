@@ -15,7 +15,6 @@ final class PlayerModel {
     private let nowPlaying: NowPlayingBridge
     var playbackState: PlaybackState { player.state }
     var isLoading: Bool { player.state == .loading }
-    var isImporting = false
     var scale: CGFloat = 2
 
     private static let lastSkinKey = "lastSkinPath"
@@ -50,22 +49,48 @@ final class PlayerModel {
     func previous() { player.previous() }
     func next() { player.next() }
     /// Winamp's eject button opens the file dialog.
-    func eject() { openAudioFiles(replace: true) }
+    func eject() { openFiles(replace: true) }
 
-    /// Shows the open panel for audio files and folders. Open replaces the queue and plays;
-    /// Add appends. The app is not sandboxed, so the returned URLs are directly readable.
-    func openAudioFiles(replace: Bool) {
+    /// Shows the open panel for audio files, folders and skins. Open replaces the queue and plays;
+    /// Add appends. A chosen `.wsz` loads as the skin. The app is not sandboxed, so the returned
+    /// URLs are directly readable.
+    func openFiles(replace: Bool) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = LocalTrackLoader.audioTypes
-        panel.message = "Choose audio files or folders"
+        panel.allowedContentTypes = LocalTrackLoader.audioTypes + [.wsz]
+        panel.message = "Choose audio files, folders or a skin"
         panel.prompt = replace ? "Open" : "Add"
         Task {
             guard await panel.begin() == .OK else { return }
-            importLocalFiles(panel.urls, replace: replace)
+            open(panel.urls, replace: replace)
         }
+    }
+
+    /// Shows the open panel for skins only.
+    func openSkin() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.wsz, .zip]
+        panel.message = "Choose a skin"
+        panel.prompt = "Open"
+        Task {
+            guard await panel.begin() == .OK, let url = panel.url else { return }
+            loadSkin(from: url)
+        }
+    }
+
+    /// Routes chosen or dropped URLs: the first `.wsz` loads as the skin (any others are ignored)
+    /// and everything else is imported as audio.
+    @discardableResult
+    func open(_ urls: [URL], replace: Bool) -> Bool {
+        let isSkin = { (url: URL) in url.pathExtension.lowercased() == "wsz" }
+        let skin = urls.first(where: isSkin)
+        let others = urls.filter { !isSkin($0) }
+        if let skin { loadSkin(from: skin) }
+        importLocalFiles(others, replace: replace)
+        return skin != nil || !others.isEmpty
     }
 
     /// Loads files and folders off the main actor, then queues them. Replacing clears the queue

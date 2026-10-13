@@ -13,11 +13,11 @@ struct SkinAmpApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Open…") { model.openAudioFiles(replace: true) }
+                Button("Open…") { model.openFiles(replace: true) }
                     .keyboardShortcut("o")
-                Button("Add to Playlist…") { model.openAudioFiles(replace: false) }
+                Button("Add to Playlist…") { model.openFiles(replace: false) }
                     .keyboardShortcut("o", modifiers: [.command, .option])
-                Button("Open Skin…") { model.isImporting = true }
+                Button("Open Skin…") { model.openSkin() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
             }
         }
