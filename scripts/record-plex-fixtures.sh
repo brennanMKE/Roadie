@@ -43,5 +43,7 @@ rec tracks-search "/library/sections/$SEC/all" 0 3 --data-urlencode type=10 --da
 
 # Scrub check: the token must not be in any fixture, and nothing may look like one.
 if grep -rqF -- "$T" "$F"; then print -u2 "!! token found in fixtures -- NOT committing"; exit 1; fi
-if grep -rqiE 'X-Plex-Token|authToken' "$F"; then print -u2 "!! token-like field in fixtures"; exit 1; fi
-print "Recorded $(ls "$F" | wc -l | tr -d ' ') fixtures into $F ($(du -sh "$F" | cut -f1))"
+# Fixtures/plextv/ is hand-written with a fake PIN code and token (never recorded), so it is skipped here;
+# the grep above still looks for the real token inside it.
+if grep -rqiE --exclude-dir=plextv 'X-Plex-Token|authToken' "$F"; then print -u2 "!! token-like field in fixtures"; exit 1; fi
+print "Recorded $(ls "$F"/*.json | wc -l | tr -d ' ') fixtures into $F ($(du -sh "$F" | cut -f1))"

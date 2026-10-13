@@ -58,4 +58,16 @@ struct PlexIntegrationTests {
         }
         print("integration: connection test ok, \(connection.musicSections.count) music section(s)")
     }
+
+    @Test(.enabled(if: PlexIntegrationTests.environment != nil))
+    func resourcesListTheServer() async throws {
+        let env = try #require(Self.environment)
+        let machine = try await client().identity().machineIdentifier
+        let account = PlexAccountClient(clientIdentifier: "skinamp-integration-test")
+        let servers = try await account.resources(token: env.token)
+        #expect(!servers.isEmpty)
+        let ours = try #require(servers.first { $0.clientIdentifier == machine })
+        #expect(ours.connections.contains { $0.isHTTPS })
+        print("integration: \(servers.count) server(s), \(ours.connections.count) connection(s) for ours")
+    }
 }

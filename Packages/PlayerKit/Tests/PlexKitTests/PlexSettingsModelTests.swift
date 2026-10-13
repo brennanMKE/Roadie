@@ -15,6 +15,7 @@ struct PlexSettingsModelTests {
         let suite: String
         let handle: StubURLProtocol.Handle
         let model: PlexSettingsModel
+        let opened: URLRecorder
 
         func cleanup() { defaults.removePersistentDomain(forName: suite) }
 
@@ -24,16 +25,25 @@ struct PlexSettingsModelTests {
         }
     }
 
-    private func make(token: String? = nil, selection: PlexServerSelection? = nil) -> Harness {
+    private func make(token: String? = nil, selection: PlexServerSelection? = nil, withAccount: Bool = true) -> Harness {
         let store = InMemoryPlexTokenStore(token: token.map(PlexToken.init))
         let suite = "PlexSettingsModelTests-\(UUID())"
         let defaults = UserDefaults(suiteName: suite)!
         if let selection { defaults.set(try! JSONEncoder().encode(selection), forKey: PlexSettingsModel.selectionDefaultsKey) }
         let handle = StubURLProtocol.handle()
+        let opened = URLRecorder()
         let model = PlexSettingsModel(
             tokenStore: store, defaults: defaults,
-            connectionTest: PlexConnectionTest(clientIdentifier: Self.identifier, session: handle.session))
-        return Harness(store: store, defaults: defaults, suite: suite, handle: handle, model: model)
+            connectionTest: PlexConnectionTest(clientIdentifier: Self.identifier, session: handle.session),
+            account: withAccount ? PlexTv.account(handle) : nil,
+            signInOptions: .init(pollInterval: .milliseconds(50), timeout: .seconds(5), maxConsecutiveFailures: 3),
+            serverResolver: PlexServerResolver(clientIdentifier: Self.identifier, session: handle.session),
+            openURL: opened.opener)
+        return Harness(store: store, defaults: defaults, suite: suite, handle: handle, model: model, opened: opened)
+    }
+
+    private func plexRoutes() throws -> [StubURLProtocol.Route] {
+        [try PlexTv.createRoute(), try PlexTv.pollRoute(.pinClaimed), try PlexTv.resourcesRoute()]
     }
 
     private func okRoutes() throws -> [StubURLProtocol.Route] {
@@ -392,5 +402,222 @@ struct PlexSettingsModelTests {
         for text in [String(describing: h.model), String(reflecting: h.model), dumped] {
             #expect(!text.contains(Self.secret))
         }
+    }
+
+    // MARK: Sign in with Plex
+
+    @Test func signInStoresTheTokenAndRunsTheTest() async throws {
+        let fake = try PlexTv.fakeToken
+        let h = make(selection: PlexServerSelection(address: "stub.local"))
+        defer { h.cleanup() }
+        h.model.load()
+        h.handle.register(try plexRoutes() + okRoutes())
+        h.model.signIn()
+        #expect(h.model.isSigningIn)
+        await h.model.waitForSignIn()
+        #expect(h.store.token == PlexToken(fake))
+        #expect(h.store.saves == 1)
+        #expect(h.model.hasStoredToken)
+        #expect(h.model.tokenText == fake)
+        #expect(h.model.signInStatus == .signedIn)
+        #expect(h.model.signInMessage == "Signed in with Plex.")
+        #expect(h.opened.opened.count == 1)
+        await h.model.waitForTest()
+        guard case .connected = h.model.status else {
+            Issue.record("expected connected, got \(h.model.status)")
+            return
+        }
+        let sections = try #require(h.handle.recorded.first { $0.url.path == "/library/sections" })
+        #expect(header(sections, "X-Plex-Token") == fake)
+        h.model.disappeared()
+        #expect(h.store.saves == 1)
+        let domain = h.defaults.persistentDomain(forName: h.suite) ?? [:]
+        let plist = try PropertyListSerialization.data(fromPropertyList: domain, format: .xml, options: 0)
+        #expect(!String(decoding: plist, as: UTF8.self).contains(fake))
+    }
+
+    @Test func signInWithoutAnAddressChoosesTheOnlyServer() async throws {
+        let h = make()
+        defer { h.cleanup() }
+        let only = try PlexTv.ownedServerOnly()
+        h.handle.register(try [PlexTv.createRoute(), PlexTv.pollRoute(.pinClaimed), PlexTv.resourcesRoute(body: only)] + okRoutes())
+        h.model.signIn()
+        await h.model.waitForSignIn()
+        await h.model.waitForServers()
+        let resources = try JSONDecoder().decode([PlexResource].self, from: only)
+        let uri = try #require(resources[0].preferredConnection?.uri)
+        #expect(h.model.address == uri)
+        #expect(h.savedSelection?.address == uri)
+        await h.model.waitForTest()
+        guard case .connected = h.model.status else {
+            Issue.record("expected connected, got \(h.model.status)")
+            return
+        }
+        #expect(h.savedSelection?.machineIdentifier == Self.machine)
+    }
+
+    @Test func signInWithoutAnAddressListsSeveralServers() async throws {
+        let h = make()
+        defer { h.cleanup() }
+        h.handle.register(try plexRoutes() + okRoutes())
+        h.model.signIn()
+        await h.model.waitForSignIn()
+        await h.model.waitForServers()
+        #expect(h.model.servers.count == 2)
+        #expect(h.model.address == "")
+        #expect(h.model.status == .idle)
+        let shared = try #require(h.model.servers.first { !$0.owned })
+        #expect(h.model.serverLabel(shared).contains("(shared)"))
+        let owned = try #require(h.model.servers.first { $0.owned })
+        #expect(!h.model.serverLabel(owned).contains("(shared)"))
+    }
+
+    @Test func cancelSignInLeavesIdle() async throws {
+        for variant in 0..<4 {
+            let h = make(token: Self.secret)
+            defer { h.cleanup() }
+            h.model.load()
+            h.handle.register([try PlexTv.createRoute(), try PlexTv.pollRoute()])
+            h.model.signIn()
+            let handle = h.handle
+            #expect(await PlexTv.wait { handle.recorded.contains(where: PlexTv.isPoll) })
+            switch variant {
+            case 0: h.model.cancelSignIn()
+            case 1: h.model.disappeared()
+            case 2: h.model.forgetToken()
+            default: h.model.tokenText = "typing"
+            }
+            #expect(h.model.signInStatus == .idle)
+            try await Task.sleep(for: .seconds(0.3))
+            #expect(h.model.signInStatus == .idle)
+            #expect(h.store.saves == 0)
+        }
+    }
+
+    @Test func signInFailureKeepsTheStoredToken() async throws {
+        let h = make(token: Self.secret)
+        defer { h.cleanup() }
+        h.model.load()
+        h.handle.register([try PlexTv.createRoute(status: 500)])
+        h.model.signIn()
+        await h.model.waitForSignIn()
+        #expect(h.model.signInStatus == .failed(.unreachable(.httpStatus(500))))
+        #expect(h.model.signInMessage == PlexSignInFailure.unreachable(.httpStatus(500)).message)
+        #expect(h.model.signInDetail == PlexError.httpStatus(500).errorDescription)
+        #expect(h.store.token == PlexToken(Self.secret))
+        #expect(h.model.tokenText == Self.secret)
+        #expect(h.store.saves == 0)
+    }
+
+    @Test func signInStoreFailureKeepsTheTokenInTheField() async throws {
+        let fake = try PlexTv.fakeToken
+        let h = make()
+        defer { h.cleanup() }
+        h.handle.register(try plexRoutes() + okRoutes())
+        h.store.failure = .keychain(-25293)
+        h.model.signIn()
+        await h.model.waitForSignIn()
+        await h.model.waitForServers()
+        #expect(h.model.tokenStoreError != nil)
+        #expect(h.model.tokenText == fake)
+        #expect(h.model.signInStatus == .signedIn)
+        let before = h.store.saves
+        h.store.failure = nil
+        h.model.submitToken()
+        #expect(h.store.saves == before + 1)
+        #expect(h.store.token == PlexToken(fake))
+        #expect(h.model.tokenStoreError == nil)
+    }
+
+    @Test func useServerSetsTheAddressAndTests() async throws {
+        let h = make(token: Self.secret)
+        defer { h.cleanup() }
+        h.model.load()
+        h.handle.register(try plexRoutes() + okRoutes())
+        h.model.loadServers()
+        await h.model.waitForServers()
+        let server = try #require(h.model.servers.first)
+        h.model.useServer(server)
+        await h.model.waitForServers()
+        let preferred = try #require(server.preferredConnection)
+        #expect(h.model.address == preferred.uri)
+        await h.model.waitForTest()
+        guard case .connected = h.model.status else {
+            Issue.record("expected connected, got \(h.model.status)")
+            return
+        }
+        let sections = try #require(h.handle.recorded.first { $0.url.path == "/library/sections" })
+        #expect(sections.url.host == preferred.url?.host)
+    }
+
+    @Test func useServerKeepsTheAddressWhenNothingAnswers() async throws {
+        let h = make(token: Self.secret, selection: PlexServerSelection(address: "joe"))
+        defer { h.cleanup() }
+        h.model.load()
+        h.handle.register([try PlexTv.resourcesRoute(), .init(path: "/identity", error: URLError(.cannotConnectToHost))])
+        h.model.loadServers()
+        await h.model.waitForServers()
+        let server = try #require(h.model.servers.first)
+        h.model.useServer(server)
+        await h.model.waitForServers()
+        #expect(h.model.address == "joe")
+        #expect(h.model.serversMessage?.contains("kept") == true)
+        #expect(h.model.status == .idle)
+        #expect(!h.handle.recorded.contains { $0.url.path == "/library/sections" })
+    }
+
+    @Test func loadServersNeedsAToken() async throws {
+        let h = make()
+        defer { h.cleanup() }
+        h.handle.register([try PlexTv.resourcesRoute()])
+        h.model.loadServers()
+        await h.model.waitForServers()
+        #expect(h.handle.recorded.isEmpty)
+        #expect(h.model.servers.isEmpty)
+
+        h.model.tokenText = Self.secret
+        h.handle.register([try PlexTv.resourcesRoute(status: 401)])
+        h.model.loadServers()
+        await h.model.waitForServers()
+        #expect(h.model.serversMessage?.contains("Sign in again") == true)
+        #expect(h.model.servers.isEmpty)
+
+        h.handle.register([try PlexTv.resourcesRoute(body: Data("[]".utf8))])
+        h.model.loadServers()
+        await h.model.waitForServers()
+        #expect(h.model.serversMessage?.contains("no servers") == true)
+    }
+
+    @Test func modelNeverPrintsTheTokenAfterSignIn() async throws {
+        let fake = try PlexTv.fakeToken
+        let h = make(token: Self.secret)
+        defer { h.cleanup() }
+        h.model.load()
+        h.handle.register(try plexRoutes() + okRoutes())
+        h.model.signIn()
+        await h.model.waitForSignIn()
+        h.model.loadServers()
+        await h.model.waitForServers()
+        await h.model.waitForTest()
+        var dumped = ""
+        dump(h.model, to: &dumped)
+        for text in [String(describing: h.model), String(reflecting: h.model), dumped] {
+            #expect(!text.contains(fake))
+            #expect(!text.contains(Self.secret))
+        }
+    }
+
+    @Test func withoutAnAccountClientSignInIsOff() async {
+        let h = make(token: Self.secret, withAccount: false)
+        defer { h.cleanup() }
+        h.model.load()
+        #expect(!h.model.canSignIn)
+        #expect(!h.model.canChooseServer)
+        h.model.signIn()
+        h.model.loadServers()
+        await h.model.waitForSignIn()
+        await h.model.waitForServers()
+        #expect(h.model.signInStatus == .idle)
+        #expect(h.handle.recorded.isEmpty)
     }
 }

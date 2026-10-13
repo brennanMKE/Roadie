@@ -7,7 +7,9 @@ struct SkinAmpApp: App {
     @State private var model = PlayerModel()
     @State private var plexSettings = PlexSettingsModel(
         tokenStore: KeychainPlexTokenStore(),
-        connectionTest: PlexConnectionTest(clientIdentifier: PlexClientIdentifier.stored()))
+        connectionTest: PlexConnectionTest(clientIdentifier: PlexClientIdentifier.stored()),
+        account: PlexAccountClient(clientIdentifier: PlexClientIdentifier.stored()),
+        openURL: { NSWorkspace.shared.open($0) })
 
     var body: some Scene {
         Window("SkinAmp", id: "main") {

@@ -37,9 +37,10 @@ public struct PlexClient: Sendable, CustomStringConvertible, CustomDebugStringCo
     public var description: String { "PlexClient(\(baseURL.absoluteString))" }
     public var debugDescription: String { description }
 
-    /// Builds a GET with every Plex header set. Public so a download can use the same headers
-    /// (token in the header, never in the URL).
-    public func request(path: String, query: [URLQueryItem] = [], page: PlexPageRequest? = nil) -> URLRequest {
+    /// Builds a request (GET unless `method` says otherwise) with every Plex header set. Public so a
+    /// download can use the same headers (token in the header, never in the URL). The path is
+    /// logged by `fetch`; the query is not.
+    public func request(method: String = "GET", path: String, query: [URLQueryItem] = [], page: PlexPageRequest? = nil) -> URLRequest {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) ?? URLComponents()
         let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
         let tail = path.hasPrefix("/") ? path : "/" + path
@@ -53,7 +54,7 @@ public struct PlexClient: Sendable, CustomStringConvertible, CustomDebugStringCo
         }
         // `URLComponents.url` can only fail for a malformed base; fall back to the base itself.
         var request = URLRequest(url: components.url ?? baseURL, timeoutInterval: timeout)
-        request.httpMethod = "GET"
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
         request.setValue(product, forHTTPHeaderField: "X-Plex-Product")

@@ -23,8 +23,58 @@ struct PlexSettingsView: View {
                         .disabled(!model.hasStoredToken)
                         .accessibilityIdentifier("plex.forget")
                 }
+                Text("Sign in with Plex to get a token, or paste one.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Button("Sign in with Plex…") { model.signIn() }
+                        .disabled(!model.canSignIn)
+                        .accessibilityIdentifier("plex.signin")
+                    if model.isSigningIn {
+                        ProgressView().controlSize(.small)
+                        Text("Finish signing in in your browser.").font(.caption)
+                        Button("Cancel") { model.cancelSignIn() }
+                            .accessibilityIdentifier("plex.signin.cancel")
+                    }
+                }
+                signInLine
+                    .accessibilityIdentifier("plex.signin.status")
+                HStack {
+                    Button("Choose Server…") { model.loadServers() }
+                        .disabled(!model.canChooseServer)
+                        .accessibilityIdentifier("plex.chooseServer")
+                    if model.isLoadingServers {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                if let message = model.serversMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("Server")
+            }
+
+            if !model.servers.isEmpty {
+                Section {
+                    ForEach(model.servers) { resource in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(resource.name)
+                                Text(model.serverLabel(resource)).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Use") { model.useServer(resource) }
+                                .disabled(model.isLoadingServers)
+                                .accessibilityIdentifier("plex.server.use")
+                        }
+                    }
+                } header: {
+                    Text("Servers")
+                } footer: {
+                    Text("Your account's servers, from plex.tv. A plex.direct address uses HTTPS and also works away from home when remote access is on.")
+                }
             }
 
             Section {
@@ -73,6 +123,25 @@ struct PlexSettingsView: View {
         .formStyle(.grouped)
         .task { model.appeared() }
         .onDisappear { model.disappeared() }
+    }
+
+    @ViewBuilder
+    private var signInLine: some View {
+        switch model.signInStatus {
+        case .signedIn:
+            Label(model.signInMessage ?? "", systemImage: "checkmark.circle")
+                .foregroundStyle(.green)
+        case .failed:
+            VStack(alignment: .leading, spacing: 2) {
+                Label(model.signInMessage ?? "", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+                if let detail = model.signInDetail {
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        case .idle, .waitingForBrowser:
+            EmptyView()
+        }
     }
 
     @ViewBuilder

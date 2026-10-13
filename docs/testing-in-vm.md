@@ -58,7 +58,7 @@ permission approvals build up, nothing lingers from an earlier run, and every bu
 - **Never share a live working copy or `$HOME` into the guest read-write.** The guest runs test
   code. The only share is a read-only directory that holds this run's export.
 - **Results come back through `tart exec … tar`**, not through the share.
-- **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`. PlexKit's opt-in integration test skips itself when `PLEX_URL`/`PLEX_TOKEN` are unset, which is always the case in the guest. TrackCache's tests download from the `URLProtocol` stub or an in-process stub downloader, and its integration test skips itself the same way.
+- **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`. PlexKit's opt-in integration test skips itself when `PLEX_URL`/`PLEX_TOKEN` are unset, which is always the case in the guest. The plex.tv sign-in tests use hand-written fixtures with a fake PIN code and token; nothing is recorded from the account, and the opener that would launch a browser is a closure. TrackCache's tests download from the `URLProtocol` stub or an in-process stub downloader, and its integration test skips itself the same way.
 - **No Keychain in the guest.** Unit tests use `InMemoryPlexTokenStore`; the real `KeychainPlexTokenStore` has an opt-in test (`PLEX_KEYCHAIN_TEST=1`) that only runs on the host by hand. A keychain dialog in the headless guest would hang the run.
 - **Never hardcode the image name.** It comes from `tart-golden require`.
 

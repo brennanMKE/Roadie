@@ -9,6 +9,8 @@ public final class StubURLProtocol: URLProtocol {
         public var method: String = "GET"
         /// "/library/sections"
         public var path: String
+        /// Matched against `url.host` when non-nil; nil matches any host.
+        public var host: String? = nil
         /// Matched as a subset of the request's query items.
         public var query: [String: String] = [:]
         /// Matched against `X-Plex-Container-Start` when non-nil.
@@ -22,12 +24,13 @@ public final class StubURLProtocol: URLProtocol {
         public var delay: TimeInterval = 0
 
         public init(
-            method: String = "GET", path: String, query: [String: String] = [:], containerStart: Int? = nil,
+            method: String = "GET", path: String, host: String? = nil, query: [String: String] = [:], containerStart: Int? = nil,
             status: Int = 200, headers: [String: String] = ["Content-Type": "application/json"],
             body: Data = Data(), error: URLError? = nil, delay: TimeInterval = 0
         ) {
             self.method = method
             self.path = path
+            self.host = host
             self.query = query
             self.containerStart = containerStart
             self.status = status
@@ -134,6 +137,7 @@ public final class StubURLProtocol: URLProtocol {
             return table.routes.first { route in
                 route.method == method
                     && route.path == url.path
+                    && (route.host == nil || route.host == url.host)
                     && route.query.allSatisfy { key, value in items.contains { $0.name == key && $0.value == value } }
                     && (route.containerStart == nil || route.containerStart == start)
             }

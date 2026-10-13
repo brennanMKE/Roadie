@@ -79,7 +79,7 @@ Follows `docs/plex-music-library.md`:
   maps to the message in the doc. Save the `machineIdentifier`; if it changes, clear the
   selected library.
 - Auth: paste-a-token first (unblocks development), then PIN sign-in through plex.tv
-  (untested; verify it). Store the token in the Keychain.
+  (#0014; the by-hand results are in `docs/plex-music-library.md`). Store the token in the Keychain.
 - Artist names: group display names by a normalized key (`&` vs `and`, trailing `;`, case).
 - Album art: `/photo/:/transcode` thumbnail URL, with a placeholder when there is no `thumb`.
 

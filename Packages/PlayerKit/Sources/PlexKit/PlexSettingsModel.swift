@@ -16,6 +16,14 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         case failed(PlexConnectionFailure)
     }
 
+    public enum SignInStatus: Hashable, Sendable {
+        case idle
+        case waitingForBrowser
+        case signedIn
+        /// Never `.cancelled`: cancellation goes back to `.idle`.
+        case failed(PlexSignInFailure)
+    }
+
     /// JSON of `PlexServerSelection`.
     public nonisolated static let selectionDefaultsKey = "PlexServerSelection"
 
@@ -23,6 +31,12 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let connectionTest: PlexConnectionTest
     @ObservationIgnored private var connectionTask: Task<Void, Never>?
+    @ObservationIgnored private let account: PlexAccountClient?
+    @ObservationIgnored private let signInOptions: PlexPinSignIn.Options
+    @ObservationIgnored private let serverResolver: PlexServerResolver
+    @ObservationIgnored private let openURL: PlexPinSignIn.URLOpener
+    @ObservationIgnored private var signInTask: Task<Void, Never>?
+    @ObservationIgnored private var serversTask: Task<Void, Never>?
     @ObservationIgnored private var loaded = false
     /// The field was edited since the last successful load or commit. Only then does closing the
     /// window or testing write to the store; a failed read must never turn into a delete.
@@ -38,11 +52,27 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
     public private(set) var hasStoredToken = false
     private var lastChange: PlexServerSelection.Change = .none
 
+    public private(set) var signInStatus: SignInStatus = .idle
+    public private(set) var servers: [PlexResource] = []
+    public private(set) var isLoadingServers = false
+    public private(set) var serversMessage: String?
+
     /// No I/O here: the app's launch must not touch the Keychain or the network.
-    public init(tokenStore: any PlexTokenStore, defaults: UserDefaults = .standard, connectionTest: PlexConnectionTest) {
+    ///
+    /// `account == nil` turns the plex.tv features off (the buttons are disabled).
+    public init(
+        tokenStore: any PlexTokenStore, defaults: UserDefaults = .standard, connectionTest: PlexConnectionTest,
+        account: PlexAccountClient? = nil, signInOptions: PlexPinSignIn.Options = .init(),
+        serverResolver: PlexServerResolver? = nil, openURL: @escaping PlexPinSignIn.URLOpener = { _ in false }
+    ) {
         self.tokenStore = tokenStore
         self.defaults = defaults
         self.connectionTest = connectionTest
+        self.account = account
+        self.signInOptions = signInOptions
+        self.serverResolver = serverResolver
+            ?? PlexServerResolver(clientIdentifier: connectionTest.clientIdentifier, session: connectionTest.session)
+        self.openURL = openURL
     }
 
     // MARK: Inputs
@@ -86,6 +116,31 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         !isTesting
             && !selection.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !trimmedToken.isEmpty
+    }
+
+    public var isSigningIn: Bool { signInStatus == .waitingForBrowser }
+
+    public var canSignIn: Bool { account != nil && !isSigningIn && tokenStoreError == nil }
+
+    public var canChooseServer: Bool { account != nil && hasStoredToken && !isLoadingServers && !isSigningIn }
+
+    public var signInMessage: String? {
+        switch signInStatus {
+        case .failed(let failure): failure.message
+        case .signedIn: "Signed in with Plex."
+        case .idle, .waitingForBrowser: nil
+        }
+    }
+
+    public var signInDetail: String? {
+        if case .failed(let failure) = signInStatus { return failure.underlying?.errorDescription }
+        return nil
+    }
+
+    /// "<name> · <preferred host or 'no address'>", plus "(shared)" for a server that is not the account's own.
+    public func serverLabel(_ resource: PlexResource) -> String {
+        let host = resource.preferredConnection?.url?.host ?? "no address"
+        return "\(resource.name) · \(host)" + (resource.owned ? "" : " (shared)")
     }
 
     public var showsLibraryPicker: Bool { musicSections.count > 1 }
@@ -148,6 +203,7 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
     public func disappeared() {
         if tokenDirty { commitToken() }
         cancelTest()
+        cancelSignIn()
     }
 
     /// Return in the token field. Commits only an edit, so Return in a field left empty by a
@@ -181,8 +237,15 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
     }
 
     public func forgetToken() {
+        cancelSignIn()
         tokenText = ""
         commitToken()
+        serversTask?.cancel()
+        serversTask = nil
+        isLoadingServers = false
+        servers = []
+        serversMessage = nil
+        signInStatus = .idle
     }
 
     public func testConnection() {
@@ -217,12 +280,172 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         await connectionTask?.value
     }
 
+    // MARK: Sign in with Plex
+
+    /// Opens the browser to sign in; the token goes straight to the store.
+    public func signIn() {
+        guard let account else { return }
+        cancelSignIn()
+        cancelTest()
+        signInStatus = .waitingForBrowser
+        let signIn = PlexPinSignIn(account: account, options: signInOptions)
+        let open = openURL
+        signInTask = Task { [weak self] in
+            let result: Result<PlexToken, PlexSignInFailure>
+            do throws(PlexSignInFailure) {
+                result = .success(try await signIn.run(open: open))
+            } catch {
+                result = .failure(error)
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.applySignIn(result)
+        }
+    }
+
+    public func cancelSignIn() {
+        signInTask?.cancel()
+        signInTask = nil
+        if signInStatus == .waitingForBrowser { signInStatus = .idle }
+    }
+
+    /// Awaits the sign-in task, for tests.
+    public func waitForSignIn() async {
+        await signInTask?.value
+    }
+
+    /// Lists the account's servers from plex.tv.
+    public func loadServers() {
+        startLoadingServers(useOnlyServer: false)
+    }
+
+    /// Probes the server's connections, then points the address at the best one that answers.
+    public func useServer(_ resource: PlexResource) {
+        serversTask?.cancel()
+        isLoadingServers = true
+        serversTask = Task { [weak self] in
+            await self?.resolveAndUse(resource)
+        }
+    }
+
+    private func startLoadingServers(useOnlyServer: Bool) {
+        guard let account else { return }
+        let text = trimmedToken
+        let token: PlexToken
+        if !text.isEmpty {
+            token = PlexToken(text)
+        } else if let stored = try? tokenStore.load() {
+            token = stored
+        } else {
+            return
+        }
+        serversTask?.cancel()
+        isLoadingServers = true
+        serversMessage = nil
+        serversTask = Task { [weak self] in
+            let result: Result<[PlexResource], PlexError>
+            do {
+                result = .success(try await account.resources(token: token))
+            } catch let error as PlexError {
+                result = .failure(error)
+            } catch {
+                result = .failure(.transport(.cancelled))
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.applyServers(result)
+            if useOnlyServer, self.servers.count == 1, let only = self.servers.first {
+                self.isLoadingServers = true
+                await self.resolveAndUse(only)
+            }
+        }
+    }
+
+    private func resolveAndUse(_ resource: PlexResource) async {
+        let connection = await serverResolver.reachableConnection(of: resource)
+        guard !Task.isCancelled else { return }
+        serversTask = nil
+        isLoadingServers = false
+        if let connection {
+            log.info("server: resolved")
+            serversMessage = nil
+            address = connection.uri
+            testConnection()
+        } else {
+            log.info("server: unreachable")
+            serversMessage = "Couldn't reach \(resource.name) at any of its addresses. The current address was kept."
+        }
+    }
+
+    /// Awaits the resources or probe task, for tests.
+    public func waitForServers() async {
+        await serversTask?.value
+    }
+
     // MARK: Private
+
+    private func applySignIn(_ result: Result<PlexToken, PlexSignInFailure>) {
+        signInTask = nil
+        switch result {
+        case .failure(.cancelled):
+            signInStatus = .idle
+            log.info("sign-in: cancelled")
+        case .failure(let failure):
+            signInStatus = .failed(failure)
+            log.info("sign-in: failed")
+        case .success(let token):
+            storeSignedInToken(token)
+            signInStatus = .signedIn
+            servers = []
+            serversMessage = nil
+            log.info("sign-in: signedIn")
+            if !selection.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                testConnection()
+            } else {
+                startLoadingServers(useOnlyServer: true)
+            }
+        }
+    }
+
+    private func storeSignedInToken(_ token: PlexToken) {
+        enteredToken = token.rawValue
+        do {
+            try tokenStore.save(token)
+            tokenDirty = false
+            hasStoredToken = true
+            tokenStoreError = nil
+            log.info("token saved")
+        } catch {
+            // Keep it in the field so Test works this session; the next commit retries the write.
+            tokenDirty = true
+            tokenStoreError = error.localizedDescription
+        }
+    }
+
+    private func applyServers(_ result: Result<[PlexResource], PlexError>) {
+        serversTask = nil
+        isLoadingServers = false
+        switch result {
+        case .success(let list):
+            servers = list
+            serversMessage = list.isEmpty ? "Your Plex account has no servers. Type an address instead." : nil
+            log.info("servers: \(list.count)")
+        case .failure(.unauthorized):
+            servers = []
+            serversMessage = "plex.tv no longer accepts this token. Sign in again."
+            log.info("servers: unauthorized")
+        case .failure(.transport(.cancelled)):
+            break
+        case .failure(let error):
+            servers = []
+            serversMessage = error.errorDescription
+            log.info("servers: failed")
+        }
+    }
 
     private var trimmedToken: String { enteredToken.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private func invalidate() {
         cancelTest()
+        cancelSignIn()
         if status != .idle { status = .idle }
     }
 
