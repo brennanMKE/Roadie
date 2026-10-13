@@ -394,6 +394,9 @@ public final class Player: NowPlayingCommandTarget {
     private func updateCurrentTime() {
         guard file != nil, let node = _graph?.playerNode,
               let renderTime = node.lastRenderTime,
+              // Invalid before the first render (offline mode, or just after a restart); passing it
+              // to playerTime(forNodeTime:) raises an Objective-C exception.
+              renderTime.isSampleTimeValid || renderTime.isHostTimeValid,
               let playerTime = node.playerTime(forNodeTime: renderTime),
               let seconds = scheduler.position(
                 atNodeSampleTime: playerTime.sampleTime, nodeSampleRate: playerTime.sampleRate)

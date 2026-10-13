@@ -3,11 +3,14 @@ import Foundation
 import Testing
 @testable import AudioCore
 
-/// Whether tests may drive the real output device. False on machines without one (CI, VM guests)
-/// or when `AUDIOCORE_SKIP_REALTIME` is set.
+/// Whether tests may drive the real output device. Opt-in: set `AUDIOCORE_REALTIME=1`. Even then the
+/// tests mute the main mixer, but starting a real-time engine still opens the output device, so the
+/// default `swift test` run renders offline only and never touches the speaker.
+/// False on machines without an output device (CI, VM guests) or when `AUDIOCORE_SKIP_REALTIME` is set.
 enum RealtimeAudio {
     static let isAvailable: Bool = {
-        if ProcessInfo.processInfo.environment["AUDIOCORE_SKIP_REALTIME"] != nil { return false }
+        let env = ProcessInfo.processInfo.environment
+        guard env["AUDIOCORE_REALTIME"] == "1", env["AUDIOCORE_SKIP_REALTIME"] == nil else { return false }
         let engine = AVAudioEngine()
         guard engine.outputNode.outputFormat(forBus: 0).sampleRate > 0 else { return false }
         _ = engine.mainMixerNode
@@ -76,8 +79,8 @@ final class PeakRecorder: @unchecked Sendable {
     }
 
     /// Nonisolated so the tap closure is not main-actor isolated (it runs on a dispatch queue).
-    nonisolated func install(on mixer: AVAudioMixerNode) {
-        mixer.installTap(onBus: 0, bufferSize: 1024, format: nil) { [self] buffer, _ in record(buffer) }
+    nonisolated func install(on node: AVAudioNode) {
+        node.installTap(onBus: 0, bufferSize: 1024, format: nil) { [self] buffer, _ in record(buffer) }
     }
 
     var blocks: (left: [Float], right: [Float]) {
@@ -211,11 +214,11 @@ final class PeakRecorder: @unchecked Sendable {
         }
         let player = Player()
         player.enqueue(try urls.map { try Track.file(at: $0) })
+        player.volume = 0 // silent: the recorder taps the EQ output, upstream of the muted mixer
         let graph = player.ensureGraph()
-        graph.installsAnalyzer = false // the recorder owns the mixer's single tap
-        let mixer = graph.mainMixerNode
+        let eqNode = graph.eq
         let recorder = PeakRecorder()
-        recorder.install(on: mixer)
+        recorder.install(on: eqNode)
 
         player.play()
         #expect(await MixedFormatSupport.waitUntil(timeout: 500) { player.state == .playing })
@@ -247,7 +250,7 @@ final class PeakRecorder: @unchecked Sendable {
             previousCount = count
             try? await Task.sleep(for: .milliseconds(50))
         }
-        mixer.removeTap(onBus: 0)
+        eqNode.removeTap(onBus: 0)
         #expect(stoppedBeforeDeadline)
         #expect(player.state == .stopped)
         #expect(player.errorMessage == nil)
@@ -276,6 +279,7 @@ final class PeakRecorder: @unchecked Sendable {
         try MixedFormatSupport.writeSine(to: b, rate: 48000, channels: 2, seconds: 0.5, amplitude: 0.05)
         let player = Player()
         player.enqueue([try Track.file(at: a), try Track.file(at: b)])
+        player.volume = 0 // silent
         player.play()
         #expect(await MixedFormatSupport.waitUntil { player.state == .playing })
         player.seek(to: 0.6)

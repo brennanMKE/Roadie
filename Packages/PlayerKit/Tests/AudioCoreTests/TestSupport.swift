@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 @testable import AudioCore
 
@@ -30,4 +31,14 @@ func waitUntil(timeoutMillis: Int = 5000, _ condition: @MainActor () -> Bool) as
         try? await Task.sleep(for: .milliseconds(10))
     }
     return condition()
+}
+
+/// Puts the player's engine in offline manual rendering mode, so `play()` drives the graph without
+/// opening the output device. Nothing renders unless the test pulls with `renderOffline`, and
+/// `.dataPlayedBack` completions never fire, so track advance needs a real-time test (`RealtimeAudio`).
+@MainActor
+func renderSilently(_ player: Player) throws {
+    let engine = player.ensureGraph().engine
+    let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
+    try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 512)
 }

@@ -100,7 +100,7 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
             case .seeked: events.append("seeked")
             }
         }
-        player.volume = 0   // real-time output device, silent
+        try renderSilently(player)
         player.play()
         #expect(await waitUntil { player.state == .playing })
         let snap = try #require(bridge.currentSnapshot())
@@ -152,7 +152,7 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         let bridge = NowPlayingBridge(player: player, artwork: { _ in nil })
         bridge.install()
         defer { bridge.uninstall() }
-        player.volume = 0   // real-time output device, silent
+        try renderSilently(player)
         player.play()
         #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == "tone" })
         #expect(center.nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] as? Double == 1)
@@ -165,8 +165,9 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         #expect(center.playbackState == .stopped)
     }
 
-    /// Real-time (silent) run: a gapless auto-advance must reach the info center, with artwork.
-    @Test func autoAdvanceUpdatesInfoCenterAndAttachesArtwork() async throws {
+    /// Real-time run with the mixer muted (opt-in, see `RealtimeAudio`): a gapless auto-advance must
+    /// reach the info center. Needs real-time I/O because offline rendering never fires completions.
+    @Test(.enabled(if: RealtimeAudio.isAvailable)) func autoAdvanceUpdatesInfoCenterAndAttachesArtwork() async throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "np-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -201,7 +202,7 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         defer { bridge.uninstall(); player.stop() }
         var seen = 0
         player.addEventObserver { _ in seen += 1 }
-        player.volume = 0
+        try renderSilently(player)
         player.play()
         #expect(await waitUntil { player.state == .playing })
         #expect(seen > 0)
@@ -219,7 +220,7 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         try GaplessRenderTests.writeSine(to: url, hz: 441)
         let png = try EmbeddedArtworkTests.pngData()
         let player = Player()
-        player.volume = 0
+        try renderSilently(player)
         player.enqueue([try Track.file(at: url)])
         let center = MPNowPlayingInfoCenter.default()
         let bridge = NowPlayingBridge(player: player, artwork: { _ in png })
