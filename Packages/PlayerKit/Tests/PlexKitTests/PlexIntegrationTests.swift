@@ -42,4 +42,20 @@ struct PlexIntegrationTests {
         #expect((tracks.items.first?.primaryPart?.size ?? 0) > 0)
         print("integration: \(artists.totalSize) artists, \(albums.items.count) albums for first artist")
     }
+
+    @Test(.enabled(if: PlexIntegrationTests.environment != nil))
+    func connectionTestSucceedsAgainstTheServer() async throws {
+        let env = try #require(Self.environment)
+        let test = PlexConnectionTest(clientIdentifier: "skinamp-integration-test")
+        let connection = try await test.run(baseURL: env.url, token: env.token)
+        #expect(!connection.musicSections.isEmpty)
+        #expect(!connection.identity.machineIdentifier.isEmpty)
+        do {
+            _ = try await test.run(baseURL: env.url, token: PlexToken("not-a-real-token"))
+            Issue.record("expected the bad token to fail")
+        } catch let failure as PlexConnectionFailure {
+            #expect(failure == .unauthorized)
+        }
+        print("integration: connection test ok, \(connection.musicSections.count) music section(s)")
+    }
 }

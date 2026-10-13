@@ -152,6 +152,10 @@ http://joe:32400 → unchanged
 Add `http://` when no scheme is given and `:32400` when no port is given, and accept
 `https://` when the user types it.
 
+A trailing slash, surrounding whitespace, a query string and a fragment are dropped (so a pasted
+`?X-Plex-Token=` never becomes part of the address); a custom port is kept; a URL with a user name or
+password is rejected.
+
 **Test the connection** with three requests. Each failure gets a different message:
 
 | Check | Failure | Message |

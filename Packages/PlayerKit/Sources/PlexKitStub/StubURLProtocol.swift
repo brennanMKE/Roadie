@@ -45,26 +45,62 @@ public final class StubURLProtocol: URLProtocol {
         public var headers: [String: String]
     }
 
-    private struct State {
+    private struct Table {
         var routes: [Route] = []
         var recorded: [RecordedRequest] = []
     }
 
-    private static let state = OSAllocatedUnfairLock(initialState: State())
+    /// Route tables keyed by session id. The static API uses the `""` key.
+    private static let state = OSAllocatedUnfairLock(initialState: [String: Table]())
 
     /// Replaces the route table.
     public static func register(_ routes: [Route]) {
-        state.withLock { $0.routes = routes }
+        state.withLock { $0[""] = Table(routes: routes, recorded: $0[""]?.recorded ?? []) }
     }
 
     /// Clears routes and recordings.
     public static func reset() {
-        state.withLock { $0 = State() }
+        state.withLock { $0[""] = Table() }
     }
 
     /// Every request seen since `reset()`.
     public static var recorded: [RecordedRequest] {
-        state.withLock { $0.recorded }
+        state.withLock { $0[""]?.recorded ?? [] }
+    }
+
+    /// Requests from a `Handle`'s session carry its id in this header; the stub strips it from recordings.
+    public static let sessionHeader = "X-Stub-Session"
+
+    /// An independent route table and recording. Suites that use handles can run in parallel
+    /// with each other and with the static table.
+    public struct Handle: Sendable {
+        public let id: String
+        public let session: URLSession
+
+        public func register(_ routes: [Route]) {
+            let id = id
+            StubURLProtocol.state.withLock { $0[id] = Table(routes: routes, recorded: $0[id]?.recorded ?? []) }
+        }
+
+        public var recorded: [RecordedRequest] {
+            let id = id
+            return StubURLProtocol.state.withLock { $0[id]?.recorded ?? [] }
+        }
+
+        public func reset() {
+            let id = id
+            StubURLProtocol.state.withLock { $0[id] = Table() }
+        }
+    }
+
+    /// A new handle with its own table.
+    public static func handle() -> Handle {
+        let id = UUID().uuidString
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        configuration.httpAdditionalHeaders = [sessionHeader: id]
+        state.withLock { $0[id] = Table() }
+        return Handle(id: id, session: URLSession(configuration: configuration))
     }
 
     /// An ephemeral session whose only protocol is this stub.
@@ -83,13 +119,16 @@ public final class StubURLProtocol: URLProtocol {
             return
         }
         let method = request.httpMethod ?? "GET"
-        let headers = request.allHTTPHeaderFields ?? [:]
+        let sessionID = request.value(forHTTPHeaderField: Self.sessionHeader) ?? ""
+        let headers = (request.allHTTPHeaderFields ?? [:]).filter { $0.key.lowercased() != Self.sessionHeader.lowercased() }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let start = request.value(forHTTPHeaderField: "X-Plex-Container-Start").flatMap(Int.init)
 
-        let route = Self.state.withLock { state -> Route? in
-            state.recorded.append(RecordedRequest(url: url, method: method, headers: headers))
-            return state.routes.first { route in
+        let route = Self.state.withLock { tables -> Route? in
+            var table = tables[sessionID] ?? Table()
+            table.recorded.append(RecordedRequest(url: url, method: method, headers: headers))
+            tables[sessionID] = table
+            return table.routes.first { route in
                 route.method == method
                     && route.path == url.path
                     && route.query.allSatisfy { key, value in items.contains { $0.name == key && $0.value == value } }
