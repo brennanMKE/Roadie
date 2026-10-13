@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "AudioCore", targets: ["AudioCore"]),
         .library(name: "PlexKit", targets: ["PlexKit"]),
         .library(name: "PlexKitStub", targets: ["PlexKitStub"]),
+        .library(name: "TrackCache", targets: ["TrackCache"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).
@@ -19,5 +20,8 @@ let package = Package(
         // URLProtocol stub plus recorded JSON fixtures, shared by unit tests and later UI tests.
         .target(name: "PlexKitStub", dependencies: ["PlexKit"], resources: [.copy("Fixtures")]),
         .testTarget(name: "PlexKitTests", dependencies: ["PlexKit", "PlexKitStub"]),
+        // Download cache with LRU eviction. Depends on both sides; AudioCore stays Plex-free.
+        .target(name: "TrackCache", dependencies: ["AudioCore", "PlexKit"]),
+        .testTarget(name: "TrackCacheTests", dependencies: ["TrackCache", "AudioCore", "PlexKit", "PlexKitStub"]),
     ]
 )

@@ -25,6 +25,8 @@ targets:
         product: AudioCore
       - package: PlayerKit
         product: PlexKit
+      - package: PlayerKit
+        product: TrackCache
     info:
       path: App/Info.plist
       properties:
@@ -61,3 +63,4 @@ schemes:
         - package: SkinKit/SkinKitTests
         - package: PlayerKit/AudioCoreTests
         - package: PlayerKit/PlexKitTests
+        - package: PlayerKit/TrackCacheTests

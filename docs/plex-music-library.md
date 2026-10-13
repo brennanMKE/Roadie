@@ -108,7 +108,7 @@ GET http://joe:32400/library/parts/<id>/<n>/file.mp3   (with X-Plex-Token)
 → 206 Partial Content, Accept-Ranges: bytes, Content-Type: audio/mpeg
 ```
 
-The server honors byte ranges, so seeking works.
+The server honors byte ranges, so seeking works. The app downloads parts with `PlexClient.request` (token in the header, `Accept: */*`), never with a `?X-Plex-Token=` URL.
 
 **This conflicts with the player's AVAudioEngine design.** `AVAudioPlayerNode` plays from
 an `AVAudioFile`, and an `AVAudioFile` can only open a local file, not a URL. There are two

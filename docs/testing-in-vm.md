@@ -25,6 +25,8 @@ clone starts cold. The summary at the end looks like this:
 ==> PASS  app-plist
 ==> PASS  app-launch
     ** BUILD SUCCEEDED **
+    ✔ Test run with 46 tests in 6 suites passed after 0.558 seconds.
+    ✔ Test run with 94 tests in 12 suites passed after 1.514 seconds.
     ✔ Test run with 100 tests in 24 suites passed after 4.267 seconds.
     ✔ Test run with 5 tests in 1 suite passed after 0.001 seconds.
 ==> AUDIO  silent: no host 'Starting IO' events during the run
@@ -56,7 +58,7 @@ permission approvals build up, nothing lingers from an earlier run, and every bu
 - **Never share a live working copy or `$HOME` into the guest read-write.** The guest runs test
   code. The only share is a read-only directory that holds this run's export.
 - **Results come back through `tart exec … tar`**, not through the share.
-- **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`. PlexKit's opt-in integration test skips itself when `PLEX_URL`/`PLEX_TOKEN` are unset, which is always the case in the guest.
+- **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`. PlexKit's opt-in integration test skips itself when `PLEX_URL`/`PLEX_TOKEN` are unset, which is always the case in the guest. TrackCache's tests download from the `URLProtocol` stub or an in-process stub downloader, and its integration test skips itself the same way.
 - **No Keychain in the guest.** Unit tests use `InMemoryPlexTokenStore`; the real `KeychainPlexTokenStore` has an opt-in test (`PLEX_KEYCHAIN_TEST=1`) that only runs on the host by hand. A keychain dialog in the headless guest would hang the run.
 - **Never hardcode the image name.** It comes from `tart-golden require`.
 

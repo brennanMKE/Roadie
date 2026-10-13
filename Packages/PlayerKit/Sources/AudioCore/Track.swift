@@ -4,8 +4,9 @@ import Foundation
 public struct Track: Identifiable, Hashable, Sendable {
     public enum Source: Hashable, Sendable {
         case file(URL)
-        /// Resolved to a local file by TrackCache (M2).
-        case plex(partKey: String, cacheKey: String)
+        /// Resolved to a local file by TrackCache. `size` is the part's byte count when Plex reported
+        /// one; the cache checks the download against it.
+        case plex(partKey: String, cacheKey: String, size: Int64? = nil)
     }
 
     /// Per queue entry, so the same file can be queued twice.

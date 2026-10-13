@@ -49,16 +49,17 @@ plays it.
   runs low, which is acceptable.
 - **Cache key:** server `machineIdentifier` + part id + the part's `updatedAt`. If the file
   changes on the server, the key changes. File extension comes from the part (`.mp3`, `.m4a`).
-- **Download:** `URLSessionDownloadTask` with the token in the `X-Plex-Token` header (never in
-  a logged URL). It writes to a temp file, checks the size against `Part.size`, then moves the
-  file into the cache. Identical requests that run at the same time share one download.
-- **Index:** a small JSON (or SQLite) file of key → size and last-access date. Every play
+- **Download:** `URLSession.bytes(for:)` with the token in the `X-Plex-Token` header (never in
+  a logged URL), streamed into `Tracks/tmp/`. It checks the size against `Part.size`, then
+  moves the file into the cache. Identical requests that run at the same time share one download.
+- **Index:** a small JSON file (`index.json`, decided) of key → size and last-access date. Every play
   updates last-access. On launch, rebuild the index from the files on disk if needed.
 - **Eviction:** LRU, run after each insert, until the total is under the size limit (default
   2 GB, set in Settings, with a "Clear cache" button). The playing track and the prefetched
   next track are never evicted. Partial temp files are deleted on launch.
-- **Prefetch:** when a track starts, download the next track in the queue. If you skip ahead,
-  the old prefetch is cancelled.
+- **Prefetch:** when a track starts, download the next track in the queue. This is the
+  `Player`'s existing look-ahead: it resolves the next track through the cache, and cancels
+  that resolve on skip. If you skip ahead, the old prefetch is cancelled.
 - **Startup delay:** a track starts after its download finishes. The marquee shows
   "Buffering…" while it waits. A track from the cache starts immediately. Playing while
   downloading is deferred to M7.

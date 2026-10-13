@@ -2,7 +2,10 @@ import AppKit
 import AudioCore
 import Foundation
 import Observation
+import PlexKit
 import SkinKit
+import TrackCache
+import os
 
 @MainActor
 @Observable
@@ -10,7 +13,11 @@ final class PlayerModel {
     private(set) var skin: Skin?
     private(set) var skinName: String?
     private(set) var errorMessage: String?
-    let player = Player()
+    let cache: TrackCache
+    let cacheSettings: CacheSettingsModel
+    let player: Player
+    /// Keeps the current and next tracks pinned in the cache; lives as long as the model.
+    private let pinner: CachePinner
     /// Media keys and Control Center; lives as long as the model.
     private let nowPlaying: NowPlayingBridge
     var playbackState: PlaybackState { player.state }
@@ -20,6 +27,27 @@ final class PlayerModel {
     private static let lastSkinKey = "lastSkinPath"
 
     init() {
+        let cache = TrackCache(
+            directory: TrackCache.defaultDirectory(),
+            limitBytes: CacheSettingsModel.storedLimit(),
+            downloader: PlexPartDownloader(clientProvider: PlexPartDownloader.settingsClientProvider()))
+        self.cache = cache
+        cacheSettings = CacheSettingsModel(cache: cache)
+        let player = Player(resolver: PlexTrackResolver(cache: cache, savedMachineIdentifier: {
+            // The saved server's identity; nil until a connection test has succeeded.
+            UserDefaults.standard.data(forKey: PlexSettingsModel.selectionDefaultsKey)
+                .flatMap { try? JSONDecoder().decode(PlexServerSelection.self, from: $0) }?
+                .machineIdentifier
+        }))
+        self.player = player
+        pinner = CachePinner(cache: cache, player: player)
+        pinner.install()
+        Task {
+            do { try await cache.prepare() } catch {
+                Logger(subsystem: "com.brennanmke.SkinAmp", category: "TrackCache")
+                    .error("could not prepare the cache: \(error.localizedDescription, privacy: .public)")
+            }
+        }
         nowPlaying = NowPlayingBridge(player: player)
         nowPlaying.install()
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {

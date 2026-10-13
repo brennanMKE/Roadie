@@ -1,5 +1,6 @@
 import PlexKit
 import SwiftUI
+import TrackCache
 
 @main
 struct SkinAmpApp: App {
@@ -29,6 +30,7 @@ struct SkinAmpApp: App {
         Settings {
             SettingsView()
                 .environment(plexSettings)
+                .environment(model.cacheSettings)
         }
     }
 }
