@@ -11,10 +11,16 @@ public final class Player {
     public private(set) var errorMessage: String?
 
     public var volume: Float = 1 {
-        didSet { _graph?.volume = volume }
+        didSet {
+            volume = min(max(volume, 0), 1)
+            _graph?.volume = volume
+        }
     }
     public var balance: Float = 0 {
-        didSet { _graph?.balance = balance }
+        didSet {
+            balance = min(max(balance, -1), 1)
+            _graph?.balance = balance
+        }
     }
     public var repeatMode: RepeatMode {
         get { queue.repeatMode }

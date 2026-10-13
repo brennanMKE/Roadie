@@ -31,8 +31,11 @@ final class AudioGraph {
         engine.attach(playerNode)
         engine.attach(eq)
         eq.bypass = true
-        self.volume = volume
-        self.balance = balance
+        // didSet does not run for assignments inside init, so apply explicitly.
+        self.volume = min(max(volume, 0), 1)
+        self.balance = min(max(balance, -1), 1)
+        engine.mainMixerNode.outputVolume = self.volume
+        playerNode.pan = self.balance
     }
 
     /// Reconnects player -> eq -> mixer when the sample rate or channel count changes.
