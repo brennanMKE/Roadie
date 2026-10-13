@@ -20,7 +20,8 @@ SCRUB='
 rec() {  # rec <name> <path> <start> <size> [curl args...]
   local name=$1 urlpath=$2 start=$3 size=$4
   shift 4
-  curl -sfS -G -H "Accept: application/json" -H "X-Plex-Token: $T" \
+  # The token goes in on stdin (-H @-), not argv, so it never shows in the process list.
+  print -r -- "X-Plex-Token: $T" | curl -sfS -G -H @- -H "Accept: application/json" \
        -H "X-Plex-Container-Start: $start" -H "X-Plex-Container-Size: $size" \
        "$@" "$P$urlpath" | jq "$SCRUB" > "$F/$name.json"
 }
