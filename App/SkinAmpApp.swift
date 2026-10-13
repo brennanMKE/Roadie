@@ -1,11 +1,11 @@
 import SwiftUI
 
 @main
-struct SkinPlayerApp: App {
+struct SkinAmpApp: App {
     @State private var model = PlayerModel()
 
     var body: some Scene {
-        Window("Skin Player", id: "main") {
+        Window("SkinAmp", id: "main") {
             PlayerView()
                 .environment(model)
         }

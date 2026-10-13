@@ -1,4 +1,4 @@
-# WinAmp for Mac
+# SkinAmp
 
 ```sh
 pip install internetarchive
@@ -8,12 +8,12 @@ ia download --search 'collection:winampskins' --glob '*.wsz'
 
 ## Development
 
-See `winamp-skin-player-brief.md` for goals. Working app name is `SkinPlayer` (placeholder).
+See `winamp-skin-player-brief.md` for goals. The app is named SkinAmp.
 
 ```sh
 brew install xcodegen
-xcodegen generate            # creates SkinPlayer.xcodeproj (git-ignored)
-open SkinPlayer.xcodeproj
+xcodegen generate            # creates SkinAmp.xcodeproj (git-ignored)
+open SkinAmp.xcodeproj
 
 swift test --package-path Packages/SkinKit
 swift run --package-path Packages/SkinKit skintool Skins/        # parse report

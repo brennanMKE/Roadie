@@ -18,3 +18,6 @@ build/
 xcuserdata/
 
 .DS_Store
+
+# Xcode removes Package.resolved from local packages; the app project owns resolution
+/Packages/*/Package.resolved

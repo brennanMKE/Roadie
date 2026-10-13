@@ -1,6 +1,6 @@
 # Classic Winamp Skin Player for macOS: Project Brief
 
-Working title: TBD (pick a name later; do not use "Winamp" or "Nullsoft" in the app name or bundle ID).
+Name: **SkinAmp** (bundle ID `com.brennanmke.SkinAmp`). Do not use "Winamp" or "Nullsoft" in the app name or bundle ID.
 
 ## Goal
 

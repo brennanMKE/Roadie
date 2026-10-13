@@ -1,10 +1,10 @@
-# SkinPlayer
+# SkinAmp
 
-A native macOS music player (working name SkinPlayer) that renders classic Winamp 2.x `.wsz` skins and plays music from a Plex server and local files. Issues are grouped into milestones from [docs/plan.md](../docs/plan.md): each milestone has an umbrella issue (Module `Milestone`) whose children are the tasks. Bugs found along the way belong here too.
+SkinAmp is a native macOS music player that renders classic Winamp 2.x `.wsz` skins and plays music from a Plex server and local files. Issues are grouped into milestones from [docs/plan.md](../docs/plan.md): each milestone has an umbrella issue (Module `Milestone`) whose children are the tasks. Bugs found along the way belong here too.
 
 This file is the local guide for managing issues in this project. The companion Mac app (Issues.app) watches the `issues/` folder and renders the current state. Markdown files (and `project.json`) are the source of truth — there is no generated artifact or index to keep in sync.
 
-The `# SkinPlayer` heading above should match the `name` field in `issues/project.json`. `project.json` is the canonical source for the project's identity (name + repo URL); this guide is the workflow companion.
+The `# SkinAmp` heading above should match the `name` field in `issues/project.json`. `project.json` is the canonical source for the project's identity (name + repo URL); this guide is the workflow companion.
 
 ## Folder layout
 
@@ -26,7 +26,7 @@ A small JSON file naming the project and its repo. Two required fields:
 
 ```json
 {
-  "name": "SkinPlayer",
+  "name": "SkinAmp",
   "url": "https://github.com/user/repo"
 }
 ```
@@ -246,7 +246,7 @@ Status flow: `open` (with `## Plan`) → `in-progress` → review → `resolved`
 
 - Regenerate the project after adding files or changing `project.yml`: `xcodegen generate`
 - Package tests: `swift test --package-path Packages/SkinKit` (and `Packages/PlayerKit` once it exists)
-- App build: `xcodebuild -project SkinPlayer.xcodeproj -scheme SkinPlayer -configuration Debug -derivedDataPath build/DerivedData build`
+- App build: `xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Debug -derivedDataPath build/DerivedData build`
 - Skin report: `swift run --package-path Packages/SkinKit skintool Skins/`
 - Opt-in integration tests: set `SKIN_CORPUS_DIR`, or `PLEX_URL` + `PLEX_TOKEN`. Never write the token to disk or logs.
 
