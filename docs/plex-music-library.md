@@ -136,7 +136,7 @@ A **Plex** section in Settings:
 | Field | Stored in | Notes |
 |---|---|---|
 | Server address | `UserDefaults` | Free text, placeholder `joe` or `192.168.1.10` |
-| Account | Keychain | A **Sign in with Plex** button runs the PIN flow. Also offer a "paste a token" field as a fallback |
+| Account | Keychain (generic password, service `com.brennanmke.SkinAmp.plex`, account `plex.tv`, login keychain) | A **Sign in with Plex** button runs the PIN flow. Also offer a "paste a token" field as a fallback |
 | Music library | `UserDefaults` | A picker, filled once the connection succeeds. Hidden when there is only one music library |
 | Server identity | `UserDefaults` | The `machineIdentifier` from `/identity`. Not shown to the user |
 
@@ -154,7 +154,7 @@ Add `http://` when no scheme is given and `:32400` when no port is given, and ac
 
 A trailing slash, surrounding whitespace, a query string and a fragment are dropped (so a pasted
 `?X-Plex-Token=` never becomes part of the address); a custom port is kept; a URL with a user name or
-password is rejected.
+password is rejected. A Plex Web link (`…/web/index.html`) is cut back to the server.
 
 **Test the connection** with three requests. Each failure gets a different message:
 

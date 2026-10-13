@@ -18,11 +18,13 @@ public final class StubURLProtocol: URLProtocol {
         public var body: Data = Data()
         /// When set, the load fails with it instead of responding.
         public var error: URLError?
+        /// Seconds to wait before answering, so a test can cancel a request that is in flight.
+        public var delay: TimeInterval = 0
 
         public init(
             method: String = "GET", path: String, query: [String: String] = [:], containerStart: Int? = nil,
             status: Int = 200, headers: [String: String] = ["Content-Type": "application/json"],
-            body: Data = Data(), error: URLError? = nil
+            body: Data = Data(), error: URLError? = nil, delay: TimeInterval = 0
         ) {
             self.method = method
             self.path = path
@@ -32,6 +34,7 @@ public final class StubURLProtocol: URLProtocol {
             self.headers = headers
             self.body = body
             self.error = error
+            self.delay = delay
         }
 
         public static func json(_ fixture: PlexFixture, path: String, query: [String: String] = [:], containerStart: Int? = nil) throws -> Route {
@@ -140,14 +143,31 @@ public final class StubURLProtocol: URLProtocol {
             respond(url: url, status: 404, headers: [:], body: Data())
             return
         }
-        if let error = route.error {
-            client?.urlProtocol(self, didFailWithError: error)
-            return
+        let status = route.status, routeHeaders = route.headers, body = route.body, error = route.error
+        let deliver: @Sendable (StubURLProtocol) -> Void = { stub in
+            if let error {
+                stub.client?.urlProtocol(stub, didFailWithError: error)
+            } else {
+                stub.respond(url: url, status: status, headers: routeHeaders, body: body)
+            }
         }
-        respond(url: url, status: route.status, headers: route.headers, body: route.body)
+        if route.delay > 0 {
+            let stopped = self.stopped
+            nonisolated(unsafe) let stub = self
+            DispatchQueue.global().asyncAfter(deadline: .now() + route.delay) {
+                if stopped.withLock({ $0 }) { return }
+                deliver(stub)
+            }
+        } else {
+            deliver(self)
+        }
     }
 
-    public override func stopLoading() {}
+    private let stopped = OSAllocatedUnfairLock(initialState: false)
+
+    public override func stopLoading() {
+        stopped.withLock { $0 = true }
+    }
 
     private func respond(url: URL, status: Int, headers: [String: String], body: Data) {
         let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!

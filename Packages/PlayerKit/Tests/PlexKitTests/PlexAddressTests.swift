@@ -54,6 +54,18 @@ struct PlexAddressTests {
         #expect(client.request(path: "/identity").url?.path == "/plex/identity")
     }
 
+    @Test(arguments: [
+        ("http://joe:32400/web/index.html", "http://joe:32400"),
+        ("http://joe:32400/web/", "http://joe:32400"),
+        ("http://joe:32400/web", "http://joe:32400"),
+        ("joe:32400/web/index.html#!/media/x", "http://joe:32400"),
+        ("http://joe:32400/plex/web/index.html", "http://joe:32400/plex"),
+        ("http://joe:32400/webhooks", "http://joe:32400/webhooks"),
+    ])
+    func plexWebPathIsStripped(input: String, expected: String) throws {
+        #expect(try normalized(input) == expected)
+    }
+
     @Test(arguments: ["joe?x=1#f", "http://joe:32400/?X-Plex-Token=abc"])
     func queryAndFragmentAreDropped(input: String) throws {
         let result = try normalized(input)
@@ -68,7 +80,8 @@ struct PlexAddressTests {
     }
 
     @Test(arguments: ["joe", "joe:3000", "https://joe", "HTTP://Joe:32400/plex/", "192.168.1.10",
-                      "joe.tailnet.ts.net", "joe?x=1"])
+                      "joe.tailnet.ts.net", "joe?x=1", "http://joe:32400/web/index.html",
+                      "http://joe:32400/plex/web/index.html"])
     func normalizeIsIdempotent(input: String) throws {
         let once = try PlexAddress.normalize(input)
         #expect(try PlexAddress.normalize(once.absoluteString) == once)

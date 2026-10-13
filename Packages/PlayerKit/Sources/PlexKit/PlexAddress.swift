@@ -5,7 +5,7 @@ public enum PlexAddress {
     public static let defaultPort = 32400
 
     /// Adds `http://` and `:32400` when missing and throws `PlexError.invalidBaseURL` otherwise.
-    /// Never guesses beyond that. Query, fragment and trailing slashes are dropped; credentials are rejected.
+    /// Never guesses beyond that. Query, fragment and trailing slashes are dropped, and a Plex Web path (`/web/…`) is cut off; credentials are rejected.
     public static func normalize(_ text: String) throws -> URL {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw PlexError.invalidBaseURL }
@@ -22,6 +22,10 @@ public enum PlexAddress {
 
         var path = components.percentEncodedPath
         while path.hasSuffix("/") { path.removeLast() }
+        // A link copied from Plex Web (`…/web/index.html#!/…`) is cut back to the server.
+        var parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        if let web = parts.firstIndex(where: { $0.lowercased() == "web" }) { parts.removeSubrange(web...) }
+        path = parts.isEmpty ? "" : "/" + parts.joined(separator: "/")
 
         components.scheme = scheme
         components.host = host.lowercased()

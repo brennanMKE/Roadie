@@ -28,6 +28,12 @@ struct PlexConnectionTestTests {
         }
     }
 
+    private func delayed(_ route: StubURLProtocol.Route, _ seconds: TimeInterval) -> StubURLProtocol.Route {
+        var route = route
+        route.delay = seconds
+        return route
+    }
+
     private func okRoutes() throws -> [StubURLProtocol.Route] {
         [try .json(.identity, path: "/identity"), try .json(.sections, path: "/library/sections")]
     }
@@ -95,6 +101,32 @@ struct PlexConnectionTestTests {
         #expect(!String(describing: result).contains(Self.secret))
     }
 
+    @Test func cancelledTransportIsCancelled() async {
+        let (handle, test) = make()
+        handle.register([.init(path: "/identity", error: URLError(.cancelled))])
+        #expect(await failure(test) == .cancelled)
+        #expect(handle.recorded.count == 1)
+    }
+
+    @Test func cancellingTheTaskIsCancelled() async throws {
+        let (handle, test) = make()
+        handle.register([delayed(try .json(.identity, path: "/identity"), 1), try .json(.sections, path: "/library/sections")])
+        let address = "stub.local"
+        let token = self.token
+        let task = Task { () async -> PlexConnectionFailure? in
+            do throws(PlexConnectionFailure) {
+                _ = try await test.run(address: address, token: token)
+                return nil
+            } catch {
+                return error
+            }
+        }
+        try await Task.sleep(for: .seconds(0.2))
+        task.cancel()
+        #expect(await task.value == .cancelled)
+        #expect(!handle.recorded.contains { $0.url.path == "/library/sections" })
+    }
+
     @Test func nonPlexServerIsUnreachable() async {
         for (status, contentType, expected) in [
             (200, "text/html", PlexError.notJSON(contentType: "text/html")),
@@ -144,6 +176,7 @@ struct PlexConnectionTestTests {
             (.unreachable(.notFound), "Can't reach the server. Check the address, and whether you're on the home network or Tailscale."),
             (.unauthorized, "Signed in, but this account can't access this server."),
             (.noMusicLibrary, "This server has no music library."),
+            (.cancelled, "The connection test was cancelled."),
         ]
         for (failure, text) in cases {
             #expect(failure.message == text)
@@ -153,10 +186,11 @@ struct PlexConnectionTestTests {
         #expect(PlexConnectionFailure.invalidAddress.message == PlexError.invalidBaseURL.errorDescription)
         #expect(PlexConnectionFailure.unreachable(.notFound).underlying == .notFound)
         #expect(PlexConnectionFailure.unauthorized.underlying == nil)
+        #expect(PlexConnectionFailure.cancelled.underlying == nil)
     }
 
     @Test func failuresNeverContainTheToken() async throws {
-        var failures: [PlexConnectionFailure] = [.invalidAddress, .unauthorized, .noMusicLibrary]
+        var failures: [PlexConnectionFailure] = [.invalidAddress, .unauthorized, .noMusicLibrary, .cancelled]
         let (handle, test) = make()
         handle.register([.init(path: "/identity", error: URLError(.timedOut))])
         if let f = await failure(test) { failures.append(f) }

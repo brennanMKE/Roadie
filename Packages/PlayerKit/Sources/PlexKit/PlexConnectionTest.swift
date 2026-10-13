@@ -26,6 +26,8 @@ public enum PlexConnectionFailure: Error, Hashable, Sendable, LocalizedError {
     case unauthorized
     /// Step 3: no section of type "artist".
     case noMusicLibrary
+    /// The task was cancelled (an edit, Cancel, or Settings closed). The UI shows nothing for it.
+    case cancelled
 
     /// The user-facing text (docs/plex-music-library.md). The one place these strings live.
     public var message: String {
@@ -34,6 +36,7 @@ public enum PlexConnectionFailure: Error, Hashable, Sendable, LocalizedError {
         case .unreachable: "Can't reach the server. Check the address, and whether you're on the home network or Tailscale."
         case .unauthorized: "Signed in, but this account can't access this server."
         case .noMusicLibrary: "This server has no music library."
+        case .cancelled: "The connection test was cancelled."
         }
     }
 
@@ -51,6 +54,7 @@ public enum PlexConnectionFailure: Error, Hashable, Sendable, LocalizedError {
         case .unreachable: "unreachable"
         case .unauthorized: "unauthorized"
         case .noMusicLibrary: "noMusicLibrary"
+        case .cancelled: "cancelled"
         }
     }
 }
@@ -109,21 +113,23 @@ public struct PlexConnectionTest: Sendable {
         // 1. Identity, deliberately without the token: tells a wrong address from a wrong token.
         let identity: PlexIdentity
         do {
+            try Task.checkCancellation()
             identity = try await client(baseURL, token: nil).identity()
         } catch {
-            throw .unreachable(Self.plexError(error))
+            throw Self.failure(error)
         }
         // 2. Sections with the token.
         let sections: [PlexLibrarySection]
         do {
+            try Task.checkCancellation()
             sections = try await client(baseURL, token: token).librarySections()
         } catch let error as PlexError {
             switch error {
             case .unauthorized, .httpStatus(403): throw .unauthorized
-            default: throw .unreachable(error)
+            default: throw Self.failure(error)
             }
         } catch {
-            throw .unreachable(Self.plexError(error))
+            throw Self.failure(error)
         }
         // 3. A music section exists.
         let music = sections.filter(\.isMusic)
@@ -131,7 +137,10 @@ public struct PlexConnectionTest: Sendable {
         return PlexConnection(baseURL: baseURL, identity: identity, musicSections: music)
     }
 
-    private static func plexError(_ error: any Error) -> PlexError {
-        (error as? PlexError) ?? .transport(.unknown)
+    private static func failure(_ error: any Error) -> PlexConnectionFailure {
+        if error is CancellationError { return .cancelled }
+        guard let plex = error as? PlexError else { return .unreachable(.transport(.unknown)) }
+        if case .transport(.cancelled) = plex { return .cancelled }
+        return .unreachable(plex)
     }
 }

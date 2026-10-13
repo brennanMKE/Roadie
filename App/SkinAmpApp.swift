@@ -1,8 +1,12 @@
+import PlexKit
 import SwiftUI
 
 @main
 struct SkinAmpApp: App {
     @State private var model = PlayerModel()
+    @State private var plexSettings = PlexSettingsModel(
+        tokenStore: KeychainPlexTokenStore(),
+        connectionTest: PlexConnectionTest(clientIdentifier: PlexClientIdentifier.stored()))
 
     var body: some Scene {
         Window("SkinAmp", id: "main") {
@@ -20,6 +24,11 @@ struct SkinAmpApp: App {
                 Button("Open Skin…") { model.openSkin() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
             }
+        }
+
+        Settings {
+            SettingsView()
+                .environment(plexSettings)
         }
     }
 }
