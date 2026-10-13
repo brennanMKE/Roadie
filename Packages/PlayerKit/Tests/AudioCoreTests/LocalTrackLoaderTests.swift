@@ -141,12 +141,18 @@ private func writeWAV(to url: URL, seconds: Double, sampleRate: Double = 44_100,
         artist.value = "Tagged Artist" as NSString
         artist.extendedLanguageTag = "und"
 
+        let album = AVMutableMetadataItem()
+        album.identifier = .commonIdentifierAlbumName
+        album.value = "Tagged Album" as NSString
+        album.extendedLanguageTag = "und"
+
         let session = try #require(AVAssetExportSession(asset: AVURLAsset(url: wav), presetName: AVAssetExportPresetAppleM4A))
-        session.metadata = [title, artist]
+        session.metadata = [title, artist, album]
         try await session.export(to: m4a, as: .m4a)
 
         let track = try await LocalTrackLoader.loadTrack(at: m4a)
         #expect(track.title == "Tagged Title")
         #expect(track.artist == "Tagged Artist")
+        #expect(track.album == "Tagged Album")
     }
 }

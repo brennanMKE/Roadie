@@ -93,7 +93,7 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         #expect(bridge.currentSnapshot() == nil)
 
         var events: [String] = []
-        player.onEvent = { event in
+        player.addEventObserver { event in
             switch event {
             case .trackChanged(let t): events.append("track:\(t?.title ?? "nil")")
             case .stateChanged(let s): events.append("state:\(s)")
@@ -115,6 +115,24 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         player.stop()
         #expect(bridge.currentSnapshot() == nil)
         #expect(events.last == "state:stopped")
+    }
+}
+
+@MainActor
+@Suite struct PlayerEventObserverTests {
+    @Test func multipleObserversAndRemoval() {
+        let player = Player()
+        var first = 0, second = 0
+        let t1 = player.addEventObserver { _ in first += 1 }
+        let t2 = player.addEventObserver { _ in second += 1 }
+        player.stop()   // always emits stateChanged(.stopped)
+        #expect(first == 1 && second == 1)
+        player.removeEventObserver(t1)
+        player.stop()
+        #expect(first == 1 && second == 2)
+        player.removeEventObserver(t2)
+        player.stop()
+        #expect(first == 1 && second == 2)
     }
 }
 
@@ -153,22 +171,61 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let a = dir.appending(path: "first.wav"), b = dir.appending(path: "second.wav")
-        try GaplessRenderTests.writeSine(to: a, hz: 441)
-        try GaplessRenderTests.writeSine(to: b, hz: 882)
-        let png = try EmbeddedArtworkTests.pngData()
+        // Long enough that a stale elapsed (the first track's end) cannot pass as "just started".
+        try MixedFormatSupport.writeSine(to: a, rate: 44100, channels: 2, seconds: 2, hz: 441)
+        try MixedFormatSupport.writeSine(to: b, rate: 44100, channels: 2, seconds: 2, hz: 882)
 
         let player = Player()
         player.volume = 0
         player.enqueue([try Track.file(at: a), try Track.file(at: b)])
         let center = MPNowPlayingInfoCenter.default()
-        let bridge = NowPlayingBridge(player: player, artwork: { _ in png })
+        let bridge = NowPlayingBridge(player: player, artwork: { _ in nil })
         bridge.install()
         defer { bridge.uninstall(); player.stop() }
         player.play()
         #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == "first" })
-        #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyArtwork] != nil })
         #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == "second" })
-        #expect(center.nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double ?? 99 < 0.5)
+        let elapsed = center.nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double ?? 99
+        #expect(elapsed < 0.5)
+    }
+
+    @Test func otherObserversDoNotDisconnectBridge() async throws {
+        let player = Player()
+        let url = FileManager.default.temporaryDirectory.appending(path: "obs-\(UUID().uuidString).wav")
+        try GaplessRenderTests.writeSine(to: url, hz: 441)
+        defer { try? FileManager.default.removeItem(at: url) }
+        player.enqueue([try Track.file(at: url)])
+        let center = MPNowPlayingInfoCenter.default()
+        let bridge = NowPlayingBridge(player: player, artwork: { _ in nil })
+        bridge.install()
+        defer { bridge.uninstall(); player.stop() }
+        var seen = 0
+        player.addEventObserver { _ in seen += 1 }
+        player.volume = 0
+        player.play()
+        #expect(await waitUntil { player.state == .playing })
+        #expect(seen > 0)
+        let title = url.deletingPathExtension().lastPathComponent
+        #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == title })
+    }
+
+    /// Artwork attaches to the published info (separate from the timing test so a republish
+    /// from the artwork load cannot mask a stale elapsed).
+    @Test func artworkAttachesToInfoCenter() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "np-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "art.wav")
+        try GaplessRenderTests.writeSine(to: url, hz: 441)
+        let png = try EmbeddedArtworkTests.pngData()
+        let player = Player()
+        player.volume = 0
+        player.enqueue([try Track.file(at: url)])
+        let center = MPNowPlayingInfoCenter.default()
+        let bridge = NowPlayingBridge(player: player, artwork: { _ in png })
+        bridge.install()
+        defer { bridge.uninstall(); player.stop() }
+        player.play()
         #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyArtwork] != nil })
     }
 }

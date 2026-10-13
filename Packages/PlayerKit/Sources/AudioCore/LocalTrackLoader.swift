@@ -105,6 +105,7 @@ public enum LocalTrackLoader {
 
         var title: String?
         var artist: String?
+        var album: String?
         var duration = fileDuration
         var bitrate: Int?
 
@@ -115,6 +116,7 @@ public enum LocalTrackLoader {
             if cmDuration.isNumeric, seconds.isFinite, seconds > 0 { duration = seconds }
             title = await stringValue(common, .commonIdentifierTitle)
             artist = await stringValue(common, .commonIdentifierArtist)
+            album = await stringValue(common, .commonIdentifierAlbumName)
             if let track = try await asset.loadTracks(withMediaType: .audio).first {
                 let rate = try await track.load(.estimatedDataRate)
                 if rate.isFinite, rate > 0 { bitrate = Int((Double(rate) / 1000).rounded()) }
@@ -131,6 +133,7 @@ public enum LocalTrackLoader {
         return Track(
             title: title ?? url.deletingPathExtension().lastPathComponent,
             artist: artist ?? "",
+            album: album,
             duration: duration,
             bitrate: bitrate,
             sampleRate: sampleRate,

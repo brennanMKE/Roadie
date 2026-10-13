@@ -9,7 +9,7 @@ public final class Player: NowPlayingCommandTarget {
         didSet { emitTrackChangeIfNeeded() }
     }
     public private(set) var state: PlaybackState = .stopped {
-        didSet { onEvent?(.stateChanged(state)) }
+        didSet { emit(.stateChanged(state)) }
     }
     public private(set) var currentTime: TimeInterval = 0
     public private(set) var errorMessage: String?
@@ -76,9 +76,26 @@ public final class Player: NowPlayingCommandTarget {
         }
     }
 
-    /// Notified (on the main actor) when the current track, the play/pause/stop state or the
-    /// position (seek) changes; never per playback tick. One observer: the Now Playing bridge.
-    @ObservationIgnored public var onEvent: (@MainActor (PlayerEvent) -> Void)?
+    /// Observers are notified (on the main actor, in registration order) when the current track,
+    /// the play/pause/stop state or the position (seek) changes; never per playback tick.
+    @ObservationIgnored private var eventObservers: [(token: PlayerEventToken, handler: @MainActor (PlayerEvent) -> Void)] = []
+
+    /// Registers an event observer; keep the token and pass it to `removeEventObserver(_:)`.
+    /// Any number of observers can coexist (Now Playing bridge, UI, prefetch).
+    @discardableResult
+    public func addEventObserver(_ handler: @escaping @MainActor (PlayerEvent) -> Void) -> PlayerEventToken {
+        let token = PlayerEventToken(id: UUID())
+        eventObservers.append((token, handler))
+        return token
+    }
+
+    public func removeEventObserver(_ token: PlayerEventToken) {
+        eventObservers.removeAll { $0.token == token }
+    }
+
+    private func emit(_ event: PlayerEvent) {
+        for observer in eventObservers { observer.handler(event) }
+    }
     @ObservationIgnored private var lastEmittedTrackID: UUID?
 
     @ObservationIgnored private let resolver: any TrackResolver
@@ -105,7 +122,7 @@ public final class Player: NowPlayingCommandTarget {
         let current = queue.current
         guard current?.id != lastEmittedTrackID else { return }
         lastEmittedTrackID = current?.id
-        onEvent?(.trackChanged(current))
+        emit(.trackChanged(current))
     }
 
     // MARK: Queue
@@ -117,6 +134,7 @@ public final class Player: NowPlayingCommandTarget {
 
     public func removeTrack(at index: Int) {
         let removingCurrent = queue.currentIndex == index
+        if removingCurrent { currentTime = 0 }   // before the queue change publishes the new track
         queue.remove(at: index)
         if removingCurrent && state != .stopped {
             if queue.current != nil { startCurrentTrack() } else { stop() }
@@ -156,6 +174,7 @@ public final class Player: NowPlayingCommandTarget {
 
     public func play(at index: Int) {
         guard queue.tracks.indices.contains(index) else { return }
+        currentTime = 0   // before the queue change publishes the new track
         queue.select(index)
         startCurrentTrack()
     }
@@ -189,6 +208,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func next() {
+        currentTime = 0   // before the queue change publishes the new track
         if queue.next() != nil {
             startCurrentTrack()
         } else {
@@ -197,6 +217,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func previous() {
+        currentTime = 0   // before the queue change publishes the new track
         if queue.previous() != nil {
             startCurrentTrack()
         } else if queue.current != nil {
@@ -223,7 +244,7 @@ public final class Player: NowPlayingCommandTarget {
             graph.playerNode.play()
         }
         scheduleNextIfNeeded()
-        onEvent?(.seeked(target))
+        emit(.seeked(target))
     }
 
     // MARK: Starting tracks
@@ -342,13 +363,16 @@ public final class Player: NowPlayingCommandTarget {
             break
         case .advanced(let id):
             // The node has already moved on to the pre-scheduled file; follow it.
-            guard queue.advanceAfterTrackEnd() != nil, queue.current?.id == id, let next = nextFile else {
+            // Reset the position before the queue moves: the queue change publishes the new track
+            // and observers read `currentTime` at that moment.
+            let next = nextFile
+            currentTime = 0
+            guard queue.advanceAfterTrackEnd() != nil, queue.current?.id == id, let next else {
                 startCurrentTrack()
                 return
             }
             file = next
             nextFile = nil
-            currentTime = 0
             scheduleNextIfNeeded()
         case .reachedEnd:
             trackEnded()
@@ -357,6 +381,7 @@ public final class Player: NowPlayingCommandTarget {
 
     /// The current track finished with nothing pre-scheduled behind it.
     private func trackEnded() {
+        currentTime = 0
         if queue.advanceAfterTrackEnd() != nil {
             startCurrentTrack()
         } else {
@@ -435,6 +460,11 @@ public final class Player: NowPlayingCommandTarget {
         stop()
         errorMessage = message
     }
+}
+
+/// Identifies one registration made with `Player.addEventObserver(_:)`.
+public struct PlayerEventToken: Hashable, Sendable {
+    let id: UUID
 }
 
 /// Coarse player changes for observers that must not poll (Now Playing).

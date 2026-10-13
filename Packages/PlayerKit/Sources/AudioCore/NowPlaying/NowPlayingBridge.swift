@@ -35,6 +35,7 @@ public final class NowPlayingBridge {
     private var artworkTask: Task<Void, Never>?
     private var artworkRequestedFor: UUID?
     private var installed = false
+    private var eventToken: PlayerEventToken?
     private let log = Logger(subsystem: "SkinAmp", category: "NowPlaying")
 
     public init(
@@ -53,7 +54,7 @@ public final class NowPlayingBridge {
     public func install() {
         guard !installed else { return }
         installed = true
-        player.onEvent = { [weak self] event in self?.handle(event) }
+        eventToken = player.addEventObserver { [weak self] event in self?.handle(event) }
 
         add(commandCenter.playCommand) { _ in .play }
         add(commandCenter.pauseCommand) { _ in .pause }
@@ -77,7 +78,8 @@ public final class NowPlayingBridge {
     public func uninstall() {
         guard installed else { return }
         installed = false
-        player.onEvent = nil
+        if let eventToken { player.removeEventObserver(eventToken) }
+        eventToken = nil
         for (command, token) in tokens { command.removeTarget(token) }
         tokens = []
         artworkTask?.cancel()
