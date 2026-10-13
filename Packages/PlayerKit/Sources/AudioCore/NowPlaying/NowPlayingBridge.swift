@@ -143,6 +143,8 @@ public final class NowPlayingBridge {
             info[MPMediaItemPropertyArtwork] = artwork.object
         }
         infoCenter.nowPlayingInfo = info
+        // `.loading` publishes as paused at elapsed 0 (rate 0): nothing is audible yet, and a running
+        // clock on the lock screen would drift ahead of the audio.
         infoCenter.playbackState = snapshot.state == .playing ? .playing : .paused
         log.debug("published \(snapshot.title, privacy: .public) \(snapshot.elapsed) rate \(snapshot.state == .playing ? 1 : 0)")
         loadArtworkIfNeeded()

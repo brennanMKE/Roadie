@@ -111,9 +111,8 @@ public final class Player: NowPlayingCommandTarget {
     @ObservationIgnored private var preloadTask: Task<Void, Never>?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     /// What the in-flight (or last) load should do when the file opens: play, or park paused.
-    @ObservationIgnored private var autoplayAfterLoad = true
-    /// A load started by `startCurrentTrack` has not reached `begin` yet.
-    @ObservationIgnored private var loadPending = false
+    /// Play, pause and toggle flip it while `state == .loading`.
+    @ObservationIgnored private(set) var autoplayAfterLoad = true
     @ObservationIgnored private var timeTask: Task<Void, Never>?
     @ObservationIgnored private var configTask: Task<Void, Never>?
 
@@ -141,8 +140,10 @@ public final class Player: NowPlayingCommandTarget {
         if removingCurrent { currentTime = 0 }   // before the queue change publishes the new track
         queue.remove(at: index)
         if removingCurrent && state != .stopped {
-            // Keep the transport intent: a paused player parks on the new current track at 0:00.
-            if queue.current != nil { startCurrentTrack(autoplay: state == .playing) } else { stop() }
+            // Keep the transport intent: a paused player parks on the new current track at 0:00,
+            // and a load in flight keeps whatever play/pause intent it has accumulated.
+            let autoplay = state == .loading ? autoplayAfterLoad : state == .playing
+            if queue.current != nil { startCurrentTrack(autoplay: autoplay) } else { stop() }
         } else {
             reconcileSchedule()
         }
@@ -159,12 +160,10 @@ public final class Player: NowPlayingCommandTarget {
         switch state {
         case .playing:
             return
+        case .loading:
+            // The load is already in flight; just make sure it plays when it lands.
+            autoplayAfterLoad = true
         case .paused:
-            if loadPending {
-                // A parked load is still in flight (nothing is scheduled yet); play when it lands.
-                autoplayAfterLoad = true
-                return
-            }
             do {
                 let graph = try startedGraph()
                 graph.playerNode.play()
@@ -190,11 +189,17 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func pause() {
-        guard state == .playing else { return }
-        updateCurrentTime()
-        _graph?.playerNode.pause()
-        timeTask?.cancel()
-        state = .paused
+        switch state {
+        case .playing:
+            updateCurrentTime()
+            _graph?.playerNode.pause()
+            timeTask?.cancel()
+            state = .paused
+        case .loading:
+            autoplayAfterLoad = false   // the track parks paused at 0:00 when it lands
+        case .paused, .stopped:
+            return
+        }
     }
 
     public func togglePlayPause() { togglePause() }
@@ -204,12 +209,12 @@ public final class Player: NowPlayingCommandTarget {
         case .playing: pause()
         case .paused: play()
         case .stopped: play()
+        case .loading: autoplayAfterLoad.toggle()
         }
     }
 
     public func stop() {
         loadTask?.cancel()
-        loadPending = false
         timeTask?.cancel()
         discardSchedule()
         _graph?.playerNode.stop()
@@ -266,22 +271,25 @@ public final class Player: NowPlayingCommandTarget {
             stop()
             return
         }
-        autoplayAfterLoad = autoplay
-        loadPending = true
         loadTask?.cancel()
         timeTask?.cancel()
-        discardSchedule()
+        discardSchedule()   // bumps the generation: any older load is now stale
         _graph?.playerNode.stop()
+        file = nil   // seek / reschedule / device change must not act on the previous track's file
+        currentTime = 0
         errorMessage = nil
+        autoplayAfterLoad = autoplay
+        state = .loading   // synchronous: observers and a repeated Play see the load immediately
+        let generation = scheduler.generation
         let resolver = self.resolver
         loadTask = Task {
             do {
                 let url = try await resolver.localURL(for: track)
-                guard !Task.isCancelled, queue.current?.id == track.id else { return }
+                guard !Task.isCancelled, scheduler.generation == generation else { return }
                 let file = try AVAudioFile(forReading: url)
                 try begin(file)
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, scheduler.generation == generation else { return }
                 fail(error)
             }
         }
@@ -295,12 +303,11 @@ public final class Player: NowPlayingCommandTarget {
         self.file = file
         schedule(file, from: 0)
         currentTime = 0
-        loadPending = false
         if autoplayAfterLoad {
             graph.playerNode.play()
             state = .playing
             startTimeUpdates()
-        } else if state != .paused {
+        } else {
             // Parked: the segment stays scheduled on the stopped node; `play()` resumes it from 0.
             state = .paused
         }
@@ -340,7 +347,7 @@ public final class Player: NowPlayingCommandTarget {
     /// Queue the track that follows the current one behind it so the node never goes silent.
     private func scheduleNextIfNeeded() {
         preloadTask?.cancel()
-        guard state != .stopped, scheduler.items.count == 1,
+        guard state == .playing || state == .paused, scheduler.items.count == 1,
               let index = queue.indexAfterCurrentEnds() else { return }
         let track = queue.tracks[index]
         let generation = scheduler.generation
@@ -461,7 +468,8 @@ public final class Player: NowPlayingCommandTarget {
 
     /// The output device changed and the engine stopped itself.
     private func handleConfigurationChange() {
-        guard let graph = _graph, state != .stopped else { return }
+        // Nothing is scheduled while stopped or loading; the load connects and starts the engine itself.
+        guard let graph = _graph, state != .stopped, state != .loading else { return }
         let resumeTime = currentTime
         do {
             discardSchedule()

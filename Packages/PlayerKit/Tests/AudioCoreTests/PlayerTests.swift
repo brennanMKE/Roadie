@@ -179,3 +179,226 @@ import Testing
         p.stop()
     }
 }
+
+/// The `.loading` state: a track is selected and its resolve is in flight. A suspending resolver holds
+/// the load open; everything is headless and silent (offline rendering where a load completes).
+@MainActor
+@Suite struct LoadingStateTests {
+    private static let missing = URL(filePath: "/nonexistent/skinamp-missing.wav")
+
+    private func makePlayer(_ count: Int = 2, honorsCancellation: Bool = true) -> (Player, GateResolver, [Track]) {
+        let gate = GateResolver(honorsCancellation: honorsCancellation)
+        let tracks = makeTracks(count)
+        let player = Player(resolver: gate)
+        player.enqueue(tracks)
+        return (player, gate, tracks)
+    }
+
+    /// Lets a released load run to its end (it only needs main-actor turns, no engine).
+    private func settle() async { try? await Task.sleep(for: .milliseconds(100)) }
+
+    private func wav() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appending(path: "ld-\(UUID().uuidString).wav")
+        try GaplessRenderTests.writeSine(to: url, hz: 440)
+        return url
+    }
+
+    @Test func playAtIsLoadingSynchronously() async {
+        let (p, gate, tracks) = makePlayer()
+        p.play(at: 0)
+        #expect(p.state == .loading)
+        #expect(p.currentTime == 0)
+        #expect(p.queue.currentIndex == 0)
+        #expect(await gate.waitForCalls(1))
+        #expect(await gate.calls == [tracks[0].id])
+        p.stop()
+        await gate.releaseAll()
+    }
+
+    @Test func playFromStoppedIsLoadingSynchronously() async {
+        let (p, gate, _) = makePlayer()
+        p.play()
+        #expect(p.state == .loading)
+        #expect(p.autoplayAfterLoad)
+        p.stop()
+        await gate.releaseAll()
+    }
+
+    @Test func repeatedPlayDuringLoadDoesNotRestart() async {
+        let (p, gate, _) = makePlayer()
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        p.play(); p.play(); p.play()
+        p.togglePause(); p.togglePause()
+        #expect(p.state == .loading)
+        #expect(p.autoplayAfterLoad)
+        await settle()
+        #expect(await gate.calls.count == 1)
+        p.stop()
+        await gate.releaseAll()
+    }
+
+    @Test func pauseDuringLoadParksIntent() async {
+        let (p, gate, _) = makePlayer()
+        p.play(at: 0)
+        p.pause()
+        #expect(p.state == .loading)
+        #expect(!p.autoplayAfterLoad)
+        p.play()
+        #expect(p.autoplayAfterLoad)
+        p.togglePause()
+        #expect(!p.autoplayAfterLoad)
+        #expect(p.state == .loading)
+        p.stop()
+        await gate.releaseAll()
+    }
+
+    @Test func loadLandsPlayingOrParkedPerIntent() async throws {
+        let url = try wav()
+        defer { try? FileManager.default.removeItem(at: url) }
+        for pause in [false, true] {
+            let (p, gate, tracks) = makePlayer(1)
+            try renderSilently(p)
+            p.play(at: 0)
+            if pause { p.pause() }
+            #expect(await gate.waitForCalls(1))
+            await gate.release(tracks[0].id, with: .success(url))
+            let expected: PlaybackState = pause ? .paused : .playing
+            #expect(await waitUntil { p.state == expected })
+            #expect(p.currentTime == 0)
+            #expect(p.errorMessage == nil)
+            p.stop()
+        }
+    }
+
+    @Test func newSelectionSupersedesLoad() async {
+        let (p, gate, tracks) = makePlayer(honorsCancellation: false)
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        p.play(at: 1)
+        #expect(p.state == .loading)
+        #expect(p.queue.currentIndex == 1)
+        #expect(await gate.waitForCalls(2))
+        #expect(await gate.calls == [tracks[0].id, tracks[1].id])
+        await gate.release(tracks[0].id, with: .success(Self.missing))   // stale: must be ignored
+        await settle()
+        #expect(p.state == .loading)
+        #expect(p.errorMessage == nil)
+        await gate.release(tracks[1].id, with: .success(Self.missing))   // live: acted on (open fails)
+        #expect(await waitUntil { p.state == .stopped })
+        #expect(p.errorMessage != nil)
+    }
+
+    @Test func restartingSameTrackSupersedesLoad() async {
+        let (p, gate, tracks) = makePlayer(honorsCancellation: false)
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        p.previous()   // restarts track 0
+        #expect(p.state == .loading)
+        #expect(await gate.waitForCalls(2))
+        #expect(await gate.calls == [tracks[0].id, tracks[0].id])
+        await gate.release(tracks[0].id, with: .success(Self.missing))   // the first load: stale
+        await settle()
+        #expect(p.state == .loading)
+        #expect(p.errorMessage == nil)
+        await gate.release(tracks[0].id, with: .success(Self.missing))
+        #expect(await waitUntil { p.state == .stopped })
+        #expect(p.errorMessage != nil)
+    }
+
+    @Test func stopDuringLoadCancels() async {
+        let (p, gate, tracks) = makePlayer(honorsCancellation: false)
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        p.stop()
+        #expect(p.state == .stopped)
+        await gate.release(tracks[0].id, with: .success(Self.missing))
+        await settle()
+        #expect(p.state == .stopped)
+        #expect(p.errorMessage == nil)
+    }
+
+    @Test func loadFailureStops() async {
+        let (p, gate, tracks) = makePlayer()
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        await gate.release(tracks[0].id, with: .failure(AudioCoreError.unresolvableSource(tracks[0].source)))
+        #expect(await waitUntil { p.state == .stopped })
+        #expect(p.errorMessage != nil)
+    }
+
+    @Test func removeCurrentWhileLoadingReloadsNext() async {
+        let (p, gate, tracks) = makePlayer(3)
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        p.removeTrack(at: 0)
+        #expect(p.state == .loading)
+        #expect(p.queue.current?.id == tracks[1].id)
+        #expect(p.autoplayAfterLoad)
+        #expect(await gate.waitForCalls(2))
+        #expect(await gate.calls == [tracks[0].id, tracks[1].id])
+        p.pause()
+        p.removeTrack(at: 0)   // current is now tracks[1]
+        #expect(p.state == .loading)
+        #expect(p.queue.current?.id == tracks[2].id)
+        #expect(!p.autoplayAfterLoad)   // the paused intent survives the reload
+        p.stop()
+        await gate.releaseAll()
+    }
+
+    @Test func removeLastCurrentWhileLoadingStops() async {
+        let (p, gate, _) = makePlayer(1)
+        p.play(at: 0)
+        p.removeTrack(at: 0)
+        #expect(p.state == .stopped)
+        await gate.releaseAll()
+    }
+
+    @Test func nextAtEndOfQueueDuringLoadStops() async {
+        let (p, gate, tracks) = makePlayer(1, honorsCancellation: false)
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        p.next()
+        #expect(p.state == .stopped)
+        await gate.release(tracks[0].id, with: .success(Self.missing))
+        await settle()
+        #expect(p.state == .stopped)
+        #expect(p.errorMessage == nil)
+    }
+
+    @Test func seekDuringLoadIgnoresPreviousFile() async throws {
+        let url = try wav()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let (p, gate, tracks) = makePlayer()
+        try renderSilently(p)
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        await gate.release(tracks[0].id, with: .success(url))
+        #expect(await waitUntil { p.state == .playing })
+        var seeks = 0
+        p.addEventObserver { if case .seeked = $0 { seeks += 1 } }
+        p.play(at: 1)
+        #expect(p.state == .loading)
+        p.seek(to: 0.5)   // the previous track's file must not be seeked
+        #expect(p.currentTime == 0)
+        #expect(seeks == 0)
+        p.stop()
+        await gate.releaseAll()
+    }
+
+    @Test func observersSeeLoadingThenPlaying() async throws {
+        let url = try wav()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let (p, gate, tracks) = makePlayer(1)
+        try renderSilently(p)
+        var states: [PlaybackState] = []
+        p.addEventObserver { if case .stateChanged(let s) = $0 { states.append(s) } }
+        p.play(at: 0)
+        #expect(states == [.loading])
+        #expect(await gate.waitForCalls(1))
+        await gate.release(tracks[0].id, with: .success(url))
+        #expect(await waitUntil { p.state == .playing })
+        #expect(states == [.loading, .playing])
+        p.stop()
+    }
+}

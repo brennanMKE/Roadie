@@ -14,6 +14,7 @@ final class PlayerModel {
     /// Media keys and Control Center; lives as long as the model.
     private let nowPlaying: NowPlayingBridge
     var playbackState: PlaybackState { player.state }
+    var isLoading: Bool { player.state == .loading }
     var isImporting = false
     var scale: CGFloat = 2
 

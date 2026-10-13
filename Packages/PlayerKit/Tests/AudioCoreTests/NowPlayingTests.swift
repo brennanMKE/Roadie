@@ -154,7 +154,10 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         defer { bridge.uninstall() }
         try renderSilently(player)
         player.play()
-        #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == "tone" })
+        // The track shows up while loading (paused, rate 0) and flips to playing once it lands.
+        #expect(center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == "tone")
+        #expect(center.nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] as? Double == 0)
+        #expect(await waitUntil { player.state == .playing })
         #expect(center.nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] as? Double == 1)
         #expect(center.playbackState == .playing)
         player.pause()

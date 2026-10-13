@@ -29,7 +29,8 @@ struct MainWindowView: View {
 
     private var playIndicator: String {
         switch model.playbackState {
-        case .playing: "MAIN_PLAYING_INDICATOR"
+        // Winamp shows the play glyph while a file is opening.
+        case .playing, .loading: "MAIN_PLAYING_INDICATOR"
         case .paused: "MAIN_PAUSED_INDICATOR"
         case .stopped: "MAIN_STOPPED_INDICATOR"
         }
