@@ -50,18 +50,38 @@ struct PlexPinSignInTests {
         #expect(methods.count >= 3)
     }
 
-    @Test func cancellationStopsPollingWithoutAToken() async throws {
+    @Test func cancellationWhileAPollIsInFlightStopsWithoutAToken() async throws {
         let (handle, signIn, _) = make()
+        handle.register([try PlexTv.createRoute(), try PlexTv.pollRoute(delay: 60)])
+        let recorder = URLRecorder()
+        let task = Task { await Self.run(signIn, recorder) }
+        // The stub records at startLoading and then holds the poll, so the loop is inside the fetch.
+        #expect(await PlexTv.wait { pollCount(handle) >= 1 })
+        let start = ContinuousClock.now
+        task.cancel()
+        let outcome = await task.value
+        // The cancel, not the 60 s gate, ended the held request.
+        #expect(ContinuousClock.now - start < .seconds(5))
+        #expect(outcome == .failure(.cancelled))
+        // No sleep before counting: the only poll ever handed to URLSession was recorded before the
+        // cancel, and run has returned with nothing detached, so the count cannot change.
+        #expect(handle.recorded.map(\.method) == ["POST", "GET"])
+        #expect(pollCount(handle) == 1)
+        #expect(recorder.opened.count == 1)
+    }
+
+    @Test func cancellationBetweenPollsSendsNoPoll() async throws {
+        let options = PlexPinSignIn.Options(pollInterval: .seconds(60), timeout: .seconds(120), maxConsecutiveFailures: 3)
+        let (handle, signIn, _) = make(options: options)
         handle.register([try PlexTv.createRoute(), try PlexTv.pollRoute()])
         let recorder = URLRecorder()
         let task = Task { await Self.run(signIn, recorder) }
-        #expect(await PlexTv.wait { pollCount(handle) >= 1 })
+        // The browser opens just before the first sleep, and no poll can be issued for 60 s after it.
+        #expect(await PlexTv.wait { recorder.opened.count == 1 })
         task.cancel()
-        let outcome = await task.value
-        #expect(outcome == .failure(.cancelled))
-        let count = pollCount(handle)
-        try await Task.sleep(for: .seconds(0.3))
-        #expect(pollCount(handle) == count)
+        #expect(await task.value == .failure(.cancelled))
+        #expect(pollCount(handle) == 0)
+        #expect(handle.recorded.map(\.method) == ["POST"])
     }
 
     @Test func expiredPinFails() async throws {

@@ -69,6 +69,9 @@ public final class StubURLProtocol: URLProtocol {
         state.withLock { $0[""] = Table() }
     }
 
+    /// A request is recorded when URLSession starts loading it, which can be after a cancelled
+    /// `data(for:)` has already thrown. A test that counts requests after a cancel must hold the
+    /// request in flight (`delay`) or make the next one impossible (a long interval), not sleep.
     /// Every request seen since `reset()`.
     public static var recorded: [RecordedRequest] {
         state.withLock { $0[""]?.recorded ?? [] }
@@ -88,6 +91,7 @@ public final class StubURLProtocol: URLProtocol {
             StubURLProtocol.state.withLock { $0[id] = Table(routes: routes, recorded: $0[id]?.recorded ?? []) }
         }
 
+        /// Requests this handle's session has started loading; see the note on the static `recorded`.
         public var recorded: [RecordedRequest] {
             let id = id
             return StubURLProtocol.state.withLock { $0[id]?.recorded ?? [] }

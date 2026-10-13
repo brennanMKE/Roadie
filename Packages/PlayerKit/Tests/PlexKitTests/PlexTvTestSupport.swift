@@ -26,8 +26,8 @@ enum PlexTv {
         .init(method: "POST", path: "/api/v2/pins", status: status, body: try fixture.data)
     }
 
-    static func pollRoute(_ fixture: PlexFixture = .pinCreated, status: Int = 200, error: URLError? = nil) throws -> StubURLProtocol.Route {
-        .init(path: "/api/v2/pins/123456789", status: status, body: try fixture.data, error: error)
+    static func pollRoute(_ fixture: PlexFixture = .pinCreated, status: Int = 200, error: URLError? = nil, delay: TimeInterval = 0) throws -> StubURLProtocol.Route {
+        .init(path: "/api/v2/pins/123456789", status: status, body: try fixture.data, error: error, delay: delay)
     }
 
     static func resourcesRoute(body: Data? = nil, status: Int = 200) throws -> StubURLProtocol.Route {
