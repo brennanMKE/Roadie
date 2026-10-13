@@ -1,0 +1,16 @@
+✔ Test newSelectionSupersedesLoad() passed after 0.615 seconds.
+✔ Test restartingSameTrackSupersedesLoad() passed after 0.615 seconds.
+✔ Suite LoadingStateTests passed after 0.615 seconds.
+✔ Test removingCurrentWhilePausedStaysPaused() passed after 0.686 seconds.
+✔ Suite RemoveCurrentTrackTests passed after 0.686 seconds.
+2026-10-13 19:00:25.270 swiftpm-testing-helper[1785:9263] Audio files cannot be non-interleaved. Ignoring setting AVLinearPCMIsNonInterleaved YES.
+2026-10-13 19:00:25.958 swiftpm-testing-helper[1785:9263] Audio files cannot be non-interleaved. Ignoring setting AVLinearPCMIsNonInterleaved YES.
+✘ Test mixedFormatsAdvanceWithoutGapRealtime() recorded an issue at MixedFormatTests.swift:265:9: Expectation failed: blocks.left[first...last].filter { $0 <= t }.isEmpty
+↳ blocks.left[first...last].filter { $0 <= t }.isEmpty → false
+↳   blocks.left[first...last].filter { $0 <= t } → [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+↳   isEmpty → false
+✘ Test mixedFormatsAdvanceWithoutGapRealtime() recorded an issue at MixedFormatTests.swift:266:9: Expectation failed: blocks.right[first...last].filter { $0 <= t }.isEmpty
+↳ blocks.right[first...last].filter { $0 <= t }.isEmpty → false
+↳   blocks.right[first...last].filter { $0 <= t } → [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+↳   isEmpty → false
+✘ Test mixedFormatsAdvanceWithoutGapRealtime() failed after 2.560 seconds with 2 issues.
