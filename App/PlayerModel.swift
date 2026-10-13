@@ -1,3 +1,4 @@
+import AppKit
 import AudioCore
 import Foundation
 import Observation
@@ -43,14 +44,42 @@ final class PlayerModel {
     func stop() { player.stop() }
     func previous() { player.previous() }
     func next() { player.next() }
-    func eject() { isImporting = true }
+    /// Winamp's eject button opens the file dialog.
+    func eject() { openAudioFiles(replace: true) }
 
-    /// Temporary drop-to-play path until the open panel lands (0006).
-    func playFiles(_ urls: [URL]) {
-        let tracks = urls.compactMap { try? Track.file(at: $0) }
-        guard !tracks.isEmpty else { return }
-        let start = player.queue.tracks.count
-        player.enqueue(tracks)
-        player.play(at: start)
+    /// Shows the open panel for audio files and folders. Open replaces the queue and plays;
+    /// Add appends. The app is not sandboxed, so the returned URLs are directly readable.
+    func openAudioFiles(replace: Bool) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = LocalTrackLoader.audioTypes
+        panel.message = "Choose audio files or folders"
+        panel.prompt = replace ? "Open" : "Add"
+        Task {
+            guard await panel.begin() == .OK else { return }
+            importLocalFiles(panel.urls, replace: replace)
+        }
+    }
+
+    /// Loads files and folders off the main actor, then queues them. Replacing clears the queue
+    /// and starts the first new track; appending only starts playback on an idle, empty player.
+    func importLocalFiles(_ urls: [URL], replace: Bool) {
+        guard !urls.isEmpty else { return }
+        Task {
+            let result = await LocalTrackLoader.load(urls)
+            guard !result.tracks.isEmpty else {
+                if !result.skipped.isEmpty {
+                    errorMessage = "Skipped \(result.skipped.count) file(s) \u{2014} see Console"
+                }
+                return
+            }
+            let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty
+            if replace { player.clearQueue() }
+            let start = player.queue.tracks.count
+            player.enqueue(result.tracks)
+            if replace || wasIdle { player.play(at: start) }
+        }
     }
 }

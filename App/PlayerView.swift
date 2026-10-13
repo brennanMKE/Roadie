@@ -23,14 +23,11 @@ struct PlayerView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            if let url = urls.first(where: { $0.pathExtension.lowercased() == "wsz" }) {
-                model.loadSkin(from: url)
-                return true
-            }
-            let audio = urls.filter { UTType(filenameExtension: $0.pathExtension)?.conforms(to: .audio) == true }
-            guard !audio.isEmpty else { return false }
-            model.playFiles(audio)
-            return true
+            let skin = urls.first { $0.pathExtension.lowercased() == "wsz" }
+            let others = urls.filter { $0.pathExtension.lowercased() != "wsz" }
+            if let skin { model.loadSkin(from: skin) }
+            if !others.isEmpty { model.importLocalFiles(others, replace: false) }
+            return skin != nil || !others.isEmpty
         }
         .fileImporter(isPresented: $model.isImporting, allowedContentTypes: [.wsz, .zip]) { result in
             if case .success(let url) = result { model.loadSkin(from: url) }
