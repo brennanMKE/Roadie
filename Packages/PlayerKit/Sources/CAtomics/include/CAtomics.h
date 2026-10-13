@@ -14,4 +14,9 @@ static inline void ca_store_release(int64_t *p, int64_t v) {
     atomic_store_explicit((_Atomic int64_t *)p, v, memory_order_release);
 }
 
+/// Orders earlier loads before later loads (seqlock reader pattern: copy, fence, recheck counter).
+static inline void ca_fence_acquire(void) {
+    atomic_thread_fence(memory_order_acquire);
+}
+
 #endif

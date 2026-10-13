@@ -32,34 +32,51 @@ public final class VisSampleRing: @unchecked Sendable {
     /// Monotonic total of samples written.
     public var writeCount: Int { Int(ca_load_acquire(counter)) }
 
-    /// Producer thread only. A write larger than `capacity` keeps just its tail.
+    /// Largest span the producer writes before publishing the counter, so an unpublished write is
+    /// never more than this far ahead of `writeCount`.
+    public var maxChunk: Int { capacity / 4 }
+
+    /// Producer thread only. Data is published in slices of at most `maxChunk`. A write larger than
+    /// `capacity` keeps just its tail (the dropped head is never written; do not rely on reading it).
     public func write(_ samples: UnsafePointer<Float>, count: Int) {
         guard count > 0 else { return }
         var src = samples
         var n = count
-        var start = produced
         if n > capacity {
             let skip = n - capacity
             src += skip
-            start += skip
+            produced += skip
             n = capacity
         }
-        let index = start & mask
-        let first = min(n, capacity - index)
-        memcpy(storage + index, src, first * MemoryLayout<Float>.stride)
-        if n > first {
-            memcpy(storage, src + first, (n - first) * MemoryLayout<Float>.stride)
+        let chunk = maxChunk
+        while n > 0 {
+            let len = min(n, chunk)
+            let index = produced & mask
+            let first = min(len, capacity - index)
+            memcpy(storage + index, src, first * MemoryLayout<Float>.stride)
+            if len > first {
+                memcpy(storage, src + first, (len - first) * MemoryLayout<Float>.stride)
+            }
+            produced += len
+            ca_store_release(counter, Int64(produced))
+            src += len
+            n -= len
         }
-        produced += count
-        ca_store_release(counter, Int64(produced))
+    }
+
+    /// True if the region starting at `begin` cannot have been touched by the producer, given the
+    /// current published count plus at most one in-flight slice.
+    func isIntact(begin: Int) -> Bool {
+        writeCount - begin <= capacity - maxChunk
     }
 
     /// Consumer thread only. Copies the newest `count` samples (oldest first) into `out`.
-    /// Returns false if fewer than `count` exist yet or the producer overwrote the region
-    /// during the copy (torn read); the caller keeps its previous frame.
+    /// Returns false if fewer than `count` exist yet, `count` exceeds `capacity - maxChunk`, or the
+    /// producer may have overwritten the region during the copy (torn read); the caller keeps its
+    /// previous frame.
     @discardableResult
     public func copyLatest(count: Int, into out: UnsafeMutablePointer<Float>) -> Bool {
-        guard count > 0, count <= capacity else { return false }
+        guard count > 0, count <= capacity - maxChunk else { return false }
         let end = writeCount
         guard end >= count else { return false }
         let begin = end - count
@@ -69,6 +86,7 @@ public final class VisSampleRing: @unchecked Sendable {
         if count > first {
             memcpy(out + first, storage, (count - first) * MemoryLayout<Float>.stride)
         }
-        return writeCount - begin <= capacity
+        ca_fence_acquire()
+        return isIntact(begin: begin)
     }
 }

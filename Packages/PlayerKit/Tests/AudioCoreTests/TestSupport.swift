@@ -20,3 +20,14 @@ func makeTracks(_ n: Int, from start: Int = 0) -> [Track] {
 }
 
 func queue(_ n: Int) -> PlayQueue { PlayQueue(tracks: makeTracks(n)) }
+
+/// Polls `condition` every 10 ms until it holds or `timeoutMillis` passes.
+@MainActor
+func waitUntil(timeoutMillis: Int = 5000, _ condition: @MainActor () -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + .milliseconds(timeoutMillis)
+    while ContinuousClock.now < deadline {
+        if condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return condition()
+}

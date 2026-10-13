@@ -21,15 +21,14 @@ import Testing
         let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!
         try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 512)
         player.play()
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(player.analyzer.isInstalled)
+        #expect(await waitUntil { player.state == .playing && player.analyzer.isInstalled })
 
         let out = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat, frameCapacity: 512)!
         for i in 0..<40 {
             _ = try engine.renderOffline(512, to: out)
             if i % 8 == 0 { try await Task.sleep(for: .milliseconds(10)) }
         }
-        try await Task.sleep(for: .milliseconds(200))
+        #expect(await waitUntil { player.analyzer.latestFrame() != nil })
 
         let frame = try #require(player.analyzer.latestFrame())
         let map = try #require(player.analyzer.columnMap)

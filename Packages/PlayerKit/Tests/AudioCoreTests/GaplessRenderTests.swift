@@ -21,14 +21,6 @@ import Testing
         try file.write(from: buffer)
     }
 
-    func waitUntil(_ condition: () -> Bool) async -> Bool {
-        for _ in 0..<500 {
-            if condition() { return true }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-        return condition()
-    }
-
     @Test func consecutiveFilesRenderWithoutSilentGap() async throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "gapless-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

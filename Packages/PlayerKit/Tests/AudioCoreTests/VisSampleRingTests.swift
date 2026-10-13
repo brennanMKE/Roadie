@@ -37,6 +37,21 @@ import Testing
         let ring = VisSampleRing(capacity: 1024)
         write(ring, (0..<3000).map(Float.init))
         #expect(ring.writeCount == 3000)
-        #expect(latest(ring, 1024) == (1976..<3000).map(Float.init))
+        #expect(latest(ring, 768) == (2232..<3000).map(Float.init))
+    }
+
+    @Test func tornReadBoundaryIsCapacityMinusMaxChunk() {
+        let ring = VisSampleRing(capacity: 1024)
+        #expect(ring.maxChunk == 256)
+        write(ring, [Float](repeating: 1, count: 512))
+        #expect(ring.isIntact(begin: 0))
+        write(ring, [Float](repeating: 1, count: 256))
+        #expect(ring.writeCount == 768)
+        #expect(ring.isIntact(begin: 0))
+        write(ring, [1])
+        #expect(!ring.isIntact(begin: 0))
+        // A request larger than capacity - maxChunk is refused outright.
+        #expect(latest(ring, 769) == nil)
+        #expect(latest(ring, 768) != nil)
     }
 }
