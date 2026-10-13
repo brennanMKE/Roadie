@@ -9,6 +9,13 @@ struct PlexAccountClientTests {
         return (handle, PlexTv.account(handle))
     }
 
+    /// The recorded request, rebuilt so the log rule can be applied to what the client really sent.
+    private func logRequest(_ recorded: StubURLProtocol.RecordedRequest) -> URLRequest {
+        var request = URLRequest(url: recorded.url)
+        request.httpMethod = recorded.method
+        return request
+    }
+
     @Test func createPinPostsWithoutAToken() async throws {
         let (handle, account) = make()
         handle.register([try PlexTv.createRoute()])
@@ -16,6 +23,7 @@ struct PlexAccountClientTests {
         let request = try #require(handle.recorded.first)
         #expect(request.method == "POST")
         #expect(request.url.path == "/api/v2/pins")
+        #expect(PlexClient.logDescription(of: logRequest(request)) == "POST /api/v2/pins")
         #expect(URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems == [.init(name: "strong", value: "true")])
         #expect(PlexTv.header(request, "Accept") == "application/json")
         #expect(PlexTv.header(request, "X-Plex-Product") == "SkinAmp")
@@ -35,6 +43,7 @@ struct PlexAccountClientTests {
         let request = try #require(handle.recorded.last)
         #expect(request.method == "GET")
         #expect(request.url.path == "/api/v2/pins/123456789")
+        #expect(PlexClient.logDescription(of: logRequest(request)) == "GET /api/v2/pins/<redacted>")
         #expect(URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems == [.init(name: "code", value: created.code)])
         #expect(PlexTv.header(request, "X-Plex-Token") == nil)
     }

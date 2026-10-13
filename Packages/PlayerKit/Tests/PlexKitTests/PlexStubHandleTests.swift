@@ -40,4 +40,23 @@ struct PlexStubHandleTests {
         handle.register([.init(path: "/identity", host: nil, body: identity)])
         #expect(try await machine("c.local") == "0123456789abcdef0123456789abcdef01234567")
     }
+
+    @Test func stoppedLoadsAreRecordedAsCancelled() async throws {
+        let handle = StubURLProtocol.handle()
+        let identity = try PlexFixture.identity.data
+        handle.register([.init(path: "/identity", body: identity, delay: 60)])
+        let client = PlexClient(baseURL: URL(string: "http://stub.local:32400")!, token: nil, clientIdentifier: "x", session: handle.session)
+        let task = Task { try await client.identity() }
+        #expect(await PlexTv.wait { handle.recorded.count == 1 })
+        task.cancel()
+        await #expect(throws: PlexError.transport(.cancelled)) { _ = try await task.value }
+        #expect(await PlexTv.wait { handle.cancelled.count == 1 })
+        #expect(handle.cancelled.first?.url.path == "/identity")
+
+        // A load that completes normally also gets stopLoading; it is not a cancel.
+        handle.register([.init(path: "/identity", body: identity)])
+        _ = try await client.identity()
+        #expect(handle.recorded.count == 2)
+        #expect(handle.cancelled.count == 1)
+    }
 }

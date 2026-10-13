@@ -58,6 +58,7 @@ public final class StubURLProtocol: URLProtocol {
     private struct Table {
         var routes: [Route] = []
         var recorded: [RecordedRequest] = []
+        var cancelled: [RecordedRequest] = []
     }
 
     /// Route tables keyed by session id. The static API uses the `""` key.
@@ -65,7 +66,7 @@ public final class StubURLProtocol: URLProtocol {
 
     /// Replaces the route table.
     public static func register(_ routes: [Route]) {
-        state.withLock { $0[""] = Table(routes: routes, recorded: $0[""]?.recorded ?? []) }
+        state.withLock { $0[""] = Table(routes: routes, recorded: $0[""]?.recorded ?? [], cancelled: $0[""]?.cancelled ?? []) }
     }
 
     /// Clears routes and recordings.
@@ -82,6 +83,14 @@ public final class StubURLProtocol: URLProtocol {
         state.withLock { $0[""]?.recorded ?? [] }
     }
 
+    /// Requests whose load URLSession stopped before the stub had answered them.
+    ///
+    /// That is what a cancelled task looks like; a request that completed normally is never
+    /// here, so a test can wait for a held (`delay`) request to appear instead of sleeping.
+    public static var cancelled: [RecordedRequest] {
+        state.withLock { $0[""]?.cancelled ?? [] }
+    }
+
     /// Requests from a `Handle`'s session carry its id in this header; the stub strips it from recordings.
     public static let sessionHeader = "X-Stub-Session"
 
@@ -93,13 +102,22 @@ public final class StubURLProtocol: URLProtocol {
 
         public func register(_ routes: [Route]) {
             let id = id
-            StubURLProtocol.state.withLock { $0[id] = Table(routes: routes, recorded: $0[id]?.recorded ?? []) }
+            StubURLProtocol.state.withLock { $0[id] = Table(routes: routes, recorded: $0[id]?.recorded ?? [], cancelled: $0[id]?.cancelled ?? []) }
         }
 
         /// Requests this handle's session has started loading; see the note on the static `recorded`.
         public var recorded: [RecordedRequest] {
             let id = id
             return StubURLProtocol.state.withLock { $0[id]?.recorded ?? [] }
+        }
+
+        /// Requests whose load URLSession stopped before the stub had answered them.
+        ///
+        /// That is what a cancelled task looks like; a request that completed normally is never
+        /// here, so a test can wait for a held (`delay`) request to appear instead of sleeping.
+        public var cancelled: [RecordedRequest] {
+            let id = id
+            return StubURLProtocol.state.withLock { $0[id]?.cancelled ?? [] }
         }
 
         public func reset() {
@@ -139,9 +157,11 @@ public final class StubURLProtocol: URLProtocol {
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let start = request.value(forHTTPHeaderField: "X-Plex-Container-Start").flatMap(Int.init)
 
+        let recordedRequest = RecordedRequest(url: url, method: method, headers: headers)
+        flags.withLock { $0.record = (sessionID, recordedRequest) }
         let route = Self.state.withLock { tables -> Route? in
             var table = tables[sessionID] ?? Table()
-            table.recorded.append(RecordedRequest(url: url, method: method, headers: headers))
+            table.recorded.append(recordedRequest)
             tables[sessionID] = table
             let index = table.routes.firstIndex { route in
                 (route.times ?? 1) > 0
@@ -161,6 +181,7 @@ public final class StubURLProtocol: URLProtocol {
         }
 
         guard let route else {
+            flags.withLock { $0.delivered = true }
             respond(url: url, status: 404, headers: [:], body: Data())
             return
         }
@@ -173,21 +194,41 @@ public final class StubURLProtocol: URLProtocol {
             }
         }
         if route.delay > 0 {
-            let stopped = self.stopped
+            let flags = self.flags
             nonisolated(unsafe) let stub = self
             DispatchQueue.global().asyncAfter(deadline: .now() + route.delay) {
-                if stopped.withLock({ $0 }) { return }
-                deliver(stub)
+                // Checked and marked in one critical section, so a stop and a delivery cannot both win.
+                let go = flags.withLock { state -> Bool in
+                    if state.stopped { return false }
+                    state.delivered = true
+                    return true
+                }
+                if go { deliver(stub) }
             }
         } else {
+            flags.withLock { $0.delivered = true }
             deliver(self)
         }
     }
 
-    private let stopped = OSAllocatedUnfairLock(initialState: false)
+    private struct Flags {
+        var stopped = false
+        var delivered = false
+        var record: (sessionID: String, request: RecordedRequest)?
+    }
 
+    private let flags = OSAllocatedUnfairLock(initialState: Flags())
+
+    /// Also called after a normal completion; `delivered` tells that apart from a cancel.
     public override func stopLoading() {
-        stopped.withLock { $0 = true }
+        let cancelledRecord = flags.withLock { state -> (sessionID: String, request: RecordedRequest)? in
+            state.stopped = true
+            return state.delivered ? nil : state.record
+        }
+        guard let cancelledRecord else { return }
+        Self.state.withLock { tables in
+            tables[cancelledRecord.sessionID, default: Table()].cancelled.append(cancelledRecord.request)
+        }
     }
 
     private func respond(url: URL, status: Int, headers: [String: String], body: Data) {

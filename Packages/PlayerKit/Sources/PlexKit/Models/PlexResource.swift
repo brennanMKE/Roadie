@@ -65,13 +65,8 @@ public struct PlexResource: Decodable, Hashable, Sendable, Identifiable {
     /// Local https non-relay, remote https non-relay, relay, http; IPv4 before IPv6 within a
     /// tier; Plex's own order is kept within the rest.
     public var rankedConnections: [PlexResourceConnection] {
-        func tier(_ c: PlexResourceConnection) -> Int {
-            if !c.isHTTPS { return 3 }
-            if c.relay { return 2 }
-            return c.local ? 0 : 1
-        }
         return connections.enumerated().sorted { a, b in
-            let (ta, tb) = (tier(a.element), tier(b.element))
+            let (ta, tb) = (a.element.tier, b.element.tier)
             if ta != tb { return ta < tb }
             if a.element.ipv6 != b.element.ipv6 { return !a.element.ipv6 }
             return a.offset < b.offset
@@ -107,4 +102,25 @@ public struct PlexResource: Decodable, Hashable, Sendable, Identifiable {
         self.owned = owned
         self.connections = connections
     }
+}
+
+extension PlexResourceConnection {
+    /// The ranking tier `PlexResource.rankedConnections` uses, best first.
+    public enum Tier: Int, Comparable, Sendable {
+        case localHTTPS, remoteHTTPS, relay, http
+
+        public static func < (a: Tier, b: Tier) -> Bool { a.rawValue < b.rawValue }
+
+        /// "local https", "remote https", "relay", "http": for logs; never an address.
+        public var name: String {
+            switch self {
+            case .localHTTPS: "local https"
+            case .remoteHTTPS: "remote https"
+            case .relay: "relay"
+            case .http: "http"
+            }
+        }
+    }
+
+    public var tier: Tier { !isHTTPS ? .http : relay ? .relay : local ? .localHTTPS : .remoteHTTPS }
 }

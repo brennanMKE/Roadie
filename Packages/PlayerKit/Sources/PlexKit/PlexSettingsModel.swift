@@ -36,6 +36,11 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
     @ObservationIgnored private let serverResolver: PlexServerResolver
     @ObservationIgnored private let openURL: PlexPinSignIn.URLOpener
     @ObservationIgnored private var signInTask: Task<Void, Never>?
+    /// The one handle for every server lookup (resources, probe, auto-select chain). Invariant:
+    /// every assignment cancels the previous task first, so a task that is not cancelled is the
+    /// current one and may clear this field; a cancelled task never touches model state, and
+    /// whoever cancelled it owns the state. `invalidate()` must not cancel it: `resolveAndUse`
+    /// sets `address`, which calls `invalidate()` from inside the task.
     @ObservationIgnored private var serversTask: Task<Void, Never>?
     @ObservationIgnored private var loaded = false
     /// The field was edited since the last successful load or commit. Only then does closing the
@@ -204,6 +209,7 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         if tokenDirty { commitToken() }
         cancelTest()
         cancelSignIn()
+        cancelServers()
     }
 
     /// Return in the token field. Commits only an edit, so Return in a field left empty by a
@@ -240,9 +246,7 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         cancelSignIn()
         tokenText = ""
         commitToken()
-        serversTask?.cancel()
-        serversTask = nil
-        isLoadingServers = false
+        cancelServers()
         servers = []
         serversMessage = nil
         signInStatus = .idle
@@ -324,6 +328,8 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         isLoadingServers = true
         serversTask = Task { [weak self] in
             await self?.resolveAndUse(resource)
+            guard let self, !Task.isCancelled else { return }
+            self.serversTaskFinished()
         }
     }
 
@@ -353,17 +359,16 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
             guard let self, !Task.isCancelled else { return }
             self.applyServers(result)
             if useOnlyServer, self.servers.count == 1, let only = self.servers.first {
-                self.isLoadingServers = true
                 await self.resolveAndUse(only)
             }
+            guard !Task.isCancelled else { return }
+            self.serversTaskFinished()
         }
     }
 
     private func resolveAndUse(_ resource: PlexResource) async {
         let connection = await serverResolver.reachableConnection(of: resource)
         guard !Task.isCancelled else { return }
-        serversTask = nil
-        isLoadingServers = false
         if let connection {
             log.info("server: resolved")
             serversMessage = nil
@@ -420,9 +425,18 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         }
     }
 
-    private func applyServers(_ result: Result<[PlexResource], PlexError>) {
+    private func cancelServers() {
+        serversTask?.cancel()
         serversTask = nil
         isLoadingServers = false
+    }
+
+    private func serversTaskFinished() {
+        serversTask = nil
+        isLoadingServers = false
+    }
+
+    private func applyServers(_ result: Result<[PlexResource], PlexError>) {
         switch result {
         case .success(let list):
             servers = list

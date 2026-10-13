@@ -33,6 +33,25 @@ struct PlexClientTests {
         #expect(!request.url.absoluteString.contains(Self.secret))
     }
 
+    @Test func logLineNamesTheMethodAndRedactsThePinId() throws {
+        let code = "FIXTURECODE0123456789AB"
+        let plain = client()
+        func line(_ client: PlexClient, _ method: String, _ path: String, _ query: [URLQueryItem] = []) -> String {
+            PlexClient.logDescription(of: client.request(method: method, path: path, query: query))
+        }
+        #expect(line(plain, "POST", "/api/v2/pins", [.init(name: "strong", value: "true")]) == "POST /api/v2/pins")
+        let poll = line(plain, "GET", "/api/v2/pins/123456789", [.init(name: "code", value: code)])
+        #expect(poll == "GET /api/v2/pins/<redacted>")
+        #expect(!poll.contains("123456789"))
+        #expect(!poll.contains(code))
+        #expect(!poll.contains("code="))
+        #expect(line(plain, "GET", "/library/sections/9/all", [.init(name: "type", value: "8")]) == "GET /library/sections/9/all")
+        #expect(line(plain, "GET", "/api/v2/pins") == "GET /api/v2/pins")
+        let proxied = client(base: "http://stub.local:32400/proxy")
+        #expect(line(proxied, "GET", "/api/v2/pins/123456789") == "GET /proxy/api/v2/pins/<redacted>")
+        #expect(!line(plain, "GET", "/identity").contains(Self.secret))
+    }
+
     @Test func identityWithoutTokenSendsNoTokenHeader() async throws {
         let client = client(token: nil)
         StubURLProtocol.register([try .json(.identity, path: "/identity")])

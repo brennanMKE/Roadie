@@ -494,6 +494,74 @@ struct PlexSettingsModelTests {
         }
     }
 
+    @Test func forgetAndCloseCancelEveryServerLookup() async throws {
+        enum Lookup: CaseIterable { case resources, useServer, autoSelect }
+        enum Action: CaseIterable { case forget, close }
+        let identity = try PlexFixture.identity.data
+        for lookup in Lookup.allCases {
+            for action in Action.allCases {
+                let h = make(token: lookup == .autoSelect ? nil : Self.secret)
+                defer { h.cleanup() }
+                let handle = h.handle
+                let cancelledPath: String
+                let expected: Int
+                switch lookup {
+                case .resources:
+                    h.model.load()
+                    handle.register([delayed(try PlexTv.resourcesRoute(), 60)])
+                    h.model.loadServers()
+                    #expect(await PlexTv.wait { handle.recorded.contains { $0.url.path == "/api/v2/resources" } })
+                    cancelledPath = "/api/v2/resources"
+                    expected = 1
+                case .useServer:
+                    h.model.load()
+                    handle.register([try PlexTv.resourcesRoute(), .init(path: "/identity", body: identity, delay: 60)])
+                    h.model.loadServers()
+                    await h.model.waitForServers()
+                    let server = try #require(h.model.servers.first)
+                    expected = server.rankedConnections.compactMap(\.url).count
+                    h.model.useServer(server)
+                    #expect(await PlexTv.wait { handle.recorded.filter { $0.url.path == "/identity" }.count == expected })
+                    cancelledPath = "/identity"
+                case .autoSelect:
+                    let only = try PlexTv.ownedServerOnly()
+                    handle.register([
+                        try PlexTv.createRoute(), try PlexTv.pollRoute(.pinClaimed), try PlexTv.resourcesRoute(body: only),
+                        .init(path: "/identity", body: identity, delay: 60),
+                    ])
+                    let resources = try JSONDecoder().decode([PlexResource].self, from: only)
+                    expected = resources[0].rankedConnections.compactMap(\.url).count
+                    h.model.signIn()
+                    await h.model.waitForSignIn()
+                    #expect(h.model.isLoadingServers)
+                    // The held probes mean the model is inside resolveAndUse, past the point where
+                    // the old code had already dropped its handle on the task.
+                    #expect(await PlexTv.wait { handle.recorded.filter { $0.url.path == "/identity" }.count == expected })
+                    cancelledPath = "/identity"
+                }
+                switch action {
+                case .forget: h.model.forgetToken()
+                case .close: h.model.disappeared()
+                }
+                #expect(!h.model.isLoadingServers)
+                #expect(h.model.status == .idle)
+                // No sleep is needed: the held loads can never complete (60 s gate, delivery
+                // suppressed after the stop), so the only way they show up as cancelled is the
+                // lookup really being cancelled, and a cancelled task returns on
+                // Task.isCancelled without touching state.
+                let cancelled = await PlexTv.wait { handle.cancelled.filter { $0.url.path == cancelledPath }.count == expected }
+                #expect(cancelled, "\(lookup) \(action): expected \(expected) cancelled \(cancelledPath)")
+                #expect(h.model.address == "")
+                #expect((h.savedSelection?.address ?? "") == "")
+                #expect(!handle.recorded.contains { $0.url.path == "/library/sections" })
+                if action == .forget {
+                    #expect(h.model.servers.isEmpty)
+                    if lookup == .autoSelect { #expect(h.store.token == nil) }
+                }
+            }
+        }
+    }
+
     @Test func signInFailureKeepsTheStoredToken() async throws {
         let h = make(token: Self.secret)
         defer { h.cleanup() }

@@ -47,11 +47,16 @@ public struct PlexServerResolver: Sendable {
             }
             return best
         }
+        if Task.isCancelled {
+            log.info("server: cancelled")
+            return nil
+        }
         guard let best else {
             log.info("server: none reachable")
             return nil
         }
-        log.info("server: resolved tier \(best)")
-        return ranked[best]
+        let connection = ranked[best]
+        log.info("server: resolved \(connection.tier.name, privacy: .public), rank \(best + 1) of \(ranked.count)")
+        return connection
     }
 }

@@ -74,6 +74,7 @@ goes in the `X-Plex-Token` header, never in a URL.
 3. Poll `GET https://plex.tv/api/v2/pins/<id>?code=<code>` every 2 seconds until `authToken` is set. The app
    stops after 10 minutes (the PIN itself lives about 30). A 404 means the PIN expired. Up to 5 transport or
    server errors in a row are retried. Cancel, Forget, editing the token and closing Settings stop the loop.
+   The log shows `GET /api/v2/pins/<redacted>`: the method and the path with the id redacted, never the query.
 4. The token goes to the Keychain and the connection test runs. With no address saved, the app lists the
    account's servers and, when there is exactly one, uses it.
 5. `GET https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1` lists each server with its connections
@@ -228,7 +229,7 @@ Checked by hand on the host with the real account. Steps are in issue #0014; eac
 | Check | Expected | Result |
 |---|---|---|
 | 1. Sign in, fresh | Browser opens the auth URL (clientID, 24-char code, no token); green "Signed in with Plex." within about 2 s of confirming; connection test runs | pending |
-| 2. Where the token went | Not in `defaults`; one Keychain item; Console shows no code, query or token; "SkinAmp" listed under plex.tv devices | pending |
+| 2. Where the token went | Not in `defaults`; one Keychain item; Console shows no code, PIN id, query or token; "SkinAmp" listed under plex.tv devices | pending |
 | 3. Choose Server | Owned server listed with its plex.direct host; Use sets an `https://…plex.direct:32400` address and connects; persists across relaunch | pending |
 | 4. Away from home | Remote or relay address wins, or the "kept" message appears with the address untouched | pending |
 | 5. Cancel and close | No spinner or red text; stored token kept; 10-minute timeout message (optional) | pending |

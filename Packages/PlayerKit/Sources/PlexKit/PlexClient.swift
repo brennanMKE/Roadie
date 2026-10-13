@@ -38,8 +38,8 @@ public struct PlexClient: Sendable, CustomStringConvertible, CustomDebugStringCo
     public var debugDescription: String { description }
 
     /// Builds a request (GET unless `method` says otherwise) with every Plex header set. Public so a
-    /// download can use the same headers (token in the header, never in the URL). The path is
-    /// logged by `fetch`; the query is not.
+    /// download can use the same headers (token in the header, never in the URL). `fetch` logs
+    /// `logDescription(of:)`: the method and the path with a PIN id redacted; never the query.
     public func request(method: String = "GET", path: String, query: [URLQueryItem] = [], page: PlexPageRequest? = nil) -> URLRequest {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) ?? URLComponents()
         let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
@@ -70,15 +70,27 @@ public struct PlexClient: Sendable, CustomStringConvertible, CustomDebugStringCo
         return request
     }
 
-    func fetch<T: Decodable>(_ request: URLRequest) async throws -> T {
+    /// What `fetch` logs for a request: the method and the path, never the query, and never a
+    /// plex.tv PIN id (everything after `/api/v2/pins/` is `<redacted>`). Add a rule here, not a
+    /// call-site parameter, if another path ever carries a secret.
+    public static func logDescription(of request: URLRequest) -> String {
+        let method = request.httpMethod ?? "GET"
         let path = request.url?.path ?? ""
-        log.debug("GET \(path, privacy: .public)")
+        if let range = path.range(of: "/api/v2/pins/"), range.upperBound < path.endIndex {
+            return "\(method) \(path[..<range.upperBound])<redacted>"
+        }
+        return "\(method) \(path)"
+    }
+
+    func fetch<T: Decodable>(_ request: URLRequest) async throws -> T {
+        let line = Self.logDescription(of: request)
+        log.debug("\(line, privacy: .public)")
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError {
-            log.error("GET \(path, privacy: .public) failed: transport \(error.code.rawValue)")
+            log.error("\(line, privacy: .public) failed: transport \(error.code.rawValue)")
             throw PlexError.transport(error.code)
         }
         guard let http = response as? HTTPURLResponse else {
@@ -87,18 +99,18 @@ public struct PlexClient: Sendable, CustomStringConvertible, CustomDebugStringCo
         switch http.statusCode {
         case 200..<300: break
         case 401:
-            log.error("GET \(path, privacy: .public) failed: 401")
+            log.error("\(line, privacy: .public) failed: 401")
             throw PlexError.unauthorized
         case 404:
-            log.error("GET \(path, privacy: .public) failed: 404")
+            log.error("\(line, privacy: .public) failed: 404")
             throw PlexError.notFound
         default:
-            log.error("GET \(path, privacy: .public) failed: \(http.statusCode)")
+            log.error("\(line, privacy: .public) failed: \(http.statusCode)")
             throw PlexError.httpStatus(http.statusCode)
         }
         let contentType = http.value(forHTTPHeaderField: "Content-Type")
         guard contentType?.lowercased().contains("json") == true else {
-            log.error("GET \(path, privacy: .public) failed: not JSON")
+            log.error("\(line, privacy: .public) failed: not JSON")
             throw PlexError.notJSON(contentType: contentType)
         }
         do {
