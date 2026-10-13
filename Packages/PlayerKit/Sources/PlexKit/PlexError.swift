@@ -19,6 +19,8 @@ public enum PlexError: Error, Hashable, Sendable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidBaseURL: "The server address is not valid."
+        case .transport(.appTransportSecurityRequiresSecureConnection):
+            "App Transport Security requires https for this address (network error -1022)."
         case .transport(let code): "Could not reach the server (network error \(code.rawValue))."
         case .unauthorized: "The server rejected the sign-in."
         case .notFound: "The server has no such item."

@@ -5,8 +5,8 @@ tracks. It also proposes a Settings screen where the user enters their own serve
 or IP.
 
 Everything under "What the server looks like" was checked against the live server on
-2026-10-12. The sign-in flow and the macOS networking notes were not tested and are marked
-as such.
+2026-10-12. The sign-in flow was not tested and is marked as such (#0014). The macOS
+networking checks are recorded under "macOS networking".
 
 ## What the server looks like
 
@@ -160,7 +160,9 @@ password is rejected. A Plex Web link (`…/web/index.html`) is cut back to the 
 
 | Check | Failure | Message |
 |---|---|---|
-| `GET /identity`, no token | No response | "Can't reach the server. Check the address, and whether you're on the home network or Tailscale." |
+| `GET /identity`, no token | No response | "Can't reach the server. Check the address, whether you're on the home network or Tailscale, and that SkinAmp is allowed under System Settings › Privacy & Security › Local Network." |
+| `GET /identity`, no token | ATS refused plain `http` (`-1022`) | "Plain http isn't allowed for this address. Use a short name like joe, a .local name, an IP address, or an https:// address." |
+| `GET /identity`, no token | Answered, but not Plex (404, HTML, 500) | "Can't reach the server. Check the address, and whether you're on the home network or Tailscale." |
 | `GET /library/sections`, with token | 401 | "Signed in, but this account can't access this server." |
 | Any section with `type == "artist"` | None found | "This server has no music library." |
 
@@ -170,16 +172,29 @@ than showing the wrong server's music.
 
 ## macOS networking
 
-*These notes are not yet tested in this app.*
+The keys are set in `project.yml` (`NSAppTransportSecurity.NSAllowsLocalNetworking`,
+`NSLocalNetworkUsageDescription`) and checked on every VM run by `scripts/check-info-plist.sh`.
+The connections themselves are checked by hand on the host; the results are in the table below
+and are `pending` until they are recorded.
 
 - **App Transport Security.** Plain HTTP is blocked by default. Setting
   `NSAppTransportSecurity` → `NSAllowsLocalNetworking = YES` covers unqualified names
   (`joe`), `.local` names and IP addresses. It does **not** cover a full Tailscale name
-  such as `joe.<tailnet>.ts.net`, which stays blocked over HTTP. For those, use the
+  such as `joe.<tailnet>.ts.net`, which stays blocked over HTTP; the user sees "Plain http
+  isn't allowed for this address…" with network error -1022. For those, use the
   `plex.direct` HTTPS URI, or ask users to enter the short name.
 - **Local Network privacy (macOS 15 and later).** The first connection to a LAN address
   shows a system permission prompt. Add `NSLocalNetworkUsageDescription` to the Info.plist
   so the prompt explains why. If the user denies it, LAN connections fail in the same way
-  as an unreachable server, so the "can't reach" message should mention this setting.
+  as an unreachable server, so the "can't reach" message ends with "…and that SkinAmp is
+  allowed under System Settings › Privacy & Security › Local Network."
 - **Sandbox.** The app is unsandboxed for now (`project.yml`). If App Sandbox is turned on,
   it needs `com.apple.security.network.client`.
+
+| Address | Expected | Result |
+|---|---|---|
+| `joe` | Connected; no Local Network prompt when `joe` resolves to a Tailscale address | pending |
+| `brennan-mac-mini-m1.local` | Local Network prompt once (text = `NSLocalNetworkUsageDescription`), then Connected | pending |
+| LAN IP (not written down; it is DHCP) | Connected, no second prompt | pending |
+| `joe.<tailnet>.ts.net` over `http` | "Plain http isn't allowed…", detail `-1022` | pending |
+| `.local` or IP with Local Network off for SkinAmp | "Can't reach the server… Local Network.", detail code recorded here | pending |

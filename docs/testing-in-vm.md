@@ -10,7 +10,7 @@ the golden image itself.
 ## Quick start
 
 ```bash
-scripts/run-tests-vm.sh            # working tree: SkinKit tests, PlayerKit tests, app build
+scripts/run-tests-vm.sh            # working tree: SkinKit tests, PlayerKit tests, app build, Info.plist check
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s, then quit it
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 ```
@@ -22,6 +22,7 @@ clone starts cold. The summary at the end looks like this:
 ==> PASS  skinkit-tests
 ==> PASS  playerkit-tests
 ==> PASS  app-build
+==> PASS  app-plist
 ==> PASS  app-launch
     ** BUILD SUCCEEDED **
     ✔ Test run with 100 tests in 24 suites passed after 4.267 seconds.
@@ -140,7 +141,7 @@ consolidated on 2026-10-11.
 6. **Prepare the guest.** Copy `/Volumes/My Shared Files/run/src` to `~/src`, mute the output, and
    record the audio devices.
 7. **Steps.** Each runs in the guest with its output teed to a log: SkinKit tests, PlayerKit tests
-   (with `AUDIOCORE_REALTIME=1`, so the real-time tests run too), the Debug app build, and with `--launch`, opening the app, checking
+   (with `AUDIOCORE_REALTIME=1`, so the real-time tests run too), the Debug app build, the Info.plist check of the built app, and with `--launch`, opening the app, checking
    it is still running after 5 s, and quitting it. `set -o pipefail` is set **inside the guest's
    shell**; without it the status is `tee`'s, which is always 0. Changeover reported false passes
    that way until 2026-10-04.

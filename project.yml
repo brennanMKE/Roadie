@@ -28,6 +28,9 @@ targets:
     info:
       path: App/Info.plist
       properties:
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: SkinAmp connects to your Plex Media Server on your local network to browse and play your music.
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.brennanmke.skinamp.wsz
             UTTypeDescription: Winamp Classic Skin
@@ -47,6 +50,7 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         # Unsandboxed for now so the app can read a large local skin corpus by path.
         ENABLE_APP_SANDBOX: NO
+        # If the sandbox is ever enabled, add com.apple.security.network.client (docs/plex-music-library.md).
 schemes:
   SkinAmp:
     build:

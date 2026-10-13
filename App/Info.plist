@@ -18,6 +18,13 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>SkinAmp connects to your Plex Media Server on your local network to browse and play your music.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

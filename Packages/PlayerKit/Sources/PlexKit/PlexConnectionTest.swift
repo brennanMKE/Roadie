@@ -33,7 +33,15 @@ public enum PlexConnectionFailure: Error, Hashable, Sendable, LocalizedError {
     public var message: String {
         switch self {
         case .invalidAddress: "The server address is not valid."
-        case .unreachable: "Can't reach the server. Check the address, and whether you're on the home network or Tailscale."
+        case .unreachable(.transport(.appTransportSecurityRequiresSecureConnection)):
+            // ATS refused plain http: the address is a dotted name that is not .local. The server may be fine.
+            "Plain http isn't allowed for this address. Use a short name like joe, a .local name, an IP address, or an https:// address."
+        case .unreachable(.transport):
+            // No response at all. A Local Network denial looks exactly like this.
+            "Can't reach the server. Check the address, whether you're on the home network or Tailscale, and that SkinAmp is allowed under System Settings › Privacy & Security › Local Network."
+        case .unreachable:
+            // Something answered, but it is not Plex (404, HTML, a 500).
+            "Can't reach the server. Check the address, and whether you're on the home network or Tailscale."
         case .unauthorized: "Signed in, but this account can't access this server."
         case .noMusicLibrary: "This server has no music library."
         case .cancelled: "The connection test was cancelled."
@@ -51,6 +59,7 @@ public enum PlexConnectionFailure: Error, Hashable, Sendable, LocalizedError {
     fileprivate var caseName: String {
         switch self {
         case .invalidAddress: "invalidAddress"
+        case .unreachable(.transport(let code)): "unreachable(\(code.rawValue))"
         case .unreachable: "unreachable"
         case .unauthorized: "unauthorized"
         case .noMusicLibrary: "noMusicLibrary"

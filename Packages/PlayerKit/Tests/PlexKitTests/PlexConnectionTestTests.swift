@@ -91,7 +91,7 @@ struct PlexConnectionTestTests {
         #expect(handle.recorded.isEmpty)
     }
 
-    @Test(arguments: [URLError.Code.cannotConnectToHost, .timedOut, .cannotFindHost, .notConnectedToInternet, .dnsLookupFailed])
+    @Test(arguments: [URLError.Code.cannotConnectToHost, .timedOut, .cannotFindHost, .notConnectedToInternet, .dnsLookupFailed, .appTransportSecurityRequiresSecureConnection])
     func transportErrorsAreUnreachable(code: URLError.Code) async throws {
         let (handle, test) = make()
         handle.register([.init(path: "/identity", error: URLError(code))])
@@ -99,6 +99,37 @@ struct PlexConnectionTestTests {
         #expect(result == .unreachable(.transport(code)))
         #expect(handle.recorded.count == 1)
         #expect(!String(describing: result).contains(Self.secret))
+    }
+
+    @Test(arguments: [URLError.Code.cannotConnectToHost, .timedOut, .cannotFindHost, .notConnectedToInternet, .dnsLookupFailed, .unknown])
+    func transportFailuresMentionTheLocalNetworkSetting(code: URLError.Code) {
+        let failure = PlexConnectionFailure.unreachable(.transport(code))
+        #expect(failure.message.hasPrefix("Can't reach the server."))
+        #expect(failure.message.contains("Local Network"))
+        #expect(failure.errorDescription == failure.message)
+    }
+
+    @Test func transportSecurityFailureAsksForASafeAddress() async throws {
+        let (handle, test) = make()
+        handle.register([.init(path: "/identity", error: URLError(.appTransportSecurityRequiresSecureConnection))])
+        let result = try #require(await failure(test))
+        #expect(result == .unreachable(.transport(.appTransportSecurityRequiresSecureConnection)))
+        #expect(result.message.hasPrefix("Plain http isn't allowed"))
+        #expect(!result.message.contains("Local Network"))
+        let detail = try #require(result.underlying?.errorDescription)
+        #expect(detail.contains("https"))
+        #expect(detail.contains("-1022"))
+        #expect(handle.recorded.count == 1)
+        for text in [String(describing: result), String(reflecting: result), result.localizedDescription] {
+            #expect(!text.contains(Self.secret))
+        }
+    }
+
+    @Test(arguments: [PlexError.notFound, .notJSON(contentType: "text/html"), .httpStatus(500), .decoding(path: "MediaContainer", detail: "x")])
+    func answeredButNotPlexKeepsTheShortMessage(error: PlexError) {
+        let message = PlexConnectionFailure.unreachable(error).message
+        #expect(message == "Can't reach the server. Check the address, and whether you're on the home network or Tailscale.")
+        #expect(!message.contains("Local Network"))
     }
 
     @Test func cancelledTransportIsCancelled() async {
@@ -174,6 +205,8 @@ struct PlexConnectionTestTests {
         let cases: [(PlexConnectionFailure, String)] = [
             (.invalidAddress, "The server address is not valid."),
             (.unreachable(.notFound), "Can't reach the server. Check the address, and whether you're on the home network or Tailscale."),
+            (.unreachable(.transport(.cannotConnectToHost)), "Can't reach the server. Check the address, whether you're on the home network or Tailscale, and that SkinAmp is allowed under System Settings › Privacy & Security › Local Network."),
+            (.unreachable(.transport(.appTransportSecurityRequiresSecureConnection)), "Plain http isn't allowed for this address. Use a short name like joe, a .local name, an IP address, or an https:// address."),
             (.unauthorized, "Signed in, but this account can't access this server."),
             (.noMusicLibrary, "This server has no music library."),
             (.cancelled, "The connection test was cancelled."),

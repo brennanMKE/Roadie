@@ -15,7 +15,8 @@
 #   1. swift test --package-path Packages/SkinKit
 #   2. swift test --package-path Packages/PlayerKit   (AUDIOCORE_REALTIME=1, muted)
 #   3. xcodebuild ... build                             (project generated on the host)
-#   4. optional: launch SkinAmp.app, check it stays up, quit it
+#   4. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
+#   5. optional: launch SkinAmp.app, check it stays up, quit it
 # The script exits non-zero if any step fails, and also if the host's coreaudiod
 # logged "Starting IO" during the run, i.e. if anything reached a speaker.
 
@@ -162,6 +163,7 @@ run_step skinkit-tests   "swift test --package-path Packages/SkinKit"
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
 run_step playerkit-tests "AUDIOCORE_REALTIME=1 swift test --package-path Packages/PlayerKit"
 run_step app-build       "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Debug -derivedDataPath build/DerivedData build"
+run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/SkinAmp.app/Contents/Info.plist"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/SkinAmp.app && sleep 5 && pgrep -x SkinAmp && osascript -e 'quit app \"SkinAmp\"' && sleep 1 && ! pgrep -x SkinAmp"
 fi
