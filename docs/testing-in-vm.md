@@ -25,7 +25,7 @@ clone starts cold. The summary at the end looks like this:
 ==> PASS  app-plist
 ==> PASS  app-launch
     ** BUILD SUCCEEDED **
-    ✔ Test run with 46 tests in 6 suites passed after 0.558 seconds.
+    ✔ Test run with 50 tests in 6 suites passed after 0.558 seconds.
     ✔ Test run with 94 tests in 12 suites passed after 1.514 seconds.
     ✔ Test run with 100 tests in 24 suites passed after 4.267 seconds.
     ✔ Test run with 5 tests in 1 suite passed after 0.001 seconds.

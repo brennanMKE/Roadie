@@ -358,4 +358,89 @@ struct TrackCacheTests {
         #expect(h.stub.calls(Harness.partKey("A")) == 2)
         #expect(FileManager.default.fileExists(atPath: again.path))
     }
+
+    // MARK: Folders removed while running
+
+    @Test func deletedCacheFolderIsRecreatedOnTheNextDownload() async throws {
+        let h = Harness(); defer { h.cleanup() }
+        try await h.get("A", bytes: 100)
+        try FileManager.default.removeItem(at: h.dir)
+        #expect(!FileManager.default.fileExists(atPath: h.dir.path))
+        let url = try await h.get("B", bytes: 100)
+        #expect(try Data(contentsOf: url).count == 100)
+        var isDirectory: ObjCBool = false
+        #expect(FileManager.default.fileExists(atPath: h.dir.appendingPathComponent("tmp").path, isDirectory: &isDirectory) && isDirectory.boolValue)
+        #expect(filesOnDisk(h.dir) == ["B.m4a": 100])
+        #expect(await h.cache.entries().map(\.key) == ["B"])
+        #expect(await h.cache.stats().totalBytes == 100)
+        #expect(tempContents(h.dir).isEmpty)
+        #expect(await h.reopen().entries().map(\.key) == ["B"])
+        try await h.get("A")
+        #expect(h.stub.calls(Harness.partKey("A")) == 2)
+    }
+
+    @Test func deletedTempFolderIsRecreatedOnTheNextDownload() async throws {
+        let h = Harness(); defer { h.cleanup() }
+        try await h.get("A", bytes: 100)
+        try FileManager.default.removeItem(at: h.dir.appendingPathComponent("tmp"))
+        try await h.get("B", bytes: 100)
+        #expect(filesOnDisk(h.dir) == ["A.m4a": 100, "B.m4a": 100])
+        #expect(Set(await h.cache.entries().map(\.key)) == ["A", "B"])
+        try await h.get("A")
+        #expect(h.stub.calls(Harness.partKey("A")) == 1)
+        #expect(tempContents(h.dir).isEmpty)
+    }
+
+    // MARK: Unpin and Clear
+
+    @Test func unpinningAWaiterlessDownloadCancelsIt() async throws {
+        let h = Harness(); defer { h.cleanup() }
+        let part = Harness.partKey("k1")
+        h.stub.gate(part)
+        h.stub.setBody(randomBytes(64), for: part)
+        await h.cache.setPinned(["k1"])
+        let task = Task { try await h.get("k1") }
+        #expect(await waitFor { h.stub.calls(part) == 1 })
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(h.stub.cancelCount == 0)
+        #expect(await h.cache.stats().inFlight == 1)
+        await h.cache.setPinned([])
+        #expect(await waitFor { h.stub.cancelCount == 1 })
+        #expect(await waitFor { tempContents(h.dir).isEmpty })
+        let stats = await h.cache.stats()
+        #expect(stats.inFlight == 0)
+        #expect(stats.fileCount == 0)
+        h.stub.release(part)
+        let url = try await h.get("k1")
+        #expect(try Data(contentsOf: url).count == 64)
+        #expect(h.stub.calls(part) == 2)
+    }
+
+    @Test func clearDuringADownloadLeavesItAndTempAlone() async throws {
+        let h = Harness(); defer { h.cleanup() }
+        try await h.get("A", bytes: 100)
+        let partB = Harness.partKey("B")
+        h.stub.gate(partB)
+        h.stub.setBody(randomBytes(64), for: partB)
+        let task = Task { try await h.get("B") }
+        #expect(await waitFor { h.stub.calls(partB) == 1 })
+        #expect(await waitFor { await h.cache.stats().inFlight == 1 })
+        try await h.cache.clear()
+        #expect(filesOnDisk(h.dir).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: h.dir.appendingPathComponent("index.json").path))
+        #expect(tempContents(h.dir).count == 1)
+        #expect(tempContents(h.dir).allSatisfy { $0.hasSuffix(".part") })
+        #expect(await h.cache.stats().inFlight == 1)
+        #expect(h.stub.cancelCount == 0)
+        h.stub.release(partB)
+        let url = try await task.value
+        #expect(try Data(contentsOf: url).count == 64)
+        #expect(filesOnDisk(h.dir) == ["B.m4a": 64])
+        #expect(await h.cache.entries().map(\.key) == ["B"])
+        #expect(tempContents(h.dir).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: h.dir.appendingPathComponent("index.json").path))
+        #expect(await h.reopen().entries().map(\.key) == ["B"])
+    }
 }

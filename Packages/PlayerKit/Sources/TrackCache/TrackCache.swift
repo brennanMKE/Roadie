@@ -97,8 +97,6 @@ public actor TrackCache {
     private let now: @Sendable () -> Date
     private var entriesByKey: [String: Entry] = [:]
     private var inflight: [String: Inflight] = [:]
-    /// Waiters whose cancellation arrived before they were registered.
-    private var cancelledEarly: Set<UUID> = []
     private var prepared = false
 
     public init(
@@ -126,7 +124,7 @@ public actor TrackCache {
         do {
             try fm.createDirectory(at: directory, withIntermediateDirectories: true)
             if fm.fileExists(atPath: tempDirectory.path) { try fm.removeItem(at: tempDirectory) }
-            try fm.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+            try createDirectories()
         } catch {
             throw TrackCacheError.io(error.localizedDescription)
         }
@@ -171,6 +169,13 @@ public actor TrackCache {
         log.debug("prepared: \(result.count) files, \(self.totalBytes) bytes")
     }
 
+    /// Creates `Tracks/` and `tmp/` if they are missing. Safe to call while downloads are in flight.
+    private func createDirectories() throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fm.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    }
+
     private func ensurePrepared() throws {
         if !prepared { try prepare() }
     }
@@ -187,10 +192,6 @@ public actor TrackCache {
         let waiterID = UUID()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
-                if cancelledEarly.remove(waiterID) != nil {
-                    continuation.resume(throwing: CancellationError())
-                    return
-                }
                 do {
                     let download = try inflight[key] ?? startDownload(key: key, partKey: partKey, expectedSize: expectedSize)
                     download.waiters[waiterID] = continuation
@@ -224,9 +225,16 @@ public actor TrackCache {
 
     private func startDownload(key: String, partKey: String, expectedSize: Int64?) throws -> Inflight {
         let tempURL = tempDirectory.appendingPathComponent("\(key)-\(UUID().uuidString).part")
-        guard FileManager.default.createFile(atPath: tempURL.path, contents: nil) else {
-            throw TrackCacheError.io("could not create a temporary file")
+        var created = FileManager.default.createFile(atPath: tempURL.path, contents: nil)
+        if !created && !FileManager.default.fileExists(atPath: tempDirectory.path) {
+            // Caches was purged, or Tracks/ deleted, while the app runs: put the folders back and retry once.
+            do { try createDirectories() } catch { throw TrackCacheError.io(error.localizedDescription) }
+            let before = entriesByKey.count
+            entriesByKey = entriesByKey.filter { FileManager.default.fileExists(atPath: directory.appendingPathComponent($0.value.fileName).path) }
+            log.info("cache folders were missing; recreated them and dropped \(before - self.entriesByKey.count) entries")
+            created = FileManager.default.createFile(atPath: tempURL.path, contents: nil)
         }
+        guard created else { throw TrackCacheError.io("could not create a temporary file") }
         let download = Inflight(tempURL: tempURL)
         inflight[key] = download
         let downloader = self.downloader
@@ -289,10 +297,9 @@ public actor TrackCache {
     }
 
     private func leave(key: String, waiter: UUID) {
-        guard let download = inflight[key], let continuation = download.waiters.removeValue(forKey: waiter) else {
-            cancelledEarly.insert(waiter)
-            return
-        }
+        // An unknown waiter was already answered: the download finished, failed, or was abandoned
+        // before this cancel reached the actor. Nothing to do.
+        guard let download = inflight[key], let continuation = download.waiters.removeValue(forKey: waiter) else { return }
         continuation.resume(throwing: CancellationError())
         if download.waiters.isEmpty && !pinned.contains(key) { abandon(key, download) }
     }
