@@ -39,6 +39,22 @@ public final class Player {
             _graph?.balance = clamped
         }
     }
+    /// Equalizer settings (10 bands, preamp, on/off). Computed over an ignored stored value for the same
+    /// reason as `volume`; changes reach the engine immediately, also mid-playback.
+    public var eq: EQState {
+        get {
+            access(keyPath: \.eq)
+            return storedEQ
+        }
+        set {
+            guard newValue != storedEQ else { return }
+            withMutation(keyPath: \.eq) {
+                storedEQ = newValue
+            }
+            _graph?.eq.apply(newValue)
+        }
+    }
+    @ObservationIgnored private var storedEQ = EQState.flat
     @ObservationIgnored private var storedVolume: Float = 1
     @ObservationIgnored private var storedBalance: Float = 0
     public var repeatMode: RepeatMode {
@@ -356,7 +372,7 @@ public final class Player {
 
     func ensureGraph() -> AudioGraph {
         if let _graph { return _graph }
-        let graph = AudioGraph(volume: volume, balance: balance)
+        let graph = AudioGraph(volume: volume, balance: balance, eq: eq)
         _graph = graph
         configTask = Task { [weak self] in
             for await note in NotificationCenter.default.notifications(named: .AVAudioEngineConfigurationChange) {

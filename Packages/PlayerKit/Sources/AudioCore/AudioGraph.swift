@@ -5,7 +5,7 @@ import AVFoundation
 final class AudioGraph {
     let engine = AVAudioEngine()
     let playerNode = AVAudioPlayerNode()
-    /// Bypassed for now; 0004 configures the bands on this instance.
+    /// Ten Winamp bands, configured in `init`; driven by `Player.eq` via `apply(_:)`.
     let eq = AVAudioUnitEQ(numberOfBands: 10)
     /// The one format player -> eq -> mixer is connected at: the output's rate, stereo.
     /// nil until the first `start()`. `AVAudioPlayerNode` converts each file to it.
@@ -32,10 +32,11 @@ final class AudioGraph {
         }
     }
 
-    init(volume: Float, balance: Float) {
+    init(volume: Float, balance: Float, eq eqState: EQState = .flat) {
         engine.attach(playerNode)
         engine.attach(eq)
-        eq.bypass = true
+        eq.configureWinampBands()
+        eq.apply(eqState)
         // didSet does not run for assignments inside init, so apply explicitly.
         self.volume = min(max(volume, 0), 1)
         self.balance = min(max(balance, -1), 1)
