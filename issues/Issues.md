@@ -369,6 +369,7 @@ The `*` matches the U+202F. Substitute the actual timestamp; if you don't know w
 - `AudioCore`: AVAudioEngine playback, EQ, analyzer, queue (`Packages/PlayerKit`)
 - `TrackCache`: Plex download cache with LRU eviction (`Packages/PlayerKit`)
 - `PlexKit`: Plex client, models, sign-in (`Packages/PlayerKit`)
+- `MusicAssistantKit`: Music Assistant WebSocket client and models (`Packages/PlayerKit`)
 - `App`: SwiftUI/AppKit app (`App/`)
 - `QuickLook`: Quick Look thumbnail and preview extensions for `.wsz` (new targets in `project.yml`)
 - `Milestone`: umbrella issues only
