@@ -244,10 +244,11 @@ Status flow: `open` (with `## Plan`) → `in-progress` → review → `resolved`
 
 ### Build / verify command for this project
 
-- Regenerate the project after adding files or changing `project.yml`: `xcodegen generate`
-- Package tests: `swift test --package-path Packages/SkinKit` (and `Packages/PlayerKit` once it exists)
-- **Tests must be silent.** Nothing may play through the speakers: the default `swift test` run renders offline only (manual rendering mode, see `renderSilently` in `TestSupport.swift`). Real-time tests are opt-in with `AUDIOCORE_REALTIME=1` and mute the main mixer. Scratch harnesses and review experiments follow the same rule: render offline, or set `player.volume = 0` / `mainMixerNode.outputVolume = 0` before starting a real-time engine. Check with `/usr/bin/log show --last 2m --predicate 'process == "coreaudiod" AND eventMessage CONTAINS "Starting IO"'`, which must print nothing but its header after a default run (in zsh, a bare `log` is a shell builtin, so use the full path).
-- App build: `xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Debug -derivedDataPath build/DerivedData build`
+**Verify in the Tart VM, never on the host.** See [docs/testing-in-vm.md](../docs/testing-in-vm.md).
+
+- Verification command: `scripts/run-tests-vm.sh` (add `--launch` to also start the app in the guest). It exports the working tree, generates the project, and runs in a fresh, muted guest with no audio path to the host: `swift test` for SkinKit, `swift test` for PlayerKit (including the real-time tests), and the Debug app build. It passes only if every step passes and the host logged no audio. Logs are in `build/vm-tests/<run-id>/`; quote the summary lines in `## Verification`.
+- Don't run `swift test`, `xcodebuild` or the app on the host to verify a change. `xcodegen generate` on the host is fine (the script runs it into the export itself).
+- **Tests must be silent.** Nothing may play through the host's speakers. Most of the suite renders offline (manual rendering mode, see `renderSilently` in `TestSupport.swift`); real-time tests are opt-in with `AUDIOCORE_REALTIME=1`, mute the main mixer, and are only turned on in the VM. Scratch harnesses and review experiments follow the same rule: run them in a VM clone, or render offline. The script checks the host with `/usr/bin/log show --predicate 'process == "coreaudiod" AND eventMessage CONTAINS "Starting IO"'` (in zsh a bare `log` is a shell builtin).
 - Skin report: `swift run --package-path Packages/SkinKit skintool Skins/`
 - Opt-in integration tests: set `SKIN_CORPUS_DIR`, or `PLEX_URL` + `PLEX_TOKEN`. Never write the token to disk or logs.
 
