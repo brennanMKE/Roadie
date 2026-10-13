@@ -43,20 +43,27 @@ public final class Player {
     @ObservationIgnored private var storedBalance: Float = 0
     public var repeatMode: RepeatMode {
         get { queue.repeatMode }
-        set { queue.repeatMode = newValue }
+        set {
+            queue.repeatMode = newValue
+            reconcileSchedule()
+        }
     }
     public var isShuffled: Bool {
         get { queue.isShuffled }
-        set { queue.setShuffle(newValue) }
+        set {
+            queue.setShuffle(newValue)
+            reconcileSchedule()
+        }
     }
 
     @ObservationIgnored private let resolver: any TrackResolver
     @ObservationIgnored var _graph: AudioGraph?
     @ObservationIgnored private var file: AVAudioFile?
-    /// Frame the current segment started at.
-    @ObservationIgnored private var frameOffset: AVAudioFramePosition = 0
-    /// Bumped on every stop / seek / new track; stale completion handlers compare against it.
-    @ObservationIgnored private var generation = 0
+    /// The pre-scheduled file behind `file`, if any (its track is `scheduler.scheduledNextTrackID`).
+    @ObservationIgnored private var nextFile: AVAudioFile?
+    /// Decides which completion handlers are still valid and tracks the node's timeline.
+    @ObservationIgnored private var scheduler = GaplessScheduler()
+    @ObservationIgnored private var preloadTask: Task<Void, Never>?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var timeTask: Task<Void, Never>?
     @ObservationIgnored private var configTask: Task<Void, Never>?
@@ -70,6 +77,7 @@ public final class Player {
 
     public func enqueue(_ tracks: [Track]) {
         queue.append(tracks)
+        reconcileSchedule()
     }
 
     public func removeTrack(at index: Int) {
@@ -77,6 +85,8 @@ public final class Player {
         queue.remove(at: index)
         if removingCurrent && state != .stopped {
             if queue.current != nil { startCurrentTrack() } else { stop() }
+        } else {
+            reconcileSchedule()
         }
     }
 
@@ -134,10 +144,9 @@ public final class Player {
     public func stop() {
         loadTask?.cancel()
         timeTask?.cancel()
-        generation += 1
+        discardSchedule()
         _graph?.playerNode.stop()
         file = nil
-        frameOffset = 0
         currentTime = 0
         state = .stopped
     }
@@ -165,16 +174,18 @@ public final class Player {
         let target = min(max(seconds, 0), duration)
         let frame = AVAudioFramePosition(target * rate)
         guard frame < file.length else {
-            segmentFinished(generation: generation)
+            trackEnded()
             return
         }
         let wasPlaying = state == .playing
+        discardSchedule()
         graph.playerNode.stop()
         schedule(file, from: frame)
         currentTime = target
         if wasPlaying {
             graph.playerNode.play()
         }
+        scheduleNextIfNeeded()
     }
 
     // MARK: Starting tracks
@@ -186,7 +197,7 @@ public final class Player {
         }
         loadTask?.cancel()
         timeTask?.cancel()
-        generation += 1
+        discardSchedule()
         _graph?.playerNode.stop()
         errorMessage = nil
         let resolver = self.resolver
@@ -205,6 +216,7 @@ public final class Player {
 
     private func begin(_ file: AVAudioFile) throws {
         let graph = ensureGraph()
+        discardSchedule()
         graph.playerNode.stop()
         graph.connect(format: file.processingFormat)
         try graph.start()
@@ -214,26 +226,101 @@ public final class Player {
         graph.playerNode.play()
         state = .playing
         startTimeUpdates()
+        scheduleNextIfNeeded()
     }
 
-    private func schedule(_ file: AVAudioFile, from frame: AVAudioFramePosition) {
-        guard let graph = _graph else { return }
-        generation += 1
-        let gen = generation
-        frameOffset = frame
+    /// Every schedule call goes through here so the scheduler's bookkeeping matches the node.
+    /// `at: nil` queues the segment right behind whatever is already scheduled.
+    private func schedule(
+        _ file: AVAudioFile, trackID: UUID? = nil, from frame: AVAudioFramePosition = 0
+    ) {
+        guard let graph = _graph, let id = trackID ?? queue.current?.id else { return }
         let remaining = file.length - frame
         guard remaining > 0 else { return }
-        let count = AVAudioFrameCount(clamping: remaining)
+        let item = scheduler.append(trackID: id, frameLength: remaining, seekOffsetFrames: frame)
+        let token = item.token
         graph.playerNode.scheduleSegment(
-            file, startingFrame: frame, frameCount: count, at: nil,
+            file, startingFrame: frame, frameCount: AVAudioFrameCount(clamping: remaining), at: nil,
             completionCallbackType: .dataPlayedBack
         ) { [weak self] _ in
-            Task { @MainActor in self?.segmentFinished(generation: gen) }
+            Task { @MainActor in self?.segmentFinished(token) }
         }
     }
 
-    private func segmentFinished(generation gen: Int) {
-        guard gen == generation else { return }
+    /// Invalidate before every `playerNode.stop()`: stop fires the handler of each discarded item.
+    private func discardSchedule() {
+        preloadTask?.cancel()
+        scheduler.invalidate()
+        nextFile = nil
+    }
+
+    /// Queue the track that follows the current one behind it so the node never goes silent.
+    private func scheduleNextIfNeeded() {
+        preloadTask?.cancel()
+        guard state != .stopped, scheduler.items.count == 1,
+              let index = queue.indexAfterCurrentEnds() else { return }
+        let track = queue.tracks[index]
+        let generation = scheduler.generation
+        let resolver = self.resolver
+        preloadTask = Task {
+            guard let url = try? await resolver.localURL(for: track),
+                  !Task.isCancelled, scheduler.generation == generation, scheduler.items.count == 1,
+                  let current = queue.indexAfterCurrentEnds(), queue.tracks[current].id == track.id,
+                  let graph = _graph, let connected = graph.connectedFormat,
+                  let next = try? AVAudioFile(forReading: url) else { return }
+            // A format change needs a reconnect; leave it to the normal (gapped) path.
+            let policy = FormatPolicy.compare(
+                current: AudioFormatDescriptor(sampleRate: connected.sampleRate, channelCount: connected.channelCount),
+                next: AudioFormatDescriptor(
+                    sampleRate: next.processingFormat.sampleRate, channelCount: next.processingFormat.channelCount))
+            guard policy == .gapless else { return }
+            nextFile = next
+            schedule(next, trackID: track.id)
+        }
+    }
+
+    /// Queue edits can make the pre-scheduled file the wrong one.
+    private func reconcileSchedule() {
+        guard state != .stopped, let file, let graph = _graph else { return }
+        let queueNext = queue.indexAfterCurrentEnds().map { queue.tracks[$0].id }
+        switch SchedulingDecision.reconcile(queueNext: queueNext, scheduledNext: scheduler.scheduledNextTrackID) {
+        case .keep:
+            break
+        case .scheduleNext:
+            scheduleNextIfNeeded()
+        case .restartCurrent:
+            if state == .playing { updateCurrentTime() }
+            let rate = file.processingFormat.sampleRate
+            let frame = min(AVAudioFramePosition(currentTime * rate), max(file.length - 1, 0))
+            discardSchedule()
+            graph.playerNode.stop()
+            schedule(file, from: frame)
+            if state == .playing { graph.playerNode.play() }
+            scheduleNextIfNeeded()
+        }
+    }
+
+    private func segmentFinished(_ token: ScheduleToken) {
+        switch scheduler.complete(token) {
+        case .stale:
+            break
+        case .advanced(let id):
+            // The node has already moved on to the pre-scheduled file; follow it.
+            guard queue.advanceAfterTrackEnd() != nil, queue.current?.id == id, let next = nextFile else {
+                startCurrentTrack()
+                return
+            }
+            file = next
+            nextFile = nil
+            currentTime = 0
+            scheduleNextIfNeeded()
+        case .reachedEnd:
+            trackEnded()
+        }
+    }
+
+    /// The current track finished with nothing pre-scheduled behind it.
+    private func trackEnded() {
         if queue.advanceAfterTrackEnd() != nil {
             startCurrentTrack()
         } else {
@@ -246,10 +333,11 @@ public final class Player {
     private func updateCurrentTime() {
         guard let file, let node = _graph?.playerNode,
               let renderTime = node.lastRenderTime,
-              let playerTime = node.playerTime(forNodeTime: renderTime) else { return }
-        let rate = file.processingFormat.sampleRate
-        let frames = frameOffset + max(playerTime.sampleTime, 0)
-        currentTime = min(Double(frames) / rate, Double(file.length) / rate)
+              let playerTime = node.playerTime(forNodeTime: renderTime),
+              let seconds = scheduler.position(
+                atNodeSampleTime: playerTime.sampleTime, sampleRate: file.processingFormat.sampleRate)
+        else { return }
+        currentTime = seconds
     }
 
     private func startTimeUpdates() {
@@ -264,6 +352,9 @@ public final class Player {
     }
 
     // MARK: Graph
+
+    /// Whether a following file is queued on the node (tests).
+    var hasPreScheduledNext: Bool { scheduler.scheduledNextTrackID != nil }
 
     func ensureGraph() -> AudioGraph {
         if let _graph { return _graph }
@@ -288,12 +379,14 @@ public final class Player {
         guard let graph = _graph, state != .stopped else { return }
         let resumeTime = currentTime
         do {
+            discardSchedule()
             graph.playerNode.stop()
             try graph.start()
             if let file {
                 let frame = AVAudioFramePosition(resumeTime * file.processingFormat.sampleRate)
                 schedule(file, from: min(frame, max(file.length - 1, 0)))
                 if state == .playing { graph.playerNode.play() }
+                scheduleNextIfNeeded()
             }
         } catch {
             fail(error)
