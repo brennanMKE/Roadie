@@ -16,6 +16,11 @@ final class AudioGraph {
 
     var mainMixerNode: AVAudioMixerNode { engine.mainMixerNode }
 
+    /// Visualizer tap on the main mixer (post-EQ, post-volume), re-installed on every `start()`.
+    let analyzer: AnalyzerTap
+    /// Tests that install their own mixer tap turn this off (one tap per bus).
+    var installsAnalyzer = true
+
     /// 0...1, linear.
     var volume: Float = 1 {
         didSet {
@@ -32,7 +37,8 @@ final class AudioGraph {
         }
     }
 
-    init(volume: Float, balance: Float, eq eqState: EQState = .flat) {
+    init(volume: Float, balance: Float, eq eqState: EQState = .flat, analyzer: AnalyzerTap = AnalyzerTap()) {
+        self.analyzer = analyzer
         engine.attach(playerNode)
         engine.attach(eq)
         eq.configureWinampBands()
@@ -65,6 +71,12 @@ final class AudioGraph {
             try engine.start()
         } catch {
             throw AudioCoreError.engineStart(underlying: error)
+        }
+        // Remove-then-install is idempotent, so engine restarts (config change) never double-install.
+        // The tap does not touch connections; the rate is the processing rate, not the mixer's
+        // pre-start report.
+        if installsAnalyzer, let rate = processingSampleRate {
+            analyzer.install(on: engine.mainMixerNode, sampleRate: rate)
         }
     }
 }

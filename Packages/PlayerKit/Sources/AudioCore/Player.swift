@@ -74,6 +74,9 @@ public final class Player {
 
     @ObservationIgnored private let resolver: any TrackResolver
     @ObservationIgnored var _graph: AudioGraph?
+    /// Spectrum / oscilloscope source for the visualizer. Pull `latestFrame()` from the main
+    /// thread at 30-60 Hz; it is installed on the mixer whenever the engine starts.
+    @ObservationIgnored public let analyzer = AnalyzerTap()
     @ObservationIgnored private var file: AVAudioFile?
     /// The pre-scheduled file behind `file`, if any (its track is `scheduler.scheduledNextTrackID`).
     @ObservationIgnored private var nextFile: AVAudioFile?
@@ -372,7 +375,7 @@ public final class Player {
 
     func ensureGraph() -> AudioGraph {
         if let _graph { return _graph }
-        let graph = AudioGraph(volume: volume, balance: balance, eq: eq)
+        let graph = AudioGraph(volume: volume, balance: balance, eq: eq, analyzer: analyzer)
         _graph = graph
         configTask = Task { [weak self] in
             for await note in NotificationCenter.default.notifications(named: .AVAudioEngineConfigurationChange) {

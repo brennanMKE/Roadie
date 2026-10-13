@@ -211,7 +211,9 @@ final class PeakRecorder: @unchecked Sendable {
         }
         let player = Player()
         player.enqueue(try urls.map { try Track.file(at: $0) })
-        let mixer = player.ensureGraph().mainMixerNode
+        let graph = player.ensureGraph()
+        graph.installsAnalyzer = false // the recorder owns the mixer's single tap
+        let mixer = graph.mainMixerNode
         let recorder = PeakRecorder()
         recorder.install(on: mixer)
 
