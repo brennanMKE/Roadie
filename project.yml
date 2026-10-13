@@ -23,6 +23,8 @@ targets:
         product: SkinKit
       - package: PlayerKit
         product: AudioCore
+      - package: PlayerKit
+        product: PlexKit
     info:
       path: App/Info.plist
       properties:
@@ -54,3 +56,4 @@ schemes:
       targets:
         - package: SkinKit/SkinKitTests
         - package: PlayerKit/AudioCoreTests
+        - package: PlayerKit/PlexKitTests

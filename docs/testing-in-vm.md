@@ -55,7 +55,7 @@ permission approvals build up, nothing lingers from an earlier run, and every bu
 - **Never share a live working copy or `$HOME` into the guest read-write.** The guest runs test
   code. The only share is a read-only directory that holds this run's export.
 - **Results come back through `tart exec … tar`**, not through the share.
-- **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`.
+- **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`. PlexKit's opt-in integration test skips itself when `PLEX_URL`/`PLEX_TOKEN` are unset, which is always the case in the guest.
 - **Never hardcode the image name.** It comes from `tart-golden require`.
 
 ## No audio

@@ -1,0 +1,74 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "totalSize": 1,
+    "offset": 0,
+    "allowSync": true,
+    "art": "/library/metadata/3683/art/1791860627",
+    "identifier": "com.plexapp.plugins.library",
+    "key": "3683",
+    "librarySectionID": 5,
+    "librarySectionTitle": "Music",
+    "librarySectionUUID": "00000000-0000-0000-0000-000000000000",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1789203812,
+    "nocache": true,
+    "parentIndex": 1,
+    "parentTitle": "10,000 Maniacs",
+    "summary": "10,000 Maniacs had a name steeped in kitschy irony, a quality wholly absent from their gentle, empathetic music. Emerging from the post-punk underground of the ",
+    "thumb": "/library/metadata/3683/thumb/1791860627",
+    "title1": "Music",
+    "title2": "10,000 Maniacs",
+    "viewGroup": "album",
+    "viewMode": 65592,
+    "Metadata": [
+      {
+        "ratingKey": "3684",
+        "key": "/library/metadata/3684/children",
+        "parentRatingKey": "3683",
+        "guid": "plex://album/5d07c179403c64029084921f",
+        "parentGuid": "plex://artist/5d07bbfc403c6402904a6384",
+        "studio": "BMG Direct Marketing, Inc.",
+        "type": "album",
+        "title": "Our Time in Eden",
+        "titleSort": "Our Time In Eden",
+        "parentKey": "/library/metadata/3683",
+        "parentTitle": "10,000 Maniacs",
+        "summary": "Pushing through the jinx that gave Blind Man's Zoo its preachy feel, 10,000 Maniacs offer up a baker's dozen of wonderful folk-pop songs with hard-hitting messa",
+        "index": 1,
+        "rating": 9.0,
+        "year": 1992,
+        "thumb": "/library/metadata/3684/thumb/1791860628",
+        "art": "/library/metadata/3683/art/1791860627",
+        "parentThumb": "/library/metadata/3683/thumb/1791860627",
+        "originallyAvailableAt": "1992-07-29",
+        "addedAt": 1791860626,
+        "updatedAt": 1791860628,
+        "loudnessAnalysisVersion": "2",
+        "Image": [
+          {
+            "alt": "Our Time in Eden",
+            "type": "coverPoster",
+            "url": "/library/metadata/3684/thumb/1791860628"
+          },
+          {
+            "alt": "Our Time in Eden",
+            "type": "background",
+            "url": "/library/metadata/3683/art/1791860627"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "4e1c0b",
+          "topRight": "993b2a",
+          "bottomRight": "91451f",
+          "bottomLeft": "874c2d"
+        },
+        "Genre": [
+          {
+            "tag": "Pop/Rock"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "totalSize": 1,
+    "offset": 0,
+    "allowSync": true,
+    "art": "/:/resources/artist-fanart.jpg",
+    "identifier": "com.plexapp.plugins.library",
+    "librarySectionID": 5,
+    "librarySectionTitle": "Music",
+    "librarySectionUUID": "00000000-0000-0000-0000-000000000000",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1789203812,
+    "nocache": true,
+    "thumb": "/:/resources/artist.png",
+    "title1": "Music",
+    "title2": "All Artists",
+    "viewGroup": "artist",
+    "viewMode": 65592,
+    "Metadata": [
+      {
+        "ratingKey": "3685",
+        "key": "/library/metadata/3685",
+        "parentRatingKey": "3684",
+        "grandparentRatingKey": "3683",
+        "guid": "plex://track/5d07ce57403c6402900432c0",
+        "parentGuid": "plex://album/5d07c179403c64029084921f",
+        "grandparentGuid": "plex://artist/5d07bbfc403c6402904a6384",
+        "parentStudio": "BMG Direct Marketing, Inc.",
+        "type": "track",
+        "title": "Candy Everybody Wants",
+        "grandparentKey": "/library/metadata/3683",
+        "parentKey": "/library/metadata/3684",
+        "grandparentTitle": "10,000 Maniacs",
+        "parentTitle": "Our Time in Eden",
+        "summary": "",
+        "index": 9,
+        "parentIndex": 1,
+        "ratingCount": 58467,
+        "parentYear": 1992,
+        "thumb": "/library/metadata/3684/thumb/1791860628",
+        "art": "/library/metadata/3683/art/1791860627",
+        "parentThumb": "/library/metadata/3684/thumb/1791860628",
+        "grandparentThumb": "/library/metadata/3683/thumb/1791860627",
+        "grandparentArt": "/library/metadata/3683/art/1791860627",
+        "duration": 186015,
+        "addedAt": 1791856627,
+        "updatedAt": 1791860628,
+        "Media": [
+          {
+            "id": 5010,
+            "duration": 186015,
+            "bitrate": 282,
+            "audioChannels": 2,
+            "audioCodec": "aac",
+            "container": "mp4",
+            "optimizedForStreaming": 1,
+            "audioProfile": "lc",
+            "has64bitOffsets": false,
+            "Part": [
+              {
+                "id": 5010,
+                "key": "/library/parts/5010/1791856627/file.m4a",
+                "duration": 186015,
+                "file": "/Media/Music/scrubbed",
+                "size": 7147054,
+                "audioProfile": "lc",
+                "container": "mp4",
+                "has64bitOffsets": false,
+                "optimizedForStreaming": true
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "Candy Everybody Wants",
+            "type": "coverPoster",
+            "url": "/library/metadata/3683/thumb/1791860627"
+          },
+          {
+            "alt": "Candy Everybody Wants",
+            "type": "background",
+            "url": "/library/metadata/3683/art/1791860627"
+          }
+        ],
+        "Genre": [
+          {
+            "tag": "Pop/Rock"
+          }
+        ]
+      }
+    ]
+  }
+}

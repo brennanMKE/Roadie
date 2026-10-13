@@ -1,0 +1,85 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "totalSize": 2232,
+    "offset": 2231,
+    "allowSync": true,
+    "art": "/:/resources/artist-fanart.jpg",
+    "identifier": "com.plexapp.plugins.library",
+    "librarySectionID": 5,
+    "librarySectionTitle": "Music",
+    "librarySectionUUID": "00000000-0000-0000-0000-000000000000",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1789203812,
+    "nocache": true,
+    "thumb": "/:/resources/artist.png",
+    "title1": "Music",
+    "title2": "All Artists",
+    "viewGroup": "artist",
+    "viewMode": 65592,
+    "Metadata": [
+      {
+        "ratingKey": "2180",
+        "key": "/library/metadata/2180",
+        "parentRatingKey": "2176",
+        "grandparentRatingKey": "2175",
+        "guid": "plex://track/5d07d004403c64029029d1ba",
+        "parentGuid": "plex://album/5d07c19d403c64029085d18c",
+        "grandparentGuid": "plex://artist/5d07bc08403c6402904ae2f3",
+        "parentStudio": "Sony Records International",
+        "type": "track",
+        "title": "Dissatisfied",
+        "grandparentKey": "/library/metadata/2175",
+        "parentKey": "/library/metadata/2176",
+        "grandparentTitle": "Zebrahead",
+        "parentTitle": "MFZB",
+        "summary": "",
+        "index": 19,
+        "parentIndex": 1,
+        "ratingCount": 7613,
+        "parentYear": 2003,
+        "thumb": "/library/metadata/2176/thumb/1791860081",
+        "art": "/library/metadata/2175/art/1791860080",
+        "parentThumb": "/library/metadata/2176/thumb/1791860081",
+        "grandparentThumb": "/library/metadata/2175/thumb/1791860080",
+        "grandparentArt": "/library/metadata/2175/art/1791860080",
+        "duration": 185730,
+        "addedAt": 1221354427,
+        "updatedAt": 1791860081,
+        "Media": [
+          {
+            "id": 3761,
+            "duration": 185730,
+            "bitrate": 192,
+            "audioChannels": 2,
+            "audioCodec": "mp3",
+            "container": "mp3",
+            "Part": [
+              {
+                "id": 3761,
+                "key": "/library/parts/3761/1221354427/file.mp3",
+                "duration": 185730,
+                "file": "/Media/Music/scrubbed",
+                "size": 4470576,
+                "container": "mp3",
+                "hasThumbnail": "1"
+              }
+            ]
+          }
+        ],
+        "Image": [
+          {
+            "alt": "Dissatisfied",
+            "type": "coverPoster",
+            "url": "/library/metadata/2175/thumb/1791860080"
+          },
+          {
+            "alt": "Dissatisfied",
+            "type": "background",
+            "url": "/library/metadata/2175/art/1791860080"
+          }
+        ]
+      }
+    ]
+  }
+}
