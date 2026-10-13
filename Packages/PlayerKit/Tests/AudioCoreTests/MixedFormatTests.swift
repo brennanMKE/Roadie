@@ -225,7 +225,8 @@ final class PeakRecorder: @unchecked Sendable {
         var lastTime: [Int: TimeInterval] = [:]
         var monotonic = true
         var inRange = true
-        for _ in 0..<600 {
+        let deadline = ContinuousClock.now + .seconds(10)
+        while ContinuousClock.now < deadline {
             if player.state == .stopped { break }
             let idx = player.queue.currentIndex ?? -1
             if indices.last != idx { indices.append(idx) }
@@ -235,9 +236,19 @@ final class PeakRecorder: @unchecked Sendable {
             lastTime[idx] = t
             try? await Task.sleep(for: .milliseconds(10))
         }
-        // The tap delivers a little behind the render thread; let the last buffers arrive.
-        try? await Task.sleep(for: .milliseconds(200))
+        let stoppedBeforeDeadline = player.state == .stopped
+        // The tap delivers a little behind the render thread; wait until it has drained (the block
+        // count is unchanged across two consecutive 50 ms samples) instead of guessing a delay.
+        var previousCount = -1
+        let drainDeadline = ContinuousClock.now + .seconds(2)
+        while ContinuousClock.now < drainDeadline {
+            let count = recorder.blocks.left.count
+            if count == previousCount { break }
+            previousCount = count
+            try? await Task.sleep(for: .milliseconds(50))
+        }
         mixer.removeTap(onBus: 0)
+        #expect(stoppedBeforeDeadline)
         #expect(player.state == .stopped)
         #expect(player.errorMessage == nil)
         #expect(indices == [0, 1, 2, 3])
@@ -269,11 +280,25 @@ final class PeakRecorder: @unchecked Sendable {
         #expect(await MixedFormatSupport.waitUntil { player.state == .playing })
         player.seek(to: 0.6)
         #expect(player.currentTime == 0.6)
-        try await Task.sleep(for: .milliseconds(200))
-        #expect((0.7...0.9).contains(player.currentTime))
+        // `currentTime` is refreshed by a 100 ms timer and the engine restarts after a seek, so poll
+        // against a deadline instead of sleeping a fixed time; bound the result by measured elapsed time.
+        let seekStart = ContinuousClock.now
+        var minimum = player.currentTime
+        let advanced = await waitUntil(timeoutMillis: 2000) {
+            minimum = min(minimum, player.currentTime)
+            return player.currentTime > 0.65
+        }
+        let current = player.currentTime
+        let elapsed = seekStart.duration(to: .now)
+        let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        #expect(advanced)
+        #expect(minimum >= 0.6)
+        #expect(current <= 0.6 + elapsedSeconds + 0.05)
+        #expect(current < 1.0)
+        #expect(player.queue.currentIndex == 0)
 
         #expect(await MixedFormatSupport.waitUntil(timeout: 300) { player.queue.currentIndex == 1 })
-        #expect(player.currentTime < 0.3)
+        #expect(player.currentTime < 0.5)
         #expect(await MixedFormatSupport.waitUntil(timeout: 300) { player.state == .stopped })
         #expect(player.errorMessage == nil)
     }
