@@ -154,6 +154,28 @@ struct PlexSettingsModelTests {
         #expect(h.model.tokenStoreError == nil)
     }
 
+    @Test func failedLoadThenReturnDoesNotDeleteTheToken() {
+        let h = make(token: Self.secret)
+        defer { h.cleanup() }
+        h.store.failure = .keychain(-128)
+        h.model.load()
+        h.store.failure = nil
+        h.model.submitToken()
+        #expect(h.store.deletes == 0)
+        #expect(h.store.saves == 0)
+        #expect(h.store.token == PlexToken(Self.secret))
+    }
+
+    @Test func returnAfterAnEditSaves() {
+        let h = make(token: Self.secret)
+        defer { h.cleanup() }
+        h.model.load()
+        h.model.tokenText = "other-token"
+        h.model.submitToken()
+        #expect(h.store.saves == 1)
+        #expect(h.store.token == PlexToken("other-token"))
+    }
+
     @Test func closeWithoutEditsDoesNotWrite() {
         let h = make(token: Self.secret)
         defer { h.cleanup() }

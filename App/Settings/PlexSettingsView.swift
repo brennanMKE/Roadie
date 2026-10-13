@@ -17,7 +17,7 @@ struct PlexSettingsView: View {
                     .foregroundStyle(.secondary)
                 HStack {
                     SecureField("Token", text: $model.tokenText, prompt: Text("Paste a Plex token"))
-                        .onSubmit { model.commitToken() }
+                        .onSubmit { model.submitToken() }
                         .accessibilityIdentifier("plex.token")
                     Button("Forget") { model.forgetToken() }
                         .disabled(!model.hasStoredToken)

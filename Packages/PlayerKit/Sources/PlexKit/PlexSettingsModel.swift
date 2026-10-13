@@ -150,8 +150,14 @@ public final class PlexSettingsModel: CustomStringConvertible, CustomDebugString
         cancelTest()
     }
 
-    /// Trimmed `tokenText` to the store; empty deletes the item. Explicit callers (Forget, Return)
-    /// commit regardless of the dirty flag.
+    /// Return in the token field. Commits only an edit, so Return in a field left empty by a
+    /// failed read does not delete the stored token; Forget is the way to delete it.
+    public func submitToken() {
+        if tokenDirty { commitToken() }
+    }
+
+    /// Trimmed `tokenText` to the store; empty deletes the item. Commits regardless of the dirty
+    /// flag (Forget and the guarded callers).
     public func commitToken() {
         let text = trimmedToken
         do {
