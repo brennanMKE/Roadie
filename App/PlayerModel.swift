@@ -1,10 +1,7 @@
+import AudioCore
 import Foundation
 import Observation
 import SkinKit
-
-enum PlaybackState {
-    case stopped, playing, paused
-}
 
 @MainActor
 @Observable
@@ -12,7 +9,8 @@ final class PlayerModel {
     private(set) var skin: Skin?
     private(set) var skinName: String?
     private(set) var errorMessage: String?
-    var playbackState: PlaybackState = .stopped
+    let player = Player()
+    var playbackState: PlaybackState { player.state }
     var isImporting = false
     var scale: CGFloat = 2
 
@@ -40,11 +38,19 @@ final class PlayerModel {
         }
     }
 
-    // TODO: Replace with AVAudioEngine playback (AudioCore).
-    func play() { playbackState = .playing }
-    func pause() { playbackState = playbackState == .paused ? .playing : .paused }
-    func stop() { playbackState = .stopped }
-    func previous() {}
-    func next() {}
+    func play() { player.play() }
+    func pause() { player.togglePause() }
+    func stop() { player.stop() }
+    func previous() { player.previous() }
+    func next() { player.next() }
     func eject() { isImporting = true }
+
+    /// Temporary drop-to-play path until the open panel lands (0006).
+    func playFiles(_ urls: [URL]) {
+        let tracks = urls.compactMap { try? Track.file(at: $0) }
+        guard !tracks.isEmpty else { return }
+        let start = player.queue.tracks.count
+        player.enqueue(tracks)
+        player.play(at: start)
+    }
 }

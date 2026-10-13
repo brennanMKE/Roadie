@@ -23,8 +23,13 @@ struct PlayerView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first(where: { $0.pathExtension.lowercased() == "wsz" }) else { return false }
-            model.loadSkin(from: url)
+            if let url = urls.first(where: { $0.pathExtension.lowercased() == "wsz" }) {
+                model.loadSkin(from: url)
+                return true
+            }
+            let audio = urls.filter { UTType(filenameExtension: $0.pathExtension)?.conforms(to: .audio) == true }
+            guard !audio.isEmpty else { return false }
+            model.playFiles(audio)
             return true
         }
         .fileImporter(isPresented: $model.isImporting, allowedContentTypes: [.wsz, .zip]) { result in

@@ -11,6 +11,8 @@ settings:
 packages:
   SkinKit:
     path: Packages/SkinKit
+  PlayerKit:
+    path: Packages/PlayerKit
 targets:
   SkinAmp:
     type: application
@@ -19,6 +21,8 @@ targets:
     dependencies:
       - package: SkinKit
         product: SkinKit
+      - package: PlayerKit
+        product: AudioCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.brennanmke.SkinAmp
@@ -40,3 +44,4 @@ schemes:
     test:
       targets:
         - package: SkinKit/SkinKitTests
+        - package: PlayerKit/AudioCoreTests
