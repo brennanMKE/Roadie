@@ -7,7 +7,12 @@ final class AudioGraph {
     let playerNode = AVAudioPlayerNode()
     /// Bypassed for now; 0004 configures the bands on this instance.
     let eq = AVAudioUnitEQ(numberOfBands: 10)
-    private(set) var connectedFormat: AVAudioFormat?
+    /// The one format player -> eq -> mixer is connected at: the output's rate, stereo.
+    /// nil until the first `start()`. `AVAudioPlayerNode` converts each file to it.
+    private(set) var processingFormat: AVAudioFormat?
+
+    /// Sample rate of the node timeline (nil until the first `start()`).
+    var processingSampleRate: Double? { processingFormat?.sampleRate }
 
     var mainMixerNode: AVAudioMixerNode { engine.mainMixerNode }
 
@@ -38,21 +43,22 @@ final class AudioGraph {
         playerNode.pan = self.balance
     }
 
-    /// Reconnects player -> eq -> mixer when the sample rate or channel count changes.
-    /// Only call while `playerNode` is stopped.
-    func connect(format: AVAudioFormat) {
-        if let current = connectedFormat,
-           current.sampleRate == format.sampleRate,
-           current.channelCount == format.channelCount {
-            return
-        }
+    /// Connects player -> eq -> mixer at the output rate, stereo, if not already.
+    /// Only safe while the engine is stopped: reconnecting an initialized `AVAudioUnitEQ`
+    /// at a different rate or channel count throws -10868 (an uncaught Objective-C exception).
+    private func connectIfNeeded() {
+        var rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
+        if rate <= 0 { rate = 44_100 }
+        if let current = processingFormat, current.sampleRate == rate { return }
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2) else { return }
         engine.connect(playerNode, to: eq, format: format)
         engine.connect(eq, to: engine.mainMixerNode, format: format)
-        connectedFormat = format
+        processingFormat = format
     }
 
     func start() throws {
         guard !engine.isRunning else { return }
+        connectIfNeeded()
         engine.prepare()
         do {
             try engine.start()

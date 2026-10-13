@@ -11,27 +11,12 @@ struct ScheduleToken: Hashable, Sendable {
 struct ScheduledItem: Equatable, Sendable {
     let token: ScheduleToken
     let trackID: UUID
-    /// Start on the node's sample timeline (connection-rate frames).
+    /// Start on the node's sample timeline (node-rate frames).
     let startFrame: Int64
+    /// Length in node-rate frames (see `nodeFrames`).
     let frameLength: Int64
-    /// First file frame of the segment (non-zero after a seek).
-    let seekOffsetFrames: Int64
-}
-
-struct AudioFormatDescriptor: Equatable, Sendable {
-    var sampleRate: Double
-    var channelCount: UInt32
-}
-
-enum FormatPolicy: Equatable, Sendable {
-    /// Same rate and channel count: the node plays the files back to back.
-    case gapless
-    /// Anything else needs the node reconnected, which means stopping it (a gap).
-    case reconnectRequired
-
-    static func compare(current: AudioFormatDescriptor, next: AudioFormatDescriptor) -> FormatPolicy {
-        current == next ? .gapless : .reconnectRequired
-    }
+    /// Seconds into the file where the segment starts (non-zero after a seek).
+    let seekOffset: TimeInterval
 }
 
 enum SchedulingDecision: Equatable, Sendable {
@@ -75,14 +60,14 @@ struct GaplessScheduler: Sendable {
         items.removeAll()
     }
 
-    mutating func append(trackID: UUID, frameLength: Int64, seekOffsetFrames: Int64 = 0) -> ScheduledItem {
+    mutating func append(trackID: UUID, frameLength: Int64, seekOffset: TimeInterval = 0) -> ScheduledItem {
         sequence += 1
         let item = ScheduledItem(
             token: ScheduleToken(generation: generation, sequence: sequence),
             trackID: trackID,
             startFrame: items.last.map { $0.startFrame + $0.frameLength } ?? 0,
             frameLength: frameLength,
-            seekOffsetFrames: seekOffsetFrames
+            seekOffset: seekOffset
         )
         items.append(item)
         return item
@@ -97,9 +82,15 @@ struct GaplessScheduler: Sendable {
 
     /// Seconds into the audible item's file for a node sample time. Clamped to the item,
     /// so it stays right between the real boundary and the completion callback arriving.
-    func position(atNodeSampleTime sample: Int64, sampleRate: Double) -> TimeInterval? {
-        guard let head = items.first, sampleRate > 0 else { return nil }
+    func position(atNodeSampleTime sample: Int64, nodeSampleRate: Double) -> TimeInterval? {
+        guard let head = items.first, nodeSampleRate > 0 else { return nil }
         let played = min(max(sample - head.startFrame, 0), head.frameLength)
-        return Double(head.seekOffsetFrames + played) / sampleRate
+        return head.seekOffset + Double(played) / nodeSampleRate
+    }
+
+    /// File frames expressed on the node's timeline.
+    static func nodeFrames(fileFrames: Int64, fileSampleRate: Double, nodeSampleRate: Double) -> Int64 {
+        guard fileSampleRate > 0, nodeSampleRate > 0, fileSampleRate != nodeSampleRate else { return fileFrames }
+        return Int64((Double(fileFrames) * nodeSampleRate / fileSampleRate).rounded())
     }
 }

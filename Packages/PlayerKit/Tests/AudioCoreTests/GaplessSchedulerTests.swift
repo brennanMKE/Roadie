@@ -18,12 +18,12 @@ import Testing
     @Test func positionAccountsForStartFrameAndSeekOffset() {
         var s = GaplessScheduler()
         let first = s.append(trackID: a, frameLength: 1000)
-        _ = s.append(trackID: b, frameLength: 4000, seekOffsetFrames: 2000)
+        _ = s.append(trackID: b, frameLength: 4000, seekOffset: 2.0)
         _ = s.complete(first.token)
-        #expect(s.position(atNodeSampleTime: 1500, sampleRate: 1000) == 2.5)
+        #expect(s.position(atNodeSampleTime: 1500, nodeSampleRate: 1000) == 2.5)
         // Before the callback arrives the position clamps to the item.
-        #expect(s.position(atNodeSampleTime: 99_999, sampleRate: 1000) == 6.0)
-        #expect(s.position(atNodeSampleTime: 0, sampleRate: 1000) == 2.0)
+        #expect(s.position(atNodeSampleTime: 99_999, nodeSampleRate: 1000) == 6.0)
+        #expect(s.position(atNodeSampleTime: 0, nodeSampleRate: 1000) == 2.0)
     }
 
     @Test func staleTokenIsIgnoredAfterInvalidate() {
@@ -61,11 +61,12 @@ import Testing
         #expect(s.items.isEmpty)
     }
 
-    @Test func formatPolicy() {
-        let base = AudioFormatDescriptor(sampleRate: 44100, channelCount: 2)
-        #expect(FormatPolicy.compare(current: base, next: base) == .gapless)
-        #expect(FormatPolicy.compare(current: base, next: .init(sampleRate: 48000, channelCount: 2)) == .reconnectRequired)
-        #expect(FormatPolicy.compare(current: base, next: .init(sampleRate: 44100, channelCount: 1)) == .reconnectRequired)
+    @Test func nodeFramesScalesWithSampleRate() {
+        typealias S = GaplessScheduler
+        #expect(S.nodeFrames(fileFrames: 22050, fileSampleRate: 44100, nodeSampleRate: 48000) == 24000)
+        #expect(S.nodeFrames(fileFrames: 24000, fileSampleRate: 48000, nodeSampleRate: 44100) == 22050)
+        #expect(S.nodeFrames(fileFrames: 48000, fileSampleRate: 96000, nodeSampleRate: 48000) == 24000)
+        #expect(S.nodeFrames(fileFrames: 12345, fileSampleRate: 44100, nodeSampleRate: 44100) == 12345)
     }
 
     @Test func reconcileKeepsScheduleWhenNextUnchanged() {

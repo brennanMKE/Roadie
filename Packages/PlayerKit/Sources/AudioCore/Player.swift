@@ -218,7 +218,6 @@ public final class Player {
         let graph = ensureGraph()
         discardSchedule()
         graph.playerNode.stop()
-        graph.connect(format: file.processingFormat)
         try graph.start()
         self.file = file
         schedule(file, from: 0)
@@ -236,8 +235,13 @@ public final class Player {
     ) {
         guard let graph = _graph, let id = trackID ?? queue.current?.id else { return }
         let remaining = file.length - frame
-        guard remaining > 0 else { return }
-        let item = scheduler.append(trackID: id, frameLength: remaining, seekOffsetFrames: frame)
+        guard remaining > 0, let nodeRate = graph.processingSampleRate else { return }
+        let fileRate = file.processingFormat.sampleRate
+        let item = scheduler.append(
+            trackID: id,
+            frameLength: GaplessScheduler.nodeFrames(
+                fileFrames: remaining, fileSampleRate: fileRate, nodeSampleRate: nodeRate),
+            seekOffset: Double(frame) / fileRate)
         let token = item.token
         graph.playerNode.scheduleSegment(
             file, startingFrame: frame, frameCount: AVAudioFrameCount(clamping: remaining), at: nil,
@@ -266,14 +270,8 @@ public final class Player {
             guard let url = try? await resolver.localURL(for: track),
                   !Task.isCancelled, scheduler.generation == generation, scheduler.items.count == 1,
                   let current = queue.indexAfterCurrentEnds(), queue.tracks[current].id == track.id,
-                  let graph = _graph, let connected = graph.connectedFormat,
+                  _graph != nil,
                   let next = try? AVAudioFile(forReading: url) else { return }
-            // A format change needs a reconnect; leave it to the normal (gapped) path.
-            let policy = FormatPolicy.compare(
-                current: AudioFormatDescriptor(sampleRate: connected.sampleRate, channelCount: connected.channelCount),
-                next: AudioFormatDescriptor(
-                    sampleRate: next.processingFormat.sampleRate, channelCount: next.processingFormat.channelCount))
-            guard policy == .gapless else { return }
             nextFile = next
             schedule(next, trackID: track.id)
         }
@@ -331,11 +329,11 @@ public final class Player {
     // MARK: Time
 
     private func updateCurrentTime() {
-        guard let file, let node = _graph?.playerNode,
+        guard file != nil, let node = _graph?.playerNode,
               let renderTime = node.lastRenderTime,
               let playerTime = node.playerTime(forNodeTime: renderTime),
               let seconds = scheduler.position(
-                atNodeSampleTime: playerTime.sampleTime, sampleRate: file.processingFormat.sampleRate)
+                atNodeSampleTime: playerTime.sampleTime, nodeSampleRate: playerTime.sampleRate)
         else { return }
         currentTime = seconds
     }
@@ -361,8 +359,9 @@ public final class Player {
         let graph = AudioGraph(volume: volume, balance: balance)
         _graph = graph
         configTask = Task { [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: .AVAudioEngineConfigurationChange) {
-                self?.handleConfigurationChange()
+            for await note in NotificationCenter.default.notifications(named: .AVAudioEngineConfigurationChange) {
+                guard let self, (note.object as AnyObject?) === self._graph?.engine else { continue }
+                self.handleConfigurationChange()
             }
         }
         return graph
