@@ -110,6 +110,10 @@ public final class Player: NowPlayingCommandTarget {
     @ObservationIgnored private var scheduler = GaplessScheduler()
     @ObservationIgnored private var preloadTask: Task<Void, Never>?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    /// What the in-flight (or last) load should do when the file opens: play, or park paused.
+    @ObservationIgnored private var autoplayAfterLoad = true
+    /// A load started by `startCurrentTrack` has not reached `begin` yet.
+    @ObservationIgnored private var loadPending = false
     @ObservationIgnored private var timeTask: Task<Void, Never>?
     @ObservationIgnored private var configTask: Task<Void, Never>?
 
@@ -137,7 +141,8 @@ public final class Player: NowPlayingCommandTarget {
         if removingCurrent { currentTime = 0 }   // before the queue change publishes the new track
         queue.remove(at: index)
         if removingCurrent && state != .stopped {
-            if queue.current != nil { startCurrentTrack() } else { stop() }
+            // Keep the transport intent: a paused player parks on the new current track at 0:00.
+            if queue.current != nil { startCurrentTrack(autoplay: state == .playing) } else { stop() }
         } else {
             reconcileSchedule()
         }
@@ -155,6 +160,11 @@ public final class Player: NowPlayingCommandTarget {
         case .playing:
             return
         case .paused:
+            if loadPending {
+                // A parked load is still in flight (nothing is scheduled yet); play when it lands.
+                autoplayAfterLoad = true
+                return
+            }
             do {
                 let graph = try startedGraph()
                 graph.playerNode.play()
@@ -199,6 +209,7 @@ public final class Player: NowPlayingCommandTarget {
 
     public func stop() {
         loadTask?.cancel()
+        loadPending = false
         timeTask?.cancel()
         discardSchedule()
         _graph?.playerNode.stop()
@@ -249,11 +260,14 @@ public final class Player: NowPlayingCommandTarget {
 
     // MARK: Starting tracks
 
-    private func startCurrentTrack() {
+    /// `autoplay: false` loads the track and parks it paused at 0:00 instead of starting it.
+    private func startCurrentTrack(autoplay: Bool = true) {
         guard let track = queue.current else {
             stop()
             return
         }
+        autoplayAfterLoad = autoplay
+        loadPending = true
         loadTask?.cancel()
         timeTask?.cancel()
         discardSchedule()
@@ -281,9 +295,15 @@ public final class Player: NowPlayingCommandTarget {
         self.file = file
         schedule(file, from: 0)
         currentTime = 0
-        graph.playerNode.play()
-        state = .playing
-        startTimeUpdates()
+        loadPending = false
+        if autoplayAfterLoad {
+            graph.playerNode.play()
+            state = .playing
+            startTimeUpdates()
+        } else if state != .paused {
+            // Parked: the segment stays scheduled on the stopped node; `play()` resumes it from 0.
+            state = .paused
+        }
         scheduleNextIfNeeded()
     }
 
