@@ -1,0 +1,42 @@
+name: SkinPlayer
+options:
+  bundleIdPrefix: com.brennanmke
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+packages:
+  SkinKit:
+    path: Packages/SkinKit
+targets:
+  SkinPlayer:
+    type: application
+    platform: macOS
+    sources: [App]
+    dependencies:
+      - package: SkinKit
+        product: SkinKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.brennanmke.SkinPlayer
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Skin Player
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: YES
+        # Unsandboxed for now so the app can read a large local skin corpus by path.
+        ENABLE_APP_SANDBOX: NO
+schemes:
+  SkinPlayer:
+    build:
+      targets:
+        SkinPlayer: all
+    test:
+      targets:
+        - package: SkinKit/SkinKitTests
