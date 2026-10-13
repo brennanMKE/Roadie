@@ -12,6 +12,7 @@ public struct Track: Identifiable, Hashable, Sendable {
     public let id: UUID
     public var title: String
     public var artist: String
+    public var album: String?
     public var duration: TimeInterval
     /// kbps
     public var bitrate: Int?
@@ -24,6 +25,7 @@ public struct Track: Identifiable, Hashable, Sendable {
         id: UUID = UUID(),
         title: String,
         artist: String,
+        album: String? = nil,
         duration: TimeInterval,
         bitrate: Int? = nil,
         sampleRate: Double? = nil,
@@ -33,6 +35,7 @@ public struct Track: Identifiable, Hashable, Sendable {
         self.id = id
         self.title = title
         self.artist = artist
+        self.album = album
         self.duration = duration
         self.bitrate = bitrate
         self.sampleRate = sampleRate

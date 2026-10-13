@@ -11,6 +11,8 @@ final class PlayerModel {
     private(set) var skinName: String?
     private(set) var errorMessage: String?
     let player = Player()
+    /// Media keys and Control Center; lives as long as the model.
+    private let nowPlaying: NowPlayingBridge
     var playbackState: PlaybackState { player.state }
     var isImporting = false
     var scale: CGFloat = 2
@@ -18,6 +20,8 @@ final class PlayerModel {
     private static let lastSkinKey = "lastSkinPath"
 
     init() {
+        nowPlaying = NowPlayingBridge(player: player)
+        nowPlaying.install()
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
         }

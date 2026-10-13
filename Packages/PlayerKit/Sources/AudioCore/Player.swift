@@ -4,9 +4,13 @@ import Observation
 
 @MainActor
 @Observable
-public final class Player {
-    public private(set) var queue = PlayQueue()
-    public private(set) var state: PlaybackState = .stopped
+public final class Player: NowPlayingCommandTarget {
+    public private(set) var queue = PlayQueue() {
+        didSet { emitTrackChangeIfNeeded() }
+    }
+    public private(set) var state: PlaybackState = .stopped {
+        didSet { onEvent?(.stateChanged(state)) }
+    }
     public private(set) var currentTime: TimeInterval = 0
     public private(set) var errorMessage: String?
 
@@ -72,6 +76,11 @@ public final class Player {
         }
     }
 
+    /// Notified (on the main actor) when the current track, the play/pause/stop state or the
+    /// position (seek) changes; never per playback tick. One observer: the Now Playing bridge.
+    @ObservationIgnored public var onEvent: (@MainActor (PlayerEvent) -> Void)?
+    @ObservationIgnored private var lastEmittedTrackID: UUID?
+
     @ObservationIgnored private let resolver: any TrackResolver
     @ObservationIgnored var _graph: AudioGraph?
     /// Spectrum / oscilloscope source for the visualizer. Pull `latestFrame()` from the main
@@ -90,6 +99,13 @@ public final class Player {
     /// Construction does not touch the audio engine.
     public init(resolver: any TrackResolver = FileTrackResolver()) {
         self.resolver = resolver
+    }
+
+    private func emitTrackChangeIfNeeded() {
+        let current = queue.current
+        guard current?.id != lastEmittedTrackID else { return }
+        lastEmittedTrackID = current?.id
+        onEvent?(.trackChanged(current))
     }
 
     // MARK: Queue
@@ -152,6 +168,8 @@ public final class Player {
         state = .paused
     }
 
+    public func togglePlayPause() { togglePause() }
+
     public func togglePause() {
         switch state {
         case .playing: pause()
@@ -205,6 +223,7 @@ public final class Player {
             graph.playerNode.play()
         }
         scheduleNextIfNeeded()
+        onEvent?(.seeked(target))
     }
 
     // MARK: Starting tracks
@@ -416,4 +435,11 @@ public final class Player {
         stop()
         errorMessage = message
     }
+}
+
+/// Coarse player changes for observers that must not poll (Now Playing).
+public enum PlayerEvent: Sendable {
+    case trackChanged(Track?)
+    case stateChanged(PlaybackState)
+    case seeked(TimeInterval)
 }
