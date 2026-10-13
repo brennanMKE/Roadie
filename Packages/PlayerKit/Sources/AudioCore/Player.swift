@@ -10,18 +10,37 @@ public final class Player {
     public private(set) var currentTime: TimeInterval = 0
     public private(set) var errorMessage: String?
 
-    public var volume: Float = 1 {
-        didSet {
-            volume = min(max(volume, 0), 1)
-            _graph?.volume = volume
+    /// 0...1. Clamped on assignment; backed by an ignored stored value so the
+    /// setter never re-enters itself (a `didSet` that reassigns recurses under `@Observable`).
+    public var volume: Float {
+        get {
+            access(keyPath: \.volume)
+            return storedVolume
+        }
+        set {
+            let clamped = min(max(newValue, 0), 1)
+            withMutation(keyPath: \.volume) {
+                storedVolume = clamped
+            }
+            _graph?.volume = clamped
         }
     }
-    public var balance: Float = 0 {
-        didSet {
-            balance = min(max(balance, -1), 1)
-            _graph?.balance = balance
+    /// -1...1. Clamped on assignment; see `volume`.
+    public var balance: Float {
+        get {
+            access(keyPath: \.balance)
+            return storedBalance
+        }
+        set {
+            let clamped = min(max(newValue, -1), 1)
+            withMutation(keyPath: \.balance) {
+                storedBalance = clamped
+            }
+            _graph?.balance = clamped
         }
     }
+    @ObservationIgnored private var storedVolume: Float = 1
+    @ObservationIgnored private var storedBalance: Float = 0
     public var repeatMode: RepeatMode {
         get { queue.repeatMode }
         set { queue.repeatMode = newValue }
@@ -32,7 +51,7 @@ public final class Player {
     }
 
     @ObservationIgnored private let resolver: any TrackResolver
-    @ObservationIgnored private var _graph: AudioGraph?
+    @ObservationIgnored var _graph: AudioGraph?
     @ObservationIgnored private var file: AVAudioFile?
     /// Frame the current segment started at.
     @ObservationIgnored private var frameOffset: AVAudioFramePosition = 0
@@ -246,7 +265,7 @@ public final class Player {
 
     // MARK: Graph
 
-    private func ensureGraph() -> AudioGraph {
+    func ensureGraph() -> AudioGraph {
         if let _graph { return _graph }
         let graph = AudioGraph(volume: volume, balance: balance)
         _graph = graph
