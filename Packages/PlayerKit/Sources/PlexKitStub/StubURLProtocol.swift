@@ -22,11 +22,14 @@ public final class StubURLProtocol: URLProtocol {
         public var error: URLError?
         /// Seconds to wait before answering, so a test can cancel a request that is in flight.
         public var delay: TimeInterval = 0
+        /// When set, the route answers only this many matching requests and then stops matching,
+        /// so a later route can take over without the test re-registering mid-flight.
+        public var times: Int?
 
         public init(
             method: String = "GET", path: String, host: String? = nil, query: [String: String] = [:], containerStart: Int? = nil,
             status: Int = 200, headers: [String: String] = ["Content-Type": "application/json"],
-            body: Data = Data(), error: URLError? = nil, delay: TimeInterval = 0
+            body: Data = Data(), error: URLError? = nil, delay: TimeInterval = 0, times: Int? = nil
         ) {
             self.method = method
             self.path = path
@@ -38,6 +41,7 @@ public final class StubURLProtocol: URLProtocol {
             self.body = body
             self.error = error
             self.delay = delay
+            self.times = times
         }
 
         public static func json(_ fixture: PlexFixture, path: String, query: [String: String] = [:], containerStart: Int? = nil) throws -> Route {
@@ -138,13 +142,21 @@ public final class StubURLProtocol: URLProtocol {
             var table = tables[sessionID] ?? Table()
             table.recorded.append(RecordedRequest(url: url, method: method, headers: headers))
             tables[sessionID] = table
-            return table.routes.first { route in
-                route.method == method
+            let index = table.routes.firstIndex { route in
+                (route.times ?? 1) > 0
+                    && route.method == method
                     && route.path == url.path
                     && (route.host == nil || route.host == url.host)
                     && route.query.allSatisfy { key, value in items.contains { $0.name == key && $0.value == value } }
                     && (route.containerStart == nil || route.containerStart == start)
             }
+            guard let index else { return nil }
+            let matched = table.routes[index]
+            if let times = matched.times {
+                table.routes[index].times = times - 1
+                tables[sessionID] = table
+            }
+            return matched
         }
 
         guard let route else {

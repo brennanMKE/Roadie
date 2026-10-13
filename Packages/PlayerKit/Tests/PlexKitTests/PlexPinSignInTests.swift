@@ -127,11 +127,15 @@ struct PlexPinSignInTests {
         let fake = try PlexTv.fakeToken
         let (handle, signIn, _) = make()
         let failing = try PlexTv.pollRoute(error: URLError(.networkConnectionLost))
-        handle.register([try PlexTv.createRoute(), failing])
-        let task = Task { await Self.run(signIn, URLRecorder()) }
-        #expect(await PlexTv.wait { pollCount(handle) >= 2 })
-        handle.register([try PlexTv.createRoute(), try PlexTv.pollRoute(.pinClaimed)])
-        #expect(await task.value == .success(PlexToken(fake)))
+        // The stub itself fails the first two polls and then answers with the claimed PIN, so no
+        // timing between the test and the loop matters.
+        handle.register([
+            try PlexTv.createRoute(),
+            try PlexTv.pollRoute(error: URLError(.networkConnectionLost), times: 2),
+            try PlexTv.pollRoute(.pinClaimed),
+        ])
+        #expect(await Self.run(signIn, URLRecorder()) == .success(PlexToken(fake)))
+        #expect(pollCount(handle) == 3)
 
         handle.reset()
         handle.register([try PlexTv.createRoute(), failing])
