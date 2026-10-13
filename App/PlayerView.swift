@@ -36,5 +36,7 @@ struct PlayerView: View {
 }
 
 extension UTType {
-    static let wsz = UTType(filenameExtension: "wsz", conformingTo: .zip) ?? .zip
+    /// Declared in the app's Info.plist (UTExportedTypeDeclarations). A dynamic type built from the
+    /// extension never matches the dynamic type Launch Services gives the file, so the panel greys it out.
+    static let wsz = UTType(exportedAs: "com.brennanmke.skinamp.wsz", conformingTo: .zip)
 }

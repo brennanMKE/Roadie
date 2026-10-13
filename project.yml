@@ -23,6 +23,15 @@ targets:
         product: SkinKit
       - package: PlayerKit
         product: AudioCore
+    info:
+      path: App/Info.plist
+      properties:
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.brennanmke.skinamp.wsz
+            UTTypeDescription: Winamp Classic Skin
+            UTTypeConformsTo: [public.zip-archive]
+            UTTypeTagSpecification:
+              public.filename-extension: [wsz]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.brennanmke.SkinAmp
