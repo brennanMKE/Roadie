@@ -119,7 +119,9 @@ public actor SkinThumbnailCache {
         if negative.contains(hash) { return nil }
         let id: UInt64
         let task: Task<SkinThumbnail?, Never>
-        if var existing = inFlight[hash] {
+        // A job whose last caller just cancelled it is on its way out (its `jobDropped` hop may not have run yet):
+        // joining it would return nil, so start a fresh one. The stale job's bookkeeping is keyed by id and ignored.
+        if var existing = inFlight[hash], !existing.job.task.isCancelled {
             existing.job.waiters += 1
             inFlight[hash] = existing
             id = existing.id
