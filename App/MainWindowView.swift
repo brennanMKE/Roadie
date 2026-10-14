@@ -10,6 +10,14 @@ struct MainWindowView: View {
     let skin: Skin
 
     var body: some View {
+        if model.isMainWindowShaded {
+            MainShadeView(skin: skin)
+        } else {
+            normalBody
+        }
+    }
+
+    private var normalBody: some View {
         ZStack(alignment: .topLeading) {
             baseLayer
             TitleBarView(skin: skin)

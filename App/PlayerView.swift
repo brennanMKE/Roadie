@@ -11,7 +11,7 @@ struct PlayerView: View {
                 MainWindowView(skin: skin)
                     .scaleEffect(model.scale, anchor: .topLeading)
                     .frame(
-                        width: MainWindowLayout.size.width * model.scale, height: MainWindowLayout.size.height * model.scale,
+                        width: MainWindowLayout.size.width * model.scale, height: model.mainWindowSkinSize.height * model.scale,
                         alignment: .topLeading)
             } else {
                 ContentUnavailableView {
@@ -21,7 +21,7 @@ struct PlayerView: View {
                 } actions: {
                     Button("Open Skin…") { model.openSkin() }
                 }
-                .frame(width: MainWindowLayout.size.width * model.scale, height: MainWindowLayout.size.height * model.scale)
+                .frame(width: MainWindowLayout.size.width * model.scale, height: model.mainWindowSkinSize.height * model.scale)
                 .background(.windowBackground, in: .rect(cornerRadius: 8))
             }
         }

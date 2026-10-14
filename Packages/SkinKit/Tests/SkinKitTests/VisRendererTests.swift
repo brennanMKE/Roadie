@@ -139,4 +139,83 @@ struct VisRendererTests {
         #expect(sink == 76 * iterations)
         #expect(meanMicroseconds < 1_000)
     }
+
+    // MARK: Shade layouts
+
+    @Test func shadeLayoutsHaveWebampSizes() {
+        let one = VisLayout.shade(pixelDensity: 1)
+        #expect(one.imageSize.width == 76 && one.imageSize.height == 5)
+        #expect(one.columnCount == 37 && one.maxHeight == 5 && one.backgroundWidth == 38 && one.pointScale == 1)
+        let two = VisLayout.shade(pixelDensity: 2)
+        #expect(two.imageSize.width == 152 && two.imageSize.height == 10)
+        #expect(two.columnCount == 75 && two.maxHeight == 10 && two.backgroundWidth == 152 && two.pointScale == 2)
+        let main = VisLayout.main
+        #expect(main.imageSize.width == 76 && main.imageSize.height == 16)
+        #expect(main.columnCount == 75 && main.maxHeight == 15 && main.backgroundWidth == 76 && main.pointScale == 1)
+    }
+
+    @Test func shadeBackgroundHasNoGridAndStopsAtThirtyEight() {
+        var r = VisRenderer(colors: c, layout: .shade(pixelDensity: 1))
+        r.clear()
+        #expect(r.color(x: 0, y: 1) == c[0] && r.color(x: 2, y: 1) == c[0])
+        #expect(r.color(x: 37, y: 4) == c[0])
+        #expect(r.alpha(x: 37, y: 4) == 255)
+        #expect(r.alpha(x: 38, y: 0) == 0 && r.alpha(x: 75, y: 4) == 0)
+        var d = VisRenderer(colors: c, layout: .shade(pixelDensity: 2))
+        d.clear()
+        #expect(d.color(x: 0, y: 1) == c[0])
+        #expect(d.alpha(x: 151, y: 9) == 255)
+    }
+
+    @Test func shadeBarsUseTheSmallRamps() {
+        var r = VisRenderer(colors: c, layout: .shade(pixelDensity: 1))
+        r.clear()
+        var h = [Int](repeating: 0, count: 75)
+        h[0] = 5; h[3] = 5; h[38] = 5
+        r.drawBars(heights: h, peaks: noPeaks, pushDown: 0)
+        for (y, index) in [4, 8, 11, 14, 17].enumerated() { #expect(r.color(x: 0, y: y) == c[index]) }
+        #expect(r.color(x: 3, y: 4) == c[0])
+        #expect(r.alpha(x: 38, y: 4) == 0)
+
+        var d = VisRenderer(colors: c, layout: .shade(pixelDensity: 2))
+        d.clear()
+        h[0] = 12
+        d.drawBars(heights: h, peaks: noPeaks, pushDown: 0)
+        for (y, index) in [4, 5, 7, 8, 10, 11, 13, 14, 16, 17].enumerated() { #expect(d.color(x: 0, y: y) == c[index]) }
+    }
+
+    @Test func shadePeaksDrawOnTheBottomRow() {
+        var r = VisRenderer(colors: c, layout: .shade(pixelDensity: 1))
+        r.clear()
+        var peaks = noPeaks
+        peaks[0] = 1
+        r.drawBars(heights: noPeaks, peaks: peaks, pushDown: 0)
+        #expect(r.color(x: 0, y: 4) == c[23])
+        r.clear()
+        peaks[0] = 6
+        r.drawBars(heights: noPeaks, peaks: peaks, pushDown: 0)
+        #expect((0..<5).allSatisfy { r.color(x: 0, y: $0) == c[0] })
+    }
+
+    @Test func shadeOscilloscopeMapsToFiveOrTenRows() {
+        var r = VisRenderer(colors: c, layout: .shade(pixelDensity: 1))
+        r.clear()
+        r.drawOscilloscope([Float](repeating: 0, count: 37), pushDown: 0)
+        for x in [0, 10, 36] { #expect(r.color(x: x, y: 2) == c[18]) }
+        #expect(r.alpha(x: 38, y: 2) == 0)
+
+        var d = VisRenderer(colors: c, layout: .shade(pixelDensity: 2))
+        d.clear()
+        d.drawOscilloscope([Float](repeating: 0, count: 75), pushDown: 0)
+        for x in [0, 30, 74] { #expect(d.color(x: x, y: 4) == c[18]) }
+
+        // 1.0 then -1.0 spans rows 4...0; -1.0 then 1.0 joins the same five rows (no main-window `top += 1` nudge).
+        for samples: [Float] in [[1, -1], [-1, 1]] {
+            var s = VisRenderer(colors: c, layout: .shade(pixelDensity: 1))
+            s.clear()
+            s.drawOscilloscope(samples, pushDown: 0)
+            let painted = (0..<5).filter { s.color(x: 1, y: $0) == c[18] }
+            #expect(painted == [0, 1, 2, 3, 4])
+        }
+    }
 }

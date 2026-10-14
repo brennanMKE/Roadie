@@ -56,6 +56,10 @@ final class PlayerModel {
     var scale: CGFloat = 2 {
         didSet { visualizer.setScale(scale) }
     }
+    /// Whether the main window is collapsed to its 14 px shade strip. Persisted, so the window comes back as it was left.
+    private(set) var isMainWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.mainWindowShadeKey)
+    /// The main window's size in skin pixels in its current mode.
+    var mainWindowSkinSize: CGSize { isMainWindowShaded ? MainWindowLayout.shadeSize : MainWindowLayout.size }
     /// The main-window spectrum / oscilloscope; ticks only while audio plays.
     let visualizer: VisualizerModel
     /// Replaces the marquee text while set, like Webamp's focus text. Set while a main-window slider is held.
@@ -115,6 +119,7 @@ final class PlayerModel {
 
     static let eqWindowOpenKey = "eqWindowOpen"
     static let playlistWindowOpenKey = "playlistWindowOpen"
+    static let mainWindowShadeKey = "mainWindowShade"
     static let equalizerKey = "equalizer"
     private static let lastSkinKey = "lastSkinPath"
     private static let timeModeKey = "timeMode"
@@ -200,7 +205,7 @@ final class PlayerModel {
             }
         }
         playlist.isLocal = { [weak self] in self?.selectedOutput == OutputDevice.thisMacID }
-        visualizer.setScale(scale)
+        visualizer.setLayout(shaded: isMainWindowShaded, scale: scale)
         visualizer.start()
         observeNowPlaying()
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
@@ -320,6 +325,14 @@ final class PlayerModel {
         defer { endSliderDrag() }
         guard positionFraction != nil else { return }
         send(.seek(min(max(fraction, 0), 1) * mainWindowStatus.duration))
+    }
+
+    /// Collapses the main window to its shade strip or restores it (the shade button, a title-bar double-click and
+    /// Window > Windowshade all come here). `SkinWindowController` follows the flag.
+    func toggleMainWindowShade() {
+        isMainWindowShaded.toggle()
+        UserDefaults.standard.set(isMainWindowShaded, forKey: Self.mainWindowShadeKey)
+        visualizer.setLayout(shaded: isMainWindowShaded, scale: scale)
     }
 
     func toggleShuffle() { send(.setShuffle(!isShuffled)) }

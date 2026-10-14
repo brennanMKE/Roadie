@@ -22,10 +22,15 @@ final class VisualizerModel {
     private(set) var mode: Mode
     /// nil draws nothing (stopped, or mode off).
     private(set) var image: CGImage?
+    /// Image pixels per skin pixel: 2 for the doubled shade strip's 152x10 image, else 1.
+    private(set) var pointScale = 1
 
     @ObservationIgnored private let player: Player
     @ObservationIgnored private var renderer: VisRenderer
     @ObservationIgnored private var bars = VisBars()
+    @ObservationIgnored private var colors: [SkinKit.RGBColor]
+    @ObservationIgnored private var isShaded = false
+    @ObservationIgnored private var scale: CGFloat = 2
     @ObservationIgnored private var link: CADisplayLink?
     @ObservationIgnored private var fallbackTimer: Timer?
     @ObservationIgnored private var target: DisplayLinkTarget?
@@ -40,6 +45,7 @@ final class VisualizerModel {
 
     init(player: Player, colors: [SkinKit.RGBColor]) {
         self.player = player
+        self.colors = colors
         renderer = VisRenderer(colors: colors)
         mode = UserDefaults.standard.object(forKey: Self.modeKey)
             .flatMap { $0 as? Int }.flatMap(Mode.init(rawValue:)) ?? .spectrum
@@ -56,13 +62,31 @@ final class VisualizerModel {
     }
 
     func setColors(_ colors: [SkinKit.RGBColor]) {
-        renderer = VisRenderer(colors: colors)
-        if player.state == .paused { render() }
+        self.colors = colors
+        applyLayout()
     }
 
     /// Winamp draws the main-window vis 2 px lower at 1x and flush when doubled.
     func setScale(_ scale: CGFloat) {
-        bars.pushDown = scale >= 2 ? 0 : 2
+        setLayout(shaded: isShaded, scale: scale)
+    }
+
+    /// The main window's 76x16 visualizer, or the shade strip's 76x5 one (at device resolution when `scale` is 2 or
+    /// more, as Webamp draws it). Survives a skin switch: `setColors` re-runs it.
+    func setLayout(shaded: Bool, scale: CGFloat) {
+        isShaded = shaded
+        self.scale = scale
+        applyLayout()
+    }
+
+    private func applyLayout() {
+        let layout: VisLayout = isShaded ? .shade(pixelDensity: scale >= 2 ? 2 : 1) : .main
+        renderer = VisRenderer(colors: colors, layout: layout)
+        pointScale = layout.pointScale
+        bars.maxHeight = layout.maxHeight
+        bars.smallVis = isShaded
+        bars.pushDown = isShaded ? 0 : (scale >= 2 ? 0 : 2)
+        if player.state == .paused { render() } else { image = nil }
     }
 
     // MARK: Lifecycle
@@ -128,9 +152,11 @@ final class VisualizerModel {
         switch player.state {
         case .stopped:
             setTicking(false)
-            let pushDown = bars.pushDown
+            let (pushDown, maxHeight, smallVis) = (bars.pushDown, bars.maxHeight, bars.smallVis)
             bars = VisBars()
             bars.pushDown = pushDown
+            bars.maxHeight = maxHeight
+            bars.smallVis = smallVis
             lastSampleCount = -1
             accumulator = 0
             image = nil
@@ -168,7 +194,11 @@ final class VisualizerModel {
         let steps = min(Int(accumulator * 60), 4)
         accumulator -= Double(steps) / 60
         if accumulator > 1.0 / 60 { accumulator = 0 }   // a long stall does not fast-forward the bars
-        let spectrum = fresh ? (frame?.spectrum ?? Self.silence) : Self.silence
+        var spectrum = fresh ? (frame?.spectrum ?? Self.silence) : Self.silence
+        if renderer.layout.columnCount == 37 {
+            // The 1x shade strip has half the columns: average adjacent pairs of the 75 bands.
+            spectrum = (0..<37).map { ((spectrum[safe: 2 * $0] ?? 0) + (spectrum[safe: 2 * $0 + 1] ?? 0)) / 2 }
+        }
         for _ in 0..<steps { bars.step(spectrum) }
         render()
     }
@@ -186,6 +216,10 @@ final class VisualizerModel {
         }
         image = renderer.makeImage()
     }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
 /// `CADisplayLink` retains its target, so this trampoline holds the model weakly.

@@ -13,6 +13,9 @@ public struct VisBars: Sendable {
     /// Per-step growth of the peak drop.
     public var peakFalloff: Float = 1.1
     public var maxHeight = 15
+    /// Webamp's `smallVis`, the shade strip's visualizer: peaks that have fallen to the bottom stay on the bottom row
+    /// instead of being pushed out of view (VisPainter.ts 415-420). The caller sets `maxHeight` to 5 or 10.
+    public var smallVis = false
     /// 2 at 1x, 0 at 2x (Winamp draws the main-window vis 2 px lower at 1x).
     public var pushDown = 0
     /// 75 values: `round(falloff) - pushDown`, never negative. The renderer skips every fourth column.
@@ -56,7 +59,7 @@ public struct VisBars: Sendable {
             peakPositions[x] -= Int(peakDrops[x].rounded())
             peakDrops[x] *= peakFalloff
             peakPositions[x] = max(peakPositions[x], 0)
-            if barPeak < 1 { barPeak = -3 }
+            if barPeak < 1 && !smallVis { barPeak = -3 }
 
             heights[x] = max(0, Int(fallingBars[x].rounded()) - pushDown)
             peaks[x] = barPeak + 1 - pushDown

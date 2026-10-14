@@ -37,6 +37,19 @@ public enum MainSliders {
         origin: CGPoint(x: 16, y: 72), size: CGSize(width: 248, height: 10),
         thumbSize: CGSize(width: 29, height: 10), thumbInsetY: 0, travel: 219)
 
+    /// `.shade #position`: (226, 4) 17x7, 3x7 thumb, travel 14 (css 479-497; TITLEBAR sprites 17x7 / 3x7).
+    public static let shadePosition = Slider(
+        origin: CGPoint(x: 226, y: 4), size: CGSize(width: 17, height: 7),
+        thumbSize: CGSize(width: 3, height: 7), thumbInsetY: 0, travel: 14)
+
+    /// Position.tsx 44-51: `position <= 33` is LEFT, `>= 66` is RIGHT, else the plain thumb (position is
+    /// floor(elapsed)/duration*100, unrounded, so the thresholds are fraction <= 0.33 and >= 0.66).
+    public static func shadePositionThumbName(fraction: Double) -> String {
+        if fraction <= 0.33 { return "MAIN_SHADE_POSITION_THUMB_LEFT" }
+        if fraction >= 0.66 { return "MAIN_SHADE_POSITION_THUMB_RIGHT" }
+        return "MAIN_SHADE_POSITION_THUMB"
+    }
+
     /// Frame height in volume.bmp / balance.bmp; 28 frames fill the 420-row sprite.
     public static let frameHeight = 15
     public static let frameCount = 28

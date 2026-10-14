@@ -79,4 +79,30 @@ import Testing
         #expect(a.heights == b.heights)
         #expect(a.peaks == b.peaks)
     }
+
+    @Test func smallVisKeepsLowPeaksOnTheBottomRow() {
+        var small = VisBars()
+        small.smallVis = true
+        small.maxHeight = 5
+        small.step(loud)
+        #expect(small.heights[0] == 5)
+        #expect(small.peaks[0] == 6)
+        for _ in 0..<200 { small.step(silent) }
+        #expect(small.peaks[0] == 1)
+        #expect(small.heights[0] == 0)
+
+        var main = VisBars()
+        main.step(loud)
+        for _ in 0..<200 { main.step(silent) }
+        #expect(main.peaks[0] <= 0)
+        #expect(main.heights[0] == 0)
+
+        // A 37-value spectrum (the 1x shade strip) leaves the columns beyond it at 0.
+        var narrow = VisBars()
+        narrow.smallVis = true
+        narrow.maxHeight = 5
+        narrow.step([Float](repeating: 1, count: 37))
+        #expect(narrow.heights[0] == 5)
+        #expect(narrow.heights[40...].allSatisfy { $0 == 0 })
+    }
 }

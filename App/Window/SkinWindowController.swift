@@ -50,12 +50,14 @@ enum SkinWindowKind {
         }
     }
 
-    /// Title-bar buttons in skin pixels; a drag started on one belongs to the button, not the window.
-    var titleButtonRects: [CGRect] {
-        switch self {
-        case .main: MainWindowLayout.TitleButton.allCases.map { MainWindowLayout.rect($0) }
-        case .equalizer: EQLayout.titleButtonRects
-        case .playlist(let steps): PlaylistLayout(steps: steps).titleButtonRects
+    /// Controls on the draggable strip, in skin pixels; a drag started on one belongs to the control, not the window.
+    /// Normal mode: the title-bar buttons. Shade: the whole strip is the drag area, minus its buttons and displays.
+    func dragExclusions(_ mode: SkinWindowController.Mode) -> [CGRect] {
+        switch (self, mode) {
+        case (.main, .normal): MainWindowLayout.TitleButton.allCases.map { MainWindowLayout.rect($0) }
+        case (.main, .shade): MainShadeLayout.dragExclusions
+        case (.equalizer, _): EQLayout.titleButtonRects
+        case (.playlist(let steps), _): PlaylistLayout(steps: steps).titleButtonRects
         }
     }
 }
@@ -68,7 +70,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     private(set) var kind: SkinWindowKind
     let window: SkinWindow
-    var mode: Mode = .normal { didSet { applyLayout() } }
+    /// Follows the model's shade flag for this window; set only by `applyLayout()`.
+    private(set) var mode: Mode = .normal
     /// Called from `windowWillClose`; a window the model tracks tells it that the window is no longer open.
     var onClose: (() -> Void)?
 
@@ -137,6 +140,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         withObservationTracking {
             _ = model.skin
             _ = model.scale
+            _ = shadeWanted
             if case .playlist = kind { _ = model.playlist.steps }
         } onChange: { [weak self] in
             Task { @MainActor in
@@ -146,8 +150,21 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         }
     }
 
+    /// Whether the model wants this window collapsed to its shade strip.
+    private var shadeWanted: Bool {
+        switch kind {
+        case .main: model.isMainWindowShaded
+        case .equalizer, .playlist: false
+        }
+    }
+
+    /// The one place a window changes size (scale, skin, shade, playlist steps), keeping the top-left corner.
+    /// Docked neighbours (#0030) follow from `windowDidResize`.
     private func applyLayout() {
         if case .playlist = kind { kind = .playlist(model.playlist.steps) }
+        let newMode: Mode = shadeWanted ? .shade : .normal
+        let modeChanged = newMode != mode
+        mode = newMode
         let scale = model.scale
         let skinSize = kind.skinSize(mode)
         let pixelSize = CGSize(width: skinSize.width * scale, height: skinSize.height * scale)
@@ -167,12 +184,16 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         if case .playlist(let steps) = kind {
             playlistOverlays?.layout(PlaylistLayout(steps: steps), scale: scale, height: pixelSize.height, shaded: mode == .shade)
         }
-        let barHeight = kind.titleBarHeight * scale
+        let barHeight = min(kind.titleBarHeight, skinSize.height) * scale
         dragView.frame = NSRect(x: 0, y: pixelSize.height - barHeight, width: pixelSize.width, height: barHeight)
-        dragView.excludedRects = kind.titleButtonRects.map {
+        dragView.excludedRects = kind.dragExclusions(mode).map {
             CGRect(x: $0.minX * scale, y: $0.minY * scale, width: $0.width * scale, height: $0.height * scale)
         }
         window.invalidateShadow()
+        // Winamp lets an unshaded window hang off the bottom of the screen; here it is pushed back on.
+        if modeChanged, window.isVisible, let screen = window.screen {
+            window.setFrame(window.constrainFrameRect(window.frame, to: screen), display: true)
+        }
     }
 
     // MARK: TitleBarDragging
@@ -180,7 +201,12 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     func dragBegan() { model.playlist.openMenu = nil }
     func drag(to proposedOrigin: NSPoint) { window.setFrameOrigin(proposedOrigin) }
     func dragEnded() {}
-    func titleBarDoubleClicked() {}
+    func titleBarDoubleClicked() {
+        switch kind {
+        case .main: model.toggleMainWindowShade()
+        case .equalizer, .playlist: break
+        }
+    }
 
     // MARK: NSWindowDelegate
 
