@@ -34,8 +34,8 @@ public actor StubMusicBackend: MusicBackend {
         }
     }
 
-    public nonisolated let sourceID = "stub"
-    public nonisolated let displayName = "Stub"
+    public nonisolated let sourceID: String
+    public nonisolated let displayName: String
     public nonisolated let capabilities: BackendCapabilities
 
     public var library: StubLibrary
@@ -57,8 +57,12 @@ public actor StubMusicBackend: MusicBackend {
     public init(
         library: StubLibrary = .sample(),
         capabilities: BackendCapabilities = [.search, .artwork, .localOutput],
-        reportsTotals: Bool = true
+        reportsTotals: Bool = true,
+        sourceID: String = "stub",
+        displayName: String = "Stub"
     ) {
+        self.sourceID = sourceID
+        self.displayName = displayName
         self.library = library
         self.capabilities = capabilities
         self.reportsTotals = reportsTotals

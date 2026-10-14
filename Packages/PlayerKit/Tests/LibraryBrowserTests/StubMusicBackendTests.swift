@@ -58,3 +58,15 @@ struct StubMusicBackendTests {
         #expect(noTotal.nextOffset == 10)
     }
 }
+
+@MainActor
+struct StubSourceIdentityTests {
+    @Test func sourceIDAndDisplayNameAreConfigurable() {
+        let custom = StubMusicBackend(sourceID: "x", displayName: "X")
+        #expect(custom.sourceID == "x")
+        #expect(custom.displayName == "X")
+        let plain = StubMusicBackend()
+        #expect(plain.sourceID == "stub")
+        #expect(plain.displayName == "Stub")
+    }
+}

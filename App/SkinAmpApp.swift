@@ -24,6 +24,7 @@ struct SkinAmpApp: App {
                 .environment(plexSettings)
                 .environment(appDelegate.model.cacheSettings)
                 .environment(appDelegate.model.folderSettings)
+                .environment(appDelegate.model.sources)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

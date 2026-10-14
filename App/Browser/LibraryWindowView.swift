@@ -17,9 +17,10 @@ struct LibraryWindowView: View {
         }
         .searchable(text: $library.searchText, placement: .toolbar, prompt: "Search artists, albums and tracks")
         .onSubmit(of: .search) { library.searchNow() }
-        .task { library.appeared() }
+        .task(id: ObjectIdentifier(player.library)) { library.appeared() }
         .onDisappear { library.disappeared() }
         .navigationTitle("Library")
+        .navigationSubtitle(library.backend.displayName)
         .toolbar {
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { library.refresh() }

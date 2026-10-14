@@ -24,16 +24,17 @@ final class PlayerModel {
     /// A transient message that takes over the marquee (and the no-skin placeholder) for a few seconds.
     private(set) var notice: StatusNotice?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
-    /// The app only talks to this; the composition below is the one place that names Plex.
-    let backend: any MusicBackend
+    /// The sources and the active one. `backend`, `library` and `artwork` below follow its choice; only
+    /// `sources.select(_:)` swaps them. The composition in `init` is the one place that names Plex and the folder.
+    let sources: LibrarySourceController
+    var backend: any MusicBackend { sources.backend }
     /// The Library window's state; connects when the window appears, never at launch.
-    let library: LibraryBrowserModel
-    /// The one thumbnail cache for the process. Refs only mean something to `backend`, so a source switch must `clear()` it.
-    let artwork: ArtworkCache
+    var library: LibraryBrowserModel { sources.library }
+    /// The thumbnail cache for the active source (rebuilt on a switch: refs only mean something to their backend).
+    var artwork: ArtworkCache { sources.artwork }
     let cache: TrackCache
     let cacheSettings: CacheSettingsModel
-    /// The local-folder source. Built here but not selected: the source picker (#0063) chooses between it and `backend`.
-    /// Shares Plex's "This Mac" output, so both play through the one `Player`.
+    /// The local-folder source; Settings › Library chooses and indexes its folder. Shares Plex's "This Mac" output, so both play through the one `Player`.
     let folderBackend: FolderBackend
     let folderSettings: FolderSettingsModel
     /// Still public for the skinned window's time and spectrum bindings and for local files.
@@ -139,9 +140,6 @@ final class PlayerModel {
 
     init() {
         let stack = PlexPlaybackStack.standard()
-        backend = stack.backend
-        library = LibraryBrowserModel(backend: stack.backend)
-        artwork = ArtworkCache(backend: stack.backend)
         cache = stack.cache
         player = stack.player
         visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors)
@@ -149,6 +147,12 @@ final class PlayerModel {
         cacheSettings = CacheSettingsModel(cache: stack.cache)
         folderBackend = FolderBackend(settings: FolderBackend.settingsProvider(), output: stack.output)
         folderSettings = FolderSettingsModel(backend: folderBackend)
+        sources = LibrarySourceController(
+            sources: [
+                LibrarySource(backend: stack.backend, isConfigured: { PlexBackend.isConfigured() }),
+                LibrarySource(backend: folderBackend, isConfigured: { FolderBackend.storedFolder() != nil }),
+            ],
+            defaultSourceID: stack.backend.sourceID)
         let cache = stack.cache
         Task {
             do { try await cache.prepare() } catch {
@@ -166,11 +170,11 @@ final class PlayerModel {
         }
         volume = stack.player.volume
         balance = stack.player.balance
-        let transportBackend = stack.backend
         Task { [weak self] in
             for await (command, output) in commands {
-                do { try await transportBackend.transport(command, on: output) } catch {
-                    self?.showBackendFailure(error)
+                guard let self else { return }
+                do { try await self.backend.transport(command, on: output) } catch {
+                    self.showBackendFailure(error)
                 }
             }
         }
@@ -186,11 +190,11 @@ final class PlayerModel {
     /// works without a server.
     private func observeNowPlaying() {
         nowPlayingTask?.cancel()
-        let backend = backend
+        let sources = sources
         let output = selectedOutput
         nowPlaying = .idle(on: output)
         nowPlayingTask = Task { [weak self] in
-            for await snapshot in await backend.nowPlaying(on: output) {
+            for await snapshot in sources.nowPlaying(on: output) {
                 guard !Task.isCancelled else { return }
                 self?.nowPlaying = snapshot
                 if let volume = snapshot.volume, self?.sliderFocus != .volume { self?.volume = volume }

@@ -35,6 +35,9 @@ public final class PagedList<Item: Identifiable & Hashable & Sendable> where Ite
     /// `loadMoreIfNeeded(current:)` fires when the item is within this many rows of the end.
     public let prefetchDistance: Int
 
+    /// Called with every error a page load throws (not cancellations), as it happens. For the fallback (#0067).
+    @ObservationIgnored public var onFailure: (@MainActor (any Error) -> Void)?
+
     private var nextOffset: Int?
     @ObservationIgnored private var loader: Loader?
     @ObservationIgnored private var generation = 0
@@ -155,6 +158,7 @@ public final class PagedList<Item: Identifiable & Hashable & Sendable> where Ite
 
     private func fail(_ error: any Error, generation: Int, isFirst: Bool) {
         guard generation == self.generation else { return }
+        onFailure?(error)
         let message = userMessage(for: error)
         if isFirst {
             phase = .failed(message)

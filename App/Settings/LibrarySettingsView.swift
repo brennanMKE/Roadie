@@ -1,13 +1,33 @@
 import AppKit
 import FolderBackendKit
+import LibraryBrowser
 import SwiftUI
 
-/// Settings › Library. Today only the local music folder; the source picker (#0063) goes above it.
+/// Settings › Library: which source the Library window browses, then the local music folder.
 struct LibrarySettingsView: View {
     @Environment(FolderSettingsModel.self) private var model
+    @Environment(LibrarySourceController.self) private var sources
 
     var body: some View {
         Form {
+            Section {
+                Picker("Library source", selection: Binding(get: { sources.preferredID }, set: { sources.select($0) })) {
+                    ForEach(sources.sources) { source in
+                        Text(source.isConfigured() ? source.displayName : "\(source.displayName) (not set up)")
+                            .tag(source.id)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                .accessibilityIdentifier("library.source")
+            } header: {
+                Text("Source")
+            } footer: {
+                Text("The Library window browses this source. Playback continues when you switch.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 LabeledContent("Folder") {
                     Text(model.pathText)

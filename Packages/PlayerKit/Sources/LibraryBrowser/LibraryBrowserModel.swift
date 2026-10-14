@@ -25,7 +25,13 @@ public final class LibraryBrowserModel {
         case idle, searching, loaded(SearchResults), failed(String)
     }
 
+    /// Where a reported failure happened: the connect, or a later list, track or search load.
+    public enum FailurePhase: Hashable, Sendable { case connect, browse }
+
     public let backend: any MusicBackend
+    /// Every `MusicBackendError` a connect, page, track or search load throws, as it happens. For the fallback (#0067).
+    /// `.notConnected` (a stale task after a switch), `.notFound` and `.unsupported` are not reachability and are not reported.
+    @ObservationIgnored public var onBackendFailure: (@MainActor (MusicBackendError, FailurePhase) -> Void)?
     public private(set) var connection: Connection = .idle
     /// `.playlists` only when the backend has the capability.
     public let sections: [LibrarySection]
@@ -130,6 +136,18 @@ public final class LibraryBrowserModel {
         allAlbums = PagedList(pageSize: pageSize)
         playlists = PagedList(pageSize: pageSize)
         artistAlbums = PagedList(pageSize: pageSize)
+        artists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
+        allAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
+        playlists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
+        artistAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
+    }
+
+    private func reportFailure(_ error: any Error, _ phase: FailurePhase) {
+        guard let error = error as? MusicBackendError else { return }
+        switch error {
+        case .notConnected, .notFound, .unsupported: return
+        default: onBackendFailure?(error, phase)
+        }
     }
 
     private var trimmedQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -235,6 +253,7 @@ public final class LibraryBrowserModel {
             } catch {
                 var needsSettings = false
                 if let backendError = error as? MusicBackendError, case .notConfigured = backendError { needsSettings = true }
+                self?.reportFailure(error, .connect)
                 self?.connectFinished(
                     .failed(message: userMessage(for: error), needsSettings: needsSettings), generation: generation)
             }
@@ -359,6 +378,7 @@ public final class LibraryBrowserModel {
             } catch is CancellationError {
                 return
             } catch {
+                self?.reportFailure(error, .browse)
                 self?.tracksFinished(.failed(userMessage(for: error)), generation: generation)
             }
         }
@@ -401,6 +421,7 @@ public final class LibraryBrowserModel {
             } catch is CancellationError {
                 return
             } catch {
+                self?.reportFailure(error, .browse)
                 self?.searchFinished(.failed(userMessage(for: error)), generation: generation)
             }
         }

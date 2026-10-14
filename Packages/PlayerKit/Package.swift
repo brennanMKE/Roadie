@@ -46,10 +46,10 @@ let package = Package(
         .target(name: "FolderBackendKit", dependencies: ["MusicBackendKit", "LocalPlayback", "AudioCore"]),
         .testTarget(name: "FolderBackendKitTests", dependencies: ["FolderBackendKit", "MusicBackendKit", "LocalPlayback", "AudioCore"]),
         // Browser view models. Foundation + Observation; depends on the protocol only, never on a backend.
-        .target(name: "LibraryBrowser", dependencies: ["MusicBackendKit"]),
+        .target(name: "LibraryBrowser", dependencies: ["MusicBackendKit", "MusicLibraryKit"]),
         // In-memory MusicBackend for tests of the browser and of anything that drives a backend.
         .target(name: "MusicBackendStub", dependencies: ["MusicBackendKit"]),
-        .testTarget(name: "LibraryBrowserTests", dependencies: ["LibraryBrowser", "MusicBackendKit", "MusicBackendStub"]),
+        .testTarget(name: "LibraryBrowserTests", dependencies: ["LibraryBrowser", "MusicBackendKit", "MusicBackendStub", "MusicLibraryKit"]),
         // Artwork cache for the browser and now-playing views. Decodes with ImageIO; Foundation + MusicBackendKit otherwise.
         .target(name: "MusicLibraryKit", dependencies: ["MusicBackendKit"]),
         .testTarget(name: "MusicLibraryKitTests", dependencies: ["MusicLibraryKit", "MusicBackendKit", "MusicBackendStub"]),

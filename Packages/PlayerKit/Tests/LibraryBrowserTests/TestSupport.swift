@@ -119,3 +119,58 @@ final class GatedLoader: @unchecked Sendable {
         }
     }
 }
+
+// MARK: Library sources
+
+/// A flag a `@Sendable` `isConfigured` closure can read while a test flips it.
+final class ConfiguredFlag: @unchecked Sendable {
+    private let lock = OSAllocatedUnfairLock(initialState: true)
+    var value: Bool {
+        get { lock.withLock { $0 } }
+        set { lock.withLock { $0 = newValue } }
+    }
+}
+
+@MainActor
+func makeDefaults() -> UserDefaults {
+    UserDefaults(suiteName: "LibraryBrowserTests-\(UUID().uuidString)")!
+}
+
+struct SourceFixture {
+    var plex: StubMusicBackend
+    var folder: StubMusicBackend
+    var plexConfigured: ConfiguredFlag
+    var folderConfigured: ConfiguredFlag
+    var defaults: UserDefaults
+    var controller: LibrarySourceController
+    var suiteName: String
+
+    /// Removes the private defaults suite.
+    func cleanUp() { defaults.removePersistentDomain(forName: suiteName) }
+}
+
+/// A controller over two stubs standing for Plex (25 artists) and the local folder (3 artists), with a private defaults suite.
+@MainActor
+func makeSources(stored: String? = nil, default defaultID: String = "plex") -> SourceFixture {
+    let suiteName = "LibraryBrowserTests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    if let stored { defaults.set(stored, forKey: LibrarySourceController.defaultsKey) }
+    let plex = StubMusicBackend(library: .sample(artistCount: 25), sourceID: "plex", displayName: "Plex")
+    let folder = StubMusicBackend(library: .sample(artistCount: 3), sourceID: "folder", displayName: "Local Folder")
+    let plexFlag = ConfiguredFlag()
+    let folderFlag = ConfiguredFlag()
+    let controller = LibrarySourceController(
+        sources: [
+            LibrarySource(backend: plex, isConfigured: { plexFlag.value }),
+            LibrarySource(backend: folder, isConfigured: { folderFlag.value }),
+        ],
+        defaultSourceID: defaultID, defaults: defaults, searchDelay: .milliseconds(20))
+    return SourceFixture(
+        plex: plex, folder: folder, plexConfigured: plexFlag, folderConfigured: folderFlag,
+        defaults: defaults, controller: controller, suiteName: suiteName)
+}
+
+/// A playing snapshot with `title`.
+func snapshot(title: String, on output: OutputDevice.ID = OutputDevice.thisMacID) -> NowPlaying {
+    NowPlaying(output: output, state: .playing, title: title)
+}

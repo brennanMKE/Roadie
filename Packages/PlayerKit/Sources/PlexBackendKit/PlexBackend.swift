@@ -62,6 +62,13 @@ public actor PlexBackend: MusicBackend, CustomStringConvertible, CustomDebugStri
     public nonisolated var debugDescription: String { description }
     public nonisolated var customMirror: Mirror { Mirror(self, children: []) }
 
+    /// Whether a server address is saved. Reads `defaults` only, never the Keychain or the network.
+    public static func isConfigured(in defaults: UserDefaults = .standard) -> Bool {
+        guard let data = defaults.data(forKey: PlexSettingsModel.selectionDefaultsKey),
+              let selection = try? JSONDecoder().decode(PlexServerSelection.self, from: data) else { return false }
+        return !selection.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// The saved selection from `defaults` and the token from `tokenStore`; nil when the address is
     /// empty or there is no token. Reads the Keychain on each call, so only `connect()` triggers it.
     public static func settingsProvider(
