@@ -17,7 +17,7 @@ struct PlayerView: View {
                 ContentUnavailableView {
                     Label("No Skin Loaded", systemImage: "paintpalette")
                 } description: {
-                    Text(model.errorMessage ?? "Drop a .wsz file here or choose File › Open Skin…")
+                    Text(model.placeholderText)
                 } actions: {
                     Button("Open Skin…") { model.openSkin() }
                 }

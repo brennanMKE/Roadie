@@ -19,7 +19,11 @@ final class PlayerModel {
     /// `MainWindowRenderer` so the app and `skintool --png` draw the same pixels. Set together with `skin`.
     private(set) var mainWindowBase: MainWindowBase?
     private(set) var skinName: String?
+    /// Why there is no skin (a failed skin load); import and skin-load feedback is `notice`.
     private(set) var errorMessage: String?
+    /// A transient message that takes over the marquee (and the no-skin placeholder) for a few seconds.
+    private(set) var notice: StatusNotice?
+    @ObservationIgnored private var noticeTask: Task<Void, Never>?
     /// The app only talks to this; the composition below is the one place that names Plex.
     let backend: any MusicBackend
     /// The Library window's state; connects when the window appears, never at launch.
@@ -68,12 +72,36 @@ final class PlayerModel {
     var isRepeating: Bool { selectedOutput == OutputDevice.thisMacID && player.repeatMode != .off }
     /// Commands go through one serial stream so a fast slider drag reaches the output in order.
     private let commandStream: AsyncStream<(TransportCommand, OutputDevice.ID)>.Continuation
-    /// What the main window marquee shows: the override, else the now-playing text. The queue number comes
-    /// from the local player's queue, which only backs the This Mac output.
+    /// What the main window marquee shows: a notice, else the slider override, else the now-playing text.
+    /// The queue number comes from the local player's queue, which only backs the This Mac output.
     var marqueeText: String {
+        if let notice { return notice.text }
         if let marqueeOverride { return marqueeOverride }
         let number = selectedOutput == OutputDevice.thisMacID ? player.queue.currentIndex.map { $0 + 1 } : nil
         return MarqueeText.display(nowPlaying, number: number)
+    }
+
+    /// What the no-skin placeholder says: an active notice, else the skin error, else the prompt.
+    var placeholderText: String {
+        if let notice { return [notice.text, notice.detail].compactMap { $0 }.joined(separator: " \u{2014} ") }
+        return errorMessage ?? "Drop a .wsz file here or choose File \u{203A} Open Skin\u{2026}"
+    }
+
+    /// Shows `notice` in the marquee (and the no-skin placeholder) until it expires. A new notice
+    /// replaces the current one and restarts the clock; Webamp's SET_USER_MESSAGE does the same.
+    func post(_ notice: StatusNotice) {
+        noticeTask?.cancel()
+        self.notice = notice
+        noticeTask = Task {
+            try? await Task.sleep(until: notice.expiresAt, clock: .continuous)
+            guard !Task.isCancelled, self.notice == notice else { return }
+            self.notice = nil
+        }
+    }
+
+    func clearNotice() {
+        noticeTask?.cancel()
+        notice = nil
     }
 
     private static let lastSkinKey = "lastSkinPath"
@@ -138,7 +166,7 @@ final class PlayerModel {
         Task { [weak self] in
             for await (command, output) in commands {
                 do { try await transportBackend.transport(command, on: output) } catch {
-                    self?.errorMessage = error.localizedDescription
+                    self?.post(StatusNotice(text: error.localizedDescription))
                 }
             }
         }
@@ -185,6 +213,7 @@ final class PlayerModel {
                 for warning in skin.warnings { print("[\(url.lastPathComponent)] \(warning)") }
             case .failure(let error):
                 errorMessage = "\(url.lastPathComponent): \(error)"
+                post(.skinFailed(url.deletingPathExtension().lastPathComponent))
             }
         }
     }
@@ -268,7 +297,7 @@ final class PlayerModel {
         let output = selectedOutput
         Task {
             do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
-                errorMessage = error.localizedDescription
+                post(StatusNotice(text: error.localizedDescription))
             }
         }
     }
@@ -324,12 +353,8 @@ final class PlayerModel {
         guard !urls.isEmpty else { return }
         Task {
             let result = await LocalTrackLoader.load(urls)
-            guard !result.tracks.isEmpty else {
-                if !result.skipped.isEmpty {
-                    errorMessage = "Skipped \(result.skipped.count) file(s) \u{2014} see Console"
-                }
-                return
-            }
+            if let skipped = StatusNotice.skipped(result) { post(skipped) } else { clearNotice() }
+            guard !result.tracks.isEmpty else { return }
             let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty
             if replace { player.clearQueue() }
             let start = player.queue.tracks.count
