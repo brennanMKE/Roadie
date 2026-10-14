@@ -4,6 +4,11 @@ public enum RepeatMode: Sendable, CaseIterable {
     case off, all, one
 }
 
+extension RepeatMode {
+    /// The main window's repeat button is a two-state toggle (Winamp 2 / Webamp): off <-> all. From `.one` it turns repeat off.
+    public var toggled: RepeatMode { self == .off ? .all : .off }
+}
+
 public struct PlayQueue: Equatable, Sendable {
     public private(set) var tracks: [Track]
     public private(set) var currentIndex: Int?

@@ -75,6 +75,21 @@ struct LocalPlayerOutputTests {
         #expect(player.currentTime == 0)
     }
 
+    @Test func performRoutesBalanceShuffleAndRepeat() {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        output.perform(.setBalance(-0.5))
+        #expect(player.balance == -0.5)
+        output.perform(.setShuffle(true))
+        #expect(player.isShuffled)
+        output.perform(.setShuffle(false))
+        #expect(!player.isShuffled)
+        output.perform(.setRepeat(true))
+        #expect(player.repeatMode == .all)
+        output.perform(.setRepeat(false))
+        #expect(player.repeatMode == .off)
+    }
+
     @Test func registryIgnoresTracksEnqueuedOutsideTheOutput() async throws {
         let player = Player()
         let output = LocalPlayerOutput(player: player)

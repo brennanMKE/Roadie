@@ -36,4 +36,24 @@ public enum MarqueeText {
         if nowPlaying.state == .loading, nowPlaying.item != nil { return buffering }
         return track(artist: nowPlaying.artist, title: title, duration: nowPlaying.duration, number: number)
     }
+
+    // MARK: Slider focus text (Webamp marqueeUtils getVolumeText, getBalanceText, getSeekText)
+
+    /// "Volume: 57%".
+    public static func volume(_ volume: Float) -> String {
+        "Volume: \(Int((min(max(volume, 0), 1) * 100).rounded()))%"
+    }
+
+    /// "Balance: Center", "Balance: 40% Left" or "Balance: 40% Right".
+    public static func balance(_ balance: Float) -> String {
+        let percent = Int((min(abs(balance), 1) * 100).rounded())
+        if percent == 0 { return "Balance: Center" }
+        return "Balance: \(percent)% \(balance < 0 ? "Left" : "Right")"
+    }
+
+    /// "Seek to: 1:23/3:45 (37%)" for a scrub `fraction` of `duration`.
+    public static func seek(fraction: Double, duration: TimeInterval) -> String {
+        let f = min(max(fraction, 0), 1)
+        return "Seek to: \(time(f * duration))/\(time(duration)) (\(Int(f * 100))%)"
+    }
 }

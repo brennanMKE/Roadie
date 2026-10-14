@@ -15,6 +15,15 @@ import Testing
         #expect(MarqueeText.time(3599.9) == "59:59")
     }
 
+    @Test func formatsSliderFocusTextLikeWebamp() {
+        #expect(MarqueeText.volume(0.57) == "Volume: 57%")
+        #expect(MarqueeText.volume(0) == "Volume: 0%")
+        #expect(MarqueeText.balance(0) == "Balance: Center")
+        #expect(MarqueeText.balance(-0.4) == "Balance: 40% Left")
+        #expect(MarqueeText.balance(1) == "Balance: 100% Right")
+        #expect(MarqueeText.seek(fraction: 0.375, duration: 225) == "Seek to: 1:24/3:45 (37%)")
+    }
+
     @Test func displaysIdleBufferingAndTrack() {
         for state in [NowPlaying.State.stopped, .loading, .playing, .paused] {
             #expect(MarqueeText.display(NowPlaying(output: output, state: state), number: nil) == MarqueeText.idle)

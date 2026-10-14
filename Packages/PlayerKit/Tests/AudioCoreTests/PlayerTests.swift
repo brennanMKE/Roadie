@@ -14,6 +14,19 @@ import Testing
         #expect(p.volume == 0.4)
     }
 
+    @Test func repeatToggledIsOffOrAll() {
+        #expect(RepeatMode.off.toggled == .all)
+        #expect(RepeatMode.all.toggled == .off)
+        #expect(RepeatMode.one.toggled == .off)
+        let p = Player()
+        p.repeatMode = p.repeatMode.toggled
+        #expect(p.repeatMode == .all)
+        #expect(p.queue.repeatMode == .all)
+        p.repeatMode = p.repeatMode.toggled
+        #expect(p.repeatMode == .off)
+        #expect(p.queue.repeatMode == .off)
+    }
+
     @Test func balanceIsClamped() {
         let p = Player()
         p.balance = 2

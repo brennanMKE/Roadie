@@ -57,4 +57,14 @@ public struct Skin: @unchecked Sendable {
         guard let (sheet, rect) = resolve(spriteName), let image = sheets[sheet] else { return nil }
         return image.cropping(to: rect)
     }
+
+    /// Crops the visible rows (13 of each 15) of frame `frame` of a multi-frame background sprite
+    /// (volume, balance), through the same `resolve` as `image(for:)`, so the balance -> volume fallback applies.
+    /// nil when the frame lies outside the sheet.
+    public func image(for spriteName: String, frame: Int) -> CGImage? {
+        guard frame >= 0, let (sheet, rect) = resolve(spriteName), let image = sheets[sheet] else { return nil }
+        let frameRect = MainSliders.frameRect(in: rect, frame: frame)
+        guard frameRect.maxY <= CGFloat(image.height), frameRect.maxY <= rect.maxY else { return nil }
+        return image.cropping(to: frameRect)
+    }
 }

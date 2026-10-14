@@ -29,6 +29,11 @@ public enum TransportCommand: Hashable, Sendable {
     case seek(TimeInterval)
     /// 0...1
     case setVolume(Float)
+    /// -1...1
+    case setBalance(Float)
+    case setShuffle(Bool)
+    /// The main window's two-state repeat: on repeats the whole queue.
+    case setRepeat(Bool)
 }
 
 public enum PlayMode: Hashable, Sendable {

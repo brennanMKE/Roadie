@@ -71,6 +71,9 @@ public final class LocalPlayerOutput {
         case .setVolume(let volume):
             player.volume = volume
             for subscription in subscriptions.values { subscription.continuation.yield(snapshot()) }
+        case .setBalance(let balance): player.balance = balance
+        case .setShuffle(let on): player.isShuffled = on
+        case .setRepeat(let on): player.repeatMode = on ? .all : .off
         }
     }
 

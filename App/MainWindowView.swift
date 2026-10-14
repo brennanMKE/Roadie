@@ -23,10 +23,51 @@ struct MainWindowView: View {
             transportButton("MAIN_NEXT_BUTTON", x: 108, y: 88, action: model.next)
             transportButton("MAIN_EJECT_BUTTON", x: 136, y: 89, action: model.eject)
 
+            volumeSlider
+            balanceSlider
+            positionSlider
+
+            toggleButton(.shuffle, selected: model.isShuffled, action: model.toggleShuffle)
+            toggleButton(.repeatAll, selected: model.isRepeating, action: model.toggleRepeat)
+            toggleButton(.equalizer, selected: model.isEQWindowOpen, action: model.toggleEQWindow)
+            toggleButton(.playlist, selected: model.isPlaylistWindowOpen, action: model.togglePlaylistWindow)
+
             MarqueeView(skin: skin, text: model.marqueeText)
         }
         .frame(width: 275, height: 116, alignment: .topLeading)
-        // TODO: position/volume/balance sliders, shuffle/repeat, visualizer.
+        // TODO: visualizer.
+    }
+
+    private var volumeSlider: some View {
+        SkinSlider(
+            skin: skin, slider: MainSliders.volume, backgroundName: "MAIN_VOLUME_BACKGROUND",
+            thumbName: "MAIN_VOLUME_THUMB", thumbPressedName: "MAIN_VOLUME_THUMB_SELECTED",
+            frame: MainSliders.volumeFrame(model.volume), fraction: Double(model.volume),
+            onChange: { model.setVolume(Float($0)) }, onCommit: { _ in model.endSliderDrag() })
+    }
+
+    private var balanceSlider: some View {
+        SkinSlider(
+            skin: skin, slider: MainSliders.balance, backgroundName: "MAIN_BALANCE_BACKGROUND",
+            thumbName: "MAIN_BALANCE_THUMB", thumbPressedName: "MAIN_BALANCE_THUMB_ACTIVE",
+            frame: MainSliders.balanceFrame(model.balance), fraction: MainSliders.fraction(forBalance: model.balance),
+            onChange: { model.setBalance(MainSliders.balance(forFraction: $0)) }, onCommit: { _ in model.endSliderDrag() })
+    }
+
+    private var positionSlider: some View {
+        let scrub: Double? = if case .position(let fraction) = model.sliderFocus { fraction } else { nil }
+        return SkinSlider(
+            skin: skin, slider: MainSliders.position, backgroundName: "MAIN_POSITION_SLIDER_BACKGROUND",
+            thumbName: "MAIN_POSITION_SLIDER_THUMB", thumbPressedName: "MAIN_POSITION_SLIDER_THUMB_SELECTED",
+            frame: nil, fraction: scrub ?? model.positionFraction,
+            onChange: { model.scrub(toFraction: $0) }, onCommit: { model.seek(toFraction: $0) })
+    }
+
+    private func toggleButton(_ toggle: MainSliders.Toggle, selected: Bool, action: @escaping () -> Void) -> some View {
+        let frame = MainSliders.frame(of: toggle)
+        return Button(action: action) { EmptyView() }
+            .buttonStyle(ToggleSpriteButtonStyle(skin: skin, toggle: toggle, selected: selected))
+            .offset(x: frame.origin.x, y: frame.origin.y)
     }
 
     private func transportButton(_ name: String, x: CGFloat, y: CGFloat, action: @escaping () -> Void) -> some View {
