@@ -337,7 +337,7 @@ final class SeekLog {
         let first = try #require(rig.feeder)
 
         rig.engine.stop()   // what a device change does to the real engine
-        rig.player.handleConfigurationChange()
+        rig.player.reconfigureOutput()
         #expect(rig.engine.isRunning)
         #expect(rig.feeder !== first)
         #expect(rig.player.state == .loading)
@@ -361,7 +361,7 @@ final class SeekLog {
         let before = rig.player.currentTime
         #expect(abs(before - 17.0 * 512 / 44100) < 0.002)
 
-        rig.player.handleConfigurationChange()
+        rig.player.reconfigureOutput()
         #expect(abs(rig.player.currentTime - before) < 0.002)
         #expect(await waitUntil { rig.feeder?.hasScheduledLastBuffer == true })
         #expect(await waitUntil { rig.player._graph?.playerNode.isPlaying == true })

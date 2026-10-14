@@ -3,6 +3,7 @@ import Foundation
 public enum AudioCoreError: Error, LocalizedError {
     case engineStart(underlying: any Error)
     case unresolvableSource(Track.Source)
+    case outputDevice(underlying: any Error)
 
     public var errorDescription: String? {
         switch self {
@@ -10,6 +11,8 @@ public enum AudioCoreError: Error, LocalizedError {
             "Could not start the audio engine: \(underlying.localizedDescription)"
         case .unresolvableSource:
             "This track is not available as a local file."
+        case .outputDevice(let underlying):
+            "Could not switch the audio output device: \(underlying.localizedDescription)"
         }
     }
 }
@@ -24,7 +27,7 @@ public protocol SourceScopedError: Error {
 extension AudioCoreError: SourceScopedError {
     public var affectsWholeSource: Bool {
         switch self {
-        case .engineStart: true
+        case .engineStart, .outputDevice: true
         case .unresolvableSource: false
         }
     }

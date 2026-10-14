@@ -1,6 +1,10 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 import Observation
+import os
+
+private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "AudioOutput")
 
 @MainActor
 @Observable
@@ -136,10 +140,22 @@ public final class Player: NowPlayingCommandTarget {
     @ObservationIgnored private(set) var autoplayAfterLoad = true
     @ObservationIgnored private var timeTask: Task<Void, Never>?
     @ObservationIgnored private var configTask: Task<Void, Never>?
+    @ObservationIgnored private var outputTask: Task<Void, Never>?
+    @ObservationIgnored let outputDevices: any OutputDeviceProvider
+    @ObservationIgnored private var outputReconfigurePending = false
 
     /// Construction does not touch the audio engine.
-    public init(resolver: any TrackResolver = FileTrackResolver()) {
+    public init(
+        resolver: any TrackResolver = FileTrackResolver(),
+        outputDevices: any OutputDeviceProvider = SystemOutputDeviceProvider()
+    ) {
         self.resolver = resolver
+        self.outputDevices = outputDevices
+    }
+
+    deinit {
+        configTask?.cancel()
+        outputTask?.cancel()
     }
 
     private func emitTrackChangeIfNeeded() {
@@ -412,7 +428,7 @@ public final class Player: NowPlayingCommandTarget {
         if recordsDiagnostics {
             record(ScheduleDiagnostic(
                 trackID: id, startFrame: item.startFrame, nodeSampleTimeAtSchedule: nodeSampleTime(),
-                nodeSampleRate: nodeRate))
+                nodeSampleRate: nodeRate, seekOffset: item.seekOffset))
         }
         graph.playerNode.scheduleSegment(
             file, startingFrame: frame, frameCount: AVAudioFrameCount(clamping: remaining), at: nil,
@@ -566,12 +582,20 @@ public final class Player: NowPlayingCommandTarget {
 
     func ensureGraph() -> AudioGraph {
         if let _graph { return _graph }
-        let graph = AudioGraph(volume: volume, balance: balance, eq: eq, analyzer: analyzer)
+        let graph = AudioGraph(volume: volume, balance: balance, eq: eq, analyzer: analyzer, outputDevices: outputDevices)
         _graph = graph
         configTask = Task { [weak self] in
             for await note in NotificationCenter.default.notifications(named: .AVAudioEngineConfigurationChange) {
                 guard let self, (note.object as AnyObject?) === self._graph?.engine else { continue }
-                self.handleConfigurationChange()
+                self.requestOutputReconfigure()
+            }
+        }
+        // Started with the graph, so a player that never plays installs no CoreAudio listener.
+        let changes = outputDevices.defaultOutputDeviceChanges()
+        outputTask = Task { [weak self] in
+            for await id in changes {
+                guard let self else { break }
+                self.outputDeviceChanged(to: id)
             }
         }
         return graph
@@ -583,17 +607,49 @@ public final class Player: NowPlayingCommandTarget {
         return graph
     }
 
-    /// The output device changed and the engine stopped itself.
-    func handleConfigurationChange() {
-        // Nothing is scheduled while stopped or loading; the load connects and starts the engine itself.
-        // The exception is a progressive track waiting for its preroll: its feeder is already scheduling, and
-        // its first buffer would start a node whose engine has stopped.
-        guard let graph = _graph, state != .stopped, state != .loading || progressive != nil else { return }
+    /// The system default output moved to another device. The engine keeps the device it was created on, so
+    /// the graph remembers the new one and `reconfigureOutput()` rebinds it. No graph yet: the engine created
+    /// later starts on the current default.
+    func outputDeviceChanged(to id: AudioDeviceID) {
+        guard let graph = _graph else { return }
+        let info = outputDevices.describe(id)
+        log.info("""
+            default output changed: device \(id, privacy: .public) \(info?.name ?? "?", privacy: .public) \
+            transport \(info?.transport ?? "?", privacy: .public) nominal \(info?.nominalSampleRate ?? 0, privacy: .public)
+            """)
+        graph.outputDevice = id
+        requestOutputReconfigure()
+    }
+
+    /// Coalesces triggers: our device listener and the engine's own notification both fire for one switch,
+    /// in either order, and land in the same turn as one restart. A later straggler repeats the idempotent
+    /// handler (one more restart from the current position).
+    func requestOutputReconfigure() {
+        guard !outputReconfigurePending else { return }
+        outputReconfigurePending = true
+        Task { @MainActor [weak self] in
+            self?.outputReconfigurePending = false
+            self?.reconfigureOutput()
+        }
+    }
+
+    /// The output device changed or the engine stopped itself: stop the engine, restart it through
+    /// `AudioGraph.start()` (which binds the new device and reconnects at its rate) and reschedule from the
+    /// current position, for a complete file and for a progressive one.
+    func reconfigureOutput() {
+        guard let graph = _graph else { return }
+        // Read the position while the node still has a render time (the listener path leaves the engine running).
+        if state == .playing { updateCurrentTime() }
+        graph.stopEngine()   // also when the engine stopped itself already (no-op)
+        // Stopped, or loading a complete file: nothing is scheduled; the next start() (play / begin) binds
+        // and connects. A progressive track waiting for its preroll is the exception: its feeder is already
+        // scheduling, and its first buffer would start a node whose engine has stopped.
+        guard state != .stopped, state != .loading || progressive != nil else { return }
         let resumeTime = currentTime
         do {
             discardSchedule()
             graph.playerNode.stop()
-            try graph.start()
+            try graph.start()   // bind -> connectIfNeeded at the new rate -> analyzer
             if let progressive {
                 // The feeder re-applies the client format itself: the output rate may have changed.
                 isBuffering = false
@@ -605,6 +661,7 @@ public final class Player: NowPlayingCommandTarget {
                 if state == .playing { graph.playerNode.play() }
                 scheduleNextIfNeeded()
             }
+            if state == .playing { emit(.seeked(resumeTime)) }
         } catch {
             fail(error)
         }
@@ -677,6 +734,8 @@ struct ScheduleDiagnostic: Sendable {
     /// The node's sample time when the segment was queued; nil before the first render.
     let nodeSampleTimeAtSchedule: Int64?
     let nodeSampleRate: Double
+    /// Seconds into the file where the segment starts (non-zero after a seek or a device change).
+    let seekOffset: TimeInterval
     let wallClock = ContinuousClock.now
 
     /// Frames between "now" on the node and where this segment starts; nil if unknown.

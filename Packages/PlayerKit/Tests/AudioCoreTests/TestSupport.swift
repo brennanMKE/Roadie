@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 @testable import AudioCore
 
@@ -95,5 +96,66 @@ actor GateResolver: TrackResolver {
     func waitForCalls(_ count: Int) async -> Bool {
         for _ in 0..<200 where calls.count < count { try? await Task.sleep(for: .milliseconds(10)) }
         return calls.count >= count
+    }
+}
+
+/// An `OutputDeviceProvider` the test drives: `send(_:)` plays the part of the system default moving to
+/// another device. Binds are recorded, never performed, unless `forwardBindsTo` is set (the one real-time
+/// test that binds the engine to the device it is already on). Nothing here ever changes a real device.
+final class ManualOutputDeviceProvider: OutputDeviceProvider, @unchecked Sendable {
+    struct BindFailure: Error {}
+
+    private let lock = NSLock()
+    private var continuation: AsyncStream<AudioDeviceID>.Continuation?
+    private var _binds: [AudioDeviceID] = []
+    private var _bound: AudioDeviceID?
+    private var _failsBinds = false
+    private var _current: AudioDeviceID?
+    let forward: (any OutputDeviceProvider)?
+
+    init(current: AudioDeviceID? = nil, forwardBindsTo forward: (any OutputDeviceProvider)? = nil) {
+        _current = current
+        self.forward = forward
+    }
+
+    var binds: [AudioDeviceID] { lock.withLock { _binds } }
+    var failsBinds: Bool {
+        get { lock.withLock { _failsBinds } }
+        set { lock.withLock { _failsBinds = newValue } }
+    }
+
+    /// The default moves to `id`. Dropped when nobody is listening yet (no graph).
+    func send(_ id: AudioDeviceID) {
+        let target = lock.withLock { () -> AsyncStream<AudioDeviceID>.Continuation? in
+            _current = id
+            return continuation
+        }
+        target?.yield(id)
+    }
+
+    func defaultOutputDevice() -> AudioDeviceID? { lock.withLock { _current } }
+
+    func defaultOutputDeviceChanges() -> AsyncStream<AudioDeviceID> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            lock.withLock { self.continuation = continuation }
+        }
+    }
+
+    @MainActor func boundDevice(of outputNode: AVAudioOutputNode) -> AudioDeviceID? {
+        if let forward { return forward.boundDevice(of: outputNode) }
+        return lock.withLock { _bound }
+    }
+
+    @MainActor func bind(_ device: AudioDeviceID, to outputNode: AVAudioOutputNode) throws {
+        if lock.withLock({ _failsBinds }) { throw BindFailure() }
+        lock.withLock {
+            _binds.append(device)
+            _bound = device
+        }
+        try forward?.bind(device, to: outputNode)
+    }
+
+    func describe(_ device: AudioDeviceID) -> OutputDeviceDescription? {
+        OutputDeviceDescription(id: device, name: "Test device \(device)", transport: "Test", nominalSampleRate: 44_100)
     }
 }

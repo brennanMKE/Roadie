@@ -92,7 +92,7 @@ extension Player {
             return
         }
         // A device change while the client format was being set stopped the engine (and `.loading` made
-        // `handleConfigurationChange` skip it): start it again, at the new rate. The feeder applies the
+        // `reconfigureOutput` skip it): start it again, at the new rate. The feeder applies the
         // graph's format itself, so a changed rate is picked up there.
         try graph.start()
         errorMessage = nil
@@ -126,7 +126,8 @@ extension Player {
             seekOffset: Double(frame) / session.fileRate)
         if recordsDiagnostics {
             record(ScheduleDiagnostic(
-                trackID: id, startFrame: item.startFrame, nodeSampleTimeAtSchedule: nil, nodeSampleRate: nodeRate))
+                trackID: id, startFrame: item.startFrame, nodeSampleTimeAtSchedule: nil, nodeSampleRate: nodeRate,
+                seekOffset: item.seekOffset))
         }
         session.feederGeneration += 1
         let generation = session.feederGeneration

@@ -14,4 +14,12 @@ import Testing
         #expect(graph.engine.mainMixerNode.outputVolume == 1)
         #expect(graph.playerNode.pan == -1)
     }
+
+    @Test func graphStillConstructsHeadless() {
+        let provider = ManualOutputDeviceProvider()
+        let graph = AudioGraph(volume: 1, balance: 0, outputDevices: provider)
+        #expect(graph.outputDevice == nil)
+        #expect(provider.binds.isEmpty)
+        #expect(graph.engine.isRunning == false)
+    }
 }

@@ -1,4 +1,8 @@
 import AVFoundation
+import CoreAudio
+import os
+
+private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "AudioOutput")
 
 /// Owns the AVAudioEngine and its nodes: player -> EQ -> main mixer -> output.
 @MainActor
@@ -37,8 +41,18 @@ final class AudioGraph {
         }
     }
 
-    init(volume: Float, balance: Float, eq eqState: EQState = .flat, analyzer: AnalyzerTap = AnalyzerTap()) {
+    /// Where the system default output comes from and how the output unit is bound to it.
+    let outputDevices: any OutputDeviceProvider
+    /// The device the output unit should use; nil means "whatever the engine chose at creation" (no bind at
+    /// the first start, so nothing changes until the default moves). Set by `Player` on a default-output change.
+    var outputDevice: AudioDeviceID?
+
+    init(
+        volume: Float, balance: Float, eq eqState: EQState = .flat, analyzer: AnalyzerTap = AnalyzerTap(),
+        outputDevices: any OutputDeviceProvider = SystemOutputDeviceProvider()
+    ) {
         self.analyzer = analyzer
+        self.outputDevices = outputDevices
         engine.attach(playerNode)
         engine.attach(eq)
         eq.configureWinampBands()
@@ -63,9 +77,36 @@ final class AudioGraph {
         processingFormat = format
     }
 
+    /// Binds the output unit to `outputDevice` before the rate is read. Only called while stopped.
+    private func bindOutputDeviceIfNeeded() throws {
+        guard let outputDevice else { return }
+        if outputDevices.boundDevice(of: engine.outputNode) != outputDevice {
+            try outputDevices.bind(outputDevice, to: engine.outputNode)
+        }
+        let nodeRate = engine.outputNode.outputFormat(forBus: 0).sampleRate
+        let info = outputDevices.describe(outputDevice)
+        log.info("""
+            output bound: device \(outputDevice, privacy: .public) \(info?.name ?? "?", privacy: .public) \
+            transport \(info?.transport ?? "?", privacy: .public) nominal \(info?.nominalSampleRate ?? 0, privacy: .public) \
+            node rate \(nodeRate, privacy: .public)
+            """)
+        if let nominal = info?.nominalSampleRate, nominal > 0, nodeRate != nominal {
+            log.notice("output node rate \(nodeRate, privacy: .public) differs from the device's nominal \(nominal, privacy: .public)")
+        }
+    }
+
+    /// Stops the engine if it is running. Never restarts by itself; `Player` decides.
+    func stopEngine() {
+        if engine.isRunning { engine.stop() }
+    }
+
     func start() throws {
         guard !engine.isRunning else { return }
+        try bindOutputDeviceIfNeeded()
         connectIfNeeded()
+        if let rate = processingSampleRate {
+            log.info("engine starting at processing rate \(rate, privacy: .public)")
+        }
         engine.prepare()
         do {
             try engine.start()
