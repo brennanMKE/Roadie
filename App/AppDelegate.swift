@@ -7,6 +7,7 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = PlayerModel()
+    private(set) lazy var docking = WindowDockingCoordinator(model: model)
     private(set) lazy var player = SkinWindowController(kind: .main, model: model, rootView: PlayerView())
     private(set) lazy var equalizer: SkinWindowController = {
         let controller = SkinWindowController(kind: .equalizer, model: model, rootView: EqualizerView())
@@ -21,10 +22,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        docking.register(player)
+        docking.register(equalizer)
+        docking.register(playlist)
+        docking.restoreOrDefaultLayout()
         player.show()
         // After the player, so a persisted-open equalizer stacks above it, as in Winamp.
         observeEQWindow()
         observePlaylistWindow()
+        docking.ensureOnScreen()
         // The Library is the only SwiftUI window scene left, so SwiftUI opens it at launch; it is
         // meant to open from ⌘L. (`defaultLaunchBehavior(.suppressed)` needs macOS 15, the target is 14.)
         DispatchQueue.main.async { [player, equalizer, playlist] in
@@ -42,6 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if model.isEQWindowOpen { equalizer.show(below: player.window) }
         if model.isPlaylistWindowOpen { playlist.show(below: playlistReference) }
         return false
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        docking.layoutDidChange()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

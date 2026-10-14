@@ -1,4 +1,4 @@
-This project includes sprite coordinate data, the `region.txt`/INI parsers and default visualizer colours, the equalizer graph spline, the .eqf preset file format and the playlist window's layout, pledit.txt parsing and scroll rules ported from Webamp
+This project includes sprite coordinate data, the `region.txt`/INI parsers and default visualizer colours, the equalizer graph spline, the .eqf preset file format and the playlist window's layout, pledit.txt parsing and scroll rules, and the window snapping, docking and layout recovery rules (snapUtils.ts, resizeUtils.ts, actionCreators/windows.ts) ported from Webamp
 (https://github.com/captbaritone/webamp), used under the MIT License:
 
 The MIT License (MIT)

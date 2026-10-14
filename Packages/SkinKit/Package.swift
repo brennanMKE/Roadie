@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "SkinKit", targets: ["SkinKit"]),
         .executable(name: "skintool", targets: ["skintool"]),
+        .library(name: "WindowDocking", targets: ["WindowDocking"]),
     ],
     dependencies: [
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19"),
@@ -18,5 +19,7 @@ let package = Package(
         ),
         .executableTarget(name: "skintool", dependencies: ["SkinKit"]),
         .testTarget(name: "SkinKitTests", dependencies: ["SkinKit"]),
+        .target(name: "WindowDocking"),
+        .testTarget(name: "WindowDockingTests", dependencies: ["WindowDocking"]),
     ]
 )

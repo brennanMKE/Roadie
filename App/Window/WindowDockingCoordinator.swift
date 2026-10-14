@@ -1,0 +1,200 @@
+import AppKit
+import SkinKit
+import WindowDocking
+
+/// Owns where the skinned windows sit: snaps and docks them while the user drags, keeps docked edges when a window
+/// changes size, saves positions, restores them at launch and brings strays back on screen. The geometry is the pure
+/// `WindowDocking` engine (ports of Webamp's `snapUtils.ts`, `resizeUtils.ts` and the layout rules of
+/// `actionCreators/windows.ts`); this class only converts between AppKit frames and the engine's boxes.
+///
+/// Whether a window is open or shaded and the playlist's size stay in `PlayerModel` (they already persist there); the
+/// coordinator persists positions.
+@MainActor
+final class WindowDockingCoordinator {
+    private let model: PlayerModel
+    private let store: WindowLayoutStore
+    private var controllers: [WindowKind: SkinWindowController] = [:]
+    private var screenObserver: NSObjectProtocol?
+
+    private var session: DragSession?
+    /// The dragged window's origin at mouse-down (AppKit space).
+    private var dragStartOrigin = NSPoint.zero
+
+    init(model: PlayerModel, store: WindowLayoutStore = WindowLayoutStore(defaults: .standard)) {
+        self.model = model
+        self.store = store
+    }
+
+    /// The skinned windows register once; the coordinator then receives their title-bar drags and size changes.
+    func register(_ controller: SkinWindowController) {
+        controller.coordinator = self
+        controllers[controller.kind.windowKind] = controller
+    }
+
+    // MARK: Desktop space
+
+    private var desktop: DesktopSpace { DesktopSpace(primaryTop: NSScreen.screens.first?.frame.maxY ?? 0) }
+    private var screenBoxes: [Box] { NSScreen.screens.map { desktop.box($0.visibleFrame) } }
+    private static let unbounded = Box(x: -100_000, y: -100_000, width: 200_000, height: 200_000)
+    private var primaryBox: Box { screenBoxes.first ?? Self.unbounded }
+
+    /// Where a dragged group may go: the one screen's work area, or with several displays the area they span together
+    /// (so a window can cross from one to the next; only the outer edges attract).
+    private var dragBounds: Box {
+        let screens = screenBoxes
+        if screens.count > 1 { return SnapUtils.boundingBox(screens) }
+        return screens.first ?? Self.unbounded
+    }
+
+    private func isVisible(_ controller: SkinWindowController) -> Bool {
+        controller.window.isVisible && !controller.window.isMiniaturized
+    }
+
+    private func dockedWindows() -> [DockedWindow] {
+        WindowKind.allCases.compactMap { kind in
+            guard let controller = controllers[kind], isVisible(controller) else { return nil }
+            return DockedWindow(kind: kind, box: desktop.box(controller.window.frame))
+        }
+    }
+
+    private func move(_ kind: WindowKind, toTopLeft position: Offset) {
+        guard let window = controllers[kind]?.window else { return }
+        let box = Box(x: position.x, y: position.y, width: window.frame.width, height: window.frame.height)
+        window.setFrameOrigin(desktop.rect(box).origin)
+    }
+
+    // MARK: Dragging
+
+    func dragBegan(_ controller: SkinWindowController) {
+        dragStartOrigin = controller.window.frame.origin
+        session = DragSession(dragging: controller.kind.windowKind, windows: dockedWindows())
+    }
+
+    func drag(_ controller: SkinWindowController, to proposedOrigin: NSPoint) {
+        guard let session else {
+            controller.window.setFrameOrigin(proposedOrigin)
+            return
+        }
+        // AppKit's y grows upward, the engine's downward.
+        let delta = Offset(x: proposedOrigin.x - dragStartOrigin.x, y: -(proposedOrigin.y - dragStartOrigin.y))
+        for (kind, position) in session.positions(forMouseDelta: delta, within: dragBounds) {
+            move(kind, toTopLeft: position)
+        }
+    }
+
+    func dragEnded(_ controller: SkinWindowController) {
+        session = nil
+        layoutDidChange()
+    }
+
+    // MARK: Size changes
+
+    /// Runs `change` (which resizes `controller`'s window, keeping its top-left corner) and moves the windows that were
+    /// docked below or to the right of it by the size difference, so the group stays docked (Webamp's
+    /// `withWindowGraphIntegrity`).
+    func resize(_ controller: SkinWindowController, _ change: () -> Void) {
+        let before = dockedWindows()
+        let graph = WindowGraph.generate(before)
+        change()
+        var sizeDiff: [WindowKind: (width: CGFloat, height: CGFloat)] = [:]
+        for window in before {
+            guard let current = controllers[window.kind]?.window.frame.size else { continue }
+            sizeDiff[window.kind] = (current.width - window.box.width, current.height - window.box.height)
+        }
+        let diff = WindowGraph.positionDiff(graph: graph, sizeDiff: sizeDiff)
+        for window in before {
+            guard let offset = diff[window.kind], offset != .zero else { continue }
+            move(window.kind, toTopLeft: Offset(x: window.box.x + offset.x, y: window.box.y + offset.y))
+        }
+        layoutDidChange()
+    }
+
+    // MARK: Persistence
+
+    /// Saves the position of every window that has one.
+    func layoutDidChange() {
+        var windows: [WindowKind: WindowLayout.Entry] = [:]
+        for (kind, controller) in controllers where controller.isPositioned {
+            let box = desktop.box(controller.window.frame)
+            windows[kind] = WindowLayout.Entry(left: box.x, top: box.y)
+        }
+        store.save(WindowLayout(windows: windows))
+    }
+
+    /// Places the windows from the saved layout; with none, from the frames the old frame autosave left (once), else
+    /// the main window and any open ones stack and centre on the primary screen. Windows with no position stay
+    /// unpositioned and sit under their reference when first shown. Call once, before the first window shows.
+    func restoreOrDefaultLayout() {
+        if screenObserver == nil {
+            screenObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.ensureOnScreen() } }
+        }
+        if let layout = store.load() {
+            for (kind, entry) in layout.windows { place(kind, Offset(x: entry.left, y: entry.top)) }
+        } else if !seedFromLegacyFrames() {
+            stackDefaultLayout()
+        }
+    }
+
+    private func place(_ kind: WindowKind, _ topLeft: Offset) {
+        guard let controller = controllers[kind] else { return }
+        move(kind, toTopLeft: topLeft)
+        controller.isPositioned = true
+    }
+
+    /// The frames `setFrameAutosaveName` saved before the coordinator existed ("x y w h ..."); read once, then removed.
+    private func seedFromLegacyFrames() -> Bool {
+        var found = false
+        for (kind, controller) in controllers {
+            let key = "NSWindow Frame \(controller.kind.legacyAutosaveName)"
+            guard let text = UserDefaults.standard.string(forKey: key) else { continue }
+            UserDefaults.standard.removeObject(forKey: key)
+            let numbers = text.split(separator: " ").prefix(4).compactMap { Double($0) }
+            guard numbers.count == 4 else { continue }
+            let rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
+            place(kind, Offset(x: desktop.box(rect).x, y: desktop.box(rect).y))
+            found = true
+        }
+        return found
+    }
+
+    private func stackDefaultLayout() {
+        let shown = WindowKind.allCases.filter { kind in
+            switch kind {
+            case .main: true
+            case .equalizer: model.isEQWindowOpen
+            case .playlist: model.isPlaylistWindowOpen
+            }
+        }
+        stack(shown)
+    }
+
+    /// Stacks `kinds` in order and centres the group on the primary screen's work area.
+    private func stack(_ kinds: [WindowKind]) {
+        var sizes: [WindowKind: CGSize] = [:]
+        for kind in kinds { sizes[kind] = controllers[kind]?.window.frame.size }
+        let positions = LayoutRules.stackedAndCentered(sizes: sizes, order: kinds, in: primaryBox)
+        for (kind, position) in positions { place(kind, position) }
+    }
+
+    // MARK: Recovery
+
+    /// Brings windows that are off every screen back: shift the group if it fits, else reset the playlist's size and
+    /// stack and centre (Webamp's `ensureWindowsAreOnScreen`). Runs after launch and when the displays change.
+    func ensureOnScreen() {
+        let windows = dockedWindows()
+        guard let recovery = LayoutRules.recovery(windows: windows, screens: screenBoxes, primary: primaryBox) else { return }
+        switch recovery {
+        case .shift(let offset):
+            for window in windows {
+                move(window.kind, toTopLeft: Offset(x: window.box.x + offset.x, y: window.box.y + offset.y))
+            }
+        case .reset:
+            model.playlist.setSteps(.zero)
+            controllers[.playlist]?.applyLayout()
+            stack(windows.map(\.kind))
+        }
+        layoutDidChange()
+    }
+}

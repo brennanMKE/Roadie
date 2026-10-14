@@ -21,6 +21,8 @@ targets:
     dependencies:
       - package: SkinKit
         product: SkinKit
+      - package: SkinKit
+        product: WindowDocking
       - package: PlayerKit
         product: AudioCore
       - package: PlayerKit
@@ -73,6 +75,7 @@ schemes:
     test:
       targets:
         - package: SkinKit/SkinKitTests
+        - package: SkinKit/WindowDockingTests
         - package: PlayerKit/AudioCoreTests
         - package: PlayerKit/PlexKitTests
         - package: PlayerKit/TrackCacheTests

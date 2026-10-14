@@ -51,7 +51,8 @@ final class SkinShapeView: NSView {
 @MainActor
 protocol TitleBarDragging: AnyObject {
     func dragBegan()
-    /// Default: move the window. #0030 snaps here.
+    /// `proposedOrigin` is where the cursor's cumulative movement since mouse-down would put the window; the docking
+    /// coordinator snaps it, a bare controller just moves the window there.
     func drag(to proposedOrigin: NSPoint)
     func dragEnded()
     /// No-op for now; #0031 toggles shade.
@@ -63,7 +64,10 @@ final class TitleBarDragView: NSView {
     weak var delegate: TitleBarDragging?
     /// Button rects in this view's coordinates (top-left origin, in points).
     var excludedRects: [CGRect] = []
-    private var lastMouse = NSPoint.zero
+    /// The cursor and the window's origin at mouse-down; the drag is anchored there, not incremental, so snapping
+    /// does not make the window drift from the cursor.
+    private var mouseStart = NSPoint.zero
+    private var startOrigin = NSPoint.zero
 
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
@@ -81,18 +85,14 @@ final class TitleBarDragView: NSView {
             delegate?.titleBarDoubleClicked()
             return
         }
-        lastMouse = NSEvent.mouseLocation
+        mouseStart = NSEvent.mouseLocation
+        startOrigin = window?.frame.origin ?? .zero
         delegate?.dragBegan()
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let window else { return }
         let mouse = NSEvent.mouseLocation
-        let proposed = NSPoint(
-            x: window.frame.origin.x + mouse.x - lastMouse.x,
-            y: window.frame.origin.y + mouse.y - lastMouse.y)
-        lastMouse = mouse
-        delegate?.drag(to: proposed)
+        delegate?.drag(to: NSPoint(x: startOrigin.x + mouse.x - mouseStart.x, y: startOrigin.y + mouse.y - mouseStart.y))
     }
 
     override func mouseUp(with event: NSEvent) {
