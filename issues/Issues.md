@@ -154,7 +154,7 @@ Any additional context, guesses at root cause, related code locations.
 4. Set status to `open`.
 5. Use today's date for First seen.
 6. Phrase the title as a single declarative sentence describing the bug, not a question or a fix description.
-7. **Plan it (phase 1).** Dispatch a fresh subagent on the **top available model (currently Fable)** to read this guide, `CLAUDE.md`, the new issue, and the relevant code, then write a `## Plan` section into `issues/NNNN.md` (after `## Description`). It writes no code and leaves status at `open`. This gives whoever picks the issue up a running start. Record the planner's usage in `## Work log`. Skip if the user is jotting a quick note and doesn't want planning yet.
+7. **Plan it (phase 1).** Dispatch a fresh subagent on **Opus** (not Fable unless the user asks; see `AGENTS.md`) to read this guide, `CLAUDE.md`, the new issue, and the relevant code, then write a `## Plan` section into `issues/NNNN.md` (after `## Description`). It writes no code and leaves status at `open`. This gives whoever picks the issue up a running start. Record the planner's usage in `## Work log`. Skip if the user is jotting a quick note and doesn't want planning yet.
 8. **If `issues/` is tracked by git**, commit the new file with message `#NNNN <issue title>` so the issue enters git history with its `open` status — the `## Plan` rides along if it's landed, else commit it separately as `#NNNN Plan`. If ignored, skip.
 
 ## Updating an issue
@@ -169,11 +169,11 @@ Issues move from filed to resolved through a **three-phase pipeline**. Each phas
 
 | Phase | When | Model | The subagent does | Status after |
 |---|---|---|---|---|
-| **1. Planning** | at issue creation (see "Filing a new issue") | **Fable** (top model) | reads conventions + issue, writes `## Plan`; no code | `open` |
+| **1. Planning** | at issue creation (see "Filing a new issue") | **Opus** | reads conventions + issue, writes `## Plan`; no code | `open` |
 | **2. Implementation** | when the issue is worked | **Sonnet** | follows the plan, fixes, builds + verifies, code commit, drafts resolution sections | `in-progress` |
 | **3. Review** | after implementation returns | **Opus** | independently re-verifies the diff, then approves or bounces | `resolved` or `open` |
 
-Fresh context per phase is deliberate: each subagent reloads this guide and `CLAUDE.md` cleanly, so edits to those files take effect on the next dispatch. The top model runs *only* in a subagent, never in the orchestrator's own context, to keep its large context isolated.
+Fresh context per phase is deliberate: each subagent reloads this guide and `CLAUDE.md` cleanly, so edits to those files take effect on the next dispatch. Each phase runs *only* in a subagent, never in the orchestrator's own context, to keep its large context isolated. Use Fable only when the user asks for it (`AGENTS.md`).
 
 ### Orchestrator: pick and dispatch
 
@@ -266,7 +266,7 @@ Never use `wontfix` or `closed` to escape a stuck issue.
 
 ## Token usage and cost tracking
 
-Every subagent dispatch gets a usage record on the issue it worked: which model did the work, exactly how many tokens it consumed, and an estimated cost. The **orchestrator** records this after the subagent returns — a subagent can't measure its own totals. Under the three-phase workflow each issue accumulates a row per phase — **planning (Fable), recorded at filing time; implementation (Sonnet); review (Opus)** — plus a row for every bounce or bail.
+Every subagent dispatch gets a usage record on the issue it worked: which model did the work, exactly how many tokens it consumed, and an estimated cost. The **orchestrator** records this after the subagent returns — a subagent can't measure its own totals. Under the three-phase workflow each issue accumulates a row per phase — **planning (Opus), recorded at filing time; implementation (Sonnet); review (Opus)** — plus a row for every bounce or bail.
 
 ### Pricing cache (`issues/model-pricing.json`)
 
