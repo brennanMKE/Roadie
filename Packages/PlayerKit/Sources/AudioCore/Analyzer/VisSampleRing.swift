@@ -76,9 +76,16 @@ public final class VisSampleRing: @unchecked Sendable {
     /// previous frame.
     @discardableResult
     public func copyLatest(count: Int, into out: UnsafeMutablePointer<Float>) -> Bool {
+        copy(count: count, endingAt: writeCount, into: out)
+    }
+
+    /// Consumer thread only. Copies `count` samples ending at absolute index `end` (exclusive), oldest first.
+    /// False if `end > writeCount`, `end < count`, `count > capacity - maxChunk`, or the region may have
+    /// been overwritten during the copy (same check as `copyLatest`).
+    @discardableResult
+    public func copy(count: Int, endingAt end: Int, into out: UnsafeMutablePointer<Float>) -> Bool {
         guard count > 0, count <= capacity - maxChunk else { return false }
-        let end = writeCount
-        guard end >= count else { return false }
+        guard end >= count, end <= writeCount else { return false }
         let begin = end - count
         let index = begin & mask
         let first = min(count, capacity - index)

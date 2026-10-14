@@ -37,7 +37,11 @@ final class PlayerModel {
     private var nowPlayingTask: Task<Void, Never>?
     var playbackState: NowPlaying.State { nowPlaying.state }
     var isLoading: Bool { nowPlaying.state == .loading }
-    var scale: CGFloat = 2
+    var scale: CGFloat = 2 {
+        didSet { visualizer.setScale(scale) }
+    }
+    /// The main-window spectrum / oscilloscope; ticks only while audio plays.
+    let visualizer: VisualizerModel
     /// Replaces the marquee text while set, like Webamp's focus text. Set while a main-window slider is held.
     var marqueeOverride: String?
     /// Which slider the pointer is holding. `position` carries the scrub fraction, which the thumb follows
@@ -104,6 +108,7 @@ final class PlayerModel {
         artwork = ArtworkCache(backend: stack.backend)
         cache = stack.cache
         player = stack.player
+        visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors)
         pinner = stack.pinner
         cacheSettings = CacheSettingsModel(cache: stack.cache)
         let cache = stack.cache
@@ -127,6 +132,8 @@ final class PlayerModel {
                 }
             }
         }
+        visualizer.setScale(scale)
+        visualizer.start()
         observeNowPlaying()
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
@@ -155,6 +162,7 @@ final class PlayerModel {
             switch result {
             case .success(let skin):
                 self.skin = skin
+                visualizer.setColors(skin.visColors)
                 skinName = url.deletingPathExtension().lastPathComponent
                 errorMessage = nil
                 UserDefaults.standard.set(url.path, forKey: Self.lastSkinKey)

@@ -45,4 +45,30 @@ import Testing
         player.analyzer.remove()
         #expect(!player.analyzer.isInstalled)
     }
+
+    @Test func frameElapsedAdvancesThroughBurstDeliveries() throws {
+        let tap = AnalyzerTap()
+        tap.prepare(sampleRate: 48_000)
+        // 1500 Hz = bin 32 of a 1024-point FFT at 48 kHz, phase-continuous across bursts.
+        let hz = 32 * 48_000.0 / 1024
+        var phase = 0
+        var frames: [VisFrame] = []
+        for tick in 0..<240 {
+            if tick % 6 == 0 {
+                let burst = (0..<4800).map { Float(0.8 * sin(2 * Double.pi * hz * Double(phase + $0) / 48_000)) }
+                phase += 4800
+                burst.withUnsafeBufferPointer { tap.ring.write($0.baseAddress!, count: 4800) }
+            }
+            if let frame = tap.frame(elapsed: 1.0 / 60) { frames.append(frame) }
+        }
+        let steady = frames.suffix(120)
+        let map = try #require(tap.columnMap)
+        var previous: Int?
+        for frame in steady {
+            if let previous { #expect((799...801).contains(frame.sampleCount - previous)) }
+            previous = frame.sampleCount
+            let peak = frame.spectrum.firstIndex(of: frame.spectrum.max()!)!
+            #expect(map.ranges[peak].contains(map.bin(forFrequency: hz)))
+        }
+    }
 }

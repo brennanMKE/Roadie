@@ -21,10 +21,13 @@ public final class AnalyzerTap: @unchecked Sendable {
     private let spectrumOut: UnsafeMutablePointer<Float>
     private let scopeOut: UnsafeMutablePointer<Float>
     private var cached: VisFrame?
+    private var cachedEnd: Int?
+    private var cursor: VisReadCursor
 
-    public init(fftSize: Int = 1024, ringCapacity: Int = 16_384) {
+    public init(fftSize: Int = 1024, ringCapacity: Int = 32_768) {
         self.fftSize = fftSize
         ring = VisSampleRing(capacity: ringCapacity)
+        cursor = VisReadCursor(window: fftSize, readable: ring.capacity - ring.maxChunk)
         scratch = .allocate(capacity: ring.capacity)
         scratch.initialize(repeating: 0, count: ring.capacity)
         window = .allocate(capacity: fftSize)
@@ -47,16 +50,29 @@ public final class AnalyzerTap: @unchecked Sendable {
     /// Nonisolated on purpose: a tap closure created in a main-actor context traps on the audio queue.
     public nonisolated func install(on node: AVAudioNode, bus: AVAudioNodeBus = 0, sampleRate: Double) {
         remove()
-        if sampleRate > 0, sampleRate != self.sampleRate || analyzer == nil {
-            analyzer = SpectrumAnalyzer(fftSize: fftSize, sampleRate: sampleRate)
-            self.sampleRate = sampleRate
-        }
+        prepare(sampleRate: sampleRate)
         self.node = node
         self.bus = bus
         node.installTap(onBus: bus, bufferSize: 1024, format: nil) { [self] buffer, _ in
             handle(buffer)
         }
         isInstalled = true
+    }
+
+    /// Builds the analyzer for `sampleRate` and resets the read cursor. `install` calls this; tests call it
+    /// directly to drive the ring without an engine.
+    nonisolated func prepare(sampleRate: Double) {
+        if sampleRate > 0, sampleRate != self.sampleRate || analyzer == nil {
+            analyzer = SpectrumAnalyzer(fftSize: fftSize, sampleRate: sampleRate)
+            self.sampleRate = sampleRate
+        }
+        resetCursor()
+    }
+
+    /// Call when the UI pauses or resumes so the cursor re-lags instead of replaying old audio.
+    public nonisolated func resetCursor() {
+        cursor.reset()
+        cachedEnd = nil
     }
 
     public nonisolated func remove() {
@@ -99,6 +115,25 @@ public final class AnalyzerTap: @unchecked Sendable {
             scope: Array(UnsafeBufferPointer(start: scopeOut, count: VisFrame.scopeLength)),
             sampleCount: count)
         cached = frame
+        return frame
+    }
+
+    /// Consumer side at display rate. Advances the read cursor by `dt` and analyzes the window ending there.
+    /// `VisFrame.sampleCount` is that end index. nil until `fftSize` samples have flowed.
+    public func frame(elapsed dt: Double) -> VisFrame? {
+        guard let analyzer else { return nil }
+        guard let end = cursor.next(writeCount: ring.writeCount, elapsed: dt, sampleRate: sampleRate) else { return cached }
+        if end == cachedEnd, let cached { return cached }
+        guard ring.copy(count: fftSize, endingAt: end, into: window) else { return cached }
+        analyzer.analyze(UnsafeBufferPointer(start: window, count: fftSize),
+                         spectrum: UnsafeMutableBufferPointer(start: spectrumOut, count: VisFrame.columnCount),
+                         scope: UnsafeMutableBufferPointer(start: scopeOut, count: VisFrame.scopeLength))
+        let frame = VisFrame(
+            spectrum: Array(UnsafeBufferPointer(start: spectrumOut, count: VisFrame.columnCount)),
+            scope: Array(UnsafeBufferPointer(start: scopeOut, count: VisFrame.scopeLength)),
+            sampleCount: end)
+        cached = frame
+        cachedEnd = end
         return frame
     }
 

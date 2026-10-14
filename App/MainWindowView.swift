@@ -32,10 +32,12 @@ struct MainWindowView: View {
             toggleButton(.equalizer, selected: model.isEQWindowOpen, action: model.toggleEQWindow)
             toggleButton(.playlist, selected: model.isPlaylistWindowOpen, action: model.togglePlaylistWindow)
 
+            VisualizerView(model: model.visualizer)
+                .offset(x: 24, y: 43)
+
             MarqueeView(skin: skin, text: model.marqueeText)
         }
         .frame(width: 275, height: 116, alignment: .topLeading)
-        // TODO: visualizer.
     }
 
     private var volumeSlider: some View {

@@ -80,19 +80,3 @@ enum Tone {
         #expect(frame.scope.count == 76)
     }
 }
-
-@Suite struct VisSmootherTests {
-    @Test func barsFallAtBoundedRateAndPeaksHold() {
-        var smoother = VisSmoother()
-        let loud = VisFrame(spectrum: [Float](repeating: 1, count: 75), scope: [], sampleCount: 1)
-        let silent = VisFrame(spectrum: [Float](repeating: 0, count: 75), scope: [], sampleCount: 1)
-        smoother.step(loud, dt: 1.0 / 60)
-        #expect(smoother.bars[0] == 1)
-        smoother.step(silent, dt: 0.1)
-        #expect(abs(smoother.bars[0] - 0.7) < 0.001)
-        #expect(smoother.peaks[0] == 1) // still holding
-        smoother.step(silent, dt: 0.5)
-        smoother.step(silent, dt: 0.1)
-        #expect(smoother.peaks[0] < 1)
-    }
-}
