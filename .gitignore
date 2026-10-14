@@ -24,3 +24,7 @@ xcuserdata/
 
 # Downloaded skins
 Skins/
+
+# Environment
+.env
+
