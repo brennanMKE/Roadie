@@ -1,0 +1,77 @@
+import LibraryBrowser
+import MusicBackendKit
+import SwiftUI
+
+struct TrackRow: View {
+    let track: LibraryTrack
+    var albumArtist: String?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(LibraryFormat.trackNumber(track))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 28, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.title).lineLimit(1)
+                if track.artistName != albumArtist {
+                    Text(track.artistName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer()
+            Text(LibraryFormat.duration(track.duration))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// The tracks of the selected album or playlist.
+struct TrackListView: View {
+    let library: LibraryBrowserModel
+
+    private var heading: String {
+        library.selectedAlbum?.title ?? library.selectedPlaylist?.name ?? ""
+    }
+
+    private var albumArtist: String? { library.selectedAlbum?.artistName }
+
+    var body: some View {
+        Group {
+            switch library.tracks {
+            case .idle:
+                Color.clear
+            case .loading:
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .failed(let message):
+                ContentUnavailableView {
+                    Label("Couldn't load the tracks", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Retry") { library.retryTracks() }
+                }
+            case .loaded(let tracks):
+                if tracks.isEmpty {
+                    ContentUnavailableView("No tracks", systemImage: "music.note")
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(heading).font(.title3.bold()).lineLimit(1)
+                            Text("\(tracks.count) tracks, \(LibraryFormat.duration(tracks.reduce(0) { $0 + ($1.duration ?? 0) }))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding([.horizontal, .top])
+                        .padding(.bottom, 8)
+                        List(tracks) { track in
+                            TrackRow(track: track, albumArtist: albumArtist)
+                        }
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("library.tracks")
+        .navigationTitle(heading)
+    }
+}

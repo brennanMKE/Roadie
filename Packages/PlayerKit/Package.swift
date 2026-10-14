@@ -12,6 +12,8 @@ let package = Package(
         .library(name: "MusicBackendKit", targets: ["MusicBackendKit"]),
         .library(name: "LocalPlayback", targets: ["LocalPlayback"]),
         .library(name: "PlexBackendKit", targets: ["PlexBackendKit"]),
+        .library(name: "LibraryBrowser", targets: ["LibraryBrowser"]),
+        .library(name: "MusicBackendStub", targets: ["MusicBackendStub"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).
@@ -37,5 +39,10 @@ let package = Package(
         .testTarget(name: "PlexBackendKitTests", dependencies: [
             "PlexBackendKit", "MusicBackendKit", "LocalPlayback", "PlexKit", "PlexKitStub", "TrackCache", "AudioCore",
         ]),
+        // Browser view models. Foundation + Observation; depends on the protocol only, never on a backend.
+        .target(name: "LibraryBrowser", dependencies: ["MusicBackendKit"]),
+        // In-memory MusicBackend for tests of the browser and of anything that drives a backend.
+        .target(name: "MusicBackendStub", dependencies: ["MusicBackendKit"]),
+        .testTarget(name: "LibraryBrowserTests", dependencies: ["LibraryBrowser", "MusicBackendKit", "MusicBackendStub"]),
     ]
 )

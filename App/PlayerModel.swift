@@ -1,6 +1,7 @@
 import AppKit
 import AudioCore
 import Foundation
+import LibraryBrowser
 import MusicBackendKit
 import Observation
 import PlexBackendKit
@@ -16,6 +17,8 @@ final class PlayerModel {
     private(set) var errorMessage: String?
     /// The app only talks to this; the composition below is the one place that names Plex.
     let backend: any MusicBackend
+    /// The Library window's state; connects when the window appears, never at launch.
+    let library: LibraryBrowserModel
     let cache: TrackCache
     let cacheSettings: CacheSettingsModel
     /// Still public for the skinned window's time and spectrum bindings and for local files.
@@ -38,6 +41,7 @@ final class PlayerModel {
     init() {
         let stack = PlexPlaybackStack.standard()
         backend = stack.backend
+        library = LibraryBrowserModel(backend: stack.backend)
         cache = stack.cache
         player = stack.player
         pinner = stack.pinner

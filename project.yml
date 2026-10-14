@@ -33,6 +33,8 @@ targets:
         product: LocalPlayback
       - package: PlayerKit
         product: PlexBackendKit
+      - package: PlayerKit
+        product: LibraryBrowser
     info:
       path: App/Info.plist
       properties:
@@ -73,3 +75,4 @@ schemes:
         - package: PlayerKit/MusicBackendKitTests
         - package: PlayerKit/LocalPlaybackTests
         - package: PlayerKit/PlexBackendKitTests
+        - package: PlayerKit/LibraryBrowserTests

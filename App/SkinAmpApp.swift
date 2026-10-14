@@ -29,6 +29,13 @@ struct SkinAmpApp: App {
             }
         }
 
+        Window("Library", id: "library") {
+            LibraryWindowView()
+                .environment(model)
+        }
+        .keyboardShortcut("l")
+        .defaultSize(width: 960, height: 600)
+
         Settings {
             SettingsView()
                 .environment(plexSettings)
