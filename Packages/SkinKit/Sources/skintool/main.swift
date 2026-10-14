@@ -11,7 +11,10 @@ import SkinLibrary
 // <out>/<basename>.diff.png. Comparison numbers are reported, never gated.
 //        skintool index <folder> [--db <file>] [--full]
 // `index` runs the incremental SQLite index pass (#0033) over a folder; without --db it writes the file the app reads.
-// Exit status: 0 only if every skin is ok and every render succeeded, 1 otherwise (64 usage, 66 no such file).
+//        skintool corpus <dir> --out <dir> [--resume] [--timeout s] [--max-memory MiB] [--sample N] [--seed n] [--manifest f]
+//        skintool corpus-report <results.jsonl> --markdown <report.md> --json <summary.json> [--env f] [--sample N] [--seed n] [--crashes dir]
+// `corpus` runs every skin of a folder through parse plus render, journaling results.jsonl so a crash can be resumed;
+// `corpus-report` turns that journal into numbers (#0038). Exit status: 0 only if every skin is ok and every render succeeded, 1 otherwise (64 usage, 66 no such file).
 
 func standardError(_ text: String) { FileHandle.standardError.write(Data((text + "\n").utf8)) }
 
@@ -50,7 +53,83 @@ func runIndex(_ arguments: [String]) async -> Int32 {
     }
 }
 
+/// `skintool corpus <dir> --out <dir> ...`: 0 when the loop finished (124/125 come from the watchdog), 64/66 usage.
+func runCorpus(_ arguments: [String]) -> Int32 {
+    let options: CorpusOptions
+    switch CorpusOptions.parse(arguments) {
+    case .success(let parsed): options = parsed
+    case .failure(let error):
+        standardError("skintool: \(error)\n\(CorpusOptions.usage)")
+        return 64
+    }
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: options.input, isDirectory: &isDirectory), isDirectory.boolValue else {
+        standardError("skintool: no such folder: \(options.input)")
+        return 66
+    }
+    var config = CorpusRunner.Config()
+    config.timeout = options.timeout
+    config.maxMemoryMiB = options.maxMemoryMiB
+    config.sample = options.sample
+    config.seed = options.seed
+    config.resume = options.resume
+    config.manifest = options.manifest.map { URL(filePath: $0) }
+    let runner = CorpusRunner(corpus: URL(filePath: options.input), out: URL(filePath: options.out), config: config)
+    do {
+        let totals = try runner.run()
+        print("corpus run finished: \(totals.unique) unique of \(totals.files) files, \(totals.attempted) attempted in this process")
+        return 0
+    } catch {
+        standardError("skintool: \(error.localizedDescription)")
+        return 1
+    }
+}
+
+/// `skintool corpus-report <results.jsonl> ...`: writes the markdown and JSON; exit 1 when the gate fails.
+func runCorpusReport(_ arguments: [String]) -> Int32 {
+    let options: CorpusReportOptions
+    switch CorpusReportOptions.parse(arguments) {
+    case .success(let parsed): options = parsed
+    case .failure(let error):
+        standardError("skintool: \(error)\n\(CorpusReportOptions.usage)")
+        return 64
+    }
+    guard FileManager.default.fileExists(atPath: options.input) else {
+        standardError("skintool: no such file: \(options.input)")
+        return 66
+    }
+    var environment: [String: String] = [:]
+    if let path = options.env, let data = FileManager.default.contents(atPath: path),
+        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    {
+        environment = object.mapValues { "\($0)" }
+    }
+    let crashLogs = options.crashes.flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0).count } ?? 0
+    let records = CorpusRunner.readRecords(URL(filePath: options.input))
+    let summary = CorpusReport.summarize(
+        records: records, environment: environment, sample: options.sample, seed: options.seed, crashLogs: crashLogs)
+    do {
+        try CorpusReport.markdown(summary).write(toFile: options.markdown, atomically: true, encoding: .utf8)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(summary).write(to: URL(filePath: options.json))
+    } catch {
+        standardError("skintool: \(error.localizedDescription)")
+        return 1
+    }
+    let c = summary.counts
+    print("corpus: \(summary.unique) unique of \(summary.files) files, \(summary.classic) classic, \(c.ok) ok, \(c.partial) partial, \(c.failed) failed, "
+        + "\(c.crashed) crashed, \(c.timeout) timed out, \(c.memory) over memory")
+    print(String(format: "main window complete %.1f%%, median %.1f ms, p95 %.1f ms, p99 %.1f ms, peak %d MiB, wall %.1f s",
+        summary.completeRate * 100, summary.timing.medianMs, summary.timing.p95Ms, summary.timing.p99Ms,
+        summary.timing.peakFootprintMiB, summary.timing.wallSeconds))
+    print(summary.gate)
+    return summary.gatePass ? 0 : 1
+}
+
 let rawArguments = Array(CommandLine.arguments.dropFirst())
+if rawArguments.first == "corpus" { exit(runCorpus(Array(rawArguments.dropFirst()))) }
+if rawArguments.first == "corpus-report" { exit(runCorpusReport(Array(rawArguments.dropFirst()))) }
 if rawArguments.first == "index" { exit(await runIndex(Array(rawArguments.dropFirst()))) }
 
 let options: SkintoolOptions

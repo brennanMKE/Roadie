@@ -18,6 +18,8 @@ scripts/run-tests-vm.sh --skins "untitled folder" --references build/webamp-refe
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
 scripts/run-tests-vm.sh --stress 30 --load  # same, with four CPU hogs running in the guest
+scripts/run-tests-vm.sh --corpus ~/Skins/museum                      # every skin under the folder through `skintool corpus` in the guest (#0038)
+scripts/run-tests-vm.sh --corpus ~/Skins/museum --corpus-sample 1000 # the fast loop: a seeded sample of 1000 unique skins
 ```
 
 A run takes a few minutes: about 15 s to boot, then SwiftPM resolution and the builds, since every
@@ -63,6 +65,7 @@ permission approvals build up, nothing lingers from an earlier run, and every bu
 - **No audio.** See [No audio](#no-audio).
 - **Never share a live working copy or `$HOME` into the guest read-write.** The guest runs test
   code. The only share is a read-only directory that holds this run's export.
+- **The corpus share is read-only and never enters git or the export.** `--corpus DIR` (#0038) adds a second named virtio-fs share (`--dir=corpus:DIR:ro`, mounted at `/Volumes/My Shared Files/corpus`); the guest copies it to `~/corpus` when the disk has the corpus size plus 2 GiB free (else it reads in place and `env.json` says so) before anything is timed. Steps `corpus-run` (`scripts/run-skin-corpus.sh`: release build of `skintool`, `skintool corpus --resume` restarted after a crash, hang or memory abort) and `corpus-report` (`skintool corpus-report`, prints `corpus:` and `gate:` lines and fails the step when the gate fails) follow the normal steps; `results.jsonl`, `report.md`, `summary.json`, `env.json`, `corpus-stderr.log` and `crashes/` come back in `build/vm-tests/<run-id>/corpus/`. The full ~103k-skin set is roughly 10-20 minutes of parsing plus the copy and the release build, and holds the VM lease the whole time.
 - **Results come back through `tart exec … tar`**, not through the share.
 - **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`. PlexKit's opt-in integration test skips itself when `PLEX_URL`/`PLEX_TOKEN` are unset, which is always the case in the guest. The plex.tv sign-in tests use hand-written fixtures with a fake PIN code and token; nothing is recorded from the account, and the opener that would launch a browser is a closure. TrackCache's tests download from the `URLProtocol` stub or an in-process stub downloader, and its integration test skips itself the same way.
 - **No Keychain in the guest.** Unit tests use `InMemoryPlexTokenStore`; the real `KeychainPlexTokenStore` has an opt-in test (`PLEX_KEYCHAIN_TEST=1`) that only runs on the host by hand. A keychain dialog in the headless guest would hang the run.

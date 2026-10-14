@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]]
+# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]] [--corpus DIR [--corpus-sample N]]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
 #   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds steps skintool and skintool-png, runs sampleSkinsAreOk
@@ -15,6 +15,10 @@
 #                     and diff each render against them in skintool-png (numbers only, never gated)
 #   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
 #   --load      with --stress: run four CPU hogs in the guest during the loop
+#   --corpus DIR  run every .wsz/.zip under DIR (any layout) through `skintool corpus` in the guest (#0038): shared read-only
+#                 as a second virtio-fs share, copied to the guest disk, then steps corpus-run and corpus-report; the
+#                 corpus never enters git or the export. Results in build/vm-tests/<run-id>/corpus/
+#   --corpus-sample N  with --corpus: only a seeded sample of N unique skins (the fast loop; 1000 is the acceptance sample)
 #
 # In the guest, in order:
 #   1. swift test --package-path Packages/SkinKit     (SKIN_SAMPLES_DIR=Skins with --skins)
@@ -35,6 +39,8 @@ STRESS=0
 LOAD=0
 SKINS_DIR=""
 REFS_DIR=""
+CORPUS_DIR=""
+CORPUS_SAMPLE=""
 args=("$@")
 while (( $#args )); do
   arg=$args[1]; shift args
@@ -45,13 +51,21 @@ while (( $#args )); do
     --load) LOAD=1 ;;
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
     --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
+    --corpus-sample) CORPUS_SAMPLE=${args[1]:-}; shift args 2>/dev/null; [[ "$CORPUS_SAMPLE" == <1-> ]] || { print -r -- "--corpus-sample needs a positive count" >&2; exit 2 } ;;
+    -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
 
 (( LOAD && ! STRESS )) && { print -r -- "--load needs --stress N" >&2; exit 2 }
 [[ -n "$REFS_DIR" && -z "$SKINS_DIR" ]] && { print -r -- "--references needs --skins DIR" >&2; exit 2 }
+[[ -n "$CORPUS_SAMPLE" && -z "$CORPUS_DIR" ]] && { print -r -- "--corpus-sample needs --corpus DIR" >&2; exit 2 }
+if [[ -n "$CORPUS_DIR" ]]; then
+  CORPUS_DIR="$(cd "$CORPUS_DIR" && pwd)"
+  [[ -n "$(find "$CORPUS_DIR" -type f \( -iname '*.wsz' -o -iname '*.zip' \) -print -quit)" ]] \
+    || { print -r -- "--corpus: no .wsz or .zip files under $CORPUS_DIR" >&2; exit 2 }
+fi
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
@@ -162,7 +176,10 @@ fi
 log "Cloning $GOLDEN -> $CLONE"
 tart clone "$GOLDEN" "$CLONE"
 log "Booting headless, no audio device, export mounted read-only"
-tart run "$CLONE" --no-graphics --no-audio --dir=run:"$EXPORT":ro >"$EXPORT/tart-run.log" 2>&1 &
+# The corpus is a second, named, read-only share; the guest copies it to its own disk before anything is timed.
+tart_dirs=(--dir=run:"$EXPORT":ro)
+[[ -n "$CORPUS_DIR" ]] && tart_dirs+=(--dir=corpus:"$CORPUS_DIR":ro)
+tart run "$CLONE" --no-graphics --no-audio "${tart_dirs[@]}" >"$EXPORT/tart-run.log" 2>&1 &
 boot_deadline=$(( SECONDS + BOOT_TIMEOUT_SECS ))
 until tart exec "$CLONE" true >/dev/null 2>&1; do
   (( SECONDS < boot_deadline )) || fail "Guest not reachable within ${BOOT_TIMEOUT_SECS}s (see $EXPORT/tart-run.log)"
@@ -177,6 +194,11 @@ gx "rm -rf $GUEST_SRC $GUEST_RESULTS && mkdir -p $GUEST_RESULTS && cp -R '/Volum
 # host. Mute it as well, and record the device list and mute state as evidence.
 gx "osascript -e 'set volume output volume 0' -e 'set volume with output muted' >/dev/null 2>&1 || true"
 gx "{ system_profiler SPAudioDataType; print -- '--- output volume settings:'; osascript -e 'get volume settings'; } > $GUEST_RESULTS/audio-devices.txt 2>&1 || true"
+
+# The export has no .git; the corpus report wants the commit.
+commit_text="$(git -C "$REPO" rev-parse --short HEAD)"
+(( USE_HEAD )) || git -C "$REPO" diff --quiet HEAD -- 2>/dev/null || commit_text="$commit_text-dirty"
+gx "print -r -- '$commit_text' > $GUEST_RESULTS/commit.txt"
 
 # --- Steps -----------------------------------------------------------------
 # `set -o pipefail` inside the guest shell: without it the status is tee's.
@@ -214,6 +236,30 @@ if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/SkinAmp.app && sleep 5 && pgrep -x SkinAmp && osascript -e 'quit app \"SkinAmp\"' && sleep 1 && ! pgrep -x SkinAmp"
 fi
 
+if [[ -n "$CORPUS_DIR" ]]; then
+  # Copy the read-only share to the guest disk when it fits (corpus size plus 2 GiB free); else read it in place.
+  corpus_in_place=1
+  corpus_src="/Volumes/My Shared Files/corpus"
+  corpus_kb=$(gx "du -sk '$corpus_src' | cut -f1" | tr -d '[:space:]')
+  guest_free_kb=$(gx "df -k / | awk 'NR == 2 { print \$4 }'" | tr -d '[:space:]')
+  if (( guest_free_kb > corpus_kb + 2 * 1024 * 1024 )); then
+    log "Guest: copying the corpus ($(( corpus_kb / 1024 )) MiB) to the guest disk"
+    gx "cp -R '$corpus_src' /Users/admin/corpus" && corpus_in_place=0
+  fi
+  if (( corpus_in_place )); then
+    log "Guest: reading the corpus in place from the share"
+    corpus_guest="$corpus_src"
+  else
+    corpus_guest="/Users/admin/corpus"
+  fi
+  sample_args=""
+  [[ -n "$CORPUS_SAMPLE" ]] && sample_args="--sample $CORPUS_SAMPLE --seed 1"
+  run_step corpus-run "RUN_ID=$RUN_ID CORPUS_IN_PLACE=$corpus_in_place COMMIT_FILE=$GUEST_RESULTS/commit.txt scripts/run-skin-corpus.sh '$corpus_guest' $GUEST_RESULTS/corpus $sample_args"
+  report_sample=1000
+  [[ -n "$CORPUS_SAMPLE" ]] && report_sample=$CORPUS_SAMPLE
+  run_step corpus-report "BIN=\$(swift build -c release --package-path Packages/SkinKit --show-bin-path)/skintool; \$BIN corpus-report $GUEST_RESULTS/corpus/results.jsonl --markdown $GUEST_RESULTS/corpus/report.md --json $GUEST_RESULTS/corpus/summary.json --env $GUEST_RESULTS/corpus/env.json --crashes $GUEST_RESULTS/corpus/crashes --sample $report_sample --seed 1"
+fi
+
 # --- Results back ----------------------------------------------------------
 
 mkdir -p "$RESULTS_DIR"
@@ -231,7 +277,7 @@ overall=0
 for name in ${(k)step_rc}; do
   if (( step_rc[$name] == 0 )); then log "PASS  $name"; else log "FAIL  $name (exit ${step_rc[$name]})"; overall=1; fi
 done
-grep -hE 'Test run with|quicklook:|stress:|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
+grep -hE 'Test run with|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
   overall=1
