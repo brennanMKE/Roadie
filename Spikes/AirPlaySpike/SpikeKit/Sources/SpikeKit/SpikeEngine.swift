@@ -43,7 +43,7 @@ public protocol SpikeEngine: AnyObject {
     var rate: Float { get }
     /// Requested-ahead seconds (see `LeadMeter`); nil when the engine has no such measurement.
     var leadSeconds: TimeInterval? { get }
-    /// A sets `picker.player`; every other engine sets it to nil.
+    /// A and A+tap set `picker.player`; A', B and B-dev set it to nil.
     func attach(to picker: AVRoutePickerView)
     func detach()
     func probe() -> [ProbeLine]

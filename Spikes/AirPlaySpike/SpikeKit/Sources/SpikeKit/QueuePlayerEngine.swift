@@ -101,8 +101,10 @@ public final class QueuePlayerEngine: SpikeEngine {
 
     public func attach(to picker: AVRoutePickerView) {
         self.picker = picker
-        picker.player = kind == .a ? player : nil
-        log.log(kind.shortName, "attach picker.player \(kind == .a ? "set" : "nil")")
+        // A+tap is A plus a tap: it binds the picker like A, so a routing difference is the tap's doing.
+        let bound = kind == .a || kind == .aTap
+        picker.player = bound ? player : nil
+        log.log(kind.shortName, "attach picker.player \(bound ? "set" : "nil")")
     }
 
     public func detach() {
