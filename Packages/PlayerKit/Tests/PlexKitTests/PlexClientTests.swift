@@ -120,6 +120,22 @@ struct PlexClientTests {
         #expect(url.absoluteString.contains("title=cowboys%20%26%20aliens"))
     }
 
+    @Test func searchArtistsAndAlbumsSendTheirTypeAndTitle() async throws {
+        let client = client()
+        StubURLProtocol.register([
+            try .json(.artistsPage, path: "/library/sections/9/all", query: ["type": "8"]),
+            try .json(.albumsPage, path: "/library/sections/9/all", query: ["type": "9"]),
+        ])
+        let artists = try await client.searchArtists(in: "9", title: "cowboys & aliens")
+        let albums = try await client.searchAlbums(in: "9", title: "cowboys & aliens")
+        #expect(!artists.items.isEmpty)
+        #expect(!albums.items.isEmpty)
+        let urls = StubURLProtocol.recorded.map(\.url)
+        let types = urls.compactMap { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "type" }?.value }
+        #expect(types == ["8", "9"])
+        #expect(urls.allSatisfy { $0.absoluteString.contains("title=cowboys%20%26%20aliens") })
+    }
+
     @Test func baseURLWithTrailingSlashJoinsOnce() async throws {
         for base in ["http://stub.local:32400", "http://stub.local:32400/"] {
             let client = client(base: base)

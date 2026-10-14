@@ -27,6 +27,12 @@ targets:
         product: PlexKit
       - package: PlayerKit
         product: TrackCache
+      - package: PlayerKit
+        product: MusicBackendKit
+      - package: PlayerKit
+        product: LocalPlayback
+      - package: PlayerKit
+        product: PlexBackendKit
     info:
       path: App/Info.plist
       properties:
@@ -64,3 +70,6 @@ schemes:
         - package: PlayerKit/AudioCoreTests
         - package: PlayerKit/PlexKitTests
         - package: PlayerKit/TrackCacheTests
+        - package: PlayerKit/MusicBackendKitTests
+        - package: PlayerKit/LocalPlaybackTests
+        - package: PlayerKit/PlexBackendKitTests

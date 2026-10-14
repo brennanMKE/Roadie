@@ -44,6 +44,20 @@ extension PlexClient {
                               page: page, as: PlexTrack.self)
     }
 
+    /// /library/sections/<id>/all?type=8&title=...
+    public func searchArtists(in section: PlexLibrarySection.ID, title: String, page: PlexPageRequest = .first) async throws -> PlexPage<PlexArtist> {
+        let query = [URLQueryItem(name: "type", value: "8"), URLQueryItem(name: "title", value: title)]
+        return try await list(request(path: "/library/sections/\(section)/all", query: query, page: page),
+                              page: page, as: PlexArtist.self)
+    }
+
+    /// /library/sections/<id>/all?type=9&title=...
+    public func searchAlbums(in section: PlexLibrarySection.ID, title: String, page: PlexPageRequest = .first) async throws -> PlexPage<PlexAlbum> {
+        let query = [URLQueryItem(name: "type", value: "9"), URLQueryItem(name: "title", value: title)]
+        return try await list(request(path: "/library/sections/\(section)/all", query: query, page: page),
+                              page: page, as: PlexAlbum.self)
+    }
+
     /// /library/metadata/<artist>/children
     public func albums(of artist: PlexArtist.ID, page: PlexPageRequest = .first) async throws -> PlexPage<PlexAlbum> {
         try await list(request(path: "/library/metadata/\(artist)/children", page: page), page: page, as: PlexAlbum.self)

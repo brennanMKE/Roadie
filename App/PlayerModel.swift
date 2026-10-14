@@ -1,8 +1,9 @@
 import AppKit
 import AudioCore
 import Foundation
+import MusicBackendKit
 import Observation
-import PlexKit
+import PlexBackendKit
 import SkinKit
 import TrackCache
 import os
@@ -13,45 +14,61 @@ final class PlayerModel {
     private(set) var skin: Skin?
     private(set) var skinName: String?
     private(set) var errorMessage: String?
+    /// The app only talks to this; the composition below is the one place that names Plex.
+    let backend: any MusicBackend
     let cache: TrackCache
     let cacheSettings: CacheSettingsModel
+    /// Still public for the skinned window's time and spectrum bindings and for local files.
     let player: Player
     /// Keeps the current and next tracks pinned in the cache; lives as long as the model.
     private let pinner: CachePinner
     /// Media keys and Control Center; lives as long as the model.
-    private let nowPlaying: NowPlayingBridge
-    var playbackState: PlaybackState { player.state }
-    var isLoading: Bool { player.state == .loading }
+    private let nowPlayingBridge: NowPlayingBridge
+    var selectedOutput: OutputDevice.ID = OutputDevice.thisMacID {
+        didSet { if selectedOutput != oldValue { observeNowPlaying() } }
+    }
+    private(set) var nowPlaying: NowPlaying = .idle(on: OutputDevice.thisMacID)
+    private var nowPlayingTask: Task<Void, Never>?
+    var playbackState: NowPlaying.State { nowPlaying.state }
+    var isLoading: Bool { nowPlaying.state == .loading }
     var scale: CGFloat = 2
 
     private static let lastSkinKey = "lastSkinPath"
 
     init() {
-        let cache = TrackCache(
-            directory: TrackCache.defaultDirectory(),
-            limitBytes: CacheSettingsModel.storedLimit(),
-            downloader: PlexPartDownloader(clientProvider: PlexPartDownloader.settingsClientProvider()))
-        self.cache = cache
-        cacheSettings = CacheSettingsModel(cache: cache)
-        let player = Player(resolver: PlexTrackResolver(cache: cache, savedMachineIdentifier: {
-            // The saved server's identity; nil until a connection test has succeeded.
-            UserDefaults.standard.data(forKey: PlexSettingsModel.selectionDefaultsKey)
-                .flatMap { try? JSONDecoder().decode(PlexServerSelection.self, from: $0) }?
-                .machineIdentifier
-        }))
-        self.player = player
-        pinner = CachePinner(cache: cache, player: player)
-        pinner.install()
+        let stack = PlexPlaybackStack.standard()
+        backend = stack.backend
+        cache = stack.cache
+        player = stack.player
+        pinner = stack.pinner
+        cacheSettings = CacheSettingsModel(cache: stack.cache)
+        let cache = stack.cache
         Task {
             do { try await cache.prepare() } catch {
                 Logger(subsystem: "com.brennanmke.SkinAmp", category: "TrackCache")
                     .error("could not prepare the cache: \(error.localizedDescription, privacy: .public)")
             }
         }
-        nowPlaying = NowPlayingBridge(player: player)
-        nowPlaying.install()
+        nowPlayingBridge = NowPlayingBridge(player: stack.player)
+        nowPlayingBridge.install()
+        observeNowPlaying()
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
+        }
+    }
+
+    /// Follows the selected output's now-playing stream. Never connects: the stream for This Mac
+    /// works without a server.
+    private func observeNowPlaying() {
+        nowPlayingTask?.cancel()
+        let backend = backend
+        let output = selectedOutput
+        nowPlaying = .idle(on: output)
+        nowPlayingTask = Task { [weak self] in
+            for await snapshot in await backend.nowPlaying(on: output) {
+                guard !Task.isCancelled else { return }
+                self?.nowPlaying = snapshot
+            }
         }
     }
 
@@ -71,11 +88,22 @@ final class PlayerModel {
         }
     }
 
-    func play() { player.play() }
-    func pause() { player.togglePause() }
-    func stop() { player.stop() }
-    func previous() { player.previous() }
-    func next() { player.next() }
+    func play() { send(.play) }
+    func pause() { send(.togglePlayPause) }
+    func stop() { send(.stop) }
+    func previous() { send(.previous) }
+    func next() { send(.next) }
+
+    private func send(_ command: TransportCommand) {
+        let backend = backend
+        let output = selectedOutput
+        Task {
+            do { try await backend.transport(command, on: output) } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     /// Winamp's eject button opens the file dialog.
     func eject() { openFiles(replace: true) }
 
