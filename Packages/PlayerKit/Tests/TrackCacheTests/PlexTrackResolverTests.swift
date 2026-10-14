@@ -168,4 +168,83 @@ struct PlexTrackResolverTests {
             #expect(!text.contains("X-Plex-Token"))
         }
     }
+
+    // MARK: resolve(_:) (#0039)
+
+    @Test func plexMissResolvesToAProgressiveDownload() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        f.serve()
+        guard case .progressive(let source) = try await f.resolver.resolve(f.track) else {
+            Issue.record("expected a progressive source")
+            return
+        }
+        #expect(source.finalSize == Int64(Self.bodySize))
+        #expect(source.pathExtension == "m4a")
+        #expect(!String(describing: source).contains(Self.secret))
+        // Reading it to the end completes and caches the part.
+        let outcome = await withCheckedContinuation { continuation in
+            Thread { continuation.resume(returning: source.waitForBytes(through: source.finalSize, timeout: 10)) }.start()
+        }
+        guard case .available = outcome else { Issue.record("expected .available"); return }
+        let cached = await waitFor { await f.cache.entries().count == 1 }
+        #expect(cached)
+        source.close()
+    }
+
+    @Test func plexHitResolvesToTheFile() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        f.serve()
+        _ = try await f.resolver.localURL(for: f.track)
+        guard case .file(let url) = try await f.resolver.resolve(f.track) else {
+            Issue.record("expected a file")
+            return
+        }
+        #expect(url.lastPathComponent.hasSuffix(".m4a"))
+        #expect(f.handle.recorded.count == 1)
+    }
+
+    @Test func fileSourcesResolveToTheFile() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let local = URL(fileURLWithPath: "/tmp/some-local-file.mp3")
+        let track = Track(title: "t", artist: "a", duration: 1, source: .file(local))
+        guard case .file(let url) = try await f.resolver.resolve(track) else {
+            Issue.record("expected a file")
+            return
+        }
+        #expect(url == local)
+        #expect(f.handle.recorded.isEmpty)
+    }
+
+    @Test func missingSizeResolvesToTheFileAfterTheDownload() async throws {
+        let f = try Fixture(size: nil); defer { f.cleanup() }
+        f.serve()
+        guard case .file(let url) = try await f.resolver.resolve(f.track) else {
+            Issue.record("expected a file")
+            return
+        }
+        #expect(try Data(contentsOf: url).count == Self.bodySize)
+    }
+
+    @Test func serverMismatchFailsResolveBeforeAnyRequest() async throws {
+        let f = try Fixture(savedMachine: "ffffffffffffffffffffffffffffffffffffffff"); defer { f.cleanup() }
+        f.serve()
+        await #expect(throws: TrackCacheError.serverMismatch) { try await f.resolver.resolve(f.track) }
+        #expect(f.handle.recorded.isEmpty)
+    }
+
+    @Test func aProgressiveDownloadNeverWritesTheTokenToDisk() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        f.serve()
+        guard case .progressive(let source) = try await f.resolver.resolve(f.track) else {
+            Issue.record("expected a progressive source")
+            return
+        }
+        let outcome = await withCheckedContinuation { continuation in
+            Thread { continuation.resume(returning: source.waitForBytes(through: source.finalSize, timeout: 10)) }.start()
+        }
+        guard case .available = outcome else { Issue.record("expected .available"); return }
+        source.close()
+        #expect(!directoryContains(f.dir, Self.secret))
+        #expect(f.handle.recorded.allSatisfy { !$0.url.absoluteString.contains(Self.secret) })
+    }
 }

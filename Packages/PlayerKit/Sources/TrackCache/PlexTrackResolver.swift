@@ -16,6 +16,23 @@ public struct PlexTrackResolver: TrackResolver, CustomStringConvertible, CustomD
     public var debugDescription: String { description }
     public var customMirror: Mirror { Mirror(self, children: []) }
 
+    /// A Plex track that is not cached yet resolves to the download in flight, so the player starts after a
+    /// short preroll instead of after the whole file. Everything else resolves as `localURL(for:)` does.
+    public func resolve(_ track: Track) async throws -> ResolvedAudio {
+        switch track.source {
+        case .file(let url):
+            return .file(url)
+        case .plex(let partKey, let cacheKey, let size):
+            if let saved = savedMachineIdentifier(), saved != PlexCacheKey.machineIdentifier(of: cacheKey) {
+                throw TrackCacheError.serverMismatch
+            }
+            switch try await cache.open(forKey: cacheKey, partKey: partKey, expectedSize: size) {
+            case .ready(let url): return .file(url)
+            case .downloading(let download): return .progressive(download)
+            }
+        }
+    }
+
     public func localURL(for track: Track) async throws -> URL {
         switch track.source {
         case .file(let url):

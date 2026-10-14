@@ -37,7 +37,8 @@ struct PlexBackendPlaybackTests {
         #expect(track.source == .plex(
             partKey: testPartPath, cacheKey: "\(testMachine)-5010-1791856627", size: Int64(testPartSize)))
 
-        #expect(await waitFor { await f.cache.entries().count == 1 })
+        // The part is fetched while the player opens it (#0039); bytes that are not audio are not cached.
+        #expect(await waitFor { f.handle.recorded.contains { $0.url.path == testPartPath } })
         let part = try #require(f.handle.recorded.first { $0.url.path == testPartPath })
         #expect(header(part, "X-Plex-Token") == testSecret)
         #expect(!part.url.absoluteString.contains(testSecret))

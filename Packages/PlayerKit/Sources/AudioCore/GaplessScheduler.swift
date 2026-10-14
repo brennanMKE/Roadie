@@ -14,7 +14,7 @@ struct ScheduledItem: Equatable, Sendable {
     /// Start on the node's sample timeline (node-rate frames).
     let startFrame: Int64
     /// Length in node-rate frames (see `nodeFrames`).
-    let frameLength: Int64
+    var frameLength: Int64
     /// Seconds into the file where the segment starts (non-zero after a seek).
     let seekOffset: TimeInterval
 }
@@ -71,6 +71,14 @@ struct GaplessScheduler: Sendable {
         )
         items.append(item)
         return item
+    }
+
+    /// A progressive track's length is an estimate until its decoder reaches the end. Corrects the item's
+    /// length so the next `append` starts where the node will really be. Ignored unless the item is the
+    /// last one of the current generation (an item with another behind it has already fixed its successor).
+    mutating func adjustLength(of token: ScheduleToken, to frames: Int64) {
+        guard token.generation == generation, let last = items.last, last.token == token, frames >= 0 else { return }
+        items[items.count - 1].frameLength = frames
     }
 
     mutating func complete(_ token: ScheduleToken) -> CompletionOutcome {

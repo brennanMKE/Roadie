@@ -8,17 +8,23 @@ public final class Player: NowPlayingCommandTarget {
     public private(set) var queue = PlayQueue() {
         didSet { emitTrackChangeIfNeeded() }
     }
-    public private(set) var state: PlaybackState = .stopped {
+    public internal(set) var state: PlaybackState = .stopped {
         didSet { emit(.stateChanged(state)) }
     }
-    public private(set) var currentTime: TimeInterval = 0
+    public internal(set) var currentTime: TimeInterval = 0
     /// File format of the loaded track; nil while loading or stopped.
-    public private(set) var currentFormat: PlaybackFormat?
+    public internal(set) var currentFormat: PlaybackFormat?
     /// The last failure's message: set by every failure, cleared when a track opens. Listeners that need
     /// each failure observe `PlayerEvent.failed`.
-    public private(set) var errorMessage: String?
+    public internal(set) var errorMessage: String?
     /// Failures in a row since a track last opened or the player last stopped; bounds the skip run to one pass.
-    @ObservationIgnored private(set) var consecutiveFailures = 0
+    @ObservationIgnored var consecutiveFailures = 0
+
+    /// True while a progressive (still downloading) track has run out of decoded audio and is waiting for
+    /// bytes: the node is paused and the position holds. Always false for a complete file.
+    public internal(set) var isBuffering = false
+    /// How far into a progressive track the downloaded bytes reach (seconds); nil for a complete file.
+    public internal(set) var bufferedTime: TimeInterval?
 
     /// 0...1. Clamped on assignment; backed by an ignored stored value so the
     /// setter never re-enters itself (a `didSet` that reassigns recurses under `@Observable`).
@@ -99,12 +105,12 @@ public final class Player: NowPlayingCommandTarget {
         eventObservers.removeAll { $0.token == token }
     }
 
-    private func emit(_ event: PlayerEvent) {
+    func emit(_ event: PlayerEvent) {
         for observer in eventObservers { observer.handler(event) }
     }
     @ObservationIgnored private var lastEmittedTrackID: UUID?
 
-    @ObservationIgnored private let resolver: any TrackResolver
+    @ObservationIgnored let resolver: any TrackResolver
     @ObservationIgnored var _graph: AudioGraph?
     /// Spectrum / oscilloscope source for the visualizer. Pull `latestFrame()` from the main
     /// thread at 30-60 Hz; it is installed on the mixer whenever the engine starts.
@@ -113,13 +119,18 @@ public final class Player: NowPlayingCommandTarget {
     @ObservationIgnored var recordsDiagnostics = false
     @ObservationIgnored private(set) var scheduleDiagnostics: [ScheduleDiagnostic] = []
     @ObservationIgnored private(set) var completionDiagnostics: [GaplessScheduler.CompletionOutcome] = []
-    @ObservationIgnored private var file: AVAudioFile?
+    @ObservationIgnored var file: AVAudioFile?
     /// The pre-scheduled file behind `file`, if any (its track is `scheduler.scheduledNextTrackID`).
     @ObservationIgnored private var nextFile: AVAudioFile?
     /// Decides which completion handlers are still valid and tracks the node's timeline.
-    @ObservationIgnored private var scheduler = GaplessScheduler()
+    @ObservationIgnored var scheduler = GaplessScheduler()
+    /// The current track when it plays from a download still in flight (#0039); `file` is nil then.
+    @ObservationIgnored var progressive: ProgressiveSession?
+    /// Test hooks: how the progressive reader waits and fetches, and the size of the buffers it schedules.
+    @ObservationIgnored var progressivePolicy = ProgressiveReadPolicy()
+    @ObservationIgnored var progressiveBufferFrames: AVAudioFrameCount?
     @ObservationIgnored private var preloadTask: Task<Void, Never>?
-    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored var loadTask: Task<Void, Never>?
     /// What the in-flight (or last) load should do when the file opens: play, or park paused.
     /// Play, pause and toggle flip it while `state == .loading`.
     @ObservationIgnored private(set) var autoplayAfterLoad = true
@@ -213,7 +224,7 @@ public final class Player: NowPlayingCommandTarget {
         case .paused:
             do {
                 let graph = try startedGraph()
-                graph.playerNode.play()
+                if !isBuffering { graph.playerNode.play() }   // a stalled node waits for the resume
                 state = .playing
                 startTimeUpdates()
             } catch {
@@ -267,6 +278,7 @@ public final class Player: NowPlayingCommandTarget {
         discardSchedule()
         _graph?.playerNode.stop()
         file = nil
+        closeProgressive()
         currentFormat = nil
         currentTime = 0
         state = .stopped
@@ -291,6 +303,10 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func seek(to seconds: TimeInterval) {
+        if let progressive {
+            seekProgressive(progressive, to: seconds)
+            return
+        }
         guard let file, let graph = _graph else { return }
         let rate = file.processingFormat.sampleRate
         let duration = Double(file.length) / rate
@@ -315,7 +331,7 @@ public final class Player: NowPlayingCommandTarget {
     // MARK: Starting tracks
 
     /// `autoplay: false` loads the track and parks it paused at 0:00 instead of starting it.
-    private func startCurrentTrack(autoplay: Bool = true) {
+    func startCurrentTrack(autoplay: Bool = true) {
         guard let track = queue.current else {
             stop()
             return
@@ -325,6 +341,7 @@ public final class Player: NowPlayingCommandTarget {
         discardSchedule()   // bumps the generation: any older load is now stale
         _graph?.playerNode.stop()
         file = nil   // seek / reschedule / device change must not act on the previous track's file
+        closeProgressive()
         currentFormat = nil
         currentTime = 0
         autoplayAfterLoad = autoplay
@@ -333,10 +350,17 @@ public final class Player: NowPlayingCommandTarget {
         let resolver = self.resolver
         loadTask = Task {
             do {
-                let url = try await resolver.localURL(for: track)
-                guard !Task.isCancelled, scheduler.generation == generation else { return }
-                let file = try AVAudioFile(forReading: url)
-                try begin(file)
+                let resolved = try await resolver.resolve(track)
+                guard !Task.isCancelled, scheduler.generation == generation else {
+                    if case .progressive(let source) = resolved { source.close() }
+                    return
+                }
+                switch resolved {
+                case .file(let url):
+                    try begin(try AVAudioFile(forReading: url))
+                case .progressive(let source):
+                    try await openProgressive(source, track: track, generation: generation)
+                }
             } catch {
                 guard !Task.isCancelled, scheduler.generation == generation else { return }
                 trackFailed(error)
@@ -348,7 +372,7 @@ public final class Player: NowPlayingCommandTarget {
         PlaybackFormat(sampleRate: file.fileFormat.sampleRate, channels: Int(file.fileFormat.channelCount))
     }
 
-    private func begin(_ file: AVAudioFile) throws {
+    func begin(_ file: AVAudioFile) throws {
         let graph = ensureGraph()
         discardSchedule()
         graph.playerNode.stop()
@@ -399,16 +423,19 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     /// Invalidate before every `playerNode.stop()`: stop fires the handler of each discarded item.
-    private func discardSchedule() {
+    func discardSchedule() {
         preloadTask?.cancel()
+        progressive?.feeder?.cancel()
+        progressive?.feeder = nil
         scheduler.invalidate()
         nextFile = nil
     }
 
     /// Queue the track that follows the current one behind it so the node never goes silent.
-    private func scheduleNextIfNeeded() {
+    func scheduleNextIfNeeded() {
         preloadTask?.cancel()
         guard state == .playing || state == .paused, scheduler.items.count == 1,
+              progressive?.hasScheduledLastBuffer ?? true,
               let index = queue.indexAfterCurrentEnds() else { return }
         let track = queue.tracks[index]
         let generation = scheduler.generation
@@ -426,7 +453,7 @@ public final class Player: NowPlayingCommandTarget {
 
     /// Queue edits can make the pre-scheduled file the wrong one.
     private func reconcileSchedule() {
-        guard state != .stopped, let file, let graph = _graph else { return }
+        guard state != .stopped, file != nil || progressive != nil, let graph = _graph else { return }
         let queueNext = queue.indexAfterCurrentEnds().map { queue.tracks[$0].id }
         switch SchedulingDecision.reconcile(queueNext: queueNext, scheduledNext: scheduler.scheduledNextTrackID) {
         case .keep:
@@ -435,6 +462,12 @@ public final class Player: NowPlayingCommandTarget {
             scheduleNextIfNeeded()
         case .restartCurrent:
             if state == .playing { updateCurrentTime() }
+            if let progressive {
+                let frame = min(Int64(currentTime * progressive.fileRate), max(progressive.lengthFrames - 1, 0))
+                restartProgressive(progressive, at: frame)
+                return
+            }
+            guard let file else { return }
             let rate = file.processingFormat.sampleRate
             let frame = min(AVAudioFramePosition(currentTime * rate), max(file.length - 1, 0))
             discardSchedule()
@@ -445,7 +478,7 @@ public final class Player: NowPlayingCommandTarget {
         }
     }
 
-    private func segmentFinished(_ token: ScheduleToken) {
+    func segmentFinished(_ token: ScheduleToken) {
         let outcome = scheduler.complete(token)
         if recordsDiagnostics { record(outcome) }
         switch outcome {
@@ -462,6 +495,7 @@ public final class Player: NowPlayingCommandTarget {
                 return
             }
             file = next
+            closeProgressive()
             currentFormat = Self.format(of: next)
             nextFile = nil
             scheduleNextIfNeeded()
@@ -471,7 +505,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     /// The current track finished with nothing pre-scheduled behind it.
-    private func trackEnded() {
+    func trackEnded() {
         currentTime = 0
         if queue.advanceAfterTrackEnd() != nil {
             startCurrentTrack()
@@ -482,8 +516,8 @@ public final class Player: NowPlayingCommandTarget {
 
     // MARK: Time
 
-    private func updateCurrentTime() {
-        guard file != nil, let node = _graph?.playerNode,
+    func updateCurrentTime() {
+        guard file != nil || progressive != nil, let node = _graph?.playerNode,
               let renderTime = node.lastRenderTime,
               // Invalid before the first render (offline mode, or just after a restart); passing it
               // to playerTime(forNodeTime:) raises an Objective-C exception.
@@ -493,9 +527,10 @@ public final class Player: NowPlayingCommandTarget {
                 atNodeSampleTime: playerTime.sampleTime, nodeSampleRate: playerTime.sampleRate)
         else { return }
         currentTime = seconds
+        refreshBufferedTime()
     }
 
-    private func startTimeUpdates() {
+    func startTimeUpdates() {
         timeTask?.cancel()
         timeTask = Task {
             while !Task.isCancelled {
@@ -516,7 +551,7 @@ public final class Player: NowPlayingCommandTarget {
         return playerTime.sampleTime
     }
 
-    private func record(_ diagnostic: ScheduleDiagnostic) {
+    func record(_ diagnostic: ScheduleDiagnostic) {
         scheduleDiagnostics.append(diagnostic)
         if scheduleDiagnostics.count > 32 { scheduleDiagnostics.removeFirst() }
     }
@@ -542,14 +577,14 @@ public final class Player: NowPlayingCommandTarget {
         return graph
     }
 
-    private func startedGraph() throws -> AudioGraph {
+    func startedGraph() throws -> AudioGraph {
         let graph = ensureGraph()
         try graph.start()
         return graph
     }
 
     /// The output device changed and the engine stopped itself.
-    private func handleConfigurationChange() {
+    func handleConfigurationChange() {
         // Nothing is scheduled while stopped or loading; the load connects and starts the engine itself.
         guard let graph = _graph, state != .stopped, state != .loading else { return }
         let resumeTime = currentTime
@@ -557,7 +592,12 @@ public final class Player: NowPlayingCommandTarget {
             discardSchedule()
             graph.playerNode.stop()
             try graph.start()
-            if let file {
+            if let progressive {
+                // The feeder re-applies the client format itself: the output rate may have changed.
+                isBuffering = false
+                let frame = min(Int64(resumeTime * progressive.fileRate), max(progressive.lengthFrames - 1, 0))
+                startFeeder(progressive, from: frame, preroll: false)
+            } else if let file {
                 let frame = AVAudioFramePosition(resumeTime * file.processingFormat.sampleRate)
                 schedule(file, from: min(frame, max(file.length - 1, 0)))
                 if state == .playing { graph.playerNode.play() }
@@ -571,7 +611,7 @@ public final class Player: NowPlayingCommandTarget {
     /// A track could not be resolved or opened. Winamp skips it and plays on; Webamp turns a media error
     /// into "ended". The player stops instead when the error says the whole source is down, when repeat is
     /// `.one` (the same track would fail again), or when every queued track has failed in a row (one pass).
-    private func trackFailed(_ error: any Error) {
+    func trackFailed(_ error: any Error) {
         let sourceWide = (error as? any SourceScopedError)?.affectsWholeSource ?? false
         let count = consecutiveFailures + 1
         guard !sourceWide, queue.repeatMode != .one, count < queue.tracks.count,
@@ -587,7 +627,7 @@ public final class Player: NowPlayingCommandTarget {
         startCurrentTrack(autoplay: autoplayAfterLoad)
     }
 
-    private func fail(_ error: any Error) {
+    func fail(_ error: any Error) {
         consecutiveFailures += 1
         let failure = PlaybackFailure(
             track: queue.current, message: error.localizedDescription,

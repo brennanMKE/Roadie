@@ -49,7 +49,7 @@ public struct PlexPartDownloader: CacheDownloader, CustomStringConvertible, Cust
         }
     }
 
-    public func download(partKey: String, to fileURL: URL) async throws -> Int64 {
+    public func download(partKey: String, to fileURL: URL, progress: @escaping @Sendable (Int64) -> Void) async throws -> Int64 {
         guard let client = try clientProvider() else { throw TrackCacheError.noServer }
         var request = client.request(path: partKey)
         // A part is a file, not JSON. The token header stays.
@@ -66,14 +66,44 @@ public struct PlexPartDownloader: CacheDownloader, CustomStringConvertible, Cust
             case 404: throw TrackCacheError.download(.notFound)
             default: throw TrackCacheError.download(.httpStatus(http.statusCode))
             }
-            return try await write(bytes, to: fileURL)
+            return try await write(bytes, to: fileURL, progress: progress)
         } catch let error as URLError {
             if error.code == .cancelled { throw CancellationError() }
             throw TrackCacheError.download(.transport(error.code))
         }
     }
 
-    private func write(_ bytes: URLSession.AsyncBytes, to fileURL: URL) async throws -> Int64 {
+    /// One byte range of a part, for a progressive reader's far jump (an `moov` atom at the end of an m4a, an
+    /// ID3v1 tag). The token travels in the header like every other request; the range is never written to disk.
+    public func fetch(partKey: String, range: Range<Int64>) async throws -> Data {
+        guard !range.isEmpty, let client = try clientProvider() else { throw TrackCacheError.noServer }
+        var request = client.request(path: partKey)
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        request.setValue("bytes=\(range.lowerBound)-\(range.upperBound - 1)", forHTTPHeaderField: "Range")
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw TrackCacheError.download(.transport(.badServerResponse))
+            }
+            switch http.statusCode {
+            case 206:
+                guard Int64(data.count) == range.count else { throw TrackCacheError.download(.transport(.badServerResponse)) }
+                return data
+            case 200:
+                // The server ignored the range and sent the whole part: keep the slice.
+                guard Int64(data.count) >= range.upperBound else { throw TrackCacheError.download(.transport(.badServerResponse)) }
+                return data.subdata(in: Int(range.lowerBound)..<Int(range.upperBound))
+            case 401: throw TrackCacheError.download(.unauthorized)
+            case 404: throw TrackCacheError.download(.notFound)
+            default: throw TrackCacheError.download(.httpStatus(http.statusCode))
+            }
+        } catch let error as URLError {
+            if error.code == .cancelled { throw CancellationError() }
+            throw TrackCacheError.download(.transport(error.code))
+        }
+    }
+
+    private func write(_ bytes: URLSession.AsyncBytes, to fileURL: URL, progress: @Sendable (Int64) -> Void) async throws -> Int64 {
         let handle: FileHandle
         do { handle = try FileHandle(forWritingTo: fileURL) } catch {
             throw TrackCacheError.io(error.localizedDescription)
@@ -88,6 +118,7 @@ public struct PlexPartDownloader: CacheDownloader, CustomStringConvertible, Cust
             do { try handle.write(contentsOf: buffer) } catch { throw TrackCacheError.io(error.localizedDescription) }
             total += Int64(buffer.count)
             buffer.removeAll(keepingCapacity: true)
+            progress(total)
         }
         for try await byte in bytes {
             buffer.append(byte)

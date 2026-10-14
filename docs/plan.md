@@ -60,9 +60,15 @@ plays it.
 - **Prefetch:** when a track starts, download the next track in the queue. This is the
   `Player`'s existing look-ahead: it resolves the next track through the cache, and cancels
   that resolve on skip. If you skip ahead, the old prefetch is cancelled.
-- **Startup delay:** a track starts after its download finishes. The marquee shows
-  "Buffering…" while it waits. A track from the cache starts immediately. Playing while
-  downloading is deferred to M7.
+- **Startup delay:** a track from the cache starts immediately. An uncached Plex track with a
+  known size starts after a short preroll (about two seconds of audio) while it keeps
+  downloading (#0039): the player reads it through `ProgressiveDownload`, decodes on its own
+  thread with CoreAudio and feeds PCM buffers to the same player node (EQ, analyzer and
+  gapless scheduling are unchanged). A far read (an `moov` atom at the end) is one HTTP
+  range request; a container that cannot be read while arriving, or a track without a size,
+  falls back to waiting for the whole file. The player pauses and shows `isBuffering` if
+  playback catches up with the download, and seeks beyond the downloaded bytes land at the
+  edge (`bufferedTime`).
 - **Tests:** eviction order, pinning, size accounting and index rebuild, using temp
   directories and a stub downloader.
 
@@ -153,7 +159,6 @@ Follows `docs/plex-music-library.md`:
 
 **M7: Polish**
 - Cursors (`.cur`), performance across the full corpus, corpus run of 1,000 skins.
-- Playing while the download continues (optional), to remove the startup delay for long tracks.
 
 ## Verification
 - `swift test` for SkinKit and PlayerKit: TrackCache LRU eviction, pinning and index rebuild, Plex JSON decoding against

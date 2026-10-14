@@ -82,4 +82,27 @@ import Testing
     @Test func reconcileWithNothingScheduled() {
         #expect(SchedulingDecision.reconcile(queueNext: b, scheduledNext: nil) == .scheduleNext)
     }
+
+    @Test func adjustLengthMovesTheNextStartFrame() {
+        var s = GaplessScheduler()
+        let first = s.append(trackID: a, frameLength: 1000)
+        s.adjustLength(of: first.token, to: 990)
+        let second = s.append(trackID: b, frameLength: 500)
+        #expect(second.startFrame == 990)
+        #expect(s.items.first?.frameLength == 990)
+    }
+
+    @Test func adjustLengthIgnoresStaleAndNonLastItems() {
+        var s = GaplessScheduler()
+        let first = s.append(trackID: a, frameLength: 1000)
+        let second = s.append(trackID: b, frameLength: 500)
+        s.adjustLength(of: first.token, to: 10)     // not the last item: its successor already started at 1000
+        #expect(s.items.map(\.frameLength) == [1000, 500])
+        s.invalidate()
+        let third = s.append(trackID: c, frameLength: 700)
+        s.adjustLength(of: second.token, to: 10)    // older generation
+        #expect(s.items.map(\.frameLength) == [700])
+        s.adjustLength(of: third.token, to: 650)
+        #expect(s.items.map(\.frameLength) == [650])
+    }
 }

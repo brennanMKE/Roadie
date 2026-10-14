@@ -69,12 +69,55 @@ final class StubDownloader: CacheDownloader, @unchecked Sendable {
         var waiting: [UUID: (partKey: String, continuation: CheckedContinuation<Void, any Error>)] = [:]
         var cancelledEarly: Set<UUID> = []
         var cancelCount = 0
+        /// Trickle mode: parts that write one chunk per permit.
+        var trickleChunk: [String: Int] = [:]
+        var permits: [String: Int] = [:]
+        var released: [String: Int] = [:]
+        var permitWaiters: [UUID: (partKey: String, continuation: CheckedContinuation<Void, any Error>)] = [:]
+        var rangeCalls: [RangeCall] = []
+    }
+
+    struct RangeCall: Equatable, Sendable {
+        let partKey: String
+        let range: Range<Int64>
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
 
     func setBody(_ data: Data, for partKey: String) { state.withLock { $0.bodies[partKey] = data } }
     func gate(_ partKey: String) { state.withLock { _ = $0.gated.insert(partKey) } }
+
+    /// Writes `partKey` in chunks of `chunkSize`, one chunk per `releaseChunks` permit, reporting progress after each.
+    func trickle(_ partKey: String, chunkSize: Int) { state.withLock { $0.trickleChunk[partKey] = chunkSize } }
+
+    func releaseChunks(_ partKey: String, count: Int) {
+        let toResume = state.withLock { state -> [CheckedContinuation<Void, any Error>] in
+            state.permits[partKey, default: 0] += count
+            var resumed: [CheckedContinuation<Void, any Error>] = []
+            for (id, waiter) in state.permitWaiters where waiter.partKey == partKey && (state.permits[partKey] ?? 0) > 0 {
+                state.permits[partKey, default: 0] -= 1
+                state.released[partKey, default: 0] += 1
+                state.permitWaiters[id] = nil
+                resumed.append(waiter.continuation)
+            }
+            return resumed
+        }
+        for continuation in toResume { continuation.resume() }
+    }
+
+    /// Chunks the trickle has written (or is allowed to).
+    func releasedChunks(_ partKey: String) -> Int { state.withLock { $0.released[partKey] ?? 0 } }
+
+    var rangeCalls: [RangeCall] { state.withLock { $0.rangeCalls } }
+
+    func fetch(partKey: String, range: Range<Int64>) async throws -> Data {
+        let body = state.withLock { state -> Data? in
+            state.rangeCalls.append(RangeCall(partKey: partKey, range: range))
+            return state.bodies[partKey]
+        }
+        guard let body, Int(range.upperBound) <= body.count else { throw TrackCacheError.download(.notFound) }
+        return body.subdata(in: Int(range.lowerBound)..<Int(range.upperBound))
+    }
 
     func calls(_ partKey: String) -> Int { state.withLock { $0.calls[partKey] ?? 0 } }
     var totalCalls: Int { state.withLock { $0.calls.values.reduce(0, +) } }
@@ -100,7 +143,7 @@ final class StubDownloader: CacheDownloader, @unchecked Sendable {
         for continuation in toResume { continuation.resume(throwing: error) }
     }
 
-    func download(partKey: String, to fileURL: URL) async throws -> Int64 {
+    func download(partKey: String, to fileURL: URL, progress: @escaping @Sendable (Int64) -> Void) async throws -> Int64 {
         let isGated = state.withLock { state -> Bool in
             state.calls[partKey, default: 0] += 1
             return state.gated.contains(partKey)
@@ -130,8 +173,58 @@ final class StubDownloader: CacheDownloader, @unchecked Sendable {
         }
         try Task.checkCancellation()
         let body = state.withLock { $0.bodies[partKey] } ?? Data(repeating: 7, count: 100)
+        if let chunk = state.withLock({ $0.trickleChunk[partKey] }) {
+            let handle = try FileHandle(forWritingTo: fileURL)
+            defer { try? handle.close() }
+            var offset = 0
+            while offset < body.count {
+                try await waitForPermit(partKey)
+                try Task.checkCancellation()
+                let end = min(offset + chunk, body.count)
+                try handle.write(contentsOf: body.subdata(in: offset..<end))
+                offset = end
+                progress(Int64(offset))
+            }
+            return Int64(body.count)
+        }
         try body.write(to: fileURL)
+        progress(Int64(body.count))
         return Int64(body.count)
+    }
+
+    /// Suspends until the test grants a chunk; cancellation resumes it with `CancellationError`.
+    private func waitForPermit(_ partKey: String) async throws {
+        enum Registration { case granted, cancelled, parked }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                let registration = state.withLock { state -> Registration in
+                    if state.cancelledEarly.remove(id) != nil { return .cancelled }
+                    if (state.permits[partKey] ?? 0) > 0 {
+                        state.permits[partKey, default: 0] -= 1
+                        state.released[partKey, default: 0] += 1
+                        return .granted
+                    }
+                    state.permitWaiters[id] = (partKey, continuation)
+                    return .parked
+                }
+                switch registration {
+                case .granted: continuation.resume()
+                case .cancelled: continuation.resume(throwing: CancellationError())
+                case .parked: break
+                }
+            }
+        } onCancel: {
+            let continuation = state.withLock { state -> CheckedContinuation<Void, any Error>? in
+                state.cancelCount += 1
+                guard let waiter = state.permitWaiters.removeValue(forKey: id) else {
+                    state.cancelledEarly.insert(id)
+                    return nil
+                }
+                return waiter.continuation
+            }
+            continuation?.resume(throwing: CancellationError())
+        }
     }
 }
 

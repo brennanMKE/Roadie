@@ -8,8 +8,18 @@ private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "TrackCa
 /// Writes one part into a file the cache created. Must honour task cancellation (throw
 /// `CancellationError` or `URLError(.cancelled)`); the cache deletes the file either way.
 public protocol CacheDownloader: Sendable {
-    /// Returns the number of bytes written.
-    func download(partKey: String, to fileURL: URL) async throws -> Int64
+    /// Returns the number of bytes written. `progress` is called with the bytes on disk so far after every
+    /// flush and once at the end; a progressive reader reads the file up to that point.
+    func download(partKey: String, to fileURL: URL, progress: @escaping @Sendable (Int64) -> Void) async throws -> Int64
+    /// `Range: bytes=lo-hi`. 206 is the body; 200 (the server ignored the range) is the slice; 401, 404 and
+    /// other statuses are the same `TrackCacheError.download` cases as `download`.
+    func fetch(partKey: String, range: Range<Int64>) async throws -> Data
+}
+
+/// What `TrackCache.open` hands back: the finished file, or a download still arriving.
+public enum CachedFile: Sendable {
+    case ready(URL)
+    case downloading(ProgressiveDownload)
 }
 
 public enum TrackCacheError: Error, Hashable, Sendable, LocalizedError {
@@ -98,6 +108,9 @@ public actor TrackCache {
         let tempURL: URL
         var task: Task<Void, Never>?
         var waiters: [UUID: CheckedContinuation<URL, any Error>] = [:]
+        /// Progressive readers that keep the download alive until they close.
+        var holders: Set<UUID> = []
+        let progress = DownloadProgress()
         init(tempURL: URL) { self.tempURL = tempURL }
     }
 
@@ -216,6 +229,35 @@ public actor TrackCache {
         }
     }
 
+    /// Like `file(forKey:)`, but a miss returns as soon as the download starts, as a `ProgressiveDownload` the
+    /// player reads while the bytes arrive. Needs `expectedSize`; without it the download is awaited in full.
+    /// The download is verified and indexed exactly as before: the index only learns a key in `insert`.
+    public func open(forKey key: String, partKey: String, expectedSize: Int64?) async throws -> CachedFile {
+        try Task.checkCancellation()
+        try ensurePrepared()
+        if let url = hit(key) { return .ready(url) }
+        guard let expectedSize, expectedSize > 0 else {
+            return .ready(try await file(forKey: key, partKey: partKey, expectedSize: expectedSize))
+        }
+        let download = try inflight[key] ?? startDownload(key: key, partKey: partKey, expectedSize: expectedSize)
+        let holder = UUID()
+        guard let reader = ProgressiveDownload(
+            cache: self, key: key, holder: holder, progress: download.progress, tempURL: download.tempURL,
+            finalSize: expectedSize, pathExtension: (Self.fileName(key: key, partKey: partKey) as NSString).pathExtension,
+            downloader: downloader, partKey: partKey) else {
+            if download.waiters.isEmpty && download.holders.isEmpty && !pinned.contains(key) { abandon(key, download) }
+            throw TrackCacheError.io("could not open the download")
+        }
+        download.holders.insert(holder)
+        return .downloading(reader)
+    }
+
+    /// A progressive reader closed. The download goes with it unless someone else still needs it.
+    func release(key: String, holder: UUID) {
+        guard let download = inflight[key], download.holders.remove(holder) != nil else { return }
+        if download.waiters.isEmpty && download.holders.isEmpty && !pinned.contains(key) { abandon(key, download) }
+    }
+
     private func hit(_ key: String) -> URL? {
         guard var entry = entriesByKey[key] else { return nil }
         let url = directory.appendingPathComponent(entry.fileName)
@@ -250,10 +292,11 @@ public actor TrackCache {
         let download = Inflight(tempURL: tempURL)
         inflight[key] = download
         let downloader = self.downloader
+        let progress = download.progress
         download.task = Task {
             let outcome: Result<Int64, any Error>
             do {
-                outcome = .success(try await downloader.download(partKey: partKey, to: tempURL))
+                outcome = .success(try await downloader.download(partKey: partKey, to: tempURL, progress: { progress.advance(to: $0) }))
             } catch {
                 outcome = .failure(error)
             }
@@ -279,6 +322,8 @@ public actor TrackCache {
             result = .failure(mapped)
         }
         if isCurrent { inflight[key] = nil }
+        // After `insert`: a reader that sees the download complete can rely on the file being verified and indexed.
+        download.progress.finish(with: result.map { _ in () })
         let waiters = download.waiters
         download.waiters = [:]
         for continuation in waiters.values { continuation.resume(with: result) }
@@ -313,19 +358,20 @@ public actor TrackCache {
         // before this cancel reached the actor. Nothing to do.
         guard let download = inflight[key], let continuation = download.waiters.removeValue(forKey: waiter) else { return }
         continuation.resume(throwing: CancellationError())
-        if download.waiters.isEmpty && !pinned.contains(key) { abandon(key, download) }
+        if download.waiters.isEmpty && download.holders.isEmpty && !pinned.contains(key) { abandon(key, download) }
     }
 
     /// Cancels a download nobody is waiting for. Its entry goes at once so a request that arrives a
     /// moment later starts a fresh download instead of inheriting a cancelled one.
     private func abandon(_ key: String, _ download: Inflight) {
         download.task?.cancel()
+        download.progress.cancel()
         try? FileManager.default.removeItem(at: download.tempURL)
         if inflight[key] === download { inflight[key] = nil }
         log.debug("cancelled \(key, privacy: .public)")
     }
 
-    private static func map(_ error: any Error) -> any Error {
+    static func map(_ error: any Error) -> any Error {
         switch error {
         case is CancellationError: return error
         case let error as TrackCacheError: return error
@@ -347,7 +393,7 @@ public actor TrackCache {
     public func setPinned(_ keys: Set<String>) {
         pinned = keys
         // A pinned download may run with no waiters; once unpinned it has no reason to continue.
-        for (key, download) in inflight where download.waiters.isEmpty && !keys.contains(key) {
+        for (key, download) in inflight where download.waiters.isEmpty && download.holders.isEmpty && !keys.contains(key) {
             abandon(key, download)
         }
     }
