@@ -10,15 +10,15 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
         var skinSize: CGSize {
             switch self {
-            case .normal: CGSize(width: 275, height: 116)
-            case .shade: CGSize(width: 275, height: 14)
+            case .normal: MainWindowLayout.size
+            case .shade: MainWindowLayout.shadeSize
             }
         }
     }
 
     /// Title-bar buttons in skin pixels (Webamp css/main-window.css): 9x9 at y 3.
-    static let titleBarHeight: CGFloat = 14
-    static let buttonRects: [CGRect] = [6, 244, 254, 264].map { CGRect(x: $0, y: 3, width: 9, height: 9) }
+    static let titleBarHeight: CGFloat = MainWindowLayout.titleBar.height
+    static let buttonRects: [CGRect] = MainWindowLayout.TitleButton.allCases.map { MainWindowLayout.rect($0) }
 
     let window: SkinWindow
     var mode: Mode = .normal { didSet { applyLayout() } }

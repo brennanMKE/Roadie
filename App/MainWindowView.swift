@@ -6,21 +6,22 @@ import SwiftUI
 /// Positions are from Webamp's css/main-window.css.
 struct MainWindowView: View {
     @Environment(PlayerModel.self) private var model
+    @Environment(\.controlActiveState) private var activeState
     let skin: Skin
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            SpriteImage(skin: skin, name: "MAIN_WINDOW_BACKGROUND")
+            baseLayer
             TitleBarView(skin: skin)
 
             MainWindowStatusLayer(skin: skin, status: model.mainWindowStatus, toggleTimeMode: model.toggleTimeMode)
 
-            transportButton("MAIN_PREVIOUS_BUTTON", x: 16, y: 88, action: model.previous)
-            transportButton("MAIN_PLAY_BUTTON", x: 39, y: 88, action: model.play)
-            transportButton("MAIN_PAUSE_BUTTON", x: 62, y: 88, action: model.pause)
-            transportButton("MAIN_STOP_BUTTON", x: 85, y: 88, action: model.stop)
-            transportButton("MAIN_NEXT_BUTTON", x: 108, y: 88, action: model.next)
-            transportButton("MAIN_EJECT_BUTTON", x: 136, y: 89, action: model.eject)
+            transportButton(.previous, action: model.previous)
+            transportButton(.play, action: model.play)
+            transportButton(.pause, action: model.pause)
+            transportButton(.stop, action: model.stop)
+            transportButton(.next, action: model.next)
+            transportButton(.eject, action: model.eject)
 
             volumeSlider
             balanceSlider
@@ -32,11 +33,22 @@ struct MainWindowView: View {
             toggleButton(.playlist, selected: model.isPlaylistWindowOpen, action: model.togglePlaylistWindow)
 
             VisualizerView(model: model.visualizer)
-                .offset(x: 24, y: 43)
+                .offset(x: MainWindowLayout.visualizer.minX, y: MainWindowLayout.visualizer.minY)
 
             MarqueeView(skin: skin, text: model.marqueeText)
         }
-        .frame(width: 275, height: 116, alignment: .topLeading)
+        .frame(width: MainWindowLayout.size.width, height: MainWindowLayout.size.height, alignment: .topLeading)
+    }
+
+    /// Background, title-bar strip, clutter bar and the unpressed transport sprites, drawn once per skin by
+    /// `MainWindowRenderer.renderBase` (the same pixels `skintool --png` writes).
+    @ViewBuilder private var baseLayer: some View {
+        if let base = model.mainWindowBase {
+            Image(decorative: activeState == .key ? base.focused : base.unfocused, scale: 1)
+                .interpolation(.none)
+        } else {
+            SpriteImage(skin: skin, name: "MAIN_WINDOW_BACKGROUND")
+        }
     }
 
     private var volumeSlider: some View {
@@ -71,10 +83,11 @@ struct MainWindowView: View {
             .offset(x: frame.origin.x, y: frame.origin.y)
     }
 
-    private func transportButton(_ name: String, x: CGFloat, y: CGFloat, action: @escaping () -> Void) -> some View {
-        Button(action: action) { EmptyView() }
-            .buttonStyle(SpriteButtonStyle(skin: skin, name: name))
-            .offset(x: x, y: y)
+    private func transportButton(_ control: MainWindowLayout.Transport, action: @escaping () -> Void) -> some View {
+        let rect = MainWindowLayout.rect(control)
+        return Button(action: action) { EmptyView() }
+            .buttonStyle(SpriteButtonStyle(skin: skin, control: control))
+            .offset(x: rect.minX, y: rect.minY)
     }
 }
 
@@ -94,12 +107,20 @@ struct SpriteImage: View {
     }
 }
 
-/// Shows `<name>` normally and `<name>_ACTIVE` while pressed.
+/// A transport button: the unpressed sprite is in the base image, so this draws only the `_ACTIVE` sprite while
+/// pressed and otherwise a clear, clickable area of the sprite's size.
 struct SpriteButtonStyle: ButtonStyle {
     let skin: Skin
-    let name: String
+    let control: MainWindowLayout.Transport
 
     func makeBody(configuration: Configuration) -> some View {
-        SpriteImage(skin: skin, name: configuration.isPressed ? "\(name)_ACTIVE" : name)
+        let size = MainWindowLayout.rect(control).size
+        ZStack(alignment: .topLeading) {
+            if configuration.isPressed {
+                SpriteImage(skin: skin, name: MainWindowLayout.spriteName(control, pressed: true))
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .contentShape(Rectangle())
     }
 }

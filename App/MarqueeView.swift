@@ -21,10 +21,10 @@ struct MarqueeView: View {
                     .offset(x: CGFloat(-offset))
             }
         }
-        .frame(width: CGFloat(MarqueeLayout.width), height: 6, alignment: .topLeading)
+        .frame(width: MainWindowLayout.marquee.width, height: MainWindowLayout.marquee.height, alignment: .topLeading)
         .clipped()
         // The 154x12 hit target Webamp gets from `padding: 3px 0`.
-        .padding(.vertical, 3)
+        .padding(.vertical, (MainWindowLayout.marqueeHitArea.height - MainWindowLayout.marquee.height) / 2)
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0, coordinateSpace: .local)
@@ -35,7 +35,7 @@ struct MarqueeView: View {
                 }
                 .onEnded { _ in dragging = false }
         )
-        .offset(x: 111, y: 21)
+        .offset(x: MainWindowLayout.marqueeHitArea.minX, y: MainWindowLayout.marqueeHitArea.minY)
         .task(id: stepping) {
             guard stepping else { return }
             while !Task.isCancelled {

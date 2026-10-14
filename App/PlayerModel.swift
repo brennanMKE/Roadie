@@ -15,6 +15,9 @@ import os
 @Observable
 final class PlayerModel {
     private(set) var skin: Skin?
+    /// The skin's static layers (background, title strip, clutter bar, transport sprites), rendered once per skin by
+    /// `MainWindowRenderer` so the app and `skintool --png` draw the same pixels. Set together with `skin`.
+    private(set) var mainWindowBase: MainWindowBase?
     private(set) var skinName: String?
     private(set) var errorMessage: String?
     /// The app only talks to this; the composition below is the one place that names Plex.
@@ -165,10 +168,16 @@ final class PlayerModel {
 
     func loadSkin(from url: URL) {
         Task {
-            let result = await Task.detached { Result { try SkinParser.parse(url: url) } }.value
+            let result = await Task.detached {
+                Result {
+                    let skin = try SkinParser.parse(url: url)
+                    return (skin, MainWindowBase(skin: skin))
+                }
+            }.value
             switch result {
-            case .success(let skin):
+            case .success(let (skin, base)):
                 self.skin = skin
+                mainWindowBase = base
                 visualizer.setColors(skin.visColors)
                 skinName = url.deletingPathExtension().lastPathComponent
                 errorMessage = nil
@@ -327,5 +336,16 @@ final class PlayerModel {
             player.enqueue(result.tracks)
             if replace || wasIdle { player.play(at: start) }
         }
+    }
+}
+
+/// The main window's static layers for both title-bar states, as `MainWindowRenderer.renderBase` draws them.
+struct MainWindowBase: @unchecked Sendable {
+    let focused: CGImage
+    let unfocused: CGImage
+
+    init(skin: Skin) {
+        focused = MainWindowRenderer.renderBase(skin: skin, focused: true)
+        unfocused = MainWindowRenderer.renderBase(skin: skin, focused: false)
     }
 }

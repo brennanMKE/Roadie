@@ -7,16 +7,18 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR] [--stress N [--load]]
+# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
-#   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds step skintool and runs sampleSkinsAreOk
+#   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds steps skintool and skintool-png, runs sampleSkinsAreOk
+#   --references DIR  with --skins: copy DIR/*.png (scripts/fetch-webamp-references.sh output) into Skins/reference/
+#                     and diff each render against them in skintool-png (numbers only, never gated)
 #   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
 #   --load      with --stress: run four CPU hogs in the guest during the loop
 #
 # In the guest, in order:
 #   1. swift test --package-path Packages/SkinKit     (SKIN_SAMPLES_DIR=Skins with --skins)
-#      skintool Skins/ (only with --skins; fails unless every skin is ok)
+#      skintool Skins/ (only with --skins; fails unless every skin is ok), then skintool --png into results/png/
 #   2. swift test --package-path Packages/PlayerKit   (AUDIOCORE_REALTIME=1, muted)
 #   3. xcodebuild ... build                             (project generated on the host)
 #   4. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
@@ -31,6 +33,7 @@ LAUNCH=0
 STRESS=0
 LOAD=0
 SKINS_DIR=""
+REFS_DIR=""
 args=("$@")
 while (( $#args )); do
   arg=$args[1]; shift args
@@ -40,12 +43,14 @@ while (( $#args )); do
     --stress) STRESS=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS" == <1-> ]] || { print -r -- "--stress needs a positive count" >&2; exit 2 } ;;
     --load) LOAD=1 ;;
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
-    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
+    --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
 
 (( LOAD && ! STRESS )) && { print -r -- "--load needs --stress N" >&2; exit 2 }
+[[ -n "$REFS_DIR" && -z "$SKINS_DIR" ]] && { print -r -- "--references needs --skins DIR" >&2; exit 2 }
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
@@ -136,6 +141,13 @@ if [[ -n "$SKINS_DIR" ]]; then
   mkdir -p "$EXPORT/src/Skins"
   cp "$SKINS_DIR"/*.wsz "$EXPORT/src/Skins/" || fail "No .wsz files in $SKINS_DIR"
   log "Copied $(ls "$EXPORT/src/Skins" | wc -l | tr -d ' ') skins from $SKINS_DIR into the export"
+  # Reference screenshots were fetched on the host; the guest has no network.
+  if [[ -n "$REFS_DIR" ]]; then
+    mkdir -p "$EXPORT/src/Skins/reference"
+    cp "$REFS_DIR"/*.png "$EXPORT/src/Skins/reference/" 2>/dev/null || true
+    [[ -f "$REFS_DIR/manifest.tsv" ]] && cp "$REFS_DIR/manifest.tsv" "$EXPORT/src/Skins/reference/"
+    log "Copied $(ls "$EXPORT/src/Skins/reference"/*.png 2>/dev/null | wc -l | tr -d ' ') reference PNGs from $REFS_DIR into the export"
+  fi
 fi
 
 # --- Clone and boot --------------------------------------------------------
@@ -181,6 +193,10 @@ run_step() {
 if [[ -n "$SKINS_DIR" ]]; then
   run_step skinkit-tests "SKIN_SAMPLES_DIR=$GUEST_SRC/Skins swift test --package-path Packages/SkinKit"
   run_step skintool      "swift run --package-path Packages/SkinKit skintool -v Skins/"
+  # Headless render of every skin to PNG (and, with --references, a diff against the Webamp screenshots).
+  compare=""
+  [[ -n "$REFS_DIR" ]] && compare="--compare $GUEST_SRC/Skins/reference"
+  run_step skintool-png  "swift run --package-path Packages/SkinKit skintool --png $GUEST_RESULTS/png $compare Skins/"
 else
   run_step skinkit-tests "swift test --package-path Packages/SkinKit"
 fi
@@ -213,7 +229,7 @@ overall=0
 for name in ${(k)step_rc}; do
   if (( step_rc[$name] == 0 )); then log "PASS  $name"; else log "FAIL  $name (exit ${step_rc[$name]})"; overall=1; fi
 done
-grep -hE 'Test run with|stress:|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
+grep -hE 'Test run with|stress:|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
   overall=1

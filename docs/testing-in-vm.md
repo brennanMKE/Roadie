@@ -13,6 +13,8 @@ the golden image itself.
 scripts/run-tests-vm.sh            # working tree: SkinKit tests, PlayerKit tests, app build, Info.plist check
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s, then quit it
 scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
+scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
+scripts/run-tests-vm.sh --skins "untitled folder" --references build/webamp-reference  # also diff each skin's skintool --png render against them
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
 scripts/run-tests-vm.sh --stress 30 --load  # same, with four CPU hogs running in the guest
@@ -147,7 +149,11 @@ consolidated on 2026-10-11.
    record the audio devices.
 7. **Steps.** Each runs in the guest with its output teed to a log: SkinKit tests, PlayerKit tests
    (with `AUDIOCORE_REALTIME=1`, so the real-time tests run too), the Debug app build, the Info.plist check of the built app, and with `--launch`, opening the app, checking
-   it is still running after 5 s, and quitting it. With `--stress N` a `playerkit-stress` step follows
+   it is still running after 5 s, and quitting it. With `--skins` a `skintool-png` step follows `skintool`:
+   it renders every skin's main window headless to `build/vm-tests/<run-id>/png/<name>.png`, and with
+   `--references DIR` (the host-fetched Webamp screenshots, copied into the export's `Skins/reference/`;
+   the guest has no network) also writes `<name>.diff.png` and prints one `diff` or `noref` line per skin
+   (also in the terminal summary). The numbers are documented in [skin-comparison.md](skin-comparison.md), never gated. With `--stress N` a `playerkit-stress` step follows
    the PlayerKit tests: `scripts/stress-realtime-gapless.sh` repeats the real-time gapless test N times
    against the built binary (`--load` adds four `yes` hogs, killed by an `EXIT` trap) and prints
    `stress: <fails>/<N> failed`; it also saves the guest's CoreAudio log as `guest-coreaudio.log`. `set -o pipefail` is set **inside the guest's

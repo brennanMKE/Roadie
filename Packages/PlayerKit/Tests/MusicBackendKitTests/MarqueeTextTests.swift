@@ -15,6 +15,11 @@ import Testing
         #expect(MarqueeText.time(3599.9) == "59:59")
     }
 
+    /// SkinKit cannot import MusicBackendKit, so `MainWindowState.idle` repeats this literal; RenderingTests pins it there.
+    @Test func idleTextIsTheLiteralSkinKitsIdleStateRepeats() {
+        #expect(MarqueeText.idle == "SkinAmp")
+    }
+
     @Test func formatsSliderFocusTextLikeWebamp() {
         #expect(MarqueeText.volume(0.57) == "Volume: 57%")
         #expect(MarqueeText.volume(0) == "Volume: 0%")

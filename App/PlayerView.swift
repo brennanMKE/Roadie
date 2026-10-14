@@ -1,3 +1,4 @@
+import SkinKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -9,7 +10,9 @@ struct PlayerView: View {
             if let skin = model.skin {
                 MainWindowView(skin: skin)
                     .scaleEffect(model.scale, anchor: .topLeading)
-                    .frame(width: 275 * model.scale, height: 116 * model.scale, alignment: .topLeading)
+                    .frame(
+                        width: MainWindowLayout.size.width * model.scale, height: MainWindowLayout.size.height * model.scale,
+                        alignment: .topLeading)
             } else {
                 ContentUnavailableView {
                     Label("No Skin Loaded", systemImage: "paintpalette")
@@ -18,7 +21,7 @@ struct PlayerView: View {
                 } actions: {
                     Button("Open Skin…") { model.openSkin() }
                 }
-                .frame(width: 275 * model.scale, height: 116 * model.scale)
+                .frame(width: MainWindowLayout.size.width * model.scale, height: MainWindowLayout.size.height * model.scale)
                 .background(.windowBackground, in: .rect(cornerRadius: 8))
             }
         }

@@ -12,14 +12,17 @@ struct MainWindowStatusLayer: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             if let indicator = status.indicator {
-                SpriteImage(skin: skin, name: indicator).offset(x: 26, y: 28)
+                SpriteImage(skin: skin, name: indicator)
+                    .offset(x: MainWindowLayout.playIndicator.x, y: MainWindowLayout.playIndicator.y)
             }
             if let work = status.workIndicator {
                 // The sprite is listed 9 wide but Webamp draws 3 px.
                 SpriteImage(skin: skin, name: work)
-                    .frame(width: 3, height: 9, alignment: .topLeading)
+                    .frame(
+                        width: MainWindowLayout.workIndicator.width, height: MainWindowLayout.workIndicator.height,
+                        alignment: .topLeading)
                     .clipped()
-                    .offset(x: 24, y: 28)
+                    .offset(x: MainWindowLayout.workIndicator.minX, y: MainWindowLayout.workIndicator.minY)
             }
             if status.showsTime {
                 if status.blinksTime {
@@ -36,39 +39,39 @@ struct MainWindowStatusLayer: View {
         ZStack(alignment: .topLeading) {
             SpriteImage(skin: skin, name: status.showsMinus ? skin.minusName : skin.noMinusName)
                 .offset(x: skin.minusFrame.minX, y: skin.minusFrame.minY)
-            digit(status.digits.minutesTens, x: 48)
-            digit(status.digits.minutesOnes, x: 60)
-            digit(status.digits.secondsTens, x: 78)
-            digit(status.digits.secondsOnes, x: 90)
+            digit(status.digits.minutesTens, x: MainWindowLayout.digitXs[0])
+            digit(status.digits.minutesOnes, x: MainWindowLayout.digitXs[1])
+            digit(status.digits.secondsTens, x: MainWindowLayout.digitXs[2])
+            digit(status.digits.secondsOnes, x: MainWindowLayout.digitXs[3])
             // The 59x13 click area of #time.
             Color.clear
-                .frame(width: 59, height: 13)
+                .frame(width: MainWindowLayout.timeHitArea.width, height: MainWindowLayout.timeHitArea.height)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: toggleTimeMode)
-                .offset(x: 39, y: 26)
+                .offset(x: MainWindowLayout.timeHitArea.minX, y: MainWindowLayout.timeHitArea.minY)
         }
     }
 
     @ViewBuilder private func digit(_ value: Int?, x: CGFloat) -> some View {
         if let value {
-            SpriteImage(skin: skin, name: skin.digitSpriteName(value)).offset(x: x, y: 26)
+            SpriteImage(skin: skin, name: skin.digitSpriteName(value)).offset(x: x, y: MainWindowLayout.digitY)
         }
     }
 
     private var mediaInfo: some View {
         ZStack(alignment: .topLeading) {
-            if let kbps = status.kbps { text(kbps, x: 111) }
-            if let khz = status.khz { text(khz, x: 156) }
+            if let kbps = status.kbps { text(kbps, at: MainWindowLayout.kbps) }
+            if let khz = status.khz { text(khz, at: MainWindowLayout.khz) }
             SpriteImage(skin: skin, name: status.monoSelected ? "MAIN_MONO_SELECTED" : "MAIN_MONO")
-                .offset(x: 212, y: 41)
+                .offset(x: MainWindowLayout.mono.x, y: MainWindowLayout.mono.y)
             SpriteImage(skin: skin, name: status.stereoSelected ? "MAIN_STEREO_SELECTED" : "MAIN_STEREO")
-                .offset(x: 239, y: 41)
+                .offset(x: MainWindowLayout.stereo.x, y: MainWindowLayout.stereo.y)
         }
     }
 
-    @ViewBuilder private func text(_ string: String, x: CGFloat) -> some View {
+    @ViewBuilder private func text(_ string: String, at point: CGPoint) -> some View {
         if let image = skin.textImage(string) {
-            Image(decorative: image, scale: 1).interpolation(.none).offset(x: x, y: 43)
+            Image(decorative: image, scale: 1).interpolation(.none).offset(x: point.x, y: point.y)
         }
     }
 }

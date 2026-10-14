@@ -1,3 +1,4 @@
+import SkinKit
 import SwiftUI
 
 /// The 76x16 visualizer at (24, 43). Clicking cycles spectrum, oscilloscope, off, like Winamp.
@@ -12,7 +13,8 @@ struct VisualizerView: View {
                     .interpolation(.none)
             }
         }
-        .frame(width: 76, height: 16, alignment: .topLeading)
+        .frame(
+            width: MainWindowLayout.visualizer.width, height: MainWindowLayout.visualizer.height, alignment: .topLeading)
         .contentShape(Rectangle())   // clickable even when nothing is drawn (Winamp cycles while stopped)
         .onTapGesture { model.cycleMode() }
     }
