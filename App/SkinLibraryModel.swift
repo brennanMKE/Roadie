@@ -24,6 +24,7 @@ final class SkinLibraryModel {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let databaseURL: URL
     @ObservationIgnored private var store: SkinIndexStore?
+    @ObservationIgnored private var opening: Task<SkinIndexStore, Error>?
     @ObservationIgnored private var indexer: SkinIndexer?
     @ObservationIgnored private var indexedPath: String?
     @ObservationIgnored private var scanTask: Task<Void, Never>?
@@ -81,9 +82,21 @@ final class SkinLibraryModel {
     func openStoreIfNeeded() async throws -> SkinIndexStore? {
         guard folderPath != nil else { return nil }
         if let store { return store }
-        let opened = try await SkinIndexStore.open(at: databaseURL)
-        store = opened
-        return opened
+        // The browser (#0035, e.g. resolving the restored skin at launch) and the first index pass can both ask
+        // before the open finishes; share one open so there is never a second connection or a racing migration.
+        if let opening { return try await opening.value }
+        let url = databaseURL
+        let task = Task { try await SkinIndexStore.open(at: url) }
+        opening = task
+        do {
+            let opened = try await task.value
+            store = opened
+            opening = nil
+            return opened
+        } catch {
+            opening = nil
+            throw error
+        }
     }
 
     func chooseFolder() {
