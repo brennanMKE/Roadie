@@ -67,6 +67,22 @@ final class PlaylistListInputView: NSView {
         return range.contains(index) ? index : nil
     }
 
+    /// An open menu's entries stack upward over the bottom of the track list (the add menu reaches 66 px above the
+    /// window's bottom, the list ends 41 px above it); presses there go to the SwiftUI menu underneath.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        guard hit === self else { return hit }
+        return MainActor.assumeIsolated {
+            let playlist = model.playlist
+            guard let menu = playlist.openMenu else { return self }
+            let layout = playlist.layout
+            let local = convert(point, from: superview)
+            let skin = CGPoint(x: layout.trackArea.minX + local.x / scale, y: layout.trackArea.minY + local.y / scale)
+            let rects = layout.menuEntries(menu).map(\.rect) + [layout.menuBar(menu).rect]
+            return rects.contains { $0.contains(skin) } ? nil : self
+        }
+    }
+
     override func mouseDown(with event: NSEvent) {
         MainActor.assumeIsolated {
             window?.makeFirstResponder(self)
