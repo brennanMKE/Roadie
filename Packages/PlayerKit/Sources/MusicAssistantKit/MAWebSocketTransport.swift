@@ -92,14 +92,20 @@ public final class URLSessionWebSocketTransport: MAWebSocketTransport, @unchecke
 
     public func ping() async throws {
         guard let task else { throw MusicAssistantError.invalidURL }
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-            task.sendPing { error in
-                if let error {
-                    continuation.resume(throwing: Self.map(error))
-                } else {
-                    continuation.resume()
+        // The client's pong timeout cancels this, and its task group waits for it to end: closing the task makes
+        // URLSession fail the pending pong handler, so a pong that never comes cannot hang the heartbeat.
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                task.sendPing { error in
+                    if let error {
+                        continuation.resume(throwing: Self.map(error))
+                    } else {
+                        continuation.resume()
+                    }
                 }
             }
+        } onCancel: {
+            task.cancel(with: .normalClosure, reason: nil)
         }
     }
 

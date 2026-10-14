@@ -81,6 +81,15 @@ public actor MusicAssistantClient {
         self.reconnectPolicy = reconnect
     }
 
+    /// A client dropped without `disconnect()` stops its loops (they hold the transport, not the client).
+    deinit {
+        senderTask?.cancel()
+        readerTask?.cancel()
+        pingTask?.cancel()
+        reconnectTask?.cancel()
+        outbound?.finish()
+    }
+
     // MARK: Probe
 
     /// `GET /info`: no token, no socket. For reachability checks and the identity comparison.

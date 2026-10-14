@@ -79,10 +79,14 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         } catch {
             throw Self.map(error)
         }
+        // A concurrent connect() may have installed its own client while this one awaited; the later one wins
+        // and the other is closed, so no connection is left running unowned.
+        let raced = client
         client = fresh
         connectedBaseURL = address.baseURL
         counts = [:]
         log.info("connected")
+        if let raced, raced !== fresh { await raced.disconnect() }
     }
 
     public func disconnect() async {

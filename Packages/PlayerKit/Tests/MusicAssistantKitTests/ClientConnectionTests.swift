@@ -97,6 +97,23 @@ struct ClientConnectionTests {
         await rig.client.disconnect()
     }
 
+    @Test func aMissingPongReconnects() async throws {
+        let second = try recordedTransport()
+        let rig = try makeClient(extraTransports: [second])
+        _ = try await rig.connect()
+        rig.transport.pingHangs = true
+        #expect(await waitFor { rig.clock.sleeperCount == 1 })
+        rig.clock.advance(by: .seconds(25))
+        // The ping is out and only the pong timeout is sleeping.
+        #expect(await waitFor { rig.transport.pingCount == 1 && rig.clock.sleeperCount == 1 })
+        rig.clock.advance(by: .seconds(10))
+        #expect(await waitFor { await rig.client.state == .reconnecting(attempt: 1) })
+        await step(rig, by: .seconds(1))
+        #expect(await waitFor { await rig.client.state == .connected })
+        #expect(rig.factory.made == 2)
+        await rig.client.disconnect()
+    }
+
     @Test func pingIsSentEveryIntervalWhileConnected() async throws {
         let rig = try makeClient()
         _ = try await rig.connect()

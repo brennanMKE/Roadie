@@ -26,6 +26,8 @@ public final class StubWebSocketTransport: MAWebSocketTransport, @unchecked Send
         var closeCodes: [Int] = []
         var pingCount = 0
         var pingError: MusicAssistantError?
+        var pingHangs = false
+        var pingWaiter: (id: UUID, continuation: CheckedContinuation<Void, any Error>)?
         var inbound: [MAWebSocketFrame] = []
         var waiter: (id: UUID, continuation: CheckedContinuation<MAWebSocketFrame, any Error>)?
         var held: Set<String> = []
@@ -57,6 +59,11 @@ public final class StubWebSocketTransport: MAWebSocketTransport, @unchecked Send
     public var pingError: MusicAssistantError? {
         get { state.withLock { $0.pingError } }
         set { state.withLock { $0.pingError = newValue } }
+    }
+    /// Pings never get a pong; `ping()` waits until cancelled.
+    public var pingHangs: Bool {
+        get { state.withLock { $0.pingHangs } }
+        set { state.withLock { $0.pingHangs = newValue } }
     }
     /// Commands that never get an answer.
     public var unanswered: Set<String> {
@@ -182,11 +189,31 @@ public final class StubWebSocketTransport: MAWebSocketTransport, @unchecked Send
     }
 
     public func ping() async throws {
-        let error = state.withLock { s -> MusicAssistantError? in
+        let (error, hangs) = state.withLock { s -> (MusicAssistantError?, Bool) in
             s.pingCount += 1
-            return s.pingError
+            return (s.pingError, s.pingHangs)
         }
         if let error { throw error }
+        guard hangs else { return }
+        // No pong: wait until cancelled, like the real transport.
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                let cancelled = state.withLock { s -> Bool in
+                    if Task.isCancelled { return true }
+                    s.pingWaiter = (id, continuation)
+                    return false
+                }
+                if cancelled { continuation.resume(throwing: CancellationError()) }
+            }
+        } onCancel: {
+            let waiter = state.withLock { s -> CheckedContinuation<Void, any Error>? in
+                guard let waiter = s.pingWaiter, waiter.id == id else { return nil }
+                s.pingWaiter = nil
+                return waiter.continuation
+            }
+            waiter?.resume(throwing: CancellationError())
+        }
     }
 
     public func close(code: Int) async {
