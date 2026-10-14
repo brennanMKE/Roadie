@@ -43,6 +43,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// A `.wsz` double-clicked in Finder (or dropped on the Dock icon, or sent with `open -a`): the same path as a drop on the
+    /// window, so the skin loads through `PlayerModel.loadSkin`. The window is an `NSWindow`, not a scene, so `onOpenURL` has no
+    /// scene to deliver to; the delegate gets the event on a cold launch and while running (#0043).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        model.open(urls, replace: false)
+        player.show()
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         player.show()
         if model.isEQWindowOpen { equalizer.show(below: player.window) }

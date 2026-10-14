@@ -28,6 +28,7 @@ clone starts cold. The summary at the end looks like this:
 ==> PASS  playerkit-tests
 ==> PASS  app-build
 ==> PASS  app-plist
+==> PASS  app-quicklook
 ==> PASS  app-launch
     ** BUILD SUCCEEDED **
     ✔ Test run with 50 tests in 6 suites passed after 0.558 seconds.
@@ -148,7 +149,7 @@ consolidated on 2026-10-11.
 6. **Prepare the guest.** Copy `/Volumes/My Shared Files/run/src` to `~/src`, mute the output, and
    record the audio devices.
 7. **Steps.** Each runs in the guest with its output teed to a log: SkinKit tests, PlayerKit tests
-   (with `AUDIOCORE_REALTIME=1`, so the real-time tests run too), the Debug app build, the Info.plist check of the built app, and with `--launch`, opening the app, checking
+   (with `AUDIOCORE_REALTIME=1`, so the real-time tests run too), the Debug app build, the Info.plist check of the built app, `app-quicklook` (#0043: `scripts/check-quicklook.sh` registers the embedded Quick Look extensions with Launch Services and `pluginkit`, generates a test `.wsz` with `scripts/make-test-skin.swift`, asks `QLThumbnailGenerator` (`scripts/ql-thumb.swift`; `qlmanage -t` hangs in the headless guest for extension-provided types, so it is informational only) for thumbnails of it and of a corrupt and a modern skin, samples the thumbnail with `scripts/pixel-at.swift`, and runs `qlmanage -p` to start the preview extension, and prints `quicklook: <check> ok|FAIL` lines; its files, including the PNGs, come back in `build/vm-tests/<run-id>/ql/`), and with `--launch`, opening the app, checking
    it is still running after 5 s, and quitting it. With `--skins` a `skintool-png` step follows `skintool`:
    it renders every skin's main window headless to `build/vm-tests/<run-id>/png/<name>.png`, and with
    `--references DIR` (the host-fetched Webamp screenshots, copied into the export's `Skins/reference/`;

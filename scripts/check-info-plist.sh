@@ -1,6 +1,6 @@
 #!/bin/zsh
 # check-info-plist.sh — assert the app's Info.plist carries the networking keys (#0012)
-# and still carries the .wsz type (#0047). Reads only; runs on the host against the
+# and still carries the .wsz type (#0047) and claims it as a document type (#0043). Reads only; runs on the host against the
 # regenerated App/Info.plist and in the guest against the built SkinAmp.app.
 # Usage: scripts/check-info-plist.sh <path/to/Info.plist>
 set -euo pipefail
@@ -21,4 +21,5 @@ desc="$(get NSLocalNetworkUsageDescription || true)"
 print -r -- "NSLocalNetworkUsageDescription = ${desc:-<absent>}"
 [[ "$desc" == *Plex* ]] || { print -u2 "!! NSLocalNetworkUsageDescription is missing or does not mention Plex"; exit 1; }
 expect UTExportedTypeDeclarations.0.UTTypeIdentifier com.brennanmke.skinamp.wsz
+expect CFBundleDocumentTypes.0.LSItemContentTypes.0 com.brennanmke.skinamp.wsz
 print -r -- "Info.plist OK: $P"

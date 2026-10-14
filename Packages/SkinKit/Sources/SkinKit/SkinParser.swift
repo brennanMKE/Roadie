@@ -4,8 +4,8 @@ import Foundation
 public enum SkinParser {
     /// Parses a `.wsz` file. Never traps on malformed input; throws `SkinError` or
     /// returns a partial skin with warnings.
-    public static func parse(url: URL) throws(SkinError) -> Skin {
-        try parse(archive: SkinArchive(url: url))
+    public static func parse(url: URL, limits: SkinArchive.Limits = .default) throws(SkinError) -> Skin {
+        try parse(archive: SkinArchive(url: url, limits: limits))
     }
 
     public static func parse(archive: SkinArchive) throws(SkinError) -> Skin {

@@ -45,12 +45,20 @@ targets:
         product: LibraryBrowser
       - package: PlayerKit
         product: MusicLibraryKit
+      # App extensions embed into Contents/PlugIns and are signed on copy (#0043).
+      - target: SkinAmpThumbnail
+      - target: SkinAmpPreview
     info:
       path: App/Info.plist
       properties:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: SkinAmp connects to your Plex Media Server on your local network to browse and play your music.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Winamp Classic Skin
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Default
+            LSItemContentTypes: [com.brennanmke.skinamp.wsz]
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.brennanmke.skinamp.wsz
             UTTypeDescription: Winamp Classic Skin
@@ -71,6 +79,76 @@ targets:
         # Unsandboxed for now so the app can read a large local skin corpus by path.
         ENABLE_APP_SANDBOX: NO
         # If the sandbox is ever enabled, add com.apple.security.network.client (docs/plex-music-library.md).
+  SkinAmpThumbnail:
+    type: app-extension
+    platform: macOS
+    sources: [QuickLook/Thumbnail]
+    dependencies:
+      - package: SkinKit
+        product: SkinKit
+    info:
+      path: QuickLook/Thumbnail/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.thumbnail
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ThumbnailProvider
+          NSExtensionAttributes:
+            QLSupportedContentTypes: [com.brennanmke.skinamp.wsz]
+            QLThumbnailMinimumDimension: 0
+    entitlements:
+      path: QuickLook/Thumbnail/SkinAmpThumbnail.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-only: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.brennanmke.SkinAmp.Thumbnail
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: SkinAmp Thumbnail
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+
+  SkinAmpPreview:
+    type: app-extension
+    platform: macOS
+    sources: [QuickLook/Preview]
+    dependencies:
+      - package: SkinKit
+        product: SkinKit
+    info:
+      path: QuickLook/Preview/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewProvider
+          NSExtensionAttributes:
+            QLSupportedContentTypes: [com.brennanmke.skinamp.wsz]
+            QLIsDataBasedPreview: true
+            QLSupportsSearchableItems: false
+    entitlements:
+      path: QuickLook/Preview/SkinAmpPreview.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-only: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.brennanmke.SkinAmp.Preview
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: SkinAmp Preview
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
 schemes:
   SkinAmp:
     build:

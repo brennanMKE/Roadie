@@ -25,7 +25,8 @@ let package = Package(
         .target(name: "SkinBrowser", dependencies: ["SkinLibrary", "SkinKit"]),
         .testTarget(name: "SkinBrowserTests", dependencies: ["SkinBrowser", "SkinLibrary", "SkinKit"]),
         .executableTarget(name: "skintool", dependencies: ["SkinKit", "SkinLibrary"]),
-        .testTarget(name: "SkinKitTests", dependencies: ["SkinKit"]),
+        // ZIPFoundation here so tests can write synthetic .wsz archives (#0043).
+        .testTarget(name: "SkinKitTests", dependencies: ["SkinKit", .product(name: "ZIPFoundation", package: "ZIPFoundation")]),
         // ZIPFoundation here so tests can write synthetic .wsz archives.
         .testTarget(
             name: "SkinLibraryTests",
