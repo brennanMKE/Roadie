@@ -23,9 +23,11 @@ struct MainWindowView: View {
             transportButton("MAIN_STOP_BUTTON", x: 85, y: 88, action: model.stop)
             transportButton("MAIN_NEXT_BUTTON", x: 108, y: 88, action: model.next)
             transportButton("MAIN_EJECT_BUTTON", x: 136, y: 89, action: model.eject)
+
+            MarqueeView(skin: skin, text: model.marqueeText)
         }
         .frame(width: 275, height: 116, alignment: .topLeading)
-        // TODO: time digits, marquee text, position/volume/balance sliders, shuffle/repeat, visualizer.
+        // TODO: time digits, position/volume/balance sliders, shuffle/repeat, visualizer.
     }
 
     private var playIndicator: String {

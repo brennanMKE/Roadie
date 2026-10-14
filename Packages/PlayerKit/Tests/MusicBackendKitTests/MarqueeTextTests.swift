@@ -1,0 +1,34 @@
+import Testing
+@testable import MusicBackendKit
+
+@Suite struct MarqueeTextTests {
+    private let output = OutputDevice.thisMacID
+
+    @Test func formatsTheTrackLikeWinamp() {
+        #expect(MarqueeText.track(artist: "Artist", title: "Title", duration: 225, number: 1) == "1. Artist - Title (3:45)")
+        #expect(MarqueeText.track(artist: "", title: "Title", duration: 225, number: 1) == "1. Title (3:45)")
+        #expect(MarqueeText.track(artist: nil, title: "Title", duration: 0, number: 1) == "1. Title")
+        #expect(MarqueeText.track(artist: "Artist", title: "Title", duration: nil, number: nil) == "Artist - Title")
+        #expect(MarqueeText.time(5) == "0:05")
+        #expect(MarqueeText.time(65) == "1:05")
+        #expect(MarqueeText.time(3725) == "62:05")
+        #expect(MarqueeText.time(3599.9) == "59:59")
+    }
+
+    @Test func displaysIdleBufferingAndTrack() {
+        for state in [NowPlaying.State.stopped, .loading, .playing, .paused] {
+            #expect(MarqueeText.display(NowPlaying(output: output, state: state), number: nil) == MarqueeText.idle)
+        }
+        func local(_ state: NowPlaying.State) -> NowPlaying {
+            NowPlaying(output: output, state: state, title: "Two", artist: "B", duration: 61)
+        }
+        for state in [NowPlaying.State.stopped, .loading, .playing, .paused] {
+            #expect(MarqueeText.display(local(state), number: 2) == "2. B - Two (1:01)")
+        }
+        var plex = local(.loading)
+        plex.item = MediaID(.track, "42")
+        #expect(MarqueeText.display(plex, number: 2) == MarqueeText.buffering)
+        plex.state = .playing
+        #expect(MarqueeText.display(plex, number: 2) == "2. B - Two (1:01)")
+    }
+}

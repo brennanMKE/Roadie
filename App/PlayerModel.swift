@@ -38,6 +38,15 @@ final class PlayerModel {
     var playbackState: NowPlaying.State { nowPlaying.state }
     var isLoading: Bool { nowPlaying.state == .loading }
     var scale: CGFloat = 2
+    /// Replaces the marquee text while set, like Webamp's focus text. #0023 sets it while a slider is dragged.
+    var marqueeOverride: String?
+    /// What the main window marquee shows: the override, else the now-playing text. The queue number comes
+    /// from the local player's queue, which only backs the This Mac output.
+    var marqueeText: String {
+        if let marqueeOverride { return marqueeOverride }
+        let number = selectedOutput == OutputDevice.thisMacID ? player.queue.currentIndex.map { $0 + 1 } : nil
+        return MarqueeText.display(nowPlaying, number: number)
+    }
 
     private static let lastSkinKey = "lastSkinPath"
 
