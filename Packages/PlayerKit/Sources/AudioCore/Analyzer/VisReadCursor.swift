@@ -12,6 +12,8 @@ public struct VisReadCursor: Sendable {
     public private(set) var largestDelivery: Int
     private var lastWriteCount: Int?
     private var stalledSeconds: Double = 0
+    /// Sub-sample remainder of `dt * sampleRate`, so rounding never biases the cursor against the audio.
+    private var carry: Double = 0
 
     /// `window` is the FFT size; `readable` is `ring.capacity - ring.maxChunk`.
     public init(window: Int, readable: Int) {
@@ -33,12 +35,18 @@ public struct VisReadCursor: Sendable {
         lastWriteCount = writeCount
         guard writeCount >= window else { return nil }
 
-        let lag = min(largestDelivery + Int(slackSeconds * sampleRate), readable - window)
+        let slack = Int(slackSeconds * sampleRate)
+        let lag = min(largestDelivery + slack, readable - window)
         let steady = writeCount - lag
-        var p = (position ?? steady) + Int((dt * sampleRate).rounded())
+        let advance = dt * sampleRate + carry
+        let step = Int(advance.rounded())
+        carry = advance - Double(step)
+        var p = (position ?? steady) + step
         // Ran into the slack margin or past the audio (clock drift, or the lag was learned too small): re-lag.
-        if p > writeCount - Int(slackSeconds * sampleRate) { p = steady }
+        if p > writeCount - slack { p = steady }
         if p < writeCount - readable + window { p = steady }          // main thread stalled, ring wrapped
+        // Drifted later than one delivery past the steady lag (audio clock faster than the display): catch up.
+        if writeCount - p > lag + largestDelivery + slack { p = steady }
         if stalledSeconds * sampleRate > Double(2 * largestDelivery) { p = writeCount }  // audio stopped
         p = max(p, window)
         position = p
@@ -49,5 +57,6 @@ public struct VisReadCursor: Sendable {
         position = nil
         lastWriteCount = nil
         stalledSeconds = 0
+        carry = 0
     }
 }

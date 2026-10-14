@@ -33,6 +33,8 @@ final class VisualizerModel {
     @ObservationIgnored private var lastSampleCount = -1
     @ObservationIgnored private var lastScope: [Float] = []
     @ObservationIgnored private var running = false
+    /// Time of the previous tick, so the read cursor advances by real elapsed time (dropped frames included).
+    @ObservationIgnored private var lastTickTime: CFTimeInterval?
 
     private static let silence = [Float](repeating: 0, count: VisBars.columnCount)
 
@@ -47,6 +49,8 @@ final class VisualizerModel {
     func cycleMode() {
         mode = Mode(rawValue: (mode.rawValue + 1) % Mode.allCases.count) ?? .spectrum
         UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
+        // Off skips the analysis, so the cursor stood still; re-lag it rather than replay old audio.
+        if mode == .spectrum { player.analyzer.resetCursor() }
         // Paused and stopped players do not tick, so repaint the frozen state in the new mode.
         if player.state == .paused { render() } else if mode == .off { image = nil }
     }
@@ -76,6 +80,7 @@ final class VisualizerModel {
         link?.invalidate(); link = nil
         fallbackTimer?.invalidate(); fallbackTimer = nil
         target = nil
+        lastTickTime = nil
     }
 
     private func makeLink() {
@@ -90,7 +95,7 @@ final class VisualizerModel {
         } else {
             Self.log.error("no main screen; the visualizer falls back to a 60 Hz timer")
             let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak target] _ in
-                MainActor.assumeIsolated { target?.fire(dt: 1.0 / 60) }
+                MainActor.assumeIsolated { target?.fire() }
             }
             RunLoop.main.add(timer, forMode: .common)
             fallbackTimer = timer
@@ -115,6 +120,7 @@ final class VisualizerModel {
             if link.isPaused == ticking { player.analyzer.resetCursor() }
             link.isPaused = !ticking
         }
+        lastTickTime = nil
         fallbackTimer?.fireDate = ticking ? .now : .distantFuture
     }
 
@@ -137,12 +143,18 @@ final class VisualizerModel {
 
     // MARK: Ticking
 
-    fileprivate func tick(link: CADisplayLink) {
-        let dt = min(max(link.targetTimestamp - link.timestamp, 0), 0.1)
+    /// `now` is the frame's timestamp; `nominal` the frame duration, used for the first tick after a resume.
+    /// `targetTimestamp - timestamp` alone would ignore dropped frames, and the cursor would fall a frame
+    /// further behind the audio with each one.
+    fileprivate func tick(now: CFTimeInterval, nominal: Double) {
+        let dt = max(lastTickTime.map { now - $0 } ?? nominal, 0)
+        lastTickTime = now
+        guard mode != .off else { return }   // image is already nil; no analysis while off
         tick(dt: dt)
     }
 
-    fileprivate func tick(dt: Double) {
+    /// `dt` is real elapsed time: unclamped for the read cursor (it re-lags after long gaps), capped for the bars.
+    private func tick(dt: Double) {
         let state = Self.signposter.beginInterval("tick")
         defer { Self.signposter.endInterval("tick", state) }
 
@@ -152,7 +164,7 @@ final class VisualizerModel {
             lastSampleCount = frame.sampleCount
             lastScope = frame.scope
         }
-        accumulator += dt
+        accumulator += min(dt, 0.1)
         let steps = min(Int(accumulator * 60), 4)
         accumulator -= Double(steps) / 60
         if accumulator > 1.0 / 60 { accumulator = 0 }   // a long stall does not fast-forward the bars
@@ -183,7 +195,9 @@ private final class DisplayLinkTarget: NSObject {
 
     init(model: VisualizerModel) { self.model = model }
 
-    @objc func tick(_ link: CADisplayLink) { model?.tick(link: link) }
+    @objc func tick(_ link: CADisplayLink) {
+        model?.tick(now: link.timestamp, nominal: link.targetTimestamp - link.timestamp)
+    }
 
-    func fire(dt: Double) { model?.tick(dt: dt) }
+    func fire() { model?.tick(now: CACurrentMediaTime(), nominal: 1.0 / 60) }
 }

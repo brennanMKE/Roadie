@@ -85,4 +85,35 @@ import Testing
         for _ in 0..<60 { ends.append(cursor.next(writeCount: write, elapsed: dt, sampleRate: rate)!) }
         #expect(ends.suffix(20).allSatisfy { $0 == write })
     }
+    @Test func catchesUpWhenTheAudioRunsAheadOfTheDisplay() {
+        // Each tick reports 1 % less time than the audio advanced: without a bound the lag would grow
+        // until the ring wraps (half a second late). It must stay within one delivery of the steady lag.
+        var cursor = VisReadCursor(window: window, readable: readable)
+        var write = 0
+        var previous: Int?
+        for tick in 0..<(120 * 60) {
+            if tick % 6 == 0 { write += 4800 }
+            let end = cursor.next(writeCount: write, elapsed: dt * 0.99, sampleRate: rate)!
+            if tick >= 30 {
+                let lag = cursor.largestDelivery + Int(cursor.slackSeconds * rate)
+                #expect(write - end <= lag + cursor.largestDelivery + Int(cursor.slackSeconds * rate))
+                if let previous { #expect(end > previous) }   // catching up skips forward, never replays
+            }
+            previous = end
+        }
+    }
+
+    @Test func fractionalAdvanceDoesNotDrift() {
+        // 59.94 Hz at 48 kHz is 800.8 samples a tick; audio arrives continuously at the same rate.
+        var cursor = VisReadCursor(window: window, readable: readable)
+        let tickDt = 1 / 59.94
+        var ends: [Int] = []
+        for tick in 1...1_200 {
+            let write = Int((Double(tick) * tickDt * rate).rounded(.down)) + 10_000
+            ends.append(cursor.next(writeCount: write, elapsed: tickDt, sampleRate: rate)!)
+        }
+        let steady = ends.suffix(1_000)
+        let advanced = Double(steady.last! - steady.first!)
+        #expect(abs(advanced - 999 * tickDt * rate) <= 1)
+    }
 }
