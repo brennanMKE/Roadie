@@ -27,6 +27,7 @@ struct SkinAmpApp: App {
                 .environment(appDelegate.model.folderSettings)
                 .environment(appDelegate.model.sources)
                 .environment(appDelegate.model.fallback)
+                .environment(appDelegate.model.skinLibrary)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

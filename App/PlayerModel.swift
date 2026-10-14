@@ -37,6 +37,8 @@ final class PlayerModel {
     let fallback: LibraryFallbackController
     let cache: TrackCache
     let cacheSettings: CacheSettingsModel
+    /// The skins folder and its SQLite index (Settings › Skins). Opens nothing until a folder is chosen.
+    let skinLibrary = SkinLibraryModel()
     /// The local-folder source; Settings › Library chooses and indexes its folder. Shares Plex's "This Mac" output, so both play through the one `Player`.
     let folderBackend: FolderBackend
     let folderSettings: FolderSettingsModel

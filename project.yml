@@ -23,6 +23,8 @@ targets:
         product: SkinKit
       - package: SkinKit
         product: WindowDocking
+      - package: SkinKit
+        product: SkinLibrary
       - package: PlayerKit
         product: AudioCore
       - package: PlayerKit
@@ -76,6 +78,7 @@ schemes:
       targets:
         - package: SkinKit/SkinKitTests
         - package: SkinKit/WindowDockingTests
+        - package: SkinKit/SkinLibraryTests
         - package: PlayerKit/AudioCoreTests
         - package: PlayerKit/PlexKitTests
         - package: PlayerKit/TrackCacheTests

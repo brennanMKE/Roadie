@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import SkinKit
+import SkinLibrary
 
 // Usage: skintool [-v|--verbose] [--png <out> [--state webamp|idle] [--scale N] [--compare <refdir>] [--no-region]]
 //                 <skin.wsz | folder>
@@ -8,9 +9,49 @@ import SkinKit
 // --png also renders the main window headless (no AppKit, no window) to <out> (a file for one skin, a folder
 // for a folder, <basename>.png each); --compare diffs each render against <refdir>/<basename>.png and writes
 // <out>/<basename>.diff.png. Comparison numbers are reported, never gated.
+//        skintool index <folder> [--db <file>] [--full]
+// `index` runs the incremental SQLite index pass (#0033) over a folder; without --db it writes the file the app reads.
 // Exit status: 0 only if every skin is ok and every render succeeded, 1 otherwise (64 usage, 66 no such file).
 
 func standardError(_ text: String) { FileHandle.standardError.write(Data((text + "\n").utf8)) }
+
+/// `skintool index <folder> [--db <file>] [--full]`: one incremental index pass, progress on stderr.
+func runIndex(_ arguments: [String]) async -> Int32 {
+    var folder: String?
+    var dbPath: String?
+    var full = false
+    var iterator = arguments.makeIterator()
+    while let argument = iterator.next() {
+        switch argument {
+        case "--db": dbPath = iterator.next()
+        case "--full": full = true
+        default: folder = argument
+        }
+    }
+    guard let folder else {
+        standardError("usage: skintool index <folder> [--db <file>] [--full]")
+        return 64
+    }
+    do {
+        let store = try await SkinIndexStore.open(at: dbPath.map { URL(filePath: $0) } ?? SkinIndexStore.defaultURL)
+        let indexer = SkinIndexer(folder: URL(filePath: folder), store: store)
+        let summary = try await indexer.run(full: full) { progress in
+            standardError("\(progress.phase.rawValue) \(progress.processed)/\(progress.changed) of \(progress.totalFiles) files")
+        }
+        let counts = try await store.counts()
+        print("\(summary.totalFiles) files, \(summary.totalSkins) skins in \(String(format: "%.2f", summary.duration)) s")
+        print("added \(summary.added), updated \(summary.updated), linked \(summary.linked), removed \(summary.removed), "
+            + "failed \(summary.failed), unchanged \(summary.unchanged)")
+        print("ok \(counts.byStatus[.ok] ?? 0), partial \(counts.byStatus[.partial] ?? 0), failed \(counts.byStatus[.failed] ?? 0)")
+        return 0
+    } catch {
+        standardError("skintool: \(error.localizedDescription)")
+        return 1
+    }
+}
+
+let rawArguments = Array(CommandLine.arguments.dropFirst())
+if rawArguments.first == "index" { exit(await runIndex(Array(rawArguments.dropFirst()))) }
 
 let options: SkintoolOptions
 switch SkintoolOptions.parse(Array(CommandLine.arguments.dropFirst())) {

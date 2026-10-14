@@ -9,7 +9,8 @@ struct SettingsView: View {
                 .tabItem { Label("Plex", systemImage: "server.rack") }
             CacheSettingsView()
                 .tabItem { Label("Cache", systemImage: "internaldrive") }
-            // A Skins tab comes with M6.
+            SkinsSettingsView()
+                .tabItem { Label("Skins", systemImage: "paintpalette") }
         }
         .frame(width: 480)
         .scenePadding()
