@@ -60,7 +60,7 @@ struct DragRecoveryTests {
         let screens = [primary, rightShorter]
         let moving = [w(.main, 2000, 790)]
         let shift = LayoutRules.dragRecovery(moving: moving, titleBarHeights: strips, screens: screens, primary: primary)
-        #expect(shift == Offset(x: 0, y: -222))
+        #expect(shift == Offset(x: 0, y: -18))
         let moved = b(2000, 790 + (shift?.y ?? 0), 550, 232)
         #expect(LayoutRules.isGrabbable(moved, titleBarHeight: 28, on: screens))
     }
@@ -68,7 +68,7 @@ struct DragRecoveryTests {
     @Test func dragRecoveryInAGapGoesToTheNearestScreen() {
         let shift = LayoutRules.dragRecovery(
             moving: [w(.main, 2000, 830)], titleBarHeights: strips, screens: [primary, rightShorter], primary: primary)
-        #expect(shift == Offset(x: 0, y: -262))
+        #expect(shift == Offset(x: 0, y: -58))
     }
 
     @Test func dragRecoveryPullsAStripFromUnderTheMenuBar() {
@@ -85,7 +85,7 @@ struct DragRecoveryTests {
         let shift = LayoutRules.dragRecovery(
             moving: [w(.main, 1700, 560), w(.equalizer, 1700, 792)], titleBarHeights: strips,
             screens: [primary, rightShorter], primary: primary)
-        #expect(shift == Offset(x: 0, y: -224))
+        #expect(shift == Offset(x: 0, y: -20))
     }
 
     @Test func dragRecoveryRevealsTheTopLeftCornerWhenTheGroupCannotFit() {
@@ -109,5 +109,21 @@ struct DragRecoveryTests {
         #expect(session.positions(forMouseDelta: Offset(x: 0, y: -90), limits: limits)[.main] == Offset(x: 300, y: 25))
         #expect(session.positions(forMouseDelta: Offset(x: 1300, y: -90), limits: limits)[.main] == Offset(x: 1600, y: 10))
         #expect(session.positions(forMouseDelta: .zero, limits: limits)[.main] == Offset(x: 300, y: 100))
+    }
+
+    @Test func dragSessionIsContinuousAtAGapEdge() {
+        let tall = b(1440, 25, 2560, 1415)
+        let limits = DragLimits(screens: [primary, tall], primary: primary, titleBarHeights: strips)
+        let session = DragSession(dragging: .main, windows: [w(.main, 300, 600)])
+        for dy: CGFloat in [272, 273, 300, 340] {
+            #expect(session.positions(forMouseDelta: Offset(x: 0, y: dy), limits: limits)[.main] == Offset(x: 300, y: 872))
+        }
+        // Shaded main (all strip) sliding right along the bottom of the primary beside a shorter display.
+        let shortLimits = DragLimits(screens: [primary, rightShorter], primary: primary, titleBarHeights: strips)
+        let shaded = DragSession(dragging: .main, windows: [w(.main, 890, 872, 550, 28)])
+        #expect(shaded.positions(forMouseDelta: Offset(x: 500, y: 0), limits: shortLimits)[.main] == Offset(x: 1390, y: 872))
+        for dx: CGFloat in [501, 502, 600] {
+            #expect(shaded.positions(forMouseDelta: Offset(x: dx, y: 0), limits: shortLimits)[.main] == Offset(x: 1390, y: 872))
+        }
     }
 }

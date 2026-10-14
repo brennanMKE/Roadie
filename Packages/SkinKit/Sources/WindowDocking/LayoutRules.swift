@@ -78,24 +78,53 @@ public enum LayoutRules {
         }
     }
 
-    /// After (and during) a drag. nil when every window in `moving` is grabbable. Otherwise the offset that moves the
-    /// group as one onto the nearest screen: the whole bounding box when it fits that screen, else its top-left corner
-    /// (`minimumGrabWidth` wide, the topmost window's strip tall; ties to the first window). Never `.reset`.
+    /// The smallest move that makes `strip` (a window's drag strip) grabbable on `screen`: vertically down to the top or up
+    /// to the bottom of the work area, horizontally just far enough that `minimumGrabWidth` (or all of a narrower strip)
+    /// shows. Zero on an axis that already satisfies it.
+    static func gripShift(for strip: Box, on screen: Box) -> Offset {
+        var moveY: CGFloat = 0
+        if strip.top < screen.top {
+            moveY = screen.top - strip.top
+        } else if strip.bottom > screen.bottom {
+            moveY = screen.bottom - strip.bottom
+        }
+        let needed = min(strip.width, minimumGrabWidth)
+        var moveX: CGFloat = 0
+        if strip.left < screen.left && strip.right - screen.left < needed {
+            moveX = needed - (strip.right - screen.left)
+        } else if strip.right > screen.right && screen.right - strip.left < needed {
+            moveX = -(needed - (screen.right - strip.left))
+        }
+        return Offset(x: moveX, y: moveY)
+    }
+
+    /// After (and during) a drag. nil when every window in `moving` is grabbable. Otherwise one offset for the whole
+    /// group: the smallest move that makes each failing window's strip grabbable on the nearest screen (per axis the
+    /// largest requirement), so the result is continuous in the window position. When the requirements conflict or the
+    /// group is larger than that screen, only the topmost window's strip is guaranteed (ties to the first window).
+    /// Never `.reset`.
     public static func dragRecovery(
         moving: [DockedWindow], titleBarHeights: [WindowKind: CGFloat], screens: [Box], primary: Box
     ) -> Offset? {
         let screenList = screens.isEmpty ? [primary] : screens
-        func stripHeight(_ window: DockedWindow) -> CGFloat { titleBarHeights[window.kind] ?? 0 }
-        if moving.allSatisfy({ isGrabbable($0.box, titleBarHeight: stripHeight($0), on: screenList) }) { return nil }
+        func strip(_ window: DockedWindow) -> Box {
+            let box = window.box
+            return Box(x: box.x, y: box.y, width: box.width, height: min(titleBarHeights[window.kind] ?? 0, box.height))
+        }
+        let failing = moving.filter { !isGrabbable($0.box, titleBarHeight: titleBarHeights[$0.kind] ?? 0, on: screenList) }
+        if failing.isEmpty { return nil }
         guard let bounding = SnapUtils.boundingBoxOrNil(moving.map(\.box)) else { return nil }
         let chosen = ScreenSelection.nearest(to: bounding, among: screenList, fallback: primary)
-        if bounding.width <= chosen.width && bounding.height <= chosen.height {
-            return shift(toFit: bounding, in: chosen)
+        let needs = failing.map { gripShift(for: strip($0), on: chosen) }
+        let fits = bounding.width <= chosen.width && bounding.height <= chosen.height
+        let conflictX = needs.contains { $0.x > 0 } && needs.contains { $0.x < 0 }
+        let conflictY = needs.contains { $0.y > 0 } && needs.contains { $0.y < 0 }
+        if fits && !conflictX && !conflictY {
+            func largest(_ values: [CGFloat]) -> CGFloat { values.max(by: { abs($0) < abs($1) }) ?? 0 }
+            return Offset(x: largest(needs.map(\.x)), y: largest(needs.map(\.y)))
         }
         var topmost = moving[0]
         for window in moving where window.box.top < topmost.box.top { topmost = window }
-        let corner = Box(
-            x: bounding.x, y: bounding.y, width: min(bounding.width, minimumGrabWidth), height: stripHeight(topmost))
-        return shift(toFit: corner, in: chosen)
+        return gripShift(for: strip(topmost), on: chosen)
     }
 }
