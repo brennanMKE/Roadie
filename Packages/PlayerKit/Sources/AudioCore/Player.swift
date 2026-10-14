@@ -159,6 +159,30 @@ public final class Player: NowPlayingCommandTarget {
         }
     }
 
+    /// Removes several tracks in one queue change and applies `removeTrack(at:)`'s transport rule once: when the current
+    /// track goes, the transport restarts on the new current track with the same play/pause intent, or stops when the
+    /// queue emptied. (Looping `removeTrack(at:)` would start and kill a load for every index.)
+    public func removeTracks(at indices: IndexSet) {
+        let valid = IndexSet(indices.filter { queue.tracks.indices.contains($0) })
+        guard !valid.isEmpty else { return }
+        let removingCurrent = queue.currentIndex.map { valid.contains($0) } ?? false
+        if removingCurrent { currentTime = 0 }   // before the queue change publishes the new track
+        queue.remove(at: valid)
+        if removingCurrent && state != .stopped {
+            let autoplay = state == .loading ? autoplayAfterLoad : state == .playing
+            if queue.current != nil { startCurrentTrack(autoplay: autoplay) } else { stop() }
+        } else {
+            reconcileSchedule()
+        }
+    }
+
+    /// Moves the tracks at `selected` by `offset` rows (see `PlayQueue.move`). The pre-scheduled next file may now be
+    /// the wrong one, so the schedule is reconciled.
+    public func moveTracks(_ selected: Set<Int>, by offset: Int) {
+        guard queue.move(selected, by: offset) else { return }
+        reconcileSchedule()
+    }
+
     public func clearQueue() {
         stop()
         queue.removeAll()

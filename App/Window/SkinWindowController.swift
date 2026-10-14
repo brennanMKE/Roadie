@@ -5,10 +5,10 @@ import SwiftUI
 
 /// Which skinned window a controller hosts. Supplies everything that differs between the windows: the skin-pixel
 /// size per mode, the `region.txt` section that shapes it, the frame-autosave name and the title bar's drag holes.
-/// #0029 adds `.playlist` here (and a size parameter, since that window resizes); nothing else in the controller
-/// names a window.
+/// Nothing else in the controller names a window, except that the playlist adds its AppKit input views.
 enum SkinWindowKind {
-    case main, equalizer
+    /// `playlist` carries the resize steps; the controller refreshes them from `PlaylistModel` as the user resizes.
+    case main, equalizer, playlist(PlaylistLayout.Steps)
 
     /// The window's size in skin pixels.
     func skinSize(_ mode: SkinWindowController.Mode) -> CGSize {
@@ -17,6 +17,9 @@ enum SkinWindowKind {
         case (.main, .shade): MainWindowLayout.shadeSize
         case (.equalizer, .normal): EQLayout.windowSize
         case (.equalizer, .shade): EQLayout.shadeSize
+        case (.playlist(let steps), .normal): PlaylistLayout(steps: steps).size
+        case (.playlist(let steps), .shade):
+            CGSize(width: PlaylistLayout(steps: steps).size.width, height: PlaylistLayout.shadeHeight)
         }
     }
 
@@ -24,6 +27,7 @@ enum SkinWindowKind {
         switch self {
         case .main: "MainWindow"
         case .equalizer: "EqualizerWindow"
+        case .playlist: "PlaylistWindow"
         }
     }
 
@@ -34,6 +38,7 @@ enum SkinWindowKind {
         case (.main, .shade): region?.windowShade
         case (.equalizer, .normal): region?.equalizer
         case (.equalizer, .shade): region?.equalizerShade
+        case (.playlist, _): nil   // the playlist has no region
         }
     }
 
@@ -41,6 +46,7 @@ enum SkinWindowKind {
         switch self {
         case .main: MainWindowLayout.titleBar.height
         case .equalizer: EQLayout.titleBarHeight
+        case .playlist: PlaylistLayout.titleBarHeight
         }
     }
 
@@ -49,6 +55,7 @@ enum SkinWindowKind {
         switch self {
         case .main: MainWindowLayout.TitleButton.allCases.map { MainWindowLayout.rect($0) }
         case .equalizer: EQLayout.titleButtonRects
+        case .playlist(let steps): PlaylistLayout(steps: steps).titleButtonRects
         }
     }
 }
@@ -59,7 +66,7 @@ enum SkinWindowKind {
 final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     enum Mode { case normal, shade }
 
-    let kind: SkinWindowKind
+    private(set) var kind: SkinWindowKind
     let window: SkinWindow
     var mode: Mode = .normal { didSet { applyLayout() } }
     /// Called from `windowWillClose`; a window the model tracks tells it that the window is no longer open.
@@ -70,6 +77,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     private let hosting: NSHostingView<AnyView>
     private let dragView = TitleBarDragView()
     private var hasBeenShown = false
+    /// The playlist's track-list and resize-corner input views; nil for the other windows.
+    private var playlistOverlays: PlaylistWindowOverlays?
 
     /// `rootView` is drawn in skin pixels scaled by the view itself; the controller adds the model and itself to its
     /// environment.
@@ -84,6 +93,11 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         hosting.rootView = AnyView(rootView.environment(model).environment(\.skinWindow, self))
         hosting.sizingOptions = []
         shape.addSubview(hosting)
+        if case .playlist = kind {
+            let overlays = PlaylistWindowOverlays(model: model)
+            overlays.install(in: shape)
+            playlistOverlays = overlays
+        }
         dragView.delegate = self
         shape.addSubview(dragView)
         window.contentView = shape
@@ -105,6 +119,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
                     window.center()
                 }
             }
+            // A restored frame carries its saved size; the model's size and the scale win.
+            applyLayout()
         }
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
@@ -121,6 +137,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         withObservationTracking {
             _ = model.skin
             _ = model.scale
+            if case .playlist = kind { _ = model.playlist.steps }
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.applyLayout()
@@ -130,6 +147,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     }
 
     private func applyLayout() {
+        if case .playlist = kind { kind = .playlist(model.playlist.steps) }
         let scale = model.scale
         let skinSize = kind.skinSize(mode)
         let pixelSize = CGSize(width: skinSize.width * scale, height: skinSize.height * scale)
@@ -146,6 +164,9 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
             mask: polygons.flatMap { SkinRegion.maskImage($0, size: skinSize, scale: scale) })
 
         hosting.frame = shape.bounds
+        if case .playlist(let steps) = kind {
+            playlistOverlays?.layout(PlaylistLayout(steps: steps), scale: scale, height: pixelSize.height, shaded: mode == .shade)
+        }
         let barHeight = kind.titleBarHeight * scale
         dragView.frame = NSRect(x: 0, y: pixelSize.height - barHeight, width: pixelSize.width, height: barHeight)
         dragView.excludedRects = kind.titleButtonRects.map {
@@ -156,7 +177,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     // MARK: TitleBarDragging
 
-    func dragBegan() {}
+    func dragBegan() { model.playlist.openMenu = nil }
     func drag(to proposedOrigin: NSPoint) { window.setFrameOrigin(proposedOrigin) }
     func dragEnded() {}
     func titleBarDoubleClicked() {}
@@ -165,6 +186,11 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     func windowDidChangeBackingProperties(_ notification: Notification) {
         applyLayout()
+    }
+
+    /// A playlist menu closes when the window stops being key.
+    func windowDidResignKey(_ notification: Notification) {
+        model.playlist.openMenu = nil
     }
 
     func windowWillClose(_ notification: Notification) {

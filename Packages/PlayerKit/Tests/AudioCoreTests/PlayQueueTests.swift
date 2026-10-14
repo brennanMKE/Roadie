@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import AudioCore
 
@@ -154,5 +155,76 @@ import Testing
                 }
             }
         }
+    }
+    // MARK: Reordering and bulk removal (#0029)
+
+    private func titles(_ q: PlayQueue) -> [String] { q.tracks.map(\.title) }
+
+    @Test func moveSelectedMatchesWebampMoveSelected() {
+        var q = queue(5)
+        let moved1 = q.move([1, 3], by: 1)
+        #expect(moved1)
+        #expect(titles(q) == ["t0", "t2", "t1", "t4", "t3"])
+        var r = queue(5)
+        let moved2 = r.move([1, 3], by: -1)
+        #expect(moved2)
+        #expect(titles(r) == ["t1", "t0", "t3", "t2", "t4"])
+    }
+
+    @Test func moveClampsAtTheEnds() {
+        var q = queue(5)
+        let moved3 = q.move([0], by: -1)
+        #expect(!moved3)
+        let moved4 = q.move([4], by: 3)
+        #expect(!moved4)
+        let moved5 = q.move([], by: 1)
+        #expect(!moved5)
+        #expect(titles(q) == ["t0", "t1", "t2", "t3", "t4"])
+        // A block that would overshoot stops at the end.
+        let moved6 = q.move([3, 4], by: -10)
+        #expect(moved6)
+        #expect(titles(q) == ["t3", "t4", "t0", "t1", "t2"])
+    }
+
+    @Test func moveKeepsTheCurrentTrack() {
+        var q = queue(5)
+        q.select(2)
+        let current = q.current?.id
+        let moved7 = q.move([0], by: 4)
+        #expect(moved7)
+        #expect(q.current?.id == current)
+        #expect(q.currentIndex == 1)
+    }
+
+    @Test func moveWhileShuffledKeepsAPermutation() {
+        var q = queue(6)
+        var rng = SplitMix64(seed: 9)
+        q.select(3)
+        q.setShuffle(true, using: &rng)
+        let current = q.current?.id
+        let moved8 = q.move([0, 5], by: 0)
+        #expect(moved8 == false)
+        let moved9 = q.move([1, 2], by: 2)
+        #expect(moved9)
+        #expect(q.current?.id == current)
+        var visited = [q.current!.id]
+        while let t = q.next() { visited.append(t.id) }
+        #expect(visited.count == 6)
+        #expect(Set(visited).count == 6)
+    }
+
+    @Test func removeIndexSetAndCrop() {
+        var q = queue(5)
+        q.remove(at: IndexSet([0, 2]))
+        #expect(titles(q) == ["t1", "t3", "t4"])
+        var c = queue(5)
+        c.select(2)
+        c.crop(keeping: [1, 3])
+        #expect(titles(c) == ["t1", "t3"])
+        #expect(c.currentIndex != nil)
+        var all = queue(3)
+        all.crop(keeping: [])
+        #expect(all.tracks.isEmpty)
+        #expect(all.currentIndex == nil)
     }
 }

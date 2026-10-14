@@ -65,8 +65,19 @@ public enum SkinParser {
         // A region file with no usable section is normal (all-comment files ship in real skins): no warning.
         let region = archive.file("region", extensions: ["txt"]).map(RegionParser.parse) ?? .empty
 
-        // TODO: pledit.txt, TEXT font sprites, cursors, base-skin fallback.
-        return Skin(sheets: sheets, visColors: visColors, region: region, warnings: warnings, fallbacks: fallbacks)
+        var playlistStyle = PlaylistStyle.defaults
+        if let data = archive.file("pledit", extensions: ["txt"]) {
+            let parsed = PlaylistStyleParser.parse(data)
+            playlistStyle = parsed.style
+            fallbacks.append(contentsOf: parsed.fallbacks)
+        } else {
+            fallbacks.append("pledit.txt missing; Webamp default playlist colours")
+        }
+
+        // TODO: cursors, base-skin fallback.
+        return Skin(
+            sheets: sheets, visColors: visColors, region: region, playlistStyle: playlistStyle, warnings: warnings,
+            fallbacks: fallbacks)
     }
 }
 

@@ -72,6 +72,49 @@ public struct PlayQueue: Equatable, Sendable {
         }
     }
 
+    /// Removes every index in `indices`, highest first, so each removal reuses `remove(at:)`'s shuffle bookkeeping and
+    /// current-track rule. One mutation, so observers see one change.
+    public mutating func remove(at indices: IndexSet) {
+        for index in indices.reversed() { remove(at: index) }
+    }
+
+    /// Keeps only the tracks at `keeping` (Webamp's crop).
+    public mutating func crop(keeping: Set<Int>) {
+        remove(at: IndexSet(tracks.indices.filter { !keeping.contains($0) }))
+    }
+
+    /// Moves the tracks at `selected` by `offset` rows, keeping their order (port of Webamp's `moveSelected` with
+    /// `dragSelected`'s clamp: the block cannot leave either end). The current track keeps its identity and the shuffle
+    /// bookkeeping stays a permutation of `tracks.indices`. Returns false when nothing moved.
+    @discardableResult
+    public mutating func move(_ selected: Set<Int>, by offset: Int) -> Bool {
+        let selected = selected.filter { tracks.indices.contains($0) }
+        guard let first = selected.min(), let last = selected.max() else { return false }
+        let clamped = min(max(offset, -first), tracks.count - 1 - last)
+        guard clamped != 0 else { return false }
+        // newOrder[newPosition] = oldIndex.
+        var newOrder = [Int](repeating: 0, count: tracks.count)
+        var next = 0
+        for i in newOrder.indices {
+            let from = i - clamped
+            if tracks.indices.contains(from) && selected.contains(from) {
+                newOrder[i] = from
+            } else {
+                while next < tracks.count && selected.contains(next) { next += 1 }
+                newOrder[i] = next
+                next += 1
+            }
+        }
+        var newPosition = [Int](repeating: 0, count: tracks.count)
+        for (new, old) in newOrder.enumerated() { newPosition[old] = new }
+        let old = tracks
+        tracks = newOrder.map { old[$0] }
+        currentIndex = currentIndex.map { newPosition[$0] }
+        shuffleOrder = shuffleOrder.map { newPosition[$0] }
+        nextPass = nextPass.map { newPosition[$0] }
+        return true
+    }
+
     public mutating func removeAll() {
         tracks.removeAll()
         currentIndex = nil

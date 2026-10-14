@@ -71,9 +71,11 @@ final class PlayerModel {
     private(set) var balance: Float = 0
     /// Whether the equalizer window is open: the source of truth for the main window's EQ button, the Window menu and the
     /// window itself (`AppDelegate` follows it). Persisted so the window comes back after a relaunch, like Winamp.
-    /// The playlist toggle only records state until #0029 adds its window.
     private(set) var isEQWindowOpen = UserDefaults.standard.bool(forKey: PlayerModel.eqWindowOpenKey)
-    private(set) var isPlaylistWindowOpen = false
+    /// Whether the playlist editor is open; persisted like the equalizer's (Winamp reopens it at launch).
+    private(set) var isPlaylistWindowOpen = UserDefaults.standard.bool(forKey: PlayerModel.playlistWindowOpenKey)
+    /// The playlist window's selection, scroll position and size; a view of `player.queue`.
+    let playlist: PlaylistModel
     /// Shuffle and repeat live in the local player's queue, so they read as off for other outputs.
     var isShuffled: Bool { selectedOutput == OutputDevice.thisMacID && player.isShuffled }
     var isRepeating: Bool { selectedOutput == OutputDevice.thisMacID && player.repeatMode != .off }
@@ -112,6 +114,7 @@ final class PlayerModel {
     }
 
     static let eqWindowOpenKey = "eqWindowOpen"
+    static let playlistWindowOpenKey = "playlistWindowOpen"
     static let equalizerKey = "equalizer"
     private static let lastSkinKey = "lastSkinPath"
     private static let timeModeKey = "timeMode"
@@ -150,6 +153,7 @@ final class PlayerModel {
         let stack = PlexPlaybackStack.standard()
         cache = stack.cache
         player = stack.player
+        playlist = PlaylistModel(player: stack.player)
         visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors)
         pinner = stack.pinner
         cacheSettings = CacheSettingsModel(cache: stack.cache)
@@ -195,6 +199,7 @@ final class PlayerModel {
                 }
             }
         }
+        playlist.isLocal = { [weak self] in self?.selectedOutput == OutputDevice.thisMacID }
         visualizer.setScale(scale)
         visualizer.start()
         observeNowPlaying()
@@ -327,7 +332,15 @@ final class PlayerModel {
         isEQWindowOpen = open
         UserDefaults.standard.set(open, forKey: Self.eqWindowOpenKey)
     }
-    func togglePlaylistWindow() { isPlaylistWindowOpen.toggle() }
+
+    func togglePlaylistWindow() { setPlaylistWindowOpen(!isPlaylistWindowOpen) }
+
+    /// Also called by the playlist window when it closes itself.
+    func setPlaylistWindowOpen(_ open: Bool) {
+        guard open != isPlaylistWindowOpen else { return }
+        isPlaylistWindowOpen = open
+        UserDefaults.standard.set(open, forKey: Self.playlistWindowOpenKey)
+    }
 
     private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playback")
 

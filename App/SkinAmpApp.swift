@@ -42,6 +42,8 @@ struct SkinAmpApp: App {
                     .keyboardShortcut("1")
                 Button("Equalizer") { appDelegate.model.toggleEQWindow() }
                     .keyboardShortcut("2")
+                Button("Playlist Editor") { appDelegate.model.togglePlaylistWindow() }
+                    .keyboardShortcut("3")
             }
         }
     }

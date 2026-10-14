@@ -79,7 +79,7 @@ struct MainWindowStatusLayer: View {
 /// Webamp's `.pause #time { animation: blink 2s step-start 1s infinite }`: visible for a second after
 /// pausing, then hidden a second, visible a second... The task ends with the view, so nothing wakes up
 /// once playback leaves the paused state.
-private struct BlinkingView<Content: View>: View {
+struct BlinkingView<Content: View>: View {
     @ViewBuilder let content: Content
     @State private var visible = true
 

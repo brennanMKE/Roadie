@@ -360,6 +360,48 @@ import Testing
         await gate.releaseAll()
     }
 
+    @Test func removeTracksAtIndexSetWhileStoppedDoesNotStart() async {
+        let (p, gate, tracks) = makePlayer(3)
+        p.play(at: 0)
+        p.stop()
+        #expect(p.queue.current?.id == tracks[0].id)
+        p.removeTracks(at: IndexSet([0, 1]))
+        #expect(p.state == .stopped)
+        #expect(p.queue.tracks.map(\.id) == [tracks[2].id])
+        #expect(p.queue.current?.id == tracks[2].id)
+        p.removeTracks(at: IndexSet(integer: 0))
+        #expect(p.state == .stopped)
+        #expect(p.queue.tracks.isEmpty)
+        await gate.releaseAll()
+    }
+
+    @Test func removeTracksIncludingTheCurrentWhileLoadingReloadsTheSurvivor() async {
+        let (p, gate, tracks) = makePlayer(3)
+        p.play(at: 0)
+        #expect(await gate.waitForCalls(1))
+        p.removeTracks(at: IndexSet([0, 1]))
+        #expect(p.queue.tracks.map(\.id) == [tracks[2].id])
+        #expect(p.state == .loading)
+        #expect(p.queue.current?.id == tracks[2].id)
+        #expect(await gate.waitForCalls(2))
+        await gate.release(tracks[2].id, with: .failure(AudioCoreError.unresolvableSource(tracks[2].source)))
+        #expect(await waitUntil { p.state == .stopped })
+        #expect(p.errorMessage != nil)
+        await gate.releaseAll()
+    }
+
+    @Test func moveTracksKeepsTheCurrentTrackIdentity() async {
+        let (p, gate, tracks) = makePlayer(4)
+        p.play(at: 1)
+        #expect(await gate.waitForCalls(1))
+        p.moveTracks([0], by: 3)
+        #expect(p.queue.current?.id == tracks[1].id)
+        #expect(p.queue.currentIndex == 0)
+        #expect(p.queue.tracks.map(\.id) == [tracks[1].id, tracks[2].id, tracks[3].id, tracks[0].id])
+        p.stop()
+        await gate.releaseAll()
+    }
+
     @Test func removeLastCurrentWhileLoadingStops() async {
         let (p, gate, _) = makePlayer(1)
         p.play(at: 0)

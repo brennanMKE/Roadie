@@ -14,8 +14,14 @@ public struct Skin: @unchecked Sendable {
     /// Substitutions that keep the skin whole (balance from volume, digits from one number sheet,
     /// default viscolors...).
     public let fallbacks: [String]
+    /// `pledit.txt`: the playlist window's colours and font; `.defaults` when the file is absent.
+    public let playlistStyle: PlaylistStyle
 
-    public init(sheets: [String: CGImage], visColors: [RGBColor], region: SkinRegion = .empty, warnings: [String], fallbacks: [String] = []) {
+    public init(
+        sheets: [String: CGImage], visColors: [RGBColor], region: SkinRegion = .empty,
+        playlistStyle: PlaylistStyle = .defaults, warnings: [String], fallbacks: [String] = []
+    ) {
+        self.playlistStyle = playlistStyle
         self.sheets = sheets
         self.visColors = visColors
         self.region = region
