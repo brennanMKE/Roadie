@@ -1,0 +1,135 @@
+{
+  "command": "music/artists/library_items",
+  "args": {
+    "limit": 3,
+    "offset": 0,
+    "order_by": "sort_name",
+    "album_artists_only": true
+  },
+  "frames": [
+    {
+      "message_id": "15",
+      "result": [
+        {
+          "item_id": "432",
+          "provider": "library",
+          "name": "10,000 Maniacs",
+          "version": "",
+          "sort_name": "10,000 maniacs",
+          "uri": "library://artist/432",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "artist",
+          "provider_mappings": [
+            {
+              "item_id": "10,000 Maniacs",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": "10,000 Maniacs",
+              "details": null
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "artist_type": "singer",
+          "available": true
+        },
+        {
+          "item_id": "296",
+          "provider": "library",
+          "name": "Aerosmith",
+          "version": "",
+          "sort_name": "aerosmith",
+          "uri": "library://artist/296",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "artist",
+          "provider_mappings": [
+            {
+              "item_id": "Aerosmith",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": null,
+              "details": null
+            }
+          ],
+          "metadata": {
+            "images": [
+              {
+                "type": "thumb",
+                "path": "https://assets.fanart.tv/fanart/aerosmith-4fd0b247b3115.jpg",
+                "provider": "fanarttv",
+                "remotely_accessible": true,
+                "proxy_id": "e4225853443aa833bf448ce29a79c806008b35957f90316ba60691fdec94abfd"
+              }
+            ]
+          },
+          "favorite": false,
+          "artist_type": "singer",
+          "available": true
+        },
+        {
+          "item_id": "71",
+          "provider": "library",
+          "name": "The Airborne Toxic Event",
+          "version": "",
+          "sort_name": "airborne toxic event, the",
+          "uri": "library://artist/71",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "artist",
+          "provider_mappings": [
+            {
+              "item_id": "The Airborne Toxic Event",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": "The Airborne Toxic Event",
+              "details": null
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "artist_type": "singer",
+          "available": true
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

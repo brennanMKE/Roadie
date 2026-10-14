@@ -1,0 +1,150 @@
+{
+  "command": "music/item_by_uri",
+  "args": {
+    "uri": "library://album/27"
+  },
+  "frames": [
+    {
+      "message_id": "31",
+      "result": {
+        "item_id": "27",
+        "provider": "library",
+        "name": "",
+        "version": "",
+        "sort_name": "",
+        "uri": "library://album/27",
+        "external_ids": [],
+        "is_playable": true,
+        "media_type": "album",
+        "provider_mappings": [
+          {
+            "item_id": "Aphex Twins",
+            "provider_domain": "filesystem_smb",
+            "provider_instance": "filesystem_smb--gPeSLx39",
+            "available": true,
+            "in_library": true,
+            "is_unique": null,
+            "audio_format": {
+              "content_type": "?",
+              "codec_type": "?",
+              "sample_rate": 44100,
+              "bit_depth": 16,
+              "channels": 2,
+              "output_format_str": "?",
+              "bit_rate": 0
+            },
+            "url": "Aphex Twins",
+            "details": null
+          }
+        ],
+        "metadata": {
+          "description": null,
+          "description_language": null,
+          "life_span": null,
+          "artist_entity_type": null,
+          "review": null,
+          "explicit": null,
+          "images": null,
+          "grouping": null,
+          "genres": null,
+          "mood": null,
+          "style": null,
+          "copyright": null,
+          "lyrics": null,
+          "lrc_lyrics": null,
+          "transcript": null,
+          "transcript_cues": null,
+          "has_transcript": null,
+          "label": null,
+          "links": null,
+          "performers": null,
+          "preview": null,
+          "popularity": null,
+          "release_date": null,
+          "languages": null,
+          "chapters": null,
+          "collections": null,
+          "last_refresh": 1792016976
+        },
+        "favorite": false,
+        "position": null,
+        "date_added": "2026-10-13T02:43:57+00:00",
+        "year": 1999,
+        "artists": [
+          {
+            "item_id": "15",
+            "provider": "library",
+            "name": "Various Artists",
+            "version": "",
+            "sort_name": "various artists",
+            "uri": "library://artist/15",
+            "external_ids": [
+              [
+                "musicbrainz_artistid",
+                "89ad4ac3-39f7-470e-963a-56509c546377"
+              ]
+            ],
+            "is_playable": true,
+            "media_type": "artist",
+            "provider_mappings": [
+              {
+                "item_id": "Various Artists",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "?",
+                  "codec_type": "?",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "?",
+                  "bit_rate": 0
+                },
+                "url": "Various Artists",
+                "details": null
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-14T22:07:42+00:00",
+            "artist_type": "singer"
+          }
+        ],
+        "album_type": "unknown"
+      },
+      "partial": false
+    }
+  ]
+}

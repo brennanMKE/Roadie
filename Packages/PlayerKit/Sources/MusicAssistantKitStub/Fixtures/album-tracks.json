@@ -1,0 +1,117 @@
+{
+  "command": "music/albums/album_tracks",
+  "args": {
+    "item_id": "27",
+    "provider_instance_id_or_domain": "library",
+    "in_library_only": true
+  },
+  "frames": [
+    {
+      "message_id": "29",
+      "result": [
+        {
+          "item_id": "132",
+          "provider": "library",
+          "name": "Ghost In The Shell",
+          "version": "",
+          "sort_name": "ghost in the shell",
+          "uri": "library://track/132",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Aphex Twins/Aphex Twins - Ghost In The Shell.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 128
+              },
+              "url": null,
+              "details": "1115565707"
+            }
+          ],
+          "metadata": {
+            "description": "mp3.com/music/Electronica/541.",
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": null,
+            "grouping": null,
+            "genres": [
+              "Electronic"
+            ],
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": null,
+          "date_added": "2026-10-13T02:43:57+00:00",
+          "duration": 530,
+          "artists": [
+            {
+              "item_id": "18",
+              "provider": "library",
+              "name": "Aphex Twins",
+              "version": "",
+              "sort_name": "aphex twins",
+              "uri": "library://artist/18",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true,
+              "image": null,
+              "year": null
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "27",
+            "provider": "library",
+            "name": "",
+            "version": "",
+            "sort_name": "",
+            "uri": "library://album/27",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "image": null,
+            "year": 1999
+          },
+          "disc_number": 0,
+          "track_number": 0,
+          "audio_metadata": null
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

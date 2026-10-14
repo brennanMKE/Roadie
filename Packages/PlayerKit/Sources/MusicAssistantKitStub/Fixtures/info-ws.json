@@ -1,0 +1,24 @@
+{
+  "command": "info",
+  "args": {},
+  "frames": [
+    {
+      "message_id": "3",
+      "result": {
+        "server_id": "0123456789abcdef0123456789abcdef",
+        "server_version": "2.10.6",
+        "schema_version": 65,
+        "min_supported_schema_version": 28,
+        "base_url": "http://ma.example:8095",
+        "homeassistant_addon": true,
+        "onboard_done": true,
+        "name": "Music Assistant",
+        "status": "running",
+        "internal_url": "http://ma.example:8095",
+        "external_url": null,
+        "has_remote_access": false
+      },
+      "partial": false
+    }
+  ]
+}

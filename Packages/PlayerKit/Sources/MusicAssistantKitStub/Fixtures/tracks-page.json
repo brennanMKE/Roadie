@@ -1,0 +1,214 @@
+{
+  "command": "music/tracks/library_items",
+  "args": {
+    "limit": 3,
+    "offset": 0,
+    "order_by": "sort_name"
+  },
+  "frames": [
+    {
+      "message_id": "23",
+      "result": [
+        {
+          "item_id": "2000",
+          "provider": "library",
+          "name": "008-tapbots",
+          "version": "",
+          "sort_name": "008-tapbots",
+          "uri": "library://track/2000",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Downloads/Podcasts/Episode 8 - The Tapbots, creators of.tmp/download.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 192
+              },
+              "url": null,
+              "details": "1233586023"
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "duration": 1167,
+          "artists": [
+            {
+              "item_id": "157",
+              "provider": "library",
+              "name": "Dan Grigsby",
+              "version": "",
+              "sort_name": "dan grigsby",
+              "uri": "library://artist/157",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "206",
+            "provider": "library",
+            "name": "Dan Grigsby's Album",
+            "version": "",
+            "sort_name": "dan grigsby's album",
+            "uri": "library://album/206",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "year": 2009
+          },
+          "disc_number": 0,
+          "track_number": 0,
+          "available": true
+        },
+        {
+          "item_id": "994",
+          "provider": "library",
+          "name": "010 - Michael Tyson - Loopy",
+          "version": "",
+          "sort_name": "010 - michael tyson - loopy",
+          "uri": "library://track/994",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Podcasts/Mobile Orchard_ iPhone Developer Podcast/Episode 10 - Michael Tyson - Creator.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 128
+              },
+              "url": null,
+              "details": "1236004010"
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "duration": 2078,
+          "artists": [
+            {
+              "item_id": "157",
+              "provider": "library",
+              "name": "Dan Grigsby",
+              "version": "",
+              "sort_name": "dan grigsby",
+              "uri": "library://artist/157",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "206",
+            "provider": "library",
+            "name": "Dan Grigsby's Album",
+            "version": "",
+            "sort_name": "dan grigsby's album",
+            "uri": "library://album/206",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "year": 2009
+          },
+          "disc_number": 0,
+          "track_number": 0,
+          "available": true
+        },
+        {
+          "item_id": "1685",
+          "provider": "library",
+          "name": "01 - Everything In It's Place",
+          "version": "",
+          "sort_name": "01 - everything in it's place",
+          "uri": "library://track/1685",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Radiohead/03 Kid A/01.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 128
+              },
+              "url": null,
+              "details": "1221354439"
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "duration": 251,
+          "artists": [
+            {
+              "item_id": "418",
+              "provider": "library",
+              "name": "Radiohead",
+              "version": "",
+              "sort_name": "radiohead",
+              "uri": "library://artist/418",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "363",
+            "provider": "library",
+            "name": "Kid A",
+            "version": "",
+            "sort_name": "kid a",
+            "uri": "library://album/363",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "year": 2000
+          },
+          "disc_number": 0,
+          "track_number": 1,
+          "available": true
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

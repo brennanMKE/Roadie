@@ -1,0 +1,11 @@
+{
+  "command": "music/artists/count",
+  "args": {},
+  "frames": [
+    {
+      "message_id": "14",
+      "result": 475,
+      "partial": false
+    }
+  ]
+}

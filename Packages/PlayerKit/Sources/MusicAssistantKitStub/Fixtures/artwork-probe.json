@@ -1,0 +1,113 @@
+{
+  "image_fields": [
+    {
+      "type": "thumb",
+      "path": "Moby/Moby - 18.mp3",
+      "provider": "filesystem_smb--gPeSLx39",
+      "remotely_accessible": false,
+      "proxy_id": "9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0"
+    }
+  ],
+  "probes": [
+    {
+      "form": "path+provider",
+      "candidate": "/imageproxy?path=Moby%2FMoby%20-%2018.mp3&provider=filesystem_smb--gPeSLx39&size=200",
+      "authorized": true,
+      "status": 400,
+      "content_type": "",
+      "bytes": 0
+    },
+    {
+      "form": "path+provider",
+      "candidate": "/imageproxy?path=Moby%2FMoby%20-%2018.mp3&provider=filesystem_smb--gPeSLx39&size=200",
+      "authorized": false,
+      "status": 400,
+      "content_type": "",
+      "bytes": 0
+    },
+    {
+      "form": "proxy_id",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=200",
+      "authorized": true,
+      "status": 400,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 84,
+      "body_text": "Unsupported size 200: must be one of 0, 80, 160, 256, 512, 1024 (0 = original size)."
+    },
+    {
+      "form": "proxy_id",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=200",
+      "authorized": false,
+      "status": 400,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 84,
+      "body_text": "Unsupported size 200: must be one of 0, 80, 160, 256, 512, 1024 (0 = original size)."
+    },
+    {
+      "form": "proxy_id+fmt",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=200&fmt=jpg",
+      "authorized": true,
+      "status": 400,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 84,
+      "body_text": "Unsupported size 200: must be one of 0, 80, 160, 256, 512, 1024 (0 = original size)."
+    },
+    {
+      "form": "proxy_id+fmt",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=200&fmt=jpg",
+      "authorized": false,
+      "status": 400,
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 84,
+      "body_text": "Unsupported size 200: must be one of 0, 80, 160, 256, 512, 1024 (0 = original size)."
+    },
+    {
+      "form": "proxy_id size=256",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=256",
+      "authorized": true,
+      "status": 200,
+      "content_type": "image/jpeg",
+      "bytes": 15812
+    },
+    {
+      "form": "proxy_id size=256",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=256",
+      "authorized": false,
+      "status": 200,
+      "content_type": "image/jpeg",
+      "bytes": 15812
+    },
+    {
+      "form": "proxy_id size=256+fmt",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=256&fmt=jpg",
+      "authorized": true,
+      "status": 200,
+      "content_type": "image/jpeg",
+      "bytes": 15812
+    },
+    {
+      "form": "proxy_id size=256+fmt",
+      "candidate": "/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=256&fmt=jpg",
+      "authorized": false,
+      "status": 200,
+      "content_type": "image/jpeg",
+      "bytes": 15812
+    },
+    {
+      "form": "server-url",
+      "candidate": "http://ma.example:8095/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=512&fmt=jpg",
+      "authorized": true,
+      "status": 200,
+      "content_type": "image/jpeg",
+      "bytes": 15812
+    },
+    {
+      "form": "server-url",
+      "candidate": "http://ma.example:8095/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=512&fmt=jpg",
+      "authorized": false,
+      "status": 200,
+      "content_type": "image/jpeg",
+      "bytes": 15812
+    }
+  ]
+}

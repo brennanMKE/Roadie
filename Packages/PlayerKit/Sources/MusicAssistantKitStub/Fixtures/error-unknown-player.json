@@ -1,0 +1,13 @@
+{
+  "command": "players/get",
+  "args": {
+    "player_id": "skinamp-no-such-player"
+  },
+  "frames": [
+    {
+      "message_id": "8",
+      "result": null,
+      "partial": false
+    }
+  ]
+}

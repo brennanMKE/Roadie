@@ -1,0 +1,167 @@
+{
+  "command": "music/albums/library_items",
+  "args": {
+    "limit": 3,
+    "offset": 0,
+    "order_by": "sort_name"
+  },
+  "frames": [
+    {
+      "message_id": "19",
+      "result": [
+        {
+          "item_id": "27",
+          "provider": "library",
+          "name": "",
+          "version": "",
+          "sort_name": "",
+          "uri": "library://album/27",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "album",
+          "provider_mappings": [
+            {
+              "item_id": "Aphex Twins",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": "Aphex Twins",
+              "details": null
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "year": 1999,
+          "artists": [
+            {
+              "item_id": "15",
+              "provider": "library",
+              "name": "Various Artists",
+              "version": "",
+              "sort_name": "various artists",
+              "uri": "library://artist/15",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "album_type": "unknown",
+          "available": true
+        },
+        {
+          "item_id": "46",
+          "provider": "library",
+          "name": "",
+          "version": "",
+          "sort_name": "",
+          "uri": "library://album/46",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "album",
+          "provider_mappings": [
+            {
+              "item_id": "Fiona Apple",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": "Fiona Apple",
+              "details": null
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "artists": [
+            {
+              "item_id": "15",
+              "provider": "library",
+              "name": "Various Artists",
+              "version": "",
+              "sort_name": "various artists",
+              "uri": "library://artist/15",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "album_type": "unknown",
+          "available": true
+        },
+        {
+          "item_id": "272",
+          "provider": "library",
+          "name": "",
+          "version": "",
+          "sort_name": "",
+          "uri": "library://album/272",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "album",
+          "provider_mappings": [
+            {
+              "item_id": "Better Than Ezra",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": "Better Than Ezra",
+              "details": null
+            }
+          ],
+          "metadata": {},
+          "favorite": false,
+          "artists": [
+            {
+              "item_id": "15",
+              "provider": "library",
+              "name": "Various Artists",
+              "version": "",
+              "sort_name": "various artists",
+              "uri": "library://artist/15",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "album_type": "unknown",
+          "available": true
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

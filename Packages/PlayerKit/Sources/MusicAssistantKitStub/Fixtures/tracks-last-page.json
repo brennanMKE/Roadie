@@ -1,0 +1,99 @@
+{
+  "command": "music/tracks/library_items",
+  "args": {
+    "limit": 3,
+    "offset": 2167,
+    "order_by": "sort_name"
+  },
+  "frames": [
+    {
+      "message_id": "24",
+      "result": [
+        {
+          "item_id": "1107",
+          "provider": "library",
+          "name": "Zion",
+          "version": "",
+          "sort_name": "zion",
+          "uri": "library://track/1107",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Fluke/Fluke - Zion.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 192
+              },
+              "url": null,
+              "details": "1115565839"
+            }
+          ],
+          "metadata": {
+            "images": [
+              {
+                "type": "thumb",
+                "path": "Fluke/Fluke - Zion.mp3",
+                "provider": "filesystem_smb--gPeSLx39",
+                "remotely_accessible": false,
+                "proxy_id": "3e2ac5e0b9f8f309dbbfe979ef24ad925c10e40e0b58a7e3722246ecae11ac91"
+              }
+            ]
+          },
+          "favorite": false,
+          "duration": 273,
+          "artists": [
+            {
+              "item_id": "178",
+              "provider": "library",
+              "name": "Fluke",
+              "version": "",
+              "sort_name": "fluke",
+              "uri": "library://artist/178",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "243",
+            "provider": "library",
+            "name": "Matrix Reloaded: The Album Disc 1",
+            "version": "",
+            "sort_name": "matrix reloaded: the album disc 1",
+            "uri": "library://album/243",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "image": {
+              "type": "thumb",
+              "path": "Fluke/Fluke - Zion.mp3",
+              "provider": "filesystem_smb--gPeSLx39",
+              "remotely_accessible": false,
+              "proxy_id": "3e2ac5e0b9f8f309dbbfe979ef24ad925c10e40e0b58a7e3722246ecae11ac91"
+            },
+            "year": 2003
+          },
+          "disc_number": 0,
+          "track_number": 11,
+          "available": true
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+$ dns-sd -B _music-assistant._tcp  (5 s)
+Browsing for _music-assistant._tcp
+DATE: ---Wed 14 Oct 2026---
+15:33:58.904  ...STARTING...
+
+$ dns-sd -B _services._dns-sd._udp  (5 s)
+Browsing for _services._dns-sd._udp
+DATE: ---Wed 14 Oct 2026---
+15:34:04.022  ...STARTING...
+Timestamp     A/R    Flags  if Domain               Service Type         Instance Name
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _eerogw
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _eero-ebid
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _workstation
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _sendspin-server
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _eerogw
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _eero-ebid
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _eero
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _home-assistant
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _plexmediasvr
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _workstation
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _viziocast
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _sendspin-server
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _esphomebuilder
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _viziocast
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _http
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _sfbeerlight
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _googlerpc
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _googlecast
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _http
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _sfbeerlight
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _googlerpc
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _googlecast
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _hue
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _plexmediasvr
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _esphomebuilder
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _eero
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _home-assistant
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _dacp
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _mass
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _dacp
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _mass
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _hue
+15:34:04.022  Add        3   1 .                    _tcp.<domain>          _ssh
+15:34:04.022  Add        3   1 .                    _tcp.<domain>          _sftp-ssh
+15:34:04.022  Add        3   1 .                    _tcp.<domain>          _rfb
+15:34:04.022  Add        3   1 .                    _tcp.<domain>          _smb
+15:34:04.022  Add        3   1 .                    _tcp.<domain>          _airplay
+15:34:04.022  Add        3   1 .                    _tcp.<domain>          _raop
+15:34:04.022  Add        3   1 .                    _tcp.<domain>          _companion-link
+15:34:04.022  Add        3   1 .                    _udp.<domain>          _asquic
+15:34:04.022  Add        3   7 .                    _udp.<domain>          _dnssd-server
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _srpl-tls
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _hap
+15:34:04.022  Add        3   7 .                    _udp.<domain>          _infra-analytics
+15:34:04.022  Add        3   7 .                    _udp.<domain>          _meshcop
+15:34:04.022  Add        3   7 .                    _udp.<domain>          _trel
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _hap
+15:34:04.022  Add        3  15 .                    _udp.<domain>          _trel
+15:34:04.022  Add        3  15 .                    _udp.<domain>          _dnssd-server
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _srpl-tls
+15:34:04.022  Add        3  15 .                    _udp.<domain>          _meshcop
+15:34:04.022  Add        3  15 .                    _udp.<domain>          _infra-analytics
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _spotify-connect
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _ssh
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _sftp-ssh
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _rfb
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _smb
+15:34:04.022  Add        3   7 .                    _udp.<domain>          _asquic
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _spotify-connect
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _ssh
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _sftp-ssh
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _rfb
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _smb
+15:34:04.022  Add        3  15 .                    _udp.<domain>          _asquic
+15:34:04.022  Add        3  15 .                    _sub.<domain>          _IE0495DB399E26797
+15:34:04.022  Add        3   7 .                    _sub.<domain>          _I6235C420587083E3
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _matter
+15:34:04.022  Add        3  15 .                    _sub.<domain>          _I6235C420587083E3
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _matter
+15:34:04.022  Add        3   7 .                    _sub.<domain>          _IE0495DB399E26797
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _companion-link
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _airplay
+15:34:04.022  Add        3  15 .                    _tcp.<domain>          _raop
+15:34:04.022  Add        3  15 .                    _udp.<domain>          _sleep-proxy
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _companion-link
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _airplay
+15:34:04.022  Add        3   7 .                    _tcp.<domain>          _raop
+15:34:04.022  Add        2   7 .                    _udp.<domain>          _sleep-proxy

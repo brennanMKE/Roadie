@@ -1,0 +1,169 @@
+{
+  "command": "music/playlists/library_items",
+  "args": {
+    "limit": 3,
+    "offset": 0,
+    "order_by": "sort_name"
+  },
+  "frames": [
+    {
+      "message_id": "27",
+      "result": [
+        {
+          "item_id": "4",
+          "provider": "library",
+          "name": "500 Random tracks (from library)",
+          "version": "",
+          "sort_name": "500 random tracks (from library)",
+          "uri": "library://playlist/4",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "playlist",
+          "provider_mappings": [
+            {
+              "item_id": "random_tracks",
+              "provider_domain": "builtin",
+              "provider_instance": "builtin",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": null,
+              "details": null
+            }
+          ],
+          "metadata": {
+            "images": [
+              {
+                "type": "thumb",
+                "path": "logo.png",
+                "provider": "builtin",
+                "remotely_accessible": false,
+                "proxy_id": "55fac4899e170b4ccae3ea5552da97da61c9ceb46494d1625964e86d8f354368"
+              }
+            ]
+          },
+          "favorite": false,
+          "owner": "user",
+          "is_editable": false,
+          "is_dynamic": false,
+          "supported_mediatypes": [
+            "track"
+          ],
+          "available": true
+        },
+        {
+          "item_id": "1",
+          "provider": "library",
+          "name": "All favorited tracks",
+          "version": "",
+          "sort_name": "all favorited tracks",
+          "uri": "library://playlist/1",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "playlist",
+          "provider_mappings": [
+            {
+              "item_id": "all_favorite_tracks",
+              "provider_domain": "builtin",
+              "provider_instance": "builtin",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": null,
+              "details": null
+            }
+          ],
+          "metadata": {
+            "images": [
+              {
+                "type": "thumb",
+                "path": "logo.png",
+                "provider": "builtin",
+                "remotely_accessible": false,
+                "proxy_id": "55fac4899e170b4ccae3ea5552da97da61c9ceb46494d1625964e86d8f354368"
+              }
+            ]
+          },
+          "favorite": false,
+          "owner": "user",
+          "is_editable": false,
+          "is_dynamic": false,
+          "supported_mediatypes": [
+            "track"
+          ],
+          "available": true
+        },
+        {
+          "item_id": "8",
+          "provider": "library",
+          "name": "Infinite Mix (favorites)",
+          "version": "",
+          "sort_name": "infinite mix (favorites)",
+          "uri": "library://playlist/8",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "playlist",
+          "provider_mappings": [
+            {
+              "item_id": "infinite_mix_favorites",
+              "provider_domain": "builtin",
+              "provider_instance": "builtin",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": null,
+              "details": null
+            }
+          ],
+          "metadata": {
+            "images": [
+              {
+                "type": "thumb",
+                "path": "logo.png",
+                "provider": "builtin",
+                "remotely_accessible": false,
+                "proxy_id": "55fac4899e170b4ccae3ea5552da97da61c9ceb46494d1625964e86d8f354368"
+              }
+            ]
+          },
+          "favorite": false,
+          "owner": "user",
+          "is_editable": false,
+          "is_dynamic": true,
+          "supported_mediatypes": [
+            "track"
+          ],
+          "available": true
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

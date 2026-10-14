@@ -1,0 +1,124 @@
+{
+  "command": "players/get",
+  "args": {
+    "player_id": "ap223aed81fe30"
+  },
+  "frames": [
+    {
+      "message_id": "7",
+      "result": {
+        "player_id": "ap223aed81fe30",
+        "provider": "airplay",
+        "type": "player",
+        "name": "4K Apple TV",
+        "available": false,
+        "device_info": {
+          "model": "Apple TV 4K",
+          "manufacturer": "Apple",
+          "software_version": null,
+          "model_id": null,
+          "manufacturer_id": null,
+          "identifiers": {
+            "mac_address": "D0:D2:B0:7F:A8:D5",
+            "ip_address": "ma.example",
+            "airplay_id": "ap223aed81fe30"
+          },
+          "mac_address": "D0:D2:B0:7F:A8:D5",
+          "ip_address": "ma.example"
+        },
+        "supported_features": [
+          "play_media",
+          "set_members",
+          "pause",
+          "volume_mute",
+          "volume_set",
+          "multi_device_dsp"
+        ],
+        "playback_state": "idle",
+        "elapsed_time": null,
+        "elapsed_time_last_updated": null,
+        "powered": true,
+        "volume_level": 20,
+        "volume_muted": false,
+        "group_members": [],
+        "static_group_members": [],
+        "can_group_with": [
+          "ap0a3090605b50",
+          "ap720a998fd71d",
+          "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+          "upd9b597ac",
+          "ap82fe09484ac9"
+        ],
+        "synced_to": null,
+        "active_sound_mode": null,
+        "sound_mode_list": [],
+        "options": [],
+        "active_source": "ap223aed81fe30",
+        "source_list": [
+          {
+            "id": "ap223aed81fe30",
+            "name": "Music Assistant Queue",
+            "passive": false,
+            "can_play_pause": false,
+            "can_seek": false,
+            "can_next_previous": false,
+            "can_shuffle": false,
+            "can_repeat": false,
+            "shuffle_enabled": null,
+            "repeat_mode": null,
+            "account_id": null
+          }
+        ],
+        "active_group": null,
+        "current_media": null,
+        "enabled": true,
+        "hide_in_ui": false,
+        "private": false,
+        "expose_to_ha": true,
+        "icon": "apple-tv",
+        "group_volume": 20,
+        "group_volume_muted": false,
+        "extra_attributes": {},
+        "power_control": "none",
+        "volume_control": "native",
+        "mute_control": "spb_223aed81fe30",
+        "output_protocols": [
+          {
+            "output_protocol_id": "native",
+            "name": "AirPlay",
+            "protocol_domain": "airplay",
+            "is_native": true,
+            "priority": 0,
+            "available": false,
+            "derived_from": null
+          },
+          {
+            "output_protocol_id": "spb_223aed81fe30",
+            "name": "Sendspin",
+            "protocol_domain": "sendspin",
+            "is_native": false,
+            "priority": 40,
+            "available": true,
+            "derived_from": "native"
+          }
+        ],
+        "active_output_protocol": null,
+        "needs_setup": true,
+        "setup_reason": "pairing_required",
+        "has_setup_flow": true,
+        "sleep_timer_expires_at": null,
+        "active_source_audio": null,
+        "display_name": "user",
+        "state": "idle",
+        "group_childs": [],
+        "extra_data": {},
+        "hide_player_in_ui": [
+          "when_unavailable",
+          "when_synced",
+          "when_group_active"
+        ]
+      },
+      "partial": false
+    }
+  ]
+}

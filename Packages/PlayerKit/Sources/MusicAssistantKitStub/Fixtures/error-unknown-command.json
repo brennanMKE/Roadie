@@ -1,0 +1,11 @@
+{
+  "command": "skinamp/no_such_command",
+  "args": {},
+  "frames": [
+    {
+      "message_id": "9",
+      "error_code": 12,
+      "details": "Invalid or unsupported command."
+    }
+  ]
+}

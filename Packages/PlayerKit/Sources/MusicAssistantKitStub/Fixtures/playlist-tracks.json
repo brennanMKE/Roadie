@@ -1,0 +1,550 @@
+{
+  "command": "music/playlists/playlist_tracks",
+  "args": {
+    "item_id": "4",
+    "provider_instance_id_or_domain": "library"
+  },
+  "frames": [
+    {
+      "message_id": "32",
+      "result": [
+        {
+          "item_id": "1061",
+          "provider": "library",
+          "name": "You've Been Flirting Again",
+          "version": "",
+          "sort_name": "you've been flirting again",
+          "uri": "library://track/1061",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Björk/Post/06 You've Been Flirting Again.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 160
+              },
+              "url": null,
+              "details": "1221355776"
+            }
+          ],
+          "metadata": {
+            "description": "0",
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": null,
+            "grouping": null,
+            "genres": [
+              "Alternative & Punk"
+            ],
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": 1,
+          "date_added": "2026-10-13T02:45:27+00:00",
+          "duration": 149,
+          "artists": [
+            {
+              "item_id": "173",
+              "provider": "library",
+              "name": "Björk",
+              "version": "",
+              "sort_name": "bjoerk",
+              "uri": "library://artist/173",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true,
+              "image": null,
+              "year": null
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "233",
+            "provider": "library",
+            "name": "Post",
+            "version": "",
+            "sort_name": "post",
+            "uri": "library://album/233",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "image": null,
+            "year": 1995
+          },
+          "disc_number": 1,
+          "track_number": 6,
+          "audio_metadata": null
+        },
+        {
+          "item_id": "710",
+          "provider": "library",
+          "name": "We Wish You a merry Christmas",
+          "version": "",
+          "sort_name": "we wish you a merry christmas",
+          "uri": "library://track/710",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "The Holiday Children's Chorale/A Children's Christmas/01 We Wish You a merry Christmas.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 192
+              },
+              "url": null,
+              "details": "1221354439"
+            }
+          ],
+          "metadata": {
+            "description": " 000005C8 0000067C 00006F3C 00006751 0000C41F 00014449 00007A70 00007B65 0000B363 00004B34",
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": null,
+            "grouping": null,
+            "genres": [
+              "Holiday"
+            ],
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": 2,
+          "date_added": "2026-10-13T02:44:27+00:00",
+          "duration": 88,
+          "artists": [
+            {
+              "item_id": "126",
+              "provider": "library",
+              "name": "The Holiday Children's Chorale",
+              "version": "",
+              "sort_name": "holiday children's chorale, the",
+              "uri": "library://artist/126",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true,
+              "image": null,
+              "year": null
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "178",
+            "provider": "library",
+            "name": "A Children's Christmas",
+            "version": "",
+            "sort_name": "children's christmas, a",
+            "uri": "library://album/178",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "image": null,
+            "year": null
+          },
+          "disc_number": 0,
+          "track_number": 1,
+          "audio_metadata": null
+        },
+        {
+          "item_id": "1032",
+          "provider": "library",
+          "name": "Lonely Christmas Eve",
+          "version": "",
+          "sort_name": "lonely christmas eve",
+          "uri": "library://track/1032",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Ben Folds/Ben Folds - Lonely Christmas Eve.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 192
+              },
+              "url": null,
+              "details": "1221355870"
+            }
+          ],
+          "metadata": {
+            "description": " 00000432 0000045F 0000168B 000016C8 00027145 00024A07 00007711 000074F8 00027145 00027145",
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": [
+              {
+                "type": "thumb",
+                "path": "Ben Folds/Ben Folds - Lonely Christmas Eve.mp3",
+                "provider": "filesystem_smb--gPeSLx39",
+                "remotely_accessible": false,
+                "proxy_id": "3f602eccc668bc517c9aee26c4568ba6b49661596ade66201e593cf8bca72e7c"
+              },
+              {
+                "type": "thumb",
+                "path": "Ben Folds/Ben Folds - Lonely Christmas Eve.mp3",
+                "provider": "filesystem_smb--gPeSLx39",
+                "remotely_accessible": false,
+                "proxy_id": "3f602eccc668bc517c9aee26c4568ba6b49661596ade66201e593cf8bca72e7c"
+              }
+            ],
+            "grouping": null,
+            "genres": [
+              "Alternative"
+            ],
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": 3,
+          "date_added": "2026-10-13T02:45:25+00:00",
+          "duration": 199,
+          "artists": [
+            {
+              "item_id": "162",
+              "provider": "library",
+              "name": "Ben Folds",
+              "version": "",
+              "sort_name": "ben folds",
+              "uri": "library://artist/162",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true,
+              "image": null,
+              "year": null
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "217",
+            "provider": "library",
+            "name": "The Grinch [Original Soundtrack]",
+            "version": "",
+            "sort_name": "grinch [original soundtrack], the",
+            "uri": "library://album/217",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "image": {
+              "type": "thumb",
+              "path": "Ben Folds/Ben Folds - Lonely Christmas Eve.mp3",
+              "provider": "filesystem_smb--gPeSLx39",
+              "remotely_accessible": false,
+              "proxy_id": "3f602eccc668bc517c9aee26c4568ba6b49661596ade66201e593cf8bca72e7c"
+            },
+            "year": 2000
+          },
+          "disc_number": 0,
+          "track_number": 5,
+          "audio_metadata": null
+        },
+        {
+          "item_id": "197",
+          "provider": "library",
+          "name": "Talk",
+          "version": "",
+          "sort_name": "talk",
+          "uri": "library://track/197",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Coldplay/X&Y/05 Talk.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 192
+              },
+              "url": null,
+              "details": "1221354434"
+            }
+          ],
+          "metadata": {
+            "description": " 00000F34 00000F6E 00009938 00008E88 00015BDB 00015BDB 00008CE3 00008C82 00015F87 00015AA1",
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": null,
+            "grouping": null,
+            "genres": [
+              "Alternative & Punk"
+            ],
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": 4,
+          "date_added": "2026-10-13T02:43:59+00:00",
+          "duration": 311,
+          "artists": [
+            {
+              "item_id": "25",
+              "provider": "library",
+              "name": "Coldplay",
+              "version": "",
+              "sort_name": "coldplay",
+              "uri": "library://artist/25",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true,
+              "image": null,
+              "year": null
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "40",
+            "provider": "library",
+            "name": "X&Y",
+            "version": "",
+            "sort_name": "x&y",
+            "uri": "library://album/40",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "image": null,
+            "year": 2005
+          },
+          "disc_number": 1,
+          "track_number": 5,
+          "audio_metadata": null
+        },
+        {
+          "item_id": "617",
+          "provider": "library",
+          "name": "Angels We Have Heard On High",
+          "version": "",
+          "sort_name": "angels we have heard on high",
+          "uri": "library://track/617",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "track",
+          "provider_mappings": [
+            {
+              "item_id": "Mannheim Steamroller/Christmas In The Aire/07 Angels We Have Heard On High.mp3",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "mp3",
+                "codec_type": "mp3",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "mp3",
+                "bit_rate": 192
+              },
+              "url": null,
+              "details": "1221355802"
+            }
+          ],
+          "metadata": {
+            "description": " 000001A4 000001D2 00000D8B 00000D95 000107AC 000107AC 000077F2 00007ED7 0000FA9C 0000FA9C",
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": null,
+            "grouping": null,
+            "genres": [
+              "Holiday"
+            ],
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": 5,
+          "date_added": "2026-10-13T02:44:22+00:00",
+          "duration": 78,
+          "artists": [
+            {
+              "item_id": "114",
+              "provider": "library",
+              "name": "Mannheim Steamroller",
+              "version": "",
+              "sort_name": "mannheim steamroller",
+              "uri": "library://artist/114",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true,
+              "image": null,
+              "year": null
+            }
+          ],
+          "last_played": 0,
+          "album": {
+            "item_id": "163",
+            "provider": "library",
+            "name": "Christmas In The Aire",
+            "version": "",
+            "sort_name": "christmas in the aire",
+            "uri": "library://album/163",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "album",
+            "available": true,
+            "image": null,
+            "year": 1995
+          },
+          "disc_number": 1,
+          "track_number": 7,
+          "audio_metadata": null
+        }
+      ],
+      "partial": true
+    },
+    {
+      "message_id": "32",
+      "result": [],
+      "partial": false
+    }
+  ],
+  "original_item_counts": [
+    500
+  ],
+  "truncated_to_5_items_per_frame": true
+}

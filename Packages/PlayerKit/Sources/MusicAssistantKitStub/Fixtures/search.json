@@ -1,0 +1,133 @@
+{
+  "command": "music/search",
+  "args": {
+    "search_query": "008-tapbots",
+    "media_types": [
+      "artist",
+      "album",
+      "track",
+      "playlist"
+    ],
+    "limit": 3,
+    "providers": [
+      "library"
+    ]
+  },
+  "frames": [
+    {
+      "message_id": "33",
+      "result": {
+        "artists": [],
+        "albums": [],
+        "genres": [],
+        "tracks": [
+          {
+            "item_id": "2000",
+            "provider": "library",
+            "name": "008-tapbots",
+            "version": "",
+            "sort_name": "008-tapbots",
+            "uri": "library://track/2000",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Downloads/Podcasts/Episode 8 - The Tapbots, creators of.tmp/download.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 192
+                },
+                "url": null,
+                "details": "1233586023"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": [],
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:25+00:00",
+            "duration": 1167,
+            "artists": [
+              {
+                "item_id": "157",
+                "provider": "library",
+                "name": "Dan Grigsby",
+                "version": "",
+                "sort_name": "dan grigsby",
+                "uri": "library://artist/157",
+                "external_ids": [],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "206",
+              "provider": "library",
+              "name": "Dan Grigsby's Album",
+              "version": "",
+              "sort_name": "dan grigsby's album",
+              "uri": "library://album/206",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": null,
+              "year": 2009
+            },
+            "disc_number": 0,
+            "track_number": 0,
+            "audio_metadata": null
+          }
+        ],
+        "playlists": [],
+        "radio": [],
+        "audiobooks": [],
+        "podcasts": [],
+        "sound_effects": []
+      },
+      "partial": false
+    }
+  ]
+}

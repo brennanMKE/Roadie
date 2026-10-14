@@ -1,0 +1,11 @@
+{
+  "command": "music/albums/count",
+  "args": {},
+  "frames": [
+    {
+      "message_id": "18",
+      "result": 449,
+      "partial": false
+    }
+  ]
+}

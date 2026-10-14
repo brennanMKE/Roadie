@@ -1,0 +1,97 @@
+{
+  "command": "music/artists/artist_albums",
+  "args": {
+    "item_id": "432",
+    "provider_instance_id_or_domain": "library"
+  },
+  "frames": [
+    {
+      "message_id": "28",
+      "result": [
+        {
+          "item_id": "384",
+          "provider": "library",
+          "name": "Our Time In Eden",
+          "version": "",
+          "sort_name": "Our Time In Eden",
+          "uri": "library://album/384",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "album",
+          "provider_mappings": [
+            {
+              "item_id": "10,000 Maniacs/Our Time In Eden",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": "10,000 Maniacs/Our Time In Eden",
+              "details": null
+            }
+          ],
+          "metadata": {
+            "description": null,
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": null,
+            "grouping": null,
+            "genres": null,
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": null,
+          "date_added": "2026-10-13T02:42:33+00:00",
+          "year": 1992,
+          "artists": [
+            {
+              "item_id": "432",
+              "provider": "library",
+              "name": "10,000 Maniacs",
+              "version": "",
+              "sort_name": "10,000 maniacs",
+              "uri": "library://artist/432",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true,
+              "image": null,
+              "year": null
+            }
+          ],
+          "album_type": "unknown"
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

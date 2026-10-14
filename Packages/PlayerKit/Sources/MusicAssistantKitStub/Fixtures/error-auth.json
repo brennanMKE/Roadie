@@ -1,0 +1,13 @@
+{
+  "command": "auth",
+  "args": {
+    "token": "<redacted>"
+  },
+  "frames": [
+    {
+      "message_id": "1",
+      "error_code": 23,
+      "details": "The access token is invalid or has expired."
+    }
+  ]
+}

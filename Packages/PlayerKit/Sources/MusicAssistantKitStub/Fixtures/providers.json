@@ -1,0 +1,70 @@
+{
+  "command": "providers",
+  "args": {
+    "provider_type": "music"
+  },
+  "frames": [
+    {
+      "message_id": "4",
+      "result": [
+        {
+          "type": "music",
+          "domain": "builtin",
+          "name": "Music Assistant",
+          "instance_id": "builtin",
+          "supported_features": [
+            "library_radios",
+            "library_tracks",
+            "playlist_create_radios",
+            "browse",
+            "playlist_create",
+            "library_playlists",
+            "playlist_create_audiobooks",
+            "playlist_create_mixed",
+            "playlist_tracks_edit",
+            "playlist_create_podcast_episodes",
+            "library_tracks_edit",
+            "library_playlists_edit",
+            "library_radios_edit"
+          ],
+          "available": true,
+          "is_streaming_provider": false,
+          "lookup_key": "builtin"
+        },
+        {
+          "type": "music",
+          "domain": "ambient_sounds",
+          "name": "Ambient Sounds",
+          "instance_id": "ambient_sounds",
+          "supported_features": [
+            "sound_effects",
+            "browse"
+          ],
+          "available": true,
+          "is_streaming_provider": false,
+          "lookup_key": "ambient_sounds"
+        },
+        {
+          "type": "music",
+          "domain": "filesystem_smb",
+          "name": "Filesystem (remote share)",
+          "instance_id": "filesystem_smb--gPeSLx39",
+          "supported_features": [
+            "library_artists",
+            "playlist_tracks_edit",
+            "library_tracks",
+            "library_albums",
+            "search",
+            "browse",
+            "playlist_create",
+            "library_playlists"
+          ],
+          "available": true,
+          "is_streaming_provider": false,
+          "lookup_key": "filesystem_smb--gPeSLx39"
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "command": "music/artists/library_items",
+  "args": {
+    "limit": 1,
+    "offset": 0,
+    "order_by": "sort_name",
+    "summary": false,
+    "album_artists_only": true
+  },
+  "frames": [
+    {
+      "message_id": "17",
+      "result": [
+        {
+          "item_id": "432",
+          "provider": "library",
+          "name": "10,000 Maniacs",
+          "version": "",
+          "sort_name": "10,000 maniacs",
+          "uri": "library://artist/432",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "artist",
+          "provider_mappings": [
+            {
+              "item_id": "10,000 Maniacs",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": "10,000 Maniacs",
+              "details": null
+            }
+          ],
+          "metadata": {
+            "description": null,
+            "description_language": null,
+            "life_span": null,
+            "artist_entity_type": null,
+            "review": null,
+            "explicit": null,
+            "images": null,
+            "grouping": null,
+            "genres": null,
+            "mood": null,
+            "style": null,
+            "copyright": null,
+            "lyrics": null,
+            "lrc_lyrics": null,
+            "transcript": null,
+            "transcript_cues": null,
+            "has_transcript": null,
+            "label": null,
+            "links": null,
+            "performers": null,
+            "preview": null,
+            "popularity": null,
+            "release_date": null,
+            "languages": null,
+            "chapters": null,
+            "collections": null,
+            "last_refresh": null
+          },
+          "favorite": false,
+          "position": null,
+          "date_added": "2026-10-14T22:09:31+00:00",
+          "artist_type": "singer"
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

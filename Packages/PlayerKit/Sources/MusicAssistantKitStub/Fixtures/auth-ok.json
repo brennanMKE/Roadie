@@ -1,0 +1,27 @@
+{
+  "command": "auth",
+  "args": {
+    "token": "<redacted>"
+  },
+  "frames": [
+    {
+      "message_id": "1",
+      "result": {
+        "authenticated": true,
+        "user": {
+          "user_id": "00000000-0000-0000-0000-000000000000",
+          "username": "user",
+          "role": "admin",
+          "enabled": true,
+          "created_at": "2026-10-14T21:57:43.253685+00:00",
+          "display_name": "user",
+          "avatar_url": null,
+          "preferences": {},
+          "provider_filter": [],
+          "player_filter": []
+        }
+      },
+      "partial": false
+    }
+  ]
+}

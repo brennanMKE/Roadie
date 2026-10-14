@@ -1,0 +1,11 @@
+{
+  "command": "time",
+  "args": {},
+  "frames": [
+    {
+      "message_id": "1",
+      "result": 1792017208.6202157,
+      "partial": false
+    }
+  ]
+}

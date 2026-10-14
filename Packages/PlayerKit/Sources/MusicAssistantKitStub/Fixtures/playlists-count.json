@@ -1,0 +1,11 @@
+{
+  "command": "music/playlists/count",
+  "args": {},
+  "frames": [
+    {
+      "message_id": "26",
+      "result": 8,
+      "partial": false
+    }
+  ]
+}

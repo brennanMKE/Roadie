@@ -1,0 +1,77 @@
+{
+  "command": "music/albums/library_items",
+  "args": {
+    "limit": 3,
+    "offset": 448,
+    "order_by": "sort_name"
+  },
+  "frames": [
+    {
+      "message_id": "20",
+      "result": [
+        {
+          "item_id": "137",
+          "provider": "library",
+          "name": "Zero",
+          "version": "",
+          "sort_name": "zero",
+          "uri": "library://album/137",
+          "external_ids": [],
+          "is_playable": true,
+          "media_type": "album",
+          "provider_mappings": [
+            {
+              "item_id": "The Smashing Pumpkins/Zero",
+              "provider_domain": "filesystem_smb",
+              "provider_instance": "filesystem_smb--gPeSLx39",
+              "available": true,
+              "in_library": true,
+              "is_unique": null,
+              "audio_format": {
+                "content_type": "?",
+                "codec_type": "?",
+                "sample_rate": 44100,
+                "bit_depth": 16,
+                "channels": 2,
+                "output_format_str": "?",
+                "bit_rate": 0
+              },
+              "url": null,
+              "details": null
+            }
+          ],
+          "metadata": {
+            "images": [
+              {
+                "type": "thumb",
+                "path": "The Smashing Pumpkins/The Smashing Pumpkins - Pennies.mp3",
+                "provider": "filesystem_smb--gPeSLx39",
+                "remotely_accessible": false,
+                "proxy_id": "4aa34013be0c2d57f12dc65ad3367825e6a41939f45bddf5b7b6f6bba102c3ac"
+              }
+            ]
+          },
+          "favorite": false,
+          "year": 1996,
+          "artists": [
+            {
+              "item_id": "96",
+              "provider": "library",
+              "name": "The Smashing Pumpkins",
+              "version": "",
+              "sort_name": "smashing pumpkins, the",
+              "uri": "library://artist/96",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "artist",
+              "available": true
+            }
+          ],
+          "album_type": "unknown",
+          "available": true
+        }
+      ],
+      "partial": false
+    }
+  ]
+}
