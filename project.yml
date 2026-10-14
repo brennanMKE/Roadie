@@ -45,6 +45,8 @@ targets:
         product: LibraryBrowser
       - package: PlayerKit
         product: MusicLibraryKit
+      - package: PlayerKit
+        product: MusicAssistantKit
       # App extensions embed into Contents/PlugIns and are signed on copy (#0043).
       - target: SkinAmpThumbnail
       - target: SkinAmpPreview
@@ -169,3 +171,4 @@ schemes:
         - package: PlayerKit/FolderBackendKitTests
         - package: PlayerKit/LibraryBrowserTests
         - package: PlayerKit/MusicLibraryKitTests
+        - package: PlayerKit/MusicAssistantKitTests

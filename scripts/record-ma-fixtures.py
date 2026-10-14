@@ -3,6 +3,7 @@
 
 Run:   /usr/bin/python3 -I scripts/record-ma-fixtures.py [--out DIR] [--events-seconds N]
 Check: /usr/bin/python3 -I scripts/record-ma-fixtures.py --check
+Live:  /usr/bin/python3 -I scripts/record-ma-fixtures.py --check-live   (read-only drift check, #0061)
 
 Reads MUSIC_ASSISTANT_URL and MUSIC_ASSISTANT_TOKEN from .env itself. The token lives in one
 variable, goes only into the `auth` frame and into Authorization headers of artwork probes, and is
@@ -757,13 +758,333 @@ def check():
     print("secret gate: passed (%d files)" % len(files))
 
 
+# ---------------------------------------------------------------- --check-live (#0061)
+
+class NullLog:
+    def write(self, _text):
+        pass
+
+    def flush(self):
+        pass
+
+
+class LiveReport:
+    """One `live: <check> ok|FAIL (<reason>)` line per check. Reasons carry key names and counts, never values."""
+
+    def __init__(self):
+        self.total = 0
+        self.failed = 0
+
+    def ok(self, name, note=""):
+        self.total += 1
+        print("live: %s ok%s" % (name, (" (" + note + ")") if note else ""))
+
+    def fail(self, name, reason):
+        self.total += 1
+        self.failed += 1
+        print("live: %s FAIL (%s)" % (name, reason))
+
+
+def load_fixture(name):
+    with open(os.path.join(ROOT, FIXTURE_REL, name + ".json"), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def first_item(result):
+    if isinstance(result, list):
+        return result[0] if result else None
+    return result
+
+
+def key_diff(fixture_name, live_result):
+    """(missing key names, count of extra live keys) of the live reply's first item against the fixture's."""
+    fx = load_fixture(fixture_name)
+    want = first_item(result_of(fx))
+    got = first_item(live_result)
+    if not isinstance(want, dict):
+        return None, 0
+    if not isinstance(got, dict):
+        return sorted(want.keys()), 0
+    return sorted(set(want) - set(got)), len(set(got) - set(want))
+
+
+def live_result(rec):
+    """The combined result of a recorded call, or raise on an error frame."""
+    if not rec["frames"]:
+        raise RuntimeError("no reply")
+    if is_error(rec):
+        raise RuntimeError("error frame %s" % rec["frames"][-1].get("error_code"))
+    return result_of(rec)
+
+
+def check_live():
+    base, token = read_env()
+    rep = LiveReport()
+    log = NullLog()
+    session_a = session_b = None
+    try:
+        # 1. info-http
+        info = None
+        try:
+            st, ctype, body = http_get(base, "/info")
+            info = json.loads(body) if st == 200 else None
+            want_keys = set(load_fixture("info-http").keys())
+            if st != 200:
+                rep.fail("info-http", "GET /info returned %d" % st)
+            elif not isinstance(info, dict) or want_keys - set(info):
+                rep.fail("info-http", "missing keys: " + ", ".join(sorted(want_keys - set(info or {}))))
+            elif not isinstance(info.get("schema_version"), int) or info["schema_version"] < 28:
+                rep.fail("info-http", "schema_version below 28")
+            elif info["schema_version"] != 65:
+                rep.ok("info-http", "schema %d; models recorded against 65" % info["schema_version"])
+            else:
+                rep.ok("info-http")
+        except Exception as e:
+            rep.fail("info-http", type(e).__name__)
+
+        # 2. handshake, 3. unauthenticated (socket A, never authenticated)
+        try:
+            session_a = Session(base, log, token)
+            first = session_a.first_frame()
+            if not isinstance(first, dict) or "message_id" in first or "command" in first:
+                rep.fail("handshake", "first frame is not bare server info")
+            elif info is not None and set(first) != set(info):
+                rep.fail("handshake", "key set differs from /info: missing %s, extra %d" % (
+                    ", ".join(sorted(set(info) - set(first))) or "none", len(set(first) - set(info))))
+            elif info is not None and first.get("server_id") != info.get("server_id"):
+                rep.fail("handshake", "server_id differs from /info")
+            else:
+                rep.ok("handshake")
+        except Exception as e:
+            rep.fail("handshake", type(e).__name__)
+        try:
+            rec = session_a.call("players/all")
+            code = rec["frames"][0].get("error_code") if rec["frames"] else None
+            rec_t = session_a.call("time")
+            t = result_of(rec_t)
+            if code != 20:
+                rep.fail("unauthenticated", "players/all before auth answered code %s" % code)
+            elif not isinstance(t, (int, float)) or isinstance(t, bool):
+                rep.fail("unauthenticated", "time did not answer a number")
+            else:
+                rep.ok("unauthenticated")
+        except Exception as e:
+            rep.fail("unauthenticated", type(e).__name__)
+        if session_a:
+            session_a.ws.close()
+
+        # 4. auth (fresh socket B)
+        authed = False
+        try:
+            session_b = Session(base, log, token)
+            session_b.first_frame()
+            rec = session_b.call("auth", {"token": token})
+            f = rec["frames"][0] if rec["frames"] else {}
+            if f.get("error_code") == 23:
+                rep.fail("auth", "token rejected")
+            elif "error_code" in f:
+                rep.fail("auth", "error code %s" % f.get("error_code"))
+            else:
+                res = f.get("result")
+                user = res.get("user") if isinstance(res, dict) else None
+                if not isinstance(res, dict) or res.get("authenticated") is not True:
+                    rep.fail("auth", "authenticated is not true")
+                elif not isinstance(user, dict) or {"user_id", "username", "role"} - set(user):
+                    rep.fail("auth", "user object lacks user_id, username or role")
+                else:
+                    authed = True
+                    rep.ok("auth")
+        except Exception as e:
+            rep.fail("auth", type(e).__name__)
+        if not authed:
+            rep.fail("remaining", "skipped: not authenticated")
+            return rep
+
+        s = session_b
+
+        def call(cmd, args=None, **kw):
+            return s.call(cmd, args, **kw)
+
+        # 5. shapes
+        proxy_ids = []
+        first_track_word = None
+        first_playlist_id = None
+        shapes = [
+            ("artists-page", "music/artists/library_items", {"limit": 1, "offset": 0, "order_by": "sort_name", "album_artists_only": True}),
+            ("albums-page", "music/albums/library_items", {"limit": 1, "offset": 0, "order_by": "sort_name"}),
+            ("tracks-page", "music/tracks/library_items", {"limit": 1, "offset": 0, "order_by": "sort_name"}),
+            ("playlists-page", "music/playlists/library_items", {"limit": 1, "offset": 0, "order_by": "sort_name"}),
+            ("players-all", "players/all", {}),
+            ("player-queues-all", "player_queues/all", {}),
+        ]
+        # use the fixtures' own args for the listings
+        for i, (name, cmd, _a) in enumerate(shapes):
+            fx = load_fixture(name)
+            if cmd.startswith("music/") and "args" in fx:
+                a = dict(fx["args"])
+                a["limit"] = 1
+                a["offset"] = 0
+                shapes[i] = (name, cmd, a)
+        for name, cmd, a in shapes:
+            try:
+                res = live_result(call(cmd, a))
+                missing, extra = key_diff(name, res)
+                if missing:
+                    rep.fail("shapes/" + name, "missing keys: " + ", ".join(missing))
+                else:
+                    rep.ok("shapes/" + name, "%d extra keys" % extra if extra else "")
+                if name == "tracks-page" and isinstance(res, list) and res:
+                    title = res[0].get("name") or ""
+                    words = [w for w in re.split(r"\W+", title) if len(w) > 2]
+                    first_track_word = words[0] if words else (title.split() or [None])[0]
+                if name == "playlists-page" and isinstance(res, list) and res:
+                    first_playlist_id = res[0].get("item_id")
+                for item in (res if isinstance(res, list) else []):
+                    imgs = ((item.get("metadata") or {}).get("images") or []) if isinstance(item, dict) else []
+                    for im in imgs:
+                        if isinstance(im, dict) and im.get("proxy_id"):
+                            proxy_ids.append(im["proxy_id"])
+            except Exception as e:
+                rep.fail("shapes/" + name, str(e) if isinstance(e, RuntimeError) else type(e).__name__)
+        try:
+            a = dict(load_fixture("search").get("args", {}))
+            a["search_query"] = first_track_word or a.get("search_query", "a")
+            a["providers"] = ["library"]
+            res = live_result(call("music/search", a))
+            missing, extra = key_diff("search", res)
+            if missing:
+                rep.fail("shapes/search", "missing keys: " + ", ".join(missing))
+            else:
+                rep.ok("shapes/search", "%d extra keys" % extra if extra else "")
+        except Exception as e:
+            rep.fail("shapes/search", str(e) if isinstance(e, RuntimeError) else type(e).__name__)
+
+        # 6. counts, 7. paging
+        counts = {}
+        try:
+            bad = []
+            for kind in ("artists", "albums", "tracks", "playlists"):
+                a = {"album_artists_only": True} if kind == "artists" else {}
+                n = live_result(call("music/%s/count" % kind, a))
+                if not isinstance(n, int) or isinstance(n, bool):
+                    bad.append(kind)
+                counts[kind] = n
+            if bad:
+                rep.fail("counts", "not an integer: " + ", ".join(bad))
+            else:
+                rep.ok("counts")
+        except Exception as e:
+            rep.fail("counts", str(e) if isinstance(e, RuntimeError) else type(e).__name__)
+        try:
+            n = counts.get("artists")
+            if not isinstance(n, int) or n < 1:
+                rep.fail("paging", "no artist count")
+            else:
+                a = {"limit": 3, "offset": n - 1, "order_by": "sort_name", "album_artists_only": True}
+                res = live_result(call("music/artists/library_items", a))
+                if isinstance(res, list) and len(res) == 1:
+                    rep.ok("paging")
+                else:
+                    rep.fail("paging", "last page has %s items" % (len(res) if isinstance(res, list) else "no"))
+        except Exception as e:
+            rep.fail("paging", str(e) if isinstance(e, RuntimeError) else type(e).__name__)
+
+        # 8. partial
+        try:
+            if not first_playlist_id:
+                rep.fail("partial", "no playlist to read")
+            else:
+                rec = call("music/playlists/playlist_tracks",
+                           {"item_id": first_playlist_id, "provider_instance_id_or_domain": "library"}, timeout=60)
+                fr = rec["frames"]
+                flags = [f.get("partial") for f in fr]
+                if not fr or flags[-1] is not False:
+                    rep.fail("partial", "no final partial:false frame")
+                elif any(f is not True for f in flags[:-1]):
+                    rep.fail("partial", "a frame before the last is not partial:true")
+                elif len(fr) < 2:
+                    rep.fail("partial", "no partial:true frame before the final one")
+                elif any(not isinstance(f.get("result"), list) for f in fr):
+                    rep.fail("partial", "a result is not an array")
+                else:
+                    rep.ok("partial", "%d frames" % len(fr))
+        except Exception as e:
+            rep.fail("partial", type(e).__name__)
+
+        # 9. null-result, 10. error-frame
+        try:
+            rec = call("players/get", {"player_id": "skinamp-no-such-player"})
+            f = rec["frames"][0] if rec["frames"] else {}
+            if "result" in f and f["result"] is None and f.get("partial") is False:
+                rep.ok("null-result")
+            else:
+                rep.fail("null-result", "not a null result with partial:false")
+        except Exception as e:
+            rep.fail("null-result", type(e).__name__)
+        try:
+            rec = call("skinamp/no_such_command", probe=True)
+            f = rec["frames"][0] if rec["frames"] else {}
+            if f.get("error_code") == 12 and isinstance(f.get("details"), str):
+                rep.ok("error-frame")
+            else:
+                rep.fail("error-frame", "expected code 12 with string details, got code %s" % f.get("error_code"))
+        except Exception as e:
+            rep.fail("error-frame", type(e).__name__)
+
+        # 11. artwork (no Authorization header)
+        try:
+            if not proxy_ids:
+                rep.fail("artwork", "no proxy_id seen")
+            else:
+                pid = proxy_ids[0]
+                st256, ct, _b = http_get(base, "/imageproxy/%s?size=256" % pid)
+                st200, _ct, _b = http_get(base, "/imageproxy/%s?size=200" % pid)
+                if st256 == 200 and ct.startswith("image/") and st200 == 400:
+                    rep.ok("artwork")
+                else:
+                    rep.fail("artwork", "size 256 answered %d (%s), size 200 answered %d" % (st256, "image" if ct.startswith("image/") else "not image", st200))
+        except Exception as e:
+            rep.fail("artwork", type(e).__name__)
+
+        # 12. ping (informational), 13. close
+        try:
+            before = s.ws.pings
+            deadline = time.time() + 30
+            while time.time() < deadline:
+                if s.ws.recv(max(0.05, deadline - time.time())) is None:
+                    break
+            n = s.ws.pings - before
+            rep.ok("ping", "%d pings in 30 s" % n)
+        except Exception as e:
+            rep.fail("ping", type(e).__name__)
+        try:
+            s.ws._send_frame(8, struct.pack(">H", 1000))
+            try:
+                s.ws.recv(3)  # the server echoes the close; Closed is the expected end
+            except Closed:
+                pass
+            rep.ok("close")
+        except Exception as e:
+            rep.fail("close", type(e).__name__)
+    finally:
+        for sess in (session_a, session_b):
+            try:
+                if sess:
+                    sess.ws.sock.close()
+            except Exception:
+                pass
+    return rep
+
+
 def main(argv):
-    args = {"out": None, "events_seconds": 30, "check": False}
+    args = {"out": None, "events_seconds": 30, "check": False, "live": False}
     i = 0
     while i < len(argv):
         a = argv[i]
         if a == "--check":
             args["check"] = True
+        elif a == "--check-live":
+            args["live"] = True
         elif a == "--out":
             i += 1
             args["out"] = argv[i]
@@ -773,6 +1094,10 @@ def main(argv):
         else:
             die("unknown argument " + a)
         i += 1
+    if args["live"]:
+        rep = check_live()
+        print("live: %d checks, %d failed" % (rep.total, rep.failed))
+        sys.exit(2 if rep.failed else 0)
     if args["check"]:
         check()
     else:

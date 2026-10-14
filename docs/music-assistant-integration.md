@@ -90,11 +90,13 @@ The `/sendspin` path on 8095 is reserved for the built-in web player and rejects
 ```
 `message_id` is any string; it is echoed back for correlation.
 
-### Connection handshake (VERIFY exact field names in /api-docs or the Python client `music_assistant_client/client.py`)
-1. On connect the server immediately sends a **server info** message (expected fields: `server_id`, `server_version`, `schema_version`, `min_supported_schema_version`, `base_url`, `onboard_done`).
-2. Schema version 28+ requires auth. Expected: send `{"message_id":"…","command":"auth","args":{"token":"<token>"}}` before any other command.
-3. Responses: success carries `result` (large results may stream in chunks flagged `partial`); errors carry `error_code` and `details`. Server-pushed events carry `event`, `object_id`, `data`. **VERIFY all of these.**
-4. Keep alive: the Python client uses a 55 s heartbeat.
+### Connection handshake (recorded in #0060; see [ma-protocol-notes.md](ma-protocol-notes.md))
+1. On connect the server immediately sends a bare **server info** message with twelve fields (`server_id`, `server_version`, `schema_version`, `min_supported_schema_version`, `base_url`, `homeassistant_addon`, `onboard_done`, `name`, `status`, `internal_url`, `external_url`, `has_remote_access`). `GET /info` returns the same without auth.
+2. Schema version 28+ requires auth: send `{"message_id":"1","command":"auth","args":{"token":"<token>"}}` first. A bad token is error 23 and any other command before auth is error 20; the socket stays open either way.
+3. Responses: success is `{"message_id", "result", "partial"}` (`partial` is always present; large results stream as several chunks with the same id, ended by `partial: false`); errors are `{"message_id", "error_code", "details"}`. Server-pushed events are `{"event", "data"}` per the API page; `object_id` is unconfirmed until #0076.
+4. Keep alive: the server pings about every 25 s and `URLSessionWebSocketTask` answers; the client pings on its own to detect a dead link. The "55 s heartbeat" is the Python client's setting.
+
+The client built on this is `MusicAssistantKit` (#0061). `scripts/record-ma-fixtures.py --check-live` re-verifies the shapes against a real server, read-only.
 
 ### Commands confirmed in MA docs
 | Command | Args |
@@ -105,21 +107,21 @@ The `/sendspin` path on 8095 is reserved for the built-in web player and rejects
 | `music/in_progress_items` | `limit?` |
 | `music/favorites/add_item` | `item` (URI or share URL) |
 | `music/sync` | `media_types?`, `providers?` (admin token) |
-| `music/playlists/playlist_tracks` | `item_id`, `provider_instance_or_domain`, `force_refresh?` |
+| `music/playlists/playlist_tracks` | `item_id`, `provider_instance_id_or_domain`, `force_refresh?` |
 | `player_queues/all` | none |
 | `player_queues/items` | `queue_id`, `limit` (keep <= 500), `offset` |
 | `player_queues/play_media` | `queue_id`, `media` (URI), `start_item?` |
 | `config/players/get` / `config/players/save` | `player_id`, `values` |
 
-Expected but **VERIFY** in `/api-docs`: `players/all`, player transport commands (play/pause/next/previous/volume/group), `music/search`, `music/artists/library_items`, `music/albums/library_items`, `music/tracks/library_items`, `start_listening` / event subscription.
+Recorded in the notes: `players/all`, the `players/cmd/*` transport commands, `music/search` (with `providers: ["library"]`), `music/{artists,albums,tracks,playlists}/library_items` plus `*/count`. There is no `start_listening` or subscribe command; events are pushed after `auth`.
 
 ### Identifiers
 - URIs look like `library://album/20`, `library://artist/1`, `plex://…`, `spotify://track/…`. Prefer `library://` URIs so items stay stable across providers.
 - `queue_id` equals `player_id` unless the player is in a group.
-- Artwork: media items carry image metadata; MA serves images through its own proxy on 8095. **VERIFY** the image URL builder in the Python client before hardcoding a path.
+- Artwork: items carry `metadata.images[].proxy_id`; fetch `/imageproxy/<proxy_id>?size=<0|80|160|256|512|1024>` with no credentials (recorded in the notes).
 
 ### Discovery
-- Bonjour service type `_music-assistant._tcp` (used by the third-party Swift app below; **VERIFY** with `dns-sd -B _music-assistant._tcp`). Fall back to a manual host:port field.
+- The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060); use a manual host:port field.
 
 ### Reference implementations worth reading
 - `github.com/music-assistant/client`: official Python client (handshake, models, every controller). Primary source for message shapes.

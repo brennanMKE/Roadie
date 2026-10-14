@@ -16,6 +16,8 @@ let package = Package(
         .library(name: "LibraryBrowser", targets: ["LibraryBrowser"]),
         .library(name: "MusicBackendStub", targets: ["MusicBackendStub"]),
         .library(name: "MusicLibraryKit", targets: ["MusicLibraryKit"]),
+        .library(name: "MusicAssistantKit", targets: ["MusicAssistantKit"]),
+        .library(name: "MusicAssistantKitStub", targets: ["MusicAssistantKitStub"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).
@@ -53,5 +55,11 @@ let package = Package(
         // Artwork cache for the browser and now-playing views. Decodes with ImageIO; Foundation + MusicBackendKit otherwise.
         .target(name: "MusicLibraryKit", dependencies: ["MusicBackendKit"]),
         .testTarget(name: "MusicLibraryKitTests", dependencies: ["MusicLibraryKit", "MusicBackendKit", "MusicBackendStub"]),
+        // Music Assistant WebSocket client, models and the MusicBackend adapter. Foundation + MusicBackendKit only:
+        // never AudioCore, PlexKit, LocalPlayback or TrackCache (#0066 adds local playback behind its own seam).
+        .target(name: "MusicAssistantKit", dependencies: ["MusicBackendKit"]),
+        // Scripted WebSocket/HTTP transports replaying #0060's recorded frames, plus an in-memory token store.
+        .target(name: "MusicAssistantKitStub", dependencies: ["MusicAssistantKit", "MusicBackendKit"], resources: [.copy("Fixtures")]),
+        .testTarget(name: "MusicAssistantKitTests", dependencies: ["MusicAssistantKit", "MusicAssistantKitStub", "MusicBackendKit"]),
     ]
 )
