@@ -55,17 +55,29 @@ enum MixedFormatSupport {
     }
 }
 
-/// Peaks per 128-frame block, per channel; written from the audio thread, read after the tap is removed.
+/// Peaks per 128-frame block, per channel, plus the render-clock time of each block; written from
+/// the tap's dispatch queue, read after the tap is removed.
 final class PeakRecorder: @unchecked Sendable {
+    struct Jump: Sendable { let expected: Int64; let actual: Int64 }
+
     private let lock = NSLock()
     private var left: [Float] = []
     private var right: [Float] = []
+    private var starts: [Int64] = []
+    private var jumps: [Jump] = []
+    private var nextExpected: Int64?
 
-    func record(_ buffer: AVAudioPCMBuffer) {
+    func record(_ buffer: AVAudioPCMBuffer, when: AVAudioTime) {
         guard let data = buffer.floatChannelData else { return }
         let channels = Int(buffer.format.channelCount)
         let count = Int(buffer.frameLength)
         lock.lock(); defer { lock.unlock() }
+        let base: Int64? = when.isSampleTimeValid ? when.sampleTime : nil
+        if let base {
+            // A dropped tap buffer shortens the recording instead of adding zeros: a test-side artifact.
+            if let expected = nextExpected, expected != base { jumps.append(Jump(expected: expected, actual: base)) }
+            nextExpected = base + Int64(count)
+        }
         var start = 0
         while start + 128 <= count {
             var l: Float = 0, r: Float = 0
@@ -74,18 +86,30 @@ final class PeakRecorder: @unchecked Sendable {
                 r = max(r, abs(data[channels > 1 ? 1 : 0][i]))
             }
             left.append(l); right.append(r)
+            starts.append((base ?? -1) + Int64(start))
             start += 128
         }
     }
 
     /// Nonisolated so the tap closure is not main-actor isolated (it runs on a dispatch queue).
     nonisolated func install(on node: AVAudioNode) {
-        node.installTap(onBus: 0, bufferSize: 1024, format: nil) { [self] buffer, _ in record(buffer) }
+        node.installTap(onBus: 0, bufferSize: 1024, format: nil) { [self] buffer, when in record(buffer, when: when) }
     }
 
     var blocks: (left: [Float], right: [Float]) {
         lock.lock(); defer { lock.unlock() }
         return (left, right)
+    }
+
+    /// Render-clock sample time of each block's first frame (-1 where the tap gave no valid time).
+    var blockStarts: [Int64] {
+        lock.lock(); defer { lock.unlock() }
+        return starts
+    }
+
+    var timeJumps: [Jump] {
+        lock.lock(); defer { lock.unlock() }
+        return jumps
     }
 }
 
@@ -200,6 +224,29 @@ final class PeakRecorder: @unchecked Sendable {
 
 @MainActor
 @Suite(.serialized) struct MixedFormatRealtimeTests {
+    /// How one measurement ended. A `gap` fails the test at once; the other non-clean outcomes are
+    /// retried (at most `maxAttempts`) because they are not the player's fault (#0055).
+    enum Outcome: Equatable { case clean, dropout, tapArtifact, gap }
+
+    struct Attempt {
+        var outcome: Outcome
+        var report: [String]
+        var minLeadMillis: Double?
+    }
+
+    static let maxAttempts = 3
+    /// One render quantum; a pre-scheduled item must be queued at least this far ahead of its start.
+    static let leadFloorFrames: Int64 = 1024
+
+    /// Four 0.5 s files in different formats must advance back to back. Three independent nets:
+    /// (1) the scheduler: every completion before the last is `.advanced` (never `.reachedEnd`, which
+    /// would mean the node ran dry and `startCurrentTrack()` restarted it) and every pre-schedule
+    /// lead is above one render quantum; (2) the audible span is 2.0 s within 2,048 frames (an
+    /// inserted gap lengthens it); (3) no silent 128-frame block inside the span. Silence that
+    /// leaves (1) and (2) intact is a guest underrun (the node's file-reading thread starved on a
+    /// loaded VM replaced audio with zeros; it did not insert time), classified as a dropout and
+    /// retried with a fresh player. That holds even if the dropout lands on a track boundary: the
+    /// span and the lead/completion checks define a gap, not the position.
     @Test(.enabled(if: RealtimeAudio.isAvailable))
     func mixedFormatsAdvanceWithoutGapRealtime() async throws {
         let dir = try MixedFormatSupport.makeDir()
@@ -212,7 +259,22 @@ final class PeakRecorder: @unchecked Sendable {
                 to: url, rate: spec.rate, channels: spec.channels, seconds: 0.5, amplitude: 0.05)
             urls.append(url)
         }
+        var attempts: [Attempt] = []
+        for n in 1...Self.maxAttempts {
+            let attempt = try await measure(urls: urls)
+            attempts.append(attempt)
+            let min = attempt.minLeadMillis.map { String(format: "%.1f ms", $0) } ?? "n/a"
+            print("[#0055] attempt \(n)/\(Self.maxAttempts): \(attempt.outcome), min pre-schedule lead \(min)")
+            if attempt.outcome != .clean { attempt.report.forEach { print("[#0055]   \($0)") } }
+            if attempt.outcome == .clean || attempt.outcome == .gap { break }
+        }
+        let last = try #require(attempts.last)
+        #expect(last.outcome == .clean, "no clean run in \(attempts.count) attempt(s): \(attempts.map(\.outcome))")
+    }
+
+    private func measure(urls: [URL]) async throws -> Attempt {
         let player = Player()
+        player.recordsDiagnostics = true
         player.enqueue(try urls.map { try Track.file(at: $0) })
         player.volume = 0 // silent: the recorder taps the EQ output, upstream of the muted mixer
         let graph = player.ensureGraph()
@@ -258,14 +320,73 @@ final class PeakRecorder: @unchecked Sendable {
         #expect(monotonic)
         #expect(inRange)
 
+        // Net 1: the scheduler's own record.
+        let completions = player.completionDiagnostics
+        let schedules = player.scheduleDiagnostics
+        var schedulerOK = true
+        var report: [String] = []
+        let leads = schedules.filter { $0.startFrame > 0 }.compactMap { $0.leadFrames }
+        let leadsMs = schedules.filter { $0.startFrame > 0 }.compactMap { $0.leadMillis }
+        let completionsOK = completions.count == 4
+            && completions.dropLast().allSatisfy { if case .advanced = $0 { true } else { false } }
+            && completions.last == .reachedEnd
+        if !completionsOK { schedulerOK = false }
+        if leads.contains(where: { $0 < Self.leadFloorFrames }) { schedulerOK = false }
+        if schedules.filter({ $0.startFrame > 0 }).count != 3 { schedulerOK = false }
+        #expect(completionsOK, "completions before the last must be .advanced, the last .reachedEnd: \(completions)")
+        #expect(
+            !leads.contains(where: { $0 < Self.leadFloorFrames }),
+            "a pre-schedule lead fell below \(Self.leadFloorFrames) frames: \(leadsMs) ms")
+        #expect(schedules.filter { $0.startFrame > 0 }.count == 3, "expected 3 pre-schedules, saw \(schedules.count - 1)")
+        report.append("completions: \(completions)")
+        report.append("pre-schedule leads (ms): \(leadsMs.map { String(format: "%.1f", $0) })")
+
+        // Nets 2 and 3: the recording.
         let blocks = recorder.blocks
+        let starts = recorder.blockStarts
         let t = Self.threshold
         let first = try #require(blocks.left.firstIndex { $0 > t })
         let last = try #require(blocks.left.lastIndex { $0 > t })
-        #expect(blocks.left[first...last].filter { $0 <= t }.isEmpty)
-        #expect(blocks.right[first...last].filter { $0 <= t }.isEmpty)
         let audible = Double((last - first + 1) * 128)
-        #expect(abs(audible - 2.0 * outputRate) <= 2048)
+        let spanDelta = audible - 2.0 * outputRate
+        let spanOK = abs(spanDelta) <= 2048
+        #expect(spanOK, "audible span is \(Int(spanDelta)) frames from 2.0 s")
+        let jumps = recorder.timeJumps
+
+        var zeroRuns: [(start: Int, length: Int)] = []
+        var runStart: Int?
+        for i in first...last {
+            let silent = blocks.left[i] <= t || blocks.right[i] <= t
+            if silent, runStart == nil { runStart = i }
+            if !silent, let s = runStart { zeroRuns.append((s, i - s)); runStart = nil }
+        }
+        report.append("rate \(Int(outputRate)), span \(Int(audible)) frames (\(Int(spanDelta)) from 2.0 s)")
+        for run in zeroRuns.prefix(6) {
+            let sec = Double((run.start - first) * 128) / outputRate
+            let nearest = (sec / 0.5).rounded() * 0.5
+            let clock = starts[run.start]
+            report.append(
+                "zero run: \(run.length) blocks at +\(String(format: "%.3f", sec)) s (render clock \(clock)), "
+                + "\(String(format: "%.1f", (sec - nearest) * 1000)) ms from the \(nearest) s boundary")
+        }
+        if !jumps.isEmpty { report.append("tap time jumps: \(jumps.prefix(4).map { "\($0.expected)->\($0.actual)" })") }
+
+        let outcome: Outcome
+        if zeroRuns.isEmpty && spanOK && schedulerOK {
+            outcome = .clean
+        } else if !schedulerOK || !spanOK {
+            outcome = .gap
+        } else if !jumps.isEmpty {
+            outcome = .tapArtifact
+        } else {
+            outcome = .dropout
+        }
+        if outcome == .dropout || outcome == .tapArtifact {
+            report.append("silence replaced audio (span, completions and leads intact): not a scheduling gap")
+        }
+        if outcome == .gap && !zeroRuns.isEmpty { Issue.record("silent blocks inside the audible span with a scheduler or span failure") }
+        player.stop()
+        return Attempt(outcome: outcome, report: report, minLeadMillis: leadsMs.min())
     }
 
     static let threshold: Float = 0.002

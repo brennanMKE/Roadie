@@ -103,6 +103,10 @@ public final class Player: NowPlayingCommandTarget {
     /// Spectrum / oscilloscope source for the visualizer. Pull `latestFrame()` from the main
     /// thread at 30-60 Hz; it is installed on the mixer whenever the engine starts.
     @ObservationIgnored public let analyzer = AnalyzerTap()
+    /// Test-only: when on, `schedule` and `segmentFinished` append to the capped diagnostic arrays below.
+    @ObservationIgnored var recordsDiagnostics = false
+    @ObservationIgnored private(set) var scheduleDiagnostics: [ScheduleDiagnostic] = []
+    @ObservationIgnored private(set) var completionDiagnostics: [GaplessScheduler.CompletionOutcome] = []
     @ObservationIgnored private var file: AVAudioFile?
     /// The pre-scheduled file behind `file`, if any (its track is `scheduler.scheduledNextTrackID`).
     @ObservationIgnored private var nextFile: AVAudioFile?
@@ -329,6 +333,11 @@ public final class Player: NowPlayingCommandTarget {
                 fileFrames: remaining, fileSampleRate: fileRate, nodeSampleRate: nodeRate),
             seekOffset: Double(frame) / fileRate)
         let token = item.token
+        if recordsDiagnostics {
+            record(ScheduleDiagnostic(
+                trackID: id, startFrame: item.startFrame, nodeSampleTimeAtSchedule: nodeSampleTime(),
+                nodeSampleRate: nodeRate))
+        }
         graph.playerNode.scheduleSegment(
             file, startingFrame: frame, frameCount: AVAudioFrameCount(clamping: remaining), at: nil,
             completionCallbackType: .dataPlayedBack
@@ -385,7 +394,9 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     private func segmentFinished(_ token: ScheduleToken) {
-        switch scheduler.complete(token) {
+        let outcome = scheduler.complete(token)
+        if recordsDiagnostics { record(outcome) }
+        switch outcome {
         case .stale:
             break
         case .advanced(let id):
@@ -443,6 +454,24 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     // MARK: Graph
+
+    /// The player node's own sample timeline now, or nil before the first render.
+    private func nodeSampleTime() -> Int64? {
+        guard let node = _graph?.playerNode, let renderTime = node.lastRenderTime,
+              renderTime.isSampleTimeValid || renderTime.isHostTimeValid,
+              let playerTime = node.playerTime(forNodeTime: renderTime) else { return nil }
+        return playerTime.sampleTime
+    }
+
+    private func record(_ diagnostic: ScheduleDiagnostic) {
+        scheduleDiagnostics.append(diagnostic)
+        if scheduleDiagnostics.count > 32 { scheduleDiagnostics.removeFirst() }
+    }
+
+    private func record(_ outcome: GaplessScheduler.CompletionOutcome) {
+        completionDiagnostics.append(outcome)
+        if completionDiagnostics.count > 32 { completionDiagnostics.removeFirst() }
+    }
 
     /// Whether a following file is queued on the node (tests).
     var hasPreScheduledNext: Bool { scheduler.scheduledNextTrackID != nil }
@@ -503,4 +532,18 @@ public enum PlayerEvent: Sendable {
     case trackChanged(Track?)
     case stateChanged(PlaybackState)
     case seeked(TimeInterval)
+}
+
+/// One `scheduleSegment` call as seen on the player node's timeline (tests, #0055).
+struct ScheduleDiagnostic: Sendable {
+    let trackID: UUID
+    let startFrame: Int64
+    /// The node's sample time when the segment was queued; nil before the first render.
+    let nodeSampleTimeAtSchedule: Int64?
+    let nodeSampleRate: Double
+    let wallClock = ContinuousClock.now
+
+    /// Frames between "now" on the node and where this segment starts; nil if unknown.
+    var leadFrames: Int64? { nodeSampleTimeAtSchedule.map { startFrame - $0 } }
+    var leadMillis: Double? { leadFrames.map { Double($0) / nodeSampleRate * 1000 } }
 }

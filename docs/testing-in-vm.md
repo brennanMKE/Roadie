@@ -13,6 +13,8 @@ the golden image itself.
 scripts/run-tests-vm.sh            # working tree: SkinKit tests, PlayerKit tests, app build, Info.plist check
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s, then quit it
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
+scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
+scripts/run-tests-vm.sh --stress 30 --load  # same, with four CPU hogs running in the guest
 ```
 
 A run takes a few minutes: about 15 s to boot, then SwiftPM resolution and the builds, since every
@@ -144,7 +146,10 @@ consolidated on 2026-10-11.
    record the audio devices.
 7. **Steps.** Each runs in the guest with its output teed to a log: SkinKit tests, PlayerKit tests
    (with `AUDIOCORE_REALTIME=1`, so the real-time tests run too), the Debug app build, the Info.plist check of the built app, and with `--launch`, opening the app, checking
-   it is still running after 5 s, and quitting it. `set -o pipefail` is set **inside the guest's
+   it is still running after 5 s, and quitting it. With `--stress N` a `playerkit-stress` step follows
+   the PlayerKit tests: `scripts/stress-realtime-gapless.sh` repeats the real-time gapless test N times
+   against the built binary (`--load` adds four `yes` hogs, killed by an `EXIT` trap) and prints
+   `stress: <fails>/<N> failed`; it also saves the guest's CoreAudio log as `guest-coreaudio.log`. `set -o pipefail` is set **inside the guest's
    shell**; without it the status is `tee`'s, which is always 0. Changeover reported false passes
    that way until 2026-10-04.
 8. **Pull results** with `tart exec … tar -cf - . | tar -x`, into `build/vm-tests/<run-id>/`.

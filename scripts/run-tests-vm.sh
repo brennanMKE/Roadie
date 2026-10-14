@@ -7,9 +7,11 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--launch]
+# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--stress N [--load]]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
+#   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
+#   --load      with --stress: run four CPU hogs in the guest during the loop
 #
 # In the guest, in order:
 #   1. swift test --package-path Packages/SkinKit
@@ -24,14 +26,22 @@ set -euo pipefail
 
 USE_HEAD=0
 LAUNCH=0
-for arg in "$@"; do
+STRESS=0
+LOAD=0
+args=("$@")
+while (( $#args )); do
+  arg=$args[1]; shift args
   case "$arg" in
     --head) USE_HEAD=1 ;;
     --launch) LAUNCH=1 ;;
-    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
+    --stress) STRESS=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS" == <1-> ]] || { print -r -- "--stress needs a positive count" >&2; exit 2 } ;;
+    --load) LOAD=1 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
+
+(( LOAD && ! STRESS )) && { print -r -- "--load needs --stress N" >&2; exit 2 }
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
@@ -162,6 +172,9 @@ run_step skinkit-tests   "swift test --package-path Packages/SkinKit"
 # The real-time tests run here too: the guest's virtual output device has no path to
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
 run_step playerkit-tests "AUDIOCORE_REALTIME=1 swift test --package-path Packages/PlayerKit"
+if (( STRESS )); then
+  run_step playerkit-stress "scripts/stress-realtime-gapless.sh $STRESS $LOAD"
+fi
 run_step app-build       "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Debug -derivedDataPath build/DerivedData build"
 run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/SkinAmp.app/Contents/Info.plist"
 if (( LAUNCH )); then
@@ -185,7 +198,7 @@ overall=0
 for name in ${(k)step_rc}; do
   if (( step_rc[$name] == 0 )); then log "PASS  $name"; else log "FAIL  $name (exit ${step_rc[$name]})"; overall=1; fi
 done
-grep -hE 'Test run with|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
+grep -hE 'Test run with|stress:|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
   overall=1
