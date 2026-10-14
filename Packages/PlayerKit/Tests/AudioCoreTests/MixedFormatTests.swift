@@ -333,11 +333,14 @@ final class PeakRecorder: @unchecked Sendable {
         if !completionsOK { schedulerOK = false }
         if leads.contains(where: { $0 < Self.leadFloorFrames }) { schedulerOK = false }
         if schedules.filter({ $0.startFrame > 0 }).count != 3 { schedulerOK = false }
+        // A pre-schedule with no node time would skip the lead check; require all three leads.
+        if leads.count != 3 { schedulerOK = false }
         #expect(completionsOK, "completions before the last must be .advanced, the last .reachedEnd: \(completions)")
         #expect(
             !leads.contains(where: { $0 < Self.leadFloorFrames }),
             "a pre-schedule lead fell below \(Self.leadFloorFrames) frames: \(leadsMs) ms")
         #expect(schedules.filter { $0.startFrame > 0 }.count == 3, "expected 3 pre-schedules, saw \(schedules.count - 1)")
+        #expect(leads.count == 3, "every pre-schedule must have a node-timeline lead: \(leads.count) of 3")
         report.append("completions: \(completions)")
         report.append("pre-schedule leads (ms): \(leadsMs.map { String(format: "%.1f", $0) })")
 
