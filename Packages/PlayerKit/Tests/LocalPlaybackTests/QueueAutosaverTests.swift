@@ -67,4 +67,18 @@ import Testing
         #expect(saver.saveCount == 0)
         #expect(!FileManager.default.fileExists(atPath: store.fileURL.path))
     }
+
+    @Test func flushWithoutChangesLeavesTheFileAlone() throws {
+        let (dir, store) = makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let newer = Data(#"{"version":2,"items":[],"repeat":"off","shuffle":false}"#.utf8)
+        try newer.write(to: store.fileURL)
+        #expect(store.load() == nil)
+        let saver = QueueAutosaver(output: LocalPlayerOutput(player: Player()), store: store, delay: .milliseconds(50))
+        saver.start()
+        saver.flush()
+        #expect(saver.saveCount == 0)
+        #expect(try Data(contentsOf: store.fileURL) == newer)
+    }
 }

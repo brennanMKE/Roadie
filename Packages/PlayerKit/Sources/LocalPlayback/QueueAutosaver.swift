@@ -13,6 +13,9 @@ public final class QueueAutosaver {
     private var pending: Task<Void, Never>?
     /// The last off-main write; the next one waits for it so an older snapshot can never land after a newer one.
     private var lastWrite: Task<Void, Never>?
+    /// The queue as it was when saving started; a quit with no change since leaves the file as found
+    /// (an unreadable or newer-version file is not replaced by an empty queue).
+    private var baseline: QueueSnapshot?
     private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "QueueAutosaver")
 
     /// Saves started so far (tests).
@@ -28,6 +31,7 @@ public final class QueueAutosaver {
     public func start() {
         guard !started else { return }
         started = true
+        baseline = output.queueSnapshot()
         observe()
     }
 
@@ -36,6 +40,7 @@ public final class QueueAutosaver {
         pending?.cancel()
         pending = nil
         let snapshot = output.queueSnapshot()
+        if saveCount == 0, snapshot == baseline { return }
         saveCount += 1
         do { try store.save(snapshot) } catch {
             log.error("could not save the queue: \(error.localizedDescription, privacy: .public)")
