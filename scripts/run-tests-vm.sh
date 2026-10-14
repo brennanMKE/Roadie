@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]] [--corpus DIR [--corpus-sample N]]
+# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
 #   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds steps skintool and skintool-png, runs sampleSkinsAreOk
@@ -19,6 +19,8 @@
 #                 as a second virtio-fs share, copied to the guest disk, then steps corpus-run and corpus-report; the
 #                 corpus never enters git or the export. Results in build/vm-tests/<run-id>/corpus/
 #   --corpus-sample N  with --corpus: only a seeded sample of N unique skins (the fast loop; 1000 is the acceptance sample)
+#   --spike  also build, test and smoke-launch the AirPlay routing spike harness (#0050): steps spike-tests, spike-build, spike-smoke;
+#            the smoke launch constructs every engine and never plays
 #
 # In the guest, in order:
 #   1. swift test --package-path Packages/SkinKit     (SKIN_SAMPLES_DIR=Skins with --skins)
@@ -37,6 +39,7 @@ USE_HEAD=0
 LAUNCH=0
 STRESS=0
 LOAD=0
+SPIKE=0
 SKINS_DIR=""
 REFS_DIR=""
 CORPUS_DIR=""
@@ -49,11 +52,12 @@ while (( $#args )); do
     --launch) LAUNCH=1 ;;
     --stress) STRESS=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS" == <1-> ]] || { print -r -- "--stress needs a positive count" >&2; exit 2 } ;;
     --load) LOAD=1 ;;
+    --spike) SPIKE=1 ;;
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
     --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
     --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
     --corpus-sample) CORPUS_SAMPLE=${args[1]:-}; shift args 2>/dev/null; [[ "$CORPUS_SAMPLE" == <1-> ]] || { print -r -- "--corpus-sample needs a positive count" >&2; exit 2 } ;;
-    -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -151,6 +155,8 @@ else
 fi
 # SkinAmp.xcodeproj is gitignored; generate it here so the guest needs no XcodeGen.
 xcodegen generate --quiet --spec "$EXPORT/src/project.yml"
+# The AirPlay spike is its own XcodeGen project (#0050); generate it here too.
+(( SPIKE )) && xcodegen generate --quiet --spec "$EXPORT/src/Spikes/AirPlaySpike/project.yml"
 # Sample skins are never committed; with --skins they go into the throwaway export only.
 if [[ -n "$SKINS_DIR" ]]; then
   mkdir -p "$EXPORT/src/Skins"
@@ -236,6 +242,14 @@ if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/SkinAmp.app && sleep 5 && pgrep -x SkinAmp && osascript -e 'quit app \"SkinAmp\"' && sleep 1 && ! pgrep -x SkinAmp"
 fi
 
+if (( SPIKE )); then
+  # check-sdk.sh prints the long-form SDK findings into spike-tests.log first. The smoke launch must never play audio:
+  # it constructs every engine and exits; open -W returns when the app quits, the grep is the real pass condition.
+  run_step spike-tests "Spikes/AirPlaySpike/check-sdk.sh && swift test --package-path Spikes/AirPlaySpike/SpikeKit"
+  run_step spike-build "xcodebuild -project Spikes/AirPlaySpike/AirPlaySpike.xcodeproj -scheme AirPlaySpike -configuration Debug -derivedDataPath build/DerivedData-spike build"
+  run_step spike-smoke "mkdir -p $GUEST_RESULTS/spike && open -W -n build/DerivedData-spike/Build/Products/Debug/AirPlaySpike.app --args --smoke --log-dir $GUEST_RESULTS/spike && grep -q 'smoke: ok' $GUEST_RESULTS/spike/smoke.log && cat $GUEST_RESULTS/spike/smoke.log && ! pgrep -x AirPlaySpike"
+fi
+
 if [[ -n "$CORPUS_DIR" ]]; then
   # Copy the read-only share to the guest disk when it fits (corpus size plus 2 GiB free); else read it in place.
   corpus_in_place=1
@@ -277,7 +291,7 @@ overall=0
 for name in ${(k)step_rc}; do
   if (( step_rc[$name] == 0 )); then log "PASS  $name"; else log "FAIL  $name (exit ${step_rc[$name]})"; overall=1; fi
 done
-grep -hE 'Test run with|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
+grep -hE 'Test run with|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
   overall=1

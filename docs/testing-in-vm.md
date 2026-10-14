@@ -15,6 +15,7 @@ scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 
 scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
 scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
 scripts/run-tests-vm.sh --skins "untitled folder" --references build/webamp-reference  # also diff each skin's skintool --png render against them
+scripts/run-tests-vm.sh --spike    # also build, test and smoke-launch the AirPlay routing spike harness (#0050); never plays
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
 scripts/run-tests-vm.sh --stress 30 --load  # same, with four CPU hogs running in the guest
