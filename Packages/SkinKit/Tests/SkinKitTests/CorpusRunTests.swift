@@ -187,6 +187,24 @@ private enum CorpusFixtures {
         #expect(results.filter { $0.path == "a.wsz" }.count == 1)
     }
 
+    @Test func resumeAfterATornLastLineKeepsTheNextRecord() throws {
+        let corpus = CorpusFixtures.tempDirectory(), out = CorpusFixtures.tempDirectory()
+        defer { try? FileManager.default.removeItem(at: corpus); try? FileManager.default.removeItem(at: out) }
+        for name in ["a", "b"] { try Data(name.utf8).write(to: corpus.appending(path: "\(name).wsz")) }
+        var startA = CorpusRecord(event: "start")
+        startA.path = "a.wsz"; startA.i = 0
+        var journal = try JSONEncoder().encode(startA)
+        journal.append(0x0A)
+        journal.append(Data(#"{"event":"start","path":"b.ws"#.utf8))  // killed mid-write, no newline
+        try journal.write(to: out.appending(path: "results.jsonl"))
+
+        let hooks = CorpusFixtures.hooks(process: { _ in CorpusFixtures.okOutcome })
+        _ = try CorpusFixtures.runner(corpus, out, config: CorpusFixtures.config(resume: true), hooks: hooks).run()
+        let results = CorpusFixtures.results(out).filter { $0.event == "result" }
+        #expect(results.first { $0.path == "a.wsz" }?.status == "crashed")
+        #expect(results.first { $0.path == "b.wsz" }?.status == "ok")
+    }
+
     @Test func sampleIsDeterministic() {
         let names = (0..<5000).map { "skin\($0)" }
         let first = CorpusSample.pick(names, n: 1000, seed: 1)

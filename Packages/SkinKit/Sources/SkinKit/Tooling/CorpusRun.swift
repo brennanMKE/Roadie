@@ -179,7 +179,14 @@ public final class CorpusRunner: @unchecked Sendable {
         // A first run under the wrapper (which always passes --resume) has no journal yet.
         if !config.resume || !FileManager.default.fileExists(atPath: resultsURL.path) { try Data().write(to: resultsURL) }
         handle = try FileHandle(forWritingTo: resultsURL)
-        try handle?.seekToEnd()
+        let length = try handle?.seekToEnd() ?? 0
+        // A process killed mid-write leaves a torn last line; end it so the next record starts on its own line
+        // (readRecords skips the torn fragment instead of losing the record appended to it).
+        if length > 0, let reader = try? FileHandle(forReadingFrom: resultsURL) {
+            defer { try? reader.close() }
+            try reader.seek(toOffset: length - 1)
+            if reader.readData(ofLength: 1) != Data([0x0A]) { try handle?.write(contentsOf: Data([0x0A])) }
+        }
         defer { try? handle?.close() }
 
         var totals = Totals()
@@ -239,7 +246,8 @@ public final class CorpusRunner: @unchecked Sendable {
             write(start)
 
             let began = ProcessInfo.processInfo.systemUptime
-            let outcome = hooks.process(url)
+            // ImageIO and CFData bridging autorelease; drain per skin so 100k skins do not accumulate.
+            let outcome = autoreleasepool { hooks.process(url) }
             let elapsed = (ProcessInfo.processInfo.systemUptime - began) * 1000
 
             var result = CorpusRecord(event: "result")
