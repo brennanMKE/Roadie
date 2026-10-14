@@ -12,6 +12,7 @@ the golden image itself.
 ```bash
 scripts/run-tests-vm.sh            # working tree: SkinKit tests, PlayerKit tests, app build, Info.plist check
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s, then quit it
+scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
 scripts/run-tests-vm.sh --stress 30 --load  # same, with four CPU hogs running in the guest

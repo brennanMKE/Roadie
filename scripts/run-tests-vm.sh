@@ -7,14 +7,16 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--stress N [--load]]
+# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR] [--stress N [--load]]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
+#   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds step skintool and runs sampleSkinsAreOk
 #   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
 #   --load      with --stress: run four CPU hogs in the guest during the loop
 #
 # In the guest, in order:
-#   1. swift test --package-path Packages/SkinKit
+#   1. swift test --package-path Packages/SkinKit     (SKIN_SAMPLES_DIR=Skins with --skins)
+#      skintool Skins/ (only with --skins; fails unless every skin is ok)
 #   2. swift test --package-path Packages/PlayerKit   (AUDIOCORE_REALTIME=1, muted)
 #   3. xcodebuild ... build                             (project generated on the host)
 #   4. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
@@ -28,6 +30,7 @@ USE_HEAD=0
 LAUNCH=0
 STRESS=0
 LOAD=0
+SKINS_DIR=""
 args=("$@")
 while (( $#args )); do
   arg=$args[1]; shift args
@@ -36,7 +39,8 @@ while (( $#args )); do
     --launch) LAUNCH=1 ;;
     --stress) STRESS=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS" == <1-> ]] || { print -r -- "--stress needs a positive count" >&2; exit 2 } ;;
     --load) LOAD=1 ;;
-    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
+    --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
+    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -127,6 +131,12 @@ else
 fi
 # SkinAmp.xcodeproj is gitignored; generate it here so the guest needs no XcodeGen.
 xcodegen generate --quiet --spec "$EXPORT/src/project.yml"
+# Sample skins are never committed; with --skins they go into the throwaway export only.
+if [[ -n "$SKINS_DIR" ]]; then
+  mkdir -p "$EXPORT/src/Skins"
+  cp "$SKINS_DIR"/*.wsz "$EXPORT/src/Skins/" || fail "No .wsz files in $SKINS_DIR"
+  log "Copied $(ls "$EXPORT/src/Skins" | wc -l | tr -d ' ') skins from $SKINS_DIR into the export"
+fi
 
 # --- Clone and boot --------------------------------------------------------
 
@@ -168,7 +178,12 @@ run_step() {
   set -e
 }
 
-run_step skinkit-tests   "swift test --package-path Packages/SkinKit"
+if [[ -n "$SKINS_DIR" ]]; then
+  run_step skinkit-tests "SKIN_SAMPLES_DIR=$GUEST_SRC/Skins swift test --package-path Packages/SkinKit"
+  run_step skintool      "swift run --package-path Packages/SkinKit skintool -v Skins/"
+else
+  run_step skinkit-tests "swift test --package-path Packages/SkinKit"
+fi
 # The real-time tests run here too: the guest's virtual output device has no path to
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
 run_step playerkit-tests "AUDIOCORE_REALTIME=1 swift test --package-path Packages/PlayerKit"

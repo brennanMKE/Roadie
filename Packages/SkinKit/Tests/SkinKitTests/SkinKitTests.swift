@@ -22,7 +22,10 @@ struct SkinKitTests {
     @Test func visColorsTolerateCommentsAndCRLF() {
         let text = "24,33,41, // background\r\n255 255 255\r\n"
         let colors = VisColorParser.parse(Data(text.utf8))
-        #expect(colors == [RGBColor(red: 24, green: 33, blue: 41), RGBColor(red: 255, green: 255, blue: 255)])
+        #expect(colors.count == 24)
+        #expect(colors[0] == RGBColor(red: 24, green: 33, blue: 41))
+        #expect(colors[1] == RGBColor(red: 255, green: 255, blue: 255))
+        #expect(colors[2] == VisColorParser.defaults[2])
     }
 
     /// Set SKIN_CORPUS_DIR to a folder of .wsz files to run against the real corpus.

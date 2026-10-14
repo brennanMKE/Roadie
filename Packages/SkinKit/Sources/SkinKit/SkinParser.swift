@@ -15,9 +15,11 @@ public enum SkinParser {
 
         var sheets: [String: CGImage] = [:]
         var warnings: [String] = []
+        var fallbacks: [String] = []
+        var missing: Set<String> = []
         for sheet in SkinSprites.sheets.keys.sorted() {
             guard let data = archive.file(sheet, extensions: ["bmp", "png"]) else {
-                warnings.append("Missing \(sheet.lowercased()).bmp")
+                missing.insert(sheet)
                 continue
             }
             guard let image = BitmapLoader.image(from: data) else {
@@ -28,16 +30,40 @@ public enum SkinParser {
         }
         guard !sheets.isEmpty else { throw .noBitmaps }
 
-        var visColors: [RGBColor] = []
-        if let data = archive.file("viscolor", extensions: ["txt"]) {
-            visColors = VisColorParser.parse(data)
+        // Sheets that are required warn; optional ones are covered by a Webamp fallback (see Skin.resolve).
+        for sheet in missing.sorted() where !SkinSprites.optionalSheets.contains(sheet) {
+            warnings.append("Missing \(sheet.lowercased()).bmp")
         }
-        if visColors.count != 24 {
-            warnings.append("viscolor.txt missing or incomplete (\(visColors.count)/24)")
+        if missing.contains("BALANCE"), sheets["VOLUME"] != nil {
+            fallbacks.append("balance.bmp missing; balance slider uses volume.bmp")
+        }
+        if missing.contains("NUMBERS"), missing.contains("NUMS_EX") {
+            warnings.append("Missing numbers.bmp and nums_ex.bmp")
+        } else if missing.contains("NUMS_EX") {
+            fallbacks.append("nums_ex.bmp missing; digits use numbers.bmp")
+        } else if missing.contains("NUMBERS") {
+            fallbacks.append("numbers.bmp missing; digits use nums_ex.bmp")
+        }
+        if missing.contains("EQ_EX") {
+            fallbacks.append("eq_ex.bmp missing; EQ maximize button uses eqmain.bmp")
+        }
+        if missing.contains("GEN") {
+            fallbacks.append("gen.bmp missing (not used in v1)")
+        }
+
+        var visColors = VisColorParser.defaults
+        if let data = archive.file("viscolor", extensions: ["txt"]) {
+            let parsed = VisColorParser.parseCounted(data)
+            visColors = parsed.colors
+            if parsed.parsedCount < 24 {
+                fallbacks.append("viscolor.txt has \(parsed.parsedCount) of 24 colours; defaults for \(parsed.parsedCount == 23 ? "23" : "\(parsed.parsedCount)\u{2013}23")")
+            }
+        } else {
+            fallbacks.append("viscolor.txt missing; Webamp defaults")
         }
 
         // TODO: pledit.txt, region.txt, TEXT font sprites, cursors, base-skin fallback.
-        return Skin(sheets: sheets, visColors: visColors, warnings: warnings)
+        return Skin(sheets: sheets, visColors: visColors, warnings: warnings, fallbacks: fallbacks)
     }
 }
 
