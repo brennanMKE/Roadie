@@ -111,4 +111,15 @@ struct MainSlidersTests {
         #expect(MainSliders.spriteName(.equalizer, selected: true, pressed: true) == "MAIN_EQ_BUTTON_DEPRESSED_SELECTED")
         #expect(MainSliders.spriteName(.playlist, selected: true, pressed: false) == "MAIN_PLAYLIST_BUTTON_SELECTED")
     }
+
+    @Test func eqShadeSlidersMatchWebampCSS() {
+        let volume = MainSliders.eqShadeVolume
+        #expect(volume.origin == CGPoint(x: 61, y: 4) && volume.size == CGSize(width: 97, height: 6))
+        #expect(volume.thumbSize == CGSize(width: 3, height: 7) && volume.travel == 94)
+        let balance = MainSliders.eqShadeBalance
+        #expect(balance.origin == CGPoint(x: 164, y: 4) && balance.size == CGSize(width: 43, height: 6) && balance.travel == 40)
+        #expect(MainSliders.shadeSegment(fraction: 0) == .left && MainSliders.shadeSegment(fraction: 0.24) == .left)
+        #expect(MainSliders.shadeSegment(fraction: 0.25) == .center && MainSliders.shadeSegment(fraction: 0.74) == .center)
+        #expect(MainSliders.shadeSegment(fraction: 0.75) == .right && MainSliders.shadeSegment(fraction: 1) == .right)
+    }
 }

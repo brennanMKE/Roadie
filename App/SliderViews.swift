@@ -6,7 +6,8 @@ import SwiftUI
 struct SkinSlider: View {
     let skin: Skin
     let slider: MainSliders.Slider
-    let backgroundName: String
+    /// nil when the strip behind already paints the track (the equalizer's shade sliders).
+    let backgroundName: String?
     let thumbName: String
     let thumbPressedName: String
     /// Frame of a multi-frame background (volume, balance); nil for the position bar.
@@ -38,6 +39,12 @@ struct SkinSlider: View {
     }
 
     @ViewBuilder private var background: some View {
+        if let backgroundName {
+            trackImage(backgroundName)
+        }
+    }
+
+    @ViewBuilder private func trackImage(_ backgroundName: String) -> some View {
         if let frame {
             if let image = skin.image(for: backgroundName, frame: frame) {
                 Image(decorative: image, scale: 1).interpolation(.none)

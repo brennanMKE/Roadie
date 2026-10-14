@@ -50,6 +50,24 @@ public enum MainSliders {
         return "MAIN_SHADE_POSITION_THUMB"
     }
 
+    /// The equalizer's shade-strip volume and balance: only the 3x7 thumb is drawn (the strip paints the tracks), on
+    /// a 6-high input at y 4 (css/equalizer-window.css 28-53).
+    public static let eqShadeVolume = Slider(
+        origin: CGPoint(x: 61, y: 4), size: CGSize(width: 97, height: 6),
+        thumbSize: CGSize(width: 3, height: 7), thumbInsetY: 0, travel: 94)
+    public static let eqShadeBalance = Slider(
+        origin: CGPoint(x: 164, y: 4), size: CGSize(width: 43, height: 6),
+        thumbSize: CGSize(width: 3, height: 7), thumbInsetY: 0, travel: 40)
+
+    public enum ShadeSegment: Sendable { case left, center, right }
+
+    /// EqualizerShade.tsx 17-19, utils.ts `segment`: the thumb sprite by thirds, `round(fraction * 2)`.
+    public static func shadeSegment(fraction: Double) -> ShadeSegment {
+        if fraction < 0.25 { return .left }
+        if fraction < 0.75 { return .center }
+        return .right
+    }
+
     /// Frame height in volume.bmp / balance.bmp; 28 frames fill the 420-row sprite.
     public static let frameHeight = 15
     public static let frameCount = 28

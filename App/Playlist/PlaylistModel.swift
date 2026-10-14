@@ -93,6 +93,23 @@ final class PlaylistModel {
 
     var allTracksAreVisible: Bool { count <= layout.visibleRows }
 
+    /// The current track as the shade strip shows it, `"<n>. <name>"` (Webamp `getMinimalMediaText`); nil without one.
+    var shadeTrackName: String? {
+        let tracks = tracks
+        guard let index = currentIndex, tracks.indices.contains(index) else { return nil }
+        let track = tracks[index]
+        let fileName: String
+        if case .file(let url) = track.source { fileName = url.lastPathComponent } else { fileName = "" }
+        return "\(index + 1). " + PlaylistText.displayName(artist: track.artist, title: track.title, fileName: fileName)
+    }
+
+    /// The current track's length for the shade strip; nil without a track or a known length.
+    var shadeTrackDuration: TimeInterval? {
+        guard let index = currentIndex, tracks.indices.contains(index) else { return nil }
+        let duration = tracks[index].duration
+        return duration > 0 ? duration : nil
+    }
+
     /// "selected/total" (unknown durations count as 0), padded to 18 cells.
     var runningTimeText: String {
         let tracks = tracks

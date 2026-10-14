@@ -56,8 +56,14 @@ enum SkinWindowKind {
         switch (self, mode) {
         case (.main, .normal): MainWindowLayout.TitleButton.allCases.map { MainWindowLayout.rect($0) }
         case (.main, .shade): MainShadeLayout.dragExclusions
-        case (.equalizer, _): EQLayout.titleButtonRects
-        case (.playlist(let steps), _): PlaylistLayout(steps: steps).titleButtonRects
+        case (.equalizer, .normal): EQLayout.titleButtonRects
+        case (.equalizer, .shade):
+            EQLayout.titleButtonRects + [MainSliders.eqShadeVolume, MainSliders.eqShadeBalance].map {
+                CGRect(origin: $0.origin, size: $0.size)
+            }
+        case (.playlist(let steps), .normal): PlaylistLayout(steps: steps).titleButtonRects
+        case (.playlist(let steps), .shade):
+            PlaylistShadeLayout.dragExclusions(width: PlaylistLayout(steps: steps).size.width)
         }
     }
 }
@@ -154,7 +160,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     private var shadeWanted: Bool {
         switch kind {
         case .main: model.isMainWindowShaded
-        case .equalizer, .playlist: false
+        case .equalizer: model.isEQWindowShaded
+        case .playlist: model.isPlaylistWindowShaded
         }
     }
 
@@ -204,7 +211,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     func titleBarDoubleClicked() {
         switch kind {
         case .main: model.toggleMainWindowShade()
-        case .equalizer, .playlist: break
+        case .equalizer: model.toggleEQWindowShade()
+        case .playlist: model.togglePlaylistWindowShade()
         }
     }
 

@@ -7,6 +7,10 @@ extension SkinSprites {
         "MAIN_BALANCE_THUMB": "MAIN_VOLUME_THUMB",
         "MAIN_BALANCE_THUMB_ACTIVE": "MAIN_VOLUME_THUMB_SELECTED",
         "EQ_MAXIMIZE_BUTTON_ACTIVE": "EQ_MAXIMIZE_BUTTON_ACTIVE_FALLBACK",
+        // Not Webamp's: it has no fallback for the shade strip, so a skin without eq_ex.bmp shows a transparent one.
+        // Both are 275x14, so the title bar stands in.
+        "EQ_SHADE_BACKGROUND": "EQ_TITLE_BAR",
+        "EQ_SHADE_BACKGROUND_SELECTED": "EQ_TITLE_BAR_SELECTED",
     ]
 
     /// Sheets whose absence is covered by a fallback or unused in v1; missing ones are noted, not warned.

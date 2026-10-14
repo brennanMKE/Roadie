@@ -105,6 +105,21 @@ struct SkinFallbackTests {
         #expect(!mentions(skin.warnings, "eq_ex"))
     }
 
+    @Test func eqShadeBackgroundFallsBackToTheTitleBar() throws {
+        let skin = try makeSkin(["eqmain.bmp": (275, 315, red)])
+        let plain = skin.resolve("EQ_SHADE_BACKGROUND")
+        #expect(plain?.sheet == "EQMAIN")
+        #expect(plain?.rect == SkinSprites.byName["EQ_TITLE_BAR"]?.sprite.rect)
+        let selected = skin.resolve("EQ_SHADE_BACKGROUND_SELECTED")
+        #expect(selected?.sheet == "EQMAIN")
+        #expect(selected?.rect == SkinSprites.byName["EQ_TITLE_BAR_SELECTED"]?.sprite.rect)
+        #expect(size(skin.image(for: "EQ_SHADE_BACKGROUND")) == [275, 14])
+        let withEx = try makeSkin(["eqmain.bmp": (275, 315, red), "eq_ex.bmp": (275, 82, blue)])
+        #expect(withEx.resolve("EQ_SHADE_BACKGROUND")?.sheet == "EQ_EX")
+        #expect(withEx.resolve("EQ_SHADE_BACKGROUND")?.rect == SkinSprites.byName["EQ_SHADE_BACKGROUND"]?.sprite.rect)
+        #expect(withEx.resolve("EQ_SHADE_BACKGROUND_SELECTED")?.rect == SkinSprites.byName["EQ_SHADE_BACKGROUND_SELECTED"]?.sprite.rect)
+    }
+
     @Test func genAndEqExAreOptional() throws {
         let skin = try makeSkin([:])
         #expect(!mentions(skin.warnings, "gen.bmp"))

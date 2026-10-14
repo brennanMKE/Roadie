@@ -22,12 +22,12 @@ final class PlaylistWindowOverlays {
     /// Positions the views over the track list and the resize corner. `container` is not flipped, so y is measured up.
     func layout(_ layout: PlaylistLayout, scale: CGFloat, height: CGFloat, shaded: Bool) {
         list.isHidden = shaded
-        resize.isHidden = shaded
+        resize.widthOnly = shaded
         func frame(_ rect: CGRect) -> NSRect {
             NSRect(x: rect.minX * scale, y: height - rect.maxY * scale, width: rect.width * scale, height: rect.height * scale)
         }
         list.frame = frame(layout.trackArea)
-        resize.frame = frame(layout.resizeTarget)
+        resize.frame = frame(shaded ? PlaylistShadeLayout.resizeFrame(width: layout.size.width) : layout.resizeTarget)
     }
 }
 
@@ -163,6 +163,8 @@ final class PlaylistResizeView: NSView {
     private unowned let model: PlayerModel
     private var startMouse = NSPoint.zero
     private var startSteps = PlaylistLayout.Steps.zero
+    /// In shade mode only the width changes (Webamp's `PlaylistResizeTarget widthOnly`).
+    var widthOnly = false
 
     init(model: PlayerModel) {
         self.model = model
@@ -187,7 +189,7 @@ final class PlaylistResizeView: NSView {
         MainActor.assumeIsolated {
             let mouse = NSEvent.mouseLocation
             let scale = model.scale
-            let delta = CGSize(width: (mouse.x - startMouse.x) / scale, height: (startMouse.y - mouse.y) / scale)
+            let delta = CGSize(width: (mouse.x - startMouse.x) / scale, height: widthOnly ? 0 : (startMouse.y - mouse.y) / scale)
             model.playlist.setSteps(PlaylistLayout.steps(from: startSteps, draggedBy: delta))
         }
     }

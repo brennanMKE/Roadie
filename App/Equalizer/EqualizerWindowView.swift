@@ -8,13 +8,14 @@ struct EqualizerView: View {
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
+        let height = (model.isEQWindowShaded ? EQLayout.shadeSize : EQLayout.windowSize).height
         Group {
             if let skin = model.skin {
-                EqualizerWindowView(skin: skin)
-                    .scaleEffect(model.scale, anchor: .topLeading)
-                    .frame(
-                        width: EQLayout.windowSize.width * model.scale, height: EQLayout.windowSize.height * model.scale,
-                        alignment: .topLeading)
+                Group {
+                    if model.isEQWindowShaded { EQShadeView(skin: skin) } else { EqualizerWindowView(skin: skin) }
+                }
+                .scaleEffect(model.scale, anchor: .topLeading)
+                .frame(width: EQLayout.windowSize.width * model.scale, height: height * model.scale, alignment: .topLeading)
             } else {
                 ContentUnavailableView {
                     Label("No Skin Loaded", systemImage: "paintpalette")
@@ -23,7 +24,7 @@ struct EqualizerView: View {
                 } actions: {
                     Button("Open Skin…") { model.openSkin() }
                 }
-                .frame(width: EQLayout.windowSize.width * model.scale, height: EQLayout.windowSize.height * model.scale)
+                .frame(width: EQLayout.windowSize.width * model.scale, height: height * model.scale)
                 .background(.windowBackground, in: .rect(cornerRadius: 8))
             }
         }
@@ -76,29 +77,77 @@ struct EqualizerWindowView: View {
     }
 }
 
-/// The title bar strip (selected on the key window) and its two buttons: shade, which only shows its pressed sprite
-/// until #0031 gives it an action, and close, which hides the window.
+/// The title bar strip (selected on the key window) and its two buttons: shade, which draws only its pressed sprite, and
+/// close, which hides the window. In shade mode the strip is the shade background and close has its own sprites. The two
+/// buttons share one "clicked" flag that resets when the window stops being key (`EqTitleButtons.tsx`).
 struct EQTitleBarView: View {
     let skin: Skin
+    var shaded = false
+    @Environment(PlayerModel.self) private var model
     @Environment(\.controlActiveState) private var activeState
     @Environment(\.skinWindow) private var window
+    @State private var clicked = false
 
     var body: some View {
         let isKey = activeState == .key
         ZStack(alignment: .topLeading) {
-            SpriteImage(skin: skin, name: isKey ? "EQ_TITLE_BAR_SELECTED" : "EQ_TITLE_BAR")
+            SpriteImage(skin: skin, name: strip(isKey: isKey))
             if isKey {
-                button(EQLayout.shadeButton, name: nil, pressedName: "EQ_MAXIMIZE_BUTTON_ACTIVE") {}
-                button(EQLayout.closeButton, name: "EQ_CLOSE_BUTTON", pressedName: "EQ_CLOSE_BUTTON_ACTIVE") { window?.close() }
+                button(
+                    EQLayout.shadeButton, name: nil,
+                    pressedName: shaded ? "EQ_MINIMIZE_BUTTON_ACTIVE" : "EQ_MAXIMIZE_BUTTON_ACTIVE"
+                ) { model.toggleEQWindowShade() }
+                button(
+                    EQLayout.closeButton, name: shaded ? "EQ_SHADE_CLOSE_BUTTON" : "EQ_CLOSE_BUTTON",
+                    pressedName: shaded ? "EQ_SHADE_CLOSE_BUTTON_ACTIVE" : "EQ_CLOSE_BUTTON_ACTIVE"
+                ) { window?.close() }
             }
         }
         .frame(width: EQLayout.windowSize.width, height: EQLayout.titleBarHeight, alignment: .topLeading)
+        .onChange(of: isKey) { _, _ in clicked = false }
+    }
+
+    private func strip(isKey: Bool) -> String {
+        if shaded { return isKey ? "EQ_SHADE_BACKGROUND_SELECTED" : "EQ_SHADE_BACKGROUND" }
+        return isKey ? "EQ_TITLE_BAR_SELECTED" : "EQ_TITLE_BAR"
     }
 
     private func button(_ rect: CGRect, name: String?, pressedName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { EmptyView() }
-            .buttonStyle(TitleBarButtonStyle(skin: skin, name: name, pressedName: pressedName))
+            .buttonStyle(TitleBarButtonStyle(skin: skin, name: name, pressedName: pressedName, group: $clicked))
             .offset(x: rect.minX, y: rect.minY)
+    }
+}
+
+/// The 275x14 equalizer shade strip: the title bar and, drawn over the strip's own tracks, the main window's volume and
+/// balance thumbs (3x7, picked by thirds). The sliders drive the same model calls as the main window's.
+struct EQShadeView: View {
+    @Environment(PlayerModel.self) private var model
+    let skin: Skin
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            EQTitleBarView(skin: skin, shaded: true)
+            slider(
+                MainSliders.eqShadeVolume, prefix: "EQ_SHADE_VOLUME_SLIDER", fraction: Double(model.volume),
+                onChange: { model.setVolume(Float($0)) })
+            slider(
+                MainSliders.eqShadeBalance, prefix: "EQ_SHADE_BALANCE_SLIDER", fraction: MainSliders.fraction(forBalance: model.balance),
+                onChange: { model.setBalance(MainSliders.balance(forFraction: $0)) })
+        }
+        .frame(width: EQLayout.shadeSize.width, height: EQLayout.shadeSize.height, alignment: .topLeading)
+    }
+
+    private func slider(_ slider: MainSliders.Slider, prefix: String, fraction: Double, onChange: @escaping (Double) -> Void) -> some View {
+        let name: String =
+            switch MainSliders.shadeSegment(fraction: fraction) {
+            case .left: prefix + "_LEFT"
+            case .center: prefix + "_CENTER"
+            case .right: prefix + "_RIGHT"
+            }
+        return SkinSlider(
+            skin: skin, slider: slider, backgroundName: nil, thumbName: name, thumbPressedName: name, frame: nil,
+            fraction: fraction, onChange: onChange, onCommit: { _ in model.endSliderDrag() })
     }
 }
 

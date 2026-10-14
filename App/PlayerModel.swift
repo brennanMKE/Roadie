@@ -58,6 +58,9 @@ final class PlayerModel {
     }
     /// Whether the main window is collapsed to its 14 px shade strip. Persisted, so the window comes back as it was left.
     private(set) var isMainWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.mainWindowShadeKey)
+    /// Whether the equalizer and playlist windows are collapsed to their shade strips; persisted like the main window's.
+    private(set) var isEQWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.eqWindowShadeKey)
+    private(set) var isPlaylistWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.playlistWindowShadeKey)
     /// The main window's size in skin pixels in its current mode.
     var mainWindowSkinSize: CGSize { isMainWindowShaded ? MainWindowLayout.shadeSize : MainWindowLayout.size }
     /// The main-window spectrum / oscilloscope; ticks only while audio plays.
@@ -120,6 +123,8 @@ final class PlayerModel {
     static let eqWindowOpenKey = "eqWindowOpen"
     static let playlistWindowOpenKey = "playlistWindowOpen"
     static let mainWindowShadeKey = "mainWindowShade"
+    static let eqWindowShadeKey = "equalizerWindowShade"
+    static let playlistWindowShadeKey = "playlistWindowShade"
     static let equalizerKey = "equalizer"
     private static let lastSkinKey = "lastSkinPath"
     private static let timeModeKey = "timeMode"
@@ -333,6 +338,16 @@ final class PlayerModel {
         isMainWindowShaded.toggle()
         UserDefaults.standard.set(isMainWindowShaded, forKey: Self.mainWindowShadeKey)
         visualizer.setLayout(shaded: isMainWindowShaded, scale: scale)
+    }
+
+    func toggleEQWindowShade() {
+        isEQWindowShaded.toggle()
+        UserDefaults.standard.set(isEQWindowShaded, forKey: Self.eqWindowShadeKey)
+    }
+
+    func togglePlaylistWindowShade() {
+        isPlaylistWindowShaded.toggle()
+        UserDefaults.standard.set(isPlaylistWindowShaded, forKey: Self.playlistWindowShadeKey)
     }
 
     func toggleShuffle() { send(.setShuffle(!isShuffled)) }

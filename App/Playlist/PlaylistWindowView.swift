@@ -34,7 +34,8 @@ struct PlaylistView: View {
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
-        let size = model.playlist.layout.size
+        let full = model.playlist.layout.size
+        let size = model.isPlaylistWindowShaded ? CGSize(width: full.width, height: PlaylistLayout.shadeHeight) : full
         Group {
             if let skin = model.skin {
                 PlaylistWindowView(skin: skin)
@@ -67,8 +68,16 @@ struct PlaylistWindowView: View {
     let skin: Skin
 
     var body: some View {
+        if model.isPlaylistWindowShaded {
+            PlaylistShadeView(skin: skin)
+        } else {
+            normalBody
+        }
+    }
+
+    private var normalBody: some View {
         let layout = model.playlist.layout
-        ZStack(alignment: .topLeading) {
+        return ZStack(alignment: .topLeading) {
             Color(skin.playlistStyle.normalBackground)
             ForEach(Array(layout.topRow(selected: activeState == .key).enumerated()), id: \.offset) { _, piece in
                 PieceView(skin: skin, piece: piece)
@@ -118,8 +127,8 @@ struct PlaylistTitleButtons: View {
     var body: some View {
         let layout = model.playlist.layout
         ZStack(alignment: .topLeading) {
-            // Shade is #0031's; until then it only shows its pressed sprite.
-            Button {} label: { EmptyView() }
+            // Like Webamp, the sprite shows only while the button is pressed.
+            Button { model.togglePlaylistWindowShade() } label: { EmptyView() }
                 .buttonStyle(TitleBarButtonStyle(skin: skin, name: nil, pressedName: "PLAYLIST_COLLAPSE_SELECTED"))
                 .offset(x: layout.shadeButton.minX, y: layout.shadeButton.minY)
             Button { window?.close() } label: { EmptyView() }
@@ -344,5 +353,47 @@ struct PlaylistMenusView: View {
         }
         hovered = nil
         playlist.openMenu = nil
+    }
+}
+
+/// The playlist in shade mode: a 14 px strip as wide as the window. Left cap, tiled middle and right cap, the current
+/// track's `n. name` and length in the text.bmp font, and the shade and close buttons (the width-only resize corner is an
+/// AppKit view, `PlaylistResizeView`). Geometry is `PlaylistShadeLayout`.
+struct PlaylistShadeView: View {
+    @Environment(PlayerModel.self) private var model
+    @Environment(\.controlActiveState) private var activeState
+    @Environment(\.skinWindow) private var window
+    let skin: Skin
+
+    var body: some View {
+        let width = model.playlist.layout.size.width
+        let playlist = model.playlist
+        let title = PlaylistShadeLayout.title(name: playlist.shadeTrackName, width: width)
+        let time = playlist.shadeTrackName == nil ? "" : PlaylistShadeLayout.timeString(playlist.shadeTrackDuration)
+        ZStack(alignment: .topLeading) {
+            TiledSpriteImage(skin: skin, name: "PLAYLIST_SHADE_BACKGROUND", size: CGSize(width: width, height: PlaylistShadeLayout.height))
+            SpriteImage(skin: skin, name: "PLAYLIST_SHADE_BACKGROUND_LEFT")
+            SpriteImage(skin: skin, name: activeState == .key ? "PLAYLIST_SHADE_BACKGROUND_RIGHT_SELECTED" : "PLAYLIST_SHADE_BACKGROUND_RIGHT")
+                .offset(x: width - PlaylistShadeLayout.rightWidth)
+            if let image = skin.textImage(title) {
+                Image(decorative: image, scale: 1).interpolation(.none)
+                    .offset(x: PlaylistShadeLayout.titleOrigin.x, y: PlaylistShadeLayout.titleOrigin.y)
+            }
+            if let image = skin.textImage(time) {
+                Image(decorative: image, scale: 1).interpolation(.none)
+                    .offset(x: PlaylistShadeLayout.timeRightEdge(width: width) - CGFloat(image.width), y: PlaylistShadeLayout.timeY)
+            }
+            button(PlaylistShadeLayout.shadeFrame(width: width), pressed: "PLAYLIST_EXPAND_SELECTED") {
+                model.togglePlaylistWindowShade()
+            }
+            button(PlaylistShadeLayout.closeFrame(width: width), pressed: "PLAYLIST_CLOSE_SELECTED") { window?.close() }
+        }
+        .frame(width: width, height: PlaylistShadeLayout.height, alignment: .topLeading)
+    }
+
+    private func button(_ rect: CGRect, pressed: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { EmptyView() }
+            .buttonStyle(TitleBarButtonStyle(skin: skin, name: nil, pressedName: pressed))
+            .offset(x: rect.minX, y: rect.minY)
     }
 }
