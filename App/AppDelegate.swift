@@ -31,12 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeEQWindow()
         observePlaylistWindow()
         docking.ensureOnScreen()
-        // The Library is the only SwiftUI window scene left, so SwiftUI opens it at launch; it is
-        // meant to open from ⌘L. (`defaultLaunchBehavior(.suppressed)` needs macOS 15, the target is 14.)
+        // The Library and Skins are the only SwiftUI window scenes, so SwiftUI opens the first at launch; they are
+        // meant to open from ⌘L and ⌘K. (`defaultLaunchBehavior(.suppressed)` needs macOS 15, the target is 14.)
         DispatchQueue.main.async { [player, equalizer, playlist] in
             for window in NSApp.windows
             where window !== player.window && window !== equalizer.window && window !== playlist.window
-                && window.identifier?.rawValue.hasPrefix("library") == true
+                && ["library", "skins"].contains(where: { window.identifier?.rawValue.hasPrefix($0) == true })
             {
                 window.close()
             }

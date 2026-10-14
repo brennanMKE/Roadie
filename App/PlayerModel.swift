@@ -7,6 +7,7 @@ import MusicBackendKit
 import MusicLibraryKit
 import Observation
 import PlexBackendKit
+import SkinBrowser
 import SkinKit
 import SkinLibrary
 import TrackCache
@@ -42,6 +43,13 @@ final class PlayerModel {
     let skinLibrary = SkinLibraryModel()
     /// Main-window thumbnails keyed by content hash, rendered lazily on request (#0034). Does no I/O until the first request.
     let skinThumbnails = SkinThumbnailCache(directory: SkinThumbnailCache.defaultDirectory())
+    /// The Skins window and menu (#0035). Lazy because its closures name `self`; it does no I/O until used.
+    @ObservationIgnored private(set) lazy var skinBrowser = SkinBrowserModel(
+        index: { [skinLibrary] in try await skinLibrary.openStoreIfNeeded() },
+        folder: { [skinLibrary] in skinLibrary.folderURL },
+        thumbnails: SkinThumbnailAdapter(cache: skinThumbnails),
+        applySkin: { [weak self] in self?.loadSkin(from: $0) })
+    @ObservationIgnored private var skinLoadGeneration = 0
     /// The local-folder source; Settings › Library chooses and indexes its folder. Shares Plex's "This Mac" output, so both play through the one `Player`.
     let folderBackend: FolderBackend
     let folderSettings: FolderSettingsModel
@@ -221,6 +229,7 @@ final class PlayerModel {
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
         }
+        skinLibrary.passFinished = { [weak self] in self?.skinBrowser.indexDidChange() }
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()
         // The model lives as long as the app, so these observers are never removed.
@@ -249,13 +258,17 @@ final class PlayerModel {
     }
 
     func loadSkin(from url: URL) {
+        // Two quick applies (holding the Next Skin shortcut) race; the newest request wins and the older parse is dropped.
+        skinLoadGeneration += 1
+        let generation = skinLoadGeneration
         Task {
-            let result = await Task.detached {
+            let result = await Task.detached(priority: .userInitiated) {
                 Result {
                     let skin = try SkinParser.parse(url: url)
                     return (skin, MainWindowBase(skin: skin))
                 }
             }.value
+            guard generation == skinLoadGeneration else { return }
             switch result {
             case .success(let (skin, base)):
                 self.skin = skin
@@ -265,6 +278,7 @@ final class PlayerModel {
                 errorMessage = nil
                 UserDefaults.standard.set(url.path, forKey: Self.lastSkinKey)
                 for warning in skin.warnings { print("[\(url.lastPathComponent)] \(warning)") }
+                skinBrowser.skinDidLoad(from: url)
             case .failure(let error):
                 errorMessage = "\(url.lastPathComponent): \(error)"
                 post(.skinFailed(url.deletingPathExtension().lastPathComponent))

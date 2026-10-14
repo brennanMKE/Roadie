@@ -358,6 +358,149 @@ public actor SkinIndexStore {
         return try skin(id: st.int64(0))
     }
 
+    // MARK: Browser queries (#0035)
+
+    /// More FTS matches than this are "broad": ranking them all by bm25 before `LIMIT` is the slow part, so they are
+    /// listed by name instead (the user types more letters to narrow them).
+    static let broadMatchThreshold = 2_000
+
+    private static func placeholders(_ statuses: Set<SkinStatus>) -> String {
+        Array(repeating: "?", count: statuses.count).joined(separator: ",")
+    }
+
+    private func bindStatuses(_ st: SQLiteDatabase.Statement, _ statuses: Set<SkinStatus>, from first: Int32) throws {
+        for (offset, status) in statuses.map(\.rawValue).sorted().enumerated() {
+            try st.bind(status, at: first + Int32(offset))
+        }
+    }
+
+    private func isBroad(_ expression: String) throws -> Bool {
+        let st = try db.statement(
+            "SELECT COUNT(*) FROM (SELECT 1 FROM skins_fts WHERE skins_fts MATCH ? LIMIT \(Self.broadMatchThreshold + 1))")
+        defer { st.reset() }
+        try st.bind(expression, at: 1)
+        return try st.step() && st.int64(0) > Int64(Self.broadMatchThreshold)
+    }
+
+    /// Text + status + page in one SELECT. Text ranks by bm25 then name; a broad match lists by name.
+    public func skins(matching query: SkinQuery) throws -> [SkinRecord] {
+        guard !query.statuses.isEmpty, query.limit > 0 else { return [] }
+        let marks = Self.placeholders(query.statuses)
+        let allStatuses = query.statuses.count == SkinStatus.allCases.count
+        let sql: String
+        let expression: String?
+        if query.hasText {
+            guard let built = Self.matchExpression(query.text) else { return [] }
+            expression = built
+            if try isBroad(built) {
+                sql = Self.select
+                    + " WHERE s.id IN (SELECT rowid FROM skins_fts WHERE skins_fts MATCH ?) AND s.status IN (\(marks))"
+                    + " ORDER BY s.name COLLATE NOCASE, s.id LIMIT ? OFFSET ?"
+            } else {
+                sql = Self.select
+                    + " JOIN skins_fts ON skins_fts.rowid = s.id WHERE skins_fts MATCH ? AND s.status IN (\(marks))"
+                    + " ORDER BY bm25(skins_fts), s.name COLLATE NOCASE, s.id LIMIT ? OFFSET ?"
+            }
+        } else {
+            expression = nil
+            // Walk the name index in order: left to the planner, a status filter picks the status index and sorts
+            // all 100k rows. Every status selected needs no filter at all.
+            let filter = allStatuses ? "" : " WHERE s.status IN (\(marks))"
+            sql = Self.select.replacingOccurrences(of: "FROM skins s", with: "FROM skins s INDEXED BY skins_name")
+                + filter + " ORDER BY s.name COLLATE NOCASE, s.id LIMIT ? OFFSET ?"
+        }
+        let st = try db.temporaryStatement(sql)
+        var index: Int32 = 1
+        if let expression {
+            try st.bind(expression, at: 1)
+            index = 2
+        }
+        let bound = (query.hasText || !allStatuses) ? query.statuses : []
+        try bindStatuses(st, bound, from: index)
+        try st.bind(Int64(query.limit), at: index + Int32(bound.count))
+        try st.bind(Int64(max(0, query.offset)), at: index + Int32(bound.count) + 1)
+        var rows: [SkinRecord] = []
+        while try st.step() { rows.append(record(st)) }
+        return rows
+    }
+
+    /// How many rows `skins(matching:)` pages over (ignores limit and offset).
+    public func count(matching query: SkinQuery) throws -> Int {
+        guard !query.statuses.isEmpty else { return 0 }
+        let marks = Self.placeholders(query.statuses)
+        var expression: String?
+        let sql: String
+        if query.hasText {
+            guard let built = Self.matchExpression(query.text) else { return 0 }
+            expression = built
+            // Every status selected: the FTS table alone answers (no join per match).
+            sql = query.statuses.count == SkinStatus.allCases.count
+                ? "SELECT COUNT(*) FROM skins_fts WHERE skins_fts MATCH ?"
+                : "SELECT COUNT(*) FROM skins s JOIN skins_fts ON skins_fts.rowid = s.id"
+                + " WHERE skins_fts MATCH ? AND s.status IN (\(marks))"
+        } else if query.statuses.count == SkinStatus.allCases.count {
+            sql = "SELECT COUNT(*) FROM skins"
+        } else {
+            sql = "SELECT COUNT(*) FROM skins s WHERE s.status IN (\(marks))"
+        }
+        let st = try db.temporaryStatement(sql)
+        var index: Int32 = 1
+        if let expression {
+            try st.bind(expression, at: 1)
+            index = 2
+        }
+        if query.statuses.count != SkinStatus.allCases.count {
+            try bindStatuses(st, query.statuses, from: index)
+        }
+        return try st.step() ? Int(st.int64(0)) : 0
+    }
+
+    /// The row after/before `id` in (name COLLATE NOCASE, id) order among `statuses`, wrapping around; nil when
+    /// no row has one of `statuses`. An id that is no longer in the index behaves as "unknown": first/last row.
+    public func neighbor(
+        of id: Int64, direction: SkinNeighborDirection, statuses: Set<SkinStatus>
+    ) throws -> SkinRecord? {
+        guard !statuses.isEmpty else { return nil }
+        let marks = Self.placeholders(statuses)
+        let count = Int32(statuses.count)
+        let forward = direction == .next
+        let order = forward ? "ASC" : "DESC"
+        let edge = "ORDER BY s.name COLLATE NOCASE \(order), s.id \(order) LIMIT 1"
+        if let current = try skin(id: id) {
+            let cmp = forward ? ">" : "<"
+            let st = try db.temporaryStatement(
+                Self.select + " WHERE s.status IN (\(marks)) AND (s.name \(cmp) ? COLLATE NOCASE"
+                    + " OR (s.name = ? COLLATE NOCASE AND s.id \(cmp) ?)) " + edge)
+            try bindStatuses(st, statuses, from: 1)
+            try st.bind(current.name, at: count + 1)
+            try st.bind(current.name, at: count + 2)
+            try st.bind(current.id, at: count + 3)
+            if try st.step() { return record(st) }
+        }
+        let wrap = try db.temporaryStatement(Self.select + " WHERE s.status IN (\(marks)) " + edge)
+        try bindStatuses(wrap, statuses, from: 1)
+        return try wrap.step() ? record(wrap) : nil
+    }
+
+    /// The skin one of whose files is at this folder-relative path.
+    public func skin(atPath path: String) throws -> SkinRecord? {
+        let st = try db.statement("SELECT skin_id FROM files WHERE path = ?")
+        defer { st.reset() }
+        try st.bind(path, at: 1)
+        guard try st.step() else { return nil }
+        return try skin(id: st.int64(0))
+    }
+
+    /// A random row among `statuses`; nil when none.
+    public func randomSkin(statuses: Set<SkinStatus>) throws -> SkinRecord? {
+        guard !statuses.isEmpty else { return nil }
+        let st = try db.temporaryStatement(
+            "SELECT id FROM skins WHERE status IN (\(Self.placeholders(statuses))) ORDER BY random() LIMIT 1")
+        try bindStatuses(st, statuses, from: 1)
+        guard try st.step() else { return nil }
+        return try skin(id: st.int64(0))
+    }
+
     // MARK: Meta and reset
 
     public func meta(_ key: String) throws -> String? {

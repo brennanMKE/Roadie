@@ -20,6 +20,13 @@ struct SkinAmpApp: App {
         .keyboardShortcut("l")
         .defaultSize(width: 960, height: 600)
 
+        Window("Skins", id: "skins") {
+            SkinBrowserWindowView()
+                .environment(appDelegate.model)
+        }
+        .keyboardShortcut("k")
+        .defaultSize(width: 920, height: 640)
+
         Settings {
             SettingsView()
                 .environment(plexSettings)
@@ -38,6 +45,7 @@ struct SkinAmpApp: App {
                 Button("Open Skin…") { appDelegate.model.openSkin() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
             }
+            SkinsCommands(model: appDelegate.model)
             CommandGroup(after: .windowArrangement) {
                 Button("Player") { appDelegate.player.show() }
                     .keyboardShortcut("1")

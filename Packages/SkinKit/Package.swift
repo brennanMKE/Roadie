@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "SkinKit", targets: ["SkinKit"]),
         .library(name: "SkinLibrary", targets: ["SkinLibrary"]),
+        .library(name: "SkinBrowser", targets: ["SkinBrowser"]),
         .executable(name: "skintool", targets: ["skintool"]),
         .library(name: "WindowDocking", targets: ["WindowDocking"]),
     ],
@@ -20,6 +21,9 @@ let package = Package(
         ),
         // Folder index in SQLite (system libsqlite3). Depends on SkinKit only; no UI, no audio, no Plex.
         .target(name: "SkinLibrary", dependencies: ["SkinKit"], linkerSettings: [.linkedLibrary("sqlite3")]),
+        // Skins window and Skins menu view models. Foundation + Observation + CoreGraphics; no UI, no audio.
+        .target(name: "SkinBrowser", dependencies: ["SkinLibrary", "SkinKit"]),
+        .testTarget(name: "SkinBrowserTests", dependencies: ["SkinBrowser", "SkinLibrary", "SkinKit"]),
         .executableTarget(name: "skintool", dependencies: ["SkinKit", "SkinLibrary"]),
         .testTarget(name: "SkinKitTests", dependencies: ["SkinKit"]),
         // ZIPFoundation here so tests can write synthetic .wsz archives.
