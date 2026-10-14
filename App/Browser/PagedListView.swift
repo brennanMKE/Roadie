@@ -2,10 +2,13 @@ import LibraryBrowser
 import SwiftUI
 
 /// A lazily paged column: spinner, failure, empty text, or a `List` that asks for the next page near its end.
-struct PagedListView<Item: Identifiable & Hashable & Sendable, Row: View>: View where Item.ID: Sendable {
-    let list: PagedList<Item>
+struct PagedListView<ListItem: Identifiable & Hashable & Sendable, Item: Identifiable, Row: View>: View
+where ListItem.ID: Sendable, Item.ID: Hashable {
+    let list: PagedList<ListItem>
     /// The rows to draw; `list.items` unless a caller maps them (artist grouping).
     let rows: [Item]
+    /// The id of an item in `list.items` that this row holds, so near-the-end rows load the next page.
+    let pagingID: (Item) -> ListItem.ID
     let emptyText: String
     let selectedID: Item.ID?
     let onSelect: (Item) -> Void
@@ -35,7 +38,7 @@ struct PagedListView<Item: Identifiable & Hashable & Sendable, Row: View>: View 
                 List(selection: selection) {
                     ForEach(rows) { item in
                         row(item)
-                            .onAppear { list.loadMoreIfNeeded(current: item) }
+                            .onAppear { list.loadMoreIfNeeded(id: pagingID(item)) }
                     }
                     footer
                 }

@@ -26,9 +26,13 @@ struct SearchResultsView: View {
                     List {
                         if !results.artists.isEmpty {
                             Section("Artists") {
-                                ForEach(results.artists) { artist in
-                                    Button { library.select(artist) } label: {
-                                        Text(artist.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                                ForEach(ArtistGrouper.group(results.artists)) { group in
+                                    Button { library.select(group) } label: {
+                                        HStack(spacing: 8) {
+                                            AlbumArtView(ref: group.artwork, side: 28)
+                                            Text(group.name).lineLimit(1)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -49,7 +53,7 @@ struct SearchResultsView: View {
                                 ForEach(results.tracks) { track in
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(track.title).lineLimit(1)
-                                        Text(track.artistName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                        Text(ArtistName.display(track.artistName)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                     }
                                 }
                             }

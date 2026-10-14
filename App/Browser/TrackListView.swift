@@ -15,7 +15,7 @@ struct TrackRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.title).lineLimit(1)
                 if track.artistName != albumArtist {
-                    Text(track.artistName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(ArtistName.display(track.artistName)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             Spacer()

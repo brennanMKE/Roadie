@@ -246,6 +246,8 @@ public actor PlexBackend: MusicBackend, CustomStringConvertible, CustomDebugStri
             switch http.statusCode {
             case 200..<300: return data
             case 401: throw MusicBackendError.unauthorized
+            // The item has no image on the server; callers show a placeholder and need not ask again.
+            case 404: throw MusicBackendError.unsupported(.artwork)
             default: throw MusicBackendError.backend("The server answered with status \(http.statusCode).")
             }
         } catch let error as URLError {

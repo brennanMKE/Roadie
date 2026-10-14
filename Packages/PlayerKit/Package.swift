@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "PlexBackendKit", targets: ["PlexBackendKit"]),
         .library(name: "LibraryBrowser", targets: ["LibraryBrowser"]),
         .library(name: "MusicBackendStub", targets: ["MusicBackendStub"]),
+        .library(name: "MusicLibraryKit", targets: ["MusicLibraryKit"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).
@@ -38,11 +39,15 @@ let package = Package(
         .target(name: "PlexBackendKit", dependencies: ["MusicBackendKit", "LocalPlayback", "AudioCore", "PlexKit", "TrackCache"]),
         .testTarget(name: "PlexBackendKitTests", dependencies: [
             "PlexBackendKit", "MusicBackendKit", "LocalPlayback", "PlexKit", "PlexKitStub", "TrackCache", "AudioCore",
+            "MusicLibraryKit",
         ]),
         // Browser view models. Foundation + Observation; depends on the protocol only, never on a backend.
         .target(name: "LibraryBrowser", dependencies: ["MusicBackendKit"]),
         // In-memory MusicBackend for tests of the browser and of anything that drives a backend.
         .target(name: "MusicBackendStub", dependencies: ["MusicBackendKit"]),
         .testTarget(name: "LibraryBrowserTests", dependencies: ["LibraryBrowser", "MusicBackendKit", "MusicBackendStub"]),
+        // Artwork cache for the browser and now-playing views. Decodes with ImageIO; Foundation + MusicBackendKit otherwise.
+        .target(name: "MusicLibraryKit", dependencies: ["MusicBackendKit"]),
+        .testTarget(name: "MusicLibraryKitTests", dependencies: ["MusicLibraryKit", "MusicBackendKit", "MusicBackendStub"]),
     ]
 )

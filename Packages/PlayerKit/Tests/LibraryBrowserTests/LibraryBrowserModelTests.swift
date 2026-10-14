@@ -37,7 +37,8 @@ struct LibraryBrowserModelTests {
         #expect(await backend.calls == [.connect, .artists(PageRequest(offset: 0, limit: 100))])
         #expect(model.connection == .connected)
         #expect(model.artists.items.count == 25)
-        #expect(model.artistRows == model.artists.items)
+        #expect(model.artistRows.count == 25)
+        #expect(model.artistRows.flatMap(\.members) == model.artists.items)
     }
 
     @Test func appearedTwiceConnectsOnce() async {

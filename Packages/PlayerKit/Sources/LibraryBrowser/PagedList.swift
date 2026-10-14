@@ -106,6 +106,12 @@ public final class PagedList<Item: Identifiable & Hashable & Sendable> where Ite
         if index >= items.count - prefetchDistance { loadMore() }
     }
 
+    /// For rows that stand for several items (grouped artists): pass the id of any item the row holds.
+    public func loadMoreIfNeeded(id: Item.ID) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        if index >= items.count - prefetchDistance { loadMore() }
+    }
+
     public func retryLoadMore() {
         loadMoreError = nil
         loadMore()

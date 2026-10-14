@@ -45,16 +45,21 @@ public final class LibraryBrowserModel {
     /// Of `selectedAlbum` or `selectedPlaylist`.
     public private(set) var tracks: LoadState<[LibraryTrack]> = .idle
 
+    /// The artist group the user picked (several spellings of one artist), when one was.
+    public private(set) var selectedArtistGroup: ArtistGroup?
+
+    /// The picked artist, or the first member of the picked group.
     public var selectedArtist: LibraryArtist? {
         didSet {
             guard selectedArtist != oldValue else { return }
             if let artist = selectedArtist {
-                let backend = backend
-                let id = artist.id
-                artistAlbums.reload(with: { try await backend.albums(of: id, page: $0) })
+                if selectedArtistGroup?.members.contains(where: { $0.id == artist.id }) != true {
+                    selectedArtistGroup = nil
+                }
             } else {
-                artistAlbums.reset()
+                selectedArtistGroup = nil
             }
+            loadArtistAlbums()
             selectedAlbum = nil
         }
     }
@@ -85,8 +90,12 @@ public final class LibraryBrowserModel {
         }
     }
 
-    /// Rows the artists column draws. #0017 replaces the identity mapping with its grouping.
-    public var artistRows: [LibraryArtist] { artists.items }
+    /// Rows the artists column draws: loaded artists grouped by `ArtistName.key`, in first-seen order.
+    /// Every group's members are ids in `artists.items`, which is how paging finds the row.
+    public var artistRows: [ArtistGroup] {
+        syncGrouper()
+        return grouper.groups
+    }
 
     public var searchText: String = "" {
         didSet { if searchText != oldValue { scheduleSearch(immediate: false) } }
@@ -97,6 +106,9 @@ public final class LibraryBrowserModel {
     public let searchDelay: Duration
     public let searchLimit: Int
 
+    @ObservationIgnored private var grouper = ArtistGrouper()
+    @ObservationIgnored private var groupedCount = 0
+    @ObservationIgnored private var lastGroupedID: MediaID?
     @ObservationIgnored private var connectTask: Task<Void, Never>?
     @ObservationIgnored private var connectGeneration = 0
     @ObservationIgnored private var tracksTask: Task<Void, Never>?
@@ -177,17 +189,23 @@ public final class LibraryBrowserModel {
     // MARK: Selection
 
     public func select(_ artist: LibraryArtist) {
+        select(group(containing: artist.id) ?? ArtistGrouper.group([artist])[0])
+    }
+
+    /// Picks an artist group; albums load from every member.
+    public func select(_ group: ArtistGroup) {
         if section != .artists { section = .artists }
-        selectedArtist = artist
+        applyGroup(group)
     }
 
     public func select(_ album: LibraryAlbum) {
         if section == .playlists { section = .albums }
-        if let artistID = album.artistID, selectedArtist?.id != artistID {
-            if let known = artists.items.first(where: { $0.id == artistID }) {
-                selectedArtist = known
+        if let artistID = album.artistID, selectedArtist?.id != artistID,
+           selectedArtistGroup?.members.contains(where: { $0.id == artistID }) != true {
+            if let known = group(containing: artistID) {
+                applyGroup(known)
             } else if section == .artists {
-                selectedArtist = LibraryArtist(id: artistID, name: album.artistName ?? "")
+                applyGroup(ArtistGrouper.group([LibraryArtist(id: artistID, name: album.artistName ?? "")])[0])
             } else {
                 selectedArtist = nil
             }
@@ -267,6 +285,56 @@ public final class LibraryBrowserModel {
             if reloading || playlists.phase == .idle {
                 playlists.reload(with: { try await backend.playlists(page: $0) })
             }
+        }
+    }
+
+    /// Makes `group` the selected artist without touching the section.
+    private func applyGroup(_ group: ArtistGroup) {
+        let previous = selectedArtist
+        let oldIDs = selectedArtistGroup?.memberIDs ?? previous.map { [$0.id] } ?? []
+        selectedArtistGroup = group
+        if previous == group.members[0] {
+            // `selectedArtist` will not change, so its observer will not run.
+            if oldIDs != group.memberIDs {
+                loadArtistAlbums()
+                selectedAlbum = nil
+            }
+        } else {
+            selectedArtist = group.members[0]
+        }
+    }
+
+    /// Albums of the selected artist: one paged list, or every member's albums when the group has several spellings.
+    private func loadArtistAlbums() {
+        guard let artist = selectedArtist else {
+            artistAlbums.reset()
+            return
+        }
+        let backend = backend
+        if let group = selectedArtistGroup, group.isMerged {
+            artistAlbums.reload(with: { _ in Page.last(try await backend.albums(of: group)) })
+        } else {
+            let id = artist.id
+            artistAlbums.reload(with: { try await backend.albums(of: id, page: $0) })
+        }
+    }
+
+    private func group(containing id: MediaID) -> ArtistGroup? {
+        syncGrouper()
+        return grouper.group(containing: id)
+    }
+
+    /// Feeds artists loaded since the last call to the grouper; starts over when the list was reset or reloaded.
+    private func syncGrouper() {
+        let items = artists.items
+        if groupedCount > items.count || (groupedCount > 0 && items[groupedCount - 1].id != lastGroupedID) {
+            grouper.removeAll()
+            groupedCount = 0
+        }
+        if groupedCount < items.count {
+            grouper.add(Array(items[groupedCount...]))
+            groupedCount = items.count
+            lastGroupedID = items.last?.id
         }
     }
 

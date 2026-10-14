@@ -53,7 +53,7 @@ struct LibraryWindowView: View {
             switch library.section {
             case .artists:
                 if let artist = library.selectedArtist {
-                    ArtistAlbumsView(library: library, artist: artist)
+                    ArtistAlbumsView(library: library, artistName: library.selectedArtistGroup?.name ?? ArtistName.display(artist.name))
                 } else {
                     ContentUnavailableView("Select an artist", systemImage: "music.mic")
                 }

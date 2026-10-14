@@ -3,6 +3,7 @@ import AudioCore
 import Foundation
 import LibraryBrowser
 import MusicBackendKit
+import MusicLibraryKit
 import Observation
 import PlexBackendKit
 import SkinKit
@@ -19,6 +20,8 @@ final class PlayerModel {
     let backend: any MusicBackend
     /// The Library window's state; connects when the window appears, never at launch.
     let library: LibraryBrowserModel
+    /// The one thumbnail cache for the process. Refs only mean something to `backend`, so a source switch must `clear()` it.
+    let artwork: ArtworkCache
     let cache: TrackCache
     let cacheSettings: CacheSettingsModel
     /// Still public for the skinned window's time and spectrum bindings and for local files.
@@ -42,6 +45,7 @@ final class PlayerModel {
         let stack = PlexPlaybackStack.standard()
         backend = stack.backend
         library = LibraryBrowserModel(backend: stack.backend)
+        artwork = ArtworkCache(backend: stack.backend)
         cache = stack.cache
         player = stack.player
         pinner = stack.pinner
