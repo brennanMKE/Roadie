@@ -238,12 +238,18 @@ public actor FolderBackend: MusicBackend {
         do {
             let fresh = try await indexer.build(root: root, previous: full ? nil : index)
             guard token == scanToken, self.root == root else { return }
+            // Rewrite the cache only when something changed (or it is missing). Without IgnoreSelf, a cache
+            // write inside a watched root (a music folder that contains ~/Library/Caches) would otherwise
+            // trigger another scan, and another write, forever.
+            let changed = index.map { !$0.hasSameContent(as: fresh) } ?? true
             index = fresh
             lookup = Lookup(fresh)
-            do {
-                try await Self.saveCache(fresh, in: cacheDirectory)
-            } catch {
-                log.warning("could not save the index: \(error.localizedDescription, privacy: .public)")
+            if changed || !FolderIndexCache.exists(for: root, in: cacheDirectory) {
+                do {
+                    try await Self.saveCache(fresh, in: cacheDirectory)
+                } catch {
+                    log.warning("could not save the index: \(error.localizedDescription, privacy: .public)")
+                }
             }
             guard token == scanToken else { return }
             setStatus(.ready(fresh.summary))

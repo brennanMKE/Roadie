@@ -36,6 +36,12 @@ public struct FolderIndex: Codable, Hashable, Sendable {
             artists: artists.count, albums: albums.count, tracks: tracks.count, skipped: skipped.count, builtAt: builtAt)
     }
 
+    /// Equal apart from when it was built.
+    public func hasSameContent(as other: FolderIndex) -> Bool {
+        version == other.version && root == other.root && artists == other.artists && albums == other.albums
+            && tracks == other.tracks && skipped == other.skipped
+    }
+
     public static func empty(root: URL) -> FolderIndex {
         FolderIndex(root: FolderIndexCache.standardizedPath(root))
     }
@@ -203,6 +209,10 @@ public enum FolderIndexCache {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(index)
         try data.write(to: fileURL(for: URL(fileURLWithPath: index.root), in: directory), options: .atomic)
+    }
+
+    public static func exists(for root: URL, in directory: URL) -> Bool {
+        FileManager.default.fileExists(atPath: fileURL(for: root, in: directory).path)
     }
 
     public static func remove(for root: URL, in directory: URL) {

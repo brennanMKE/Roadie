@@ -390,6 +390,38 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         #expect(await waitFor { statuses.sawReady })
     }
 
+    @Test func anUnchangedRescanDoesNotRewriteTheCache() async throws {
+        let root = makeTempDir()
+        let fixture = try BackendFixture(root: root)
+        defer { fixture.cleanup() }
+        try await fixture.backend.connect()
+        let file = FolderIndexCache.fileURL(for: root, in: fixture.cache)
+        func modified() throws -> Date? {
+            try file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        }
+        func builtAt() async -> Date? {
+            if case .ready(let summary) = await fixture.backend.status { summary.builtAt } else { nil }
+        }
+        let firstWrite = try modified()
+        let firstBuilt = await builtAt()
+        #expect(firstWrite != nil)
+        let watcher = try #require(fixture.watchers.last)
+
+        // A change event with nothing changed: a scan runs, the cache file is left alone.
+        watcher.fire()
+        #expect(await waitFor { let now = await builtAt(); return now != nil && now != firstBuilt })
+        await fixture.backend.waitForIndexing()
+        #expect(try modified() == firstWrite)
+
+        // A real change rewrites it.
+        try writeWAV(to: root.appending(path: "The Beatles/Abbey Road/01 Come Together.wav"))
+        watcher.fire()
+        #expect(await waitFor { if case .ready(let summary) = await fixture.backend.status { summary.tracks == 8 } else { false } })
+        await fixture.backend.waitForIndexing()
+        #expect(try modified() != firstWrite)
+        #expect(FolderIndexCache.load(for: root, in: fixture.cache)?.summary.tracks == 8)
+    }
+
     @Test func reindexRereadsEveryFile() async throws {
         let fixture = try BackendFixture(root: makeTempDir())
         defer { fixture.cleanup() }
