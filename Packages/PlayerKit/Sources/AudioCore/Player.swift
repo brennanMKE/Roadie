@@ -586,7 +586,9 @@ public final class Player: NowPlayingCommandTarget {
     /// The output device changed and the engine stopped itself.
     func handleConfigurationChange() {
         // Nothing is scheduled while stopped or loading; the load connects and starts the engine itself.
-        guard let graph = _graph, state != .stopped, state != .loading else { return }
+        // The exception is a progressive track waiting for its preroll: its feeder is already scheduling, and
+        // its first buffer would start a node whose engine has stopped.
+        guard let graph = _graph, state != .stopped, state != .loading || progressive != nil else { return }
         let resumeTime = currentTime
         do {
             discardSchedule()
@@ -596,7 +598,7 @@ public final class Player: NowPlayingCommandTarget {
                 // The feeder re-applies the client format itself: the output rate may have changed.
                 isBuffering = false
                 let frame = min(Int64(resumeTime * progressive.fileRate), max(progressive.lengthFrames - 1, 0))
-                startFeeder(progressive, from: frame, preroll: false)
+                startFeeder(progressive, from: frame, preroll: state == .loading)
             } else if let file {
                 let frame = AVAudioFramePosition(resumeTime * file.processingFormat.sampleRate)
                 schedule(file, from: min(frame, max(file.length - 1, 0)))

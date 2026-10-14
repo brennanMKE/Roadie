@@ -91,6 +91,10 @@ extension Player {
             reader.close()
             return
         }
+        // A device change while the client format was being set stopped the engine (and `.loading` made
+        // `handleConfigurationChange` skip it): start it again, at the new rate. The feeder applies the
+        // graph's format itself, so a changed rate is picked up there.
+        try graph.start()
         errorMessage = nil
         consecutiveFailures = 0
         let source = reader.source

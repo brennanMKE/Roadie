@@ -324,6 +324,31 @@ final class SeekLog {
         #expect(await waitUntil { source.isClosed })
     }
 
+    /// A device change during the preroll stops the engine while the track is still `.loading`. The feeder is
+    /// already queued, so its first buffer must not start a node whose engine is stopped (an Objective-C
+    /// exception); the change restarts the engine and the feeder from the start.
+    @Test func deviceChangeDuringThePrerollRestartsTheEngineAndTheFeeder() async throws {
+        let rig = try ProgressiveRig(available: 0.25) { $0.minimumPrerollBytes = 1 << 30 }
+        defer { rig.cleanup() }
+        rig.player.enqueue([rig.track])
+        rig.player.play()
+        #expect(await waitUntil { rig.feeder?.isWaitingForBytes == true })
+        #expect(rig.player.state == .loading)
+        let first = try #require(rig.feeder)
+
+        rig.engine.stop()   // what a device change does to the real engine
+        rig.player.handleConfigurationChange()
+        #expect(rig.engine.isRunning)
+        #expect(rig.feeder !== first)
+        #expect(rig.player.state == .loading)
+
+        rig.source.advance(toFraction: 1.0)
+        #expect(await rig.waitPlaying())
+        try await rig.renderUntilFinished()
+        let audible = rig.audibleBlocks * 512
+        #expect(audible >= 22050 - 1024 && audible <= 22050 + 1024, "audible frames \(audible)")
+    }
+
     @Test func deviceChangeRestartsTheFeederAtTheSamePosition() async throws {
         let rig = try ProgressiveRig(available: 1.0)
         defer { rig.cleanup() }
