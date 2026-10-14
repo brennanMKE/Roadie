@@ -16,10 +16,11 @@ extension View {
     }
 
     /// Album rows in a selectable list: double-click plays the album, replacing the queue; the
-    /// context menu adds Add to Playlist. Single click keeps selecting (opening) the album.
+    /// context menu adds Add to Playlist. Single click keeps selecting (opening) the album: the
+    /// double-click is a simultaneous gesture so it never takes the click from the List's selection.
     func libraryAlbumActions(_ album: MediaID, model: PlayerModel) -> some View {
         libraryAlbumMenu(album, model: model)
-            .onTapGesture(count: 2) { model.playFromLibrary(.play(album: album)) }
+            .simultaneousGesture(TapGesture(count: 2).onEnded { model.playFromLibrary(.play(album: album)) })
     }
 
     /// Context menu only, for album rows that are buttons.
