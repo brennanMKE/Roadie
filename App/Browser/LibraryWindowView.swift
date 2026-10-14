@@ -5,6 +5,7 @@ import SwiftUI
 /// The Library window: sections, then the section's list, then albums and tracks. Search lives in the toolbar.
 struct LibraryWindowView: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(LibraryFallbackController.self) private var fallback
 
     var body: some View {
         @Bindable var library = player.library
@@ -20,7 +21,7 @@ struct LibraryWindowView: View {
         .task(id: ObjectIdentifier(player.library)) { library.appeared() }
         .onDisappear { library.disappeared() }
         .navigationTitle("Library")
-        .navigationSubtitle(library.backend.displayName)
+        .navigationSubtitle(FallbackText.subtitle(fallback.status))
         .toolbar {
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { library.refresh() }

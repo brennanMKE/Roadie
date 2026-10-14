@@ -346,4 +346,64 @@ struct LibraryBrowserModelTests {
         #expect(await waitFor { model.artistAlbums.phase == .loaded })
         #expect(await backend.count(.connect) == 1)
     }
+
+    // MARK: Failure hook (#0067)
+
+    private final class FailureLog {
+        var entries: [String] = []
+    }
+
+    private func log(_ model: LibraryBrowserModel) -> FailureLog {
+        let log = FailureLog()
+        model.onBackendFailure = { error, phase in log.entries.append("\(error)|\(phase)") }
+        return log
+    }
+
+    @Test func connectFailuresReachTheFailureHook() async {
+        let (backend, model) = makeModel()
+        let failures = log(model)
+        await backend.setError(.notConfigured("Set it up."), for: .connect)
+        model.appeared()
+        #expect(await waitFor { failures.entries.count == 1 })
+        #expect(failures.entries == ["notConfigured(\"Set it up.\")|connect"])
+        await backend.setError(.unreachable("down"), for: .connect)
+        model.retryConnection()
+        #expect(await waitFor { failures.entries.count == 2 })
+        #expect(failures.entries.last == "unreachable(\"down\")|connect")
+        // A cancelled connect is not a failure.
+        await backend.setError(nil, for: .connect)
+        await backend.gate(.connect)
+        model.retryConnection()
+        #expect(await waitFor { await backend.suspendedCount == 1 })
+        model.disappeared()
+        #expect(await waitFor { await backend.cancelledCount == 1 })
+        #expect(failures.entries.count == 2)
+    }
+
+    @Test func listTrackAndSearchFailuresReachTheFailureHook() async {
+        let (backend, model) = makeModel()
+        let failures = log(model)
+        await backend.setError(.unreachable("a"), for: .artists)
+        model.appeared()
+        #expect(await waitFor { failures.entries == ["unreachable(\"a\")|browse"] })
+        await backend.setError(.notConnected, for: .artists)
+        model.section = .albums
+        model.section = .artists
+        #expect(await waitFor { if case .failed = model.artists.phase { true } else { false } })
+        await backend.setError(nil, for: .artists)
+        model.refresh()
+        #expect(await waitFor { model.artists.phase == .loaded })
+        await backend.setError(.backend("t"), for: .tracks)
+        model.select(model.artists.items[0])
+        #expect(await waitFor { model.artistAlbums.phase == .loaded })
+        model.select(model.artistAlbums.items[0])
+        #expect(await waitFor { failures.entries.count == 2 })
+        await backend.setError(.notFound(id(.track, "x")), for: .tracks)
+        model.retryTracks()
+        #expect(await waitFor { if case .failed = model.tracks { true } else { false } })
+        await backend.setError(.unreachable("s"), for: .search)
+        model.searchText = "artist"
+        #expect(await waitFor { failures.entries.count == 3 })
+        #expect(failures.entries == ["unreachable(\"a\")|browse", "backend(\"t\")|browse", "unreachable(\"s\")|browse"])
+    }
 }

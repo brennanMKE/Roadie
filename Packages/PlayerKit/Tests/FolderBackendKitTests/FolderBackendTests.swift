@@ -48,6 +48,39 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         #expect(!message.contains(root.lastPathComponent))
     }
 
+    @Test func checkReachableReportsNotConfiguredUnreadableAndOk() async throws {
+        let suite = "FolderBackendTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let root = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        func check() -> MusicBackendError? {
+            do { try FolderBackend.checkReachable(in: defaults) } catch { return error }
+            return nil
+        }
+        guard case .notConfigured? = check() else {
+            Issue.record("expected notConfigured, got \(String(describing: check()))")
+            return
+        }
+        let file = root.appending(path: "afile.txt")
+        try Data("x".utf8).write(to: file)
+        defaults.set(file.path, forKey: FolderBackend.folderDefaultsKey)
+        guard case .unreachable(let notADirectory)? = check() else {
+            Issue.record("a file is not a folder")
+            return
+        }
+        #expect(notADirectory.contains("afile.txt"))
+        defaults.set(root.appending(path: "Gone Music").path, forKey: FolderBackend.folderDefaultsKey)
+        guard case .unreachable(let missing)? = check() else {
+            Issue.record("a missing folder is unreachable")
+            return
+        }
+        #expect(missing.contains("Gone Music"))
+        defaults.set(root.path, forKey: FolderBackend.folderDefaultsKey)
+        #expect(check() == nil)
+    }
+
     @Test func libraryCallsBeforeConnectThrowNotConnected() async throws {
         let fixture = try BackendFixture(root: makeTempDir())
         defer { fixture.cleanup() }

@@ -32,6 +32,9 @@ final class PlayerModel {
     var library: LibraryBrowserModel { sources.library }
     /// The thumbnail cache for the active source (rebuilt on a switch: refs only mean something to their backend).
     var artwork: ArtworkCache { sources.artwork }
+    /// Moves the Library to the next usable source when the chosen one is not set up or cannot be reached, and
+    /// back when it returns. Playback is never touched.
+    let fallback: LibraryFallbackController
     let cache: TrackCache
     let cacheSettings: CacheSettingsModel
     /// The local-folder source; Settings › Library chooses and indexes its folder. Shares Plex's "This Mac" output, so both play through the one `Player`.
@@ -150,9 +153,12 @@ final class PlayerModel {
         sources = LibrarySourceController(
             sources: [
                 LibrarySource(backend: stack.backend, isConfigured: { PlexBackend.isConfigured() }),
-                LibrarySource(backend: folderBackend, isConfigured: { FolderBackend.storedFolder() != nil }),
+                LibrarySource(
+                    backend: folderBackend, isConfigured: { FolderBackend.storedFolder() != nil },
+                    probe: SourceProbes.checking { try FolderBackend.checkReachable() }),
             ],
             defaultSourceID: stack.backend.sourceID)
+        fallback = LibraryFallbackController(sources: sources)
         let cache = stack.cache
         Task {
             do { try await cache.prepare() } catch {
@@ -184,6 +190,15 @@ final class PlayerModel {
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
         }
+        fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
+        fallback.start()
+        // The model lives as long as the app, so these observers are never removed.
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.fallback.settingsChanged() } }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.fallback.retryNow() } }
     }
 
     /// Follows the selected output's now-playing stream. Never connects: the stream for This Mac
@@ -317,9 +332,11 @@ final class PlayerModel {
         }
         Self.log.info("play from library: \(request.items.count, privacy: .public) item(s), \(mode, privacy: .public)")
         let backend = backend
+        let sourceID = backend.sourceID
         let output = selectedOutput
         Task {
             do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
+                fallback.report(error, from: sourceID)
                 showBackendFailure(error)
             }
         }

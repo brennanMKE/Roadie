@@ -7,11 +7,12 @@ import SwiftUI
 struct LibrarySettingsView: View {
     @Environment(FolderSettingsModel.self) private var model
     @Environment(LibrarySourceController.self) private var sources
+    @Environment(LibraryFallbackController.self) private var fallback
 
     var body: some View {
         Form {
             Section {
-                Picker("Library source", selection: Binding(get: { sources.preferredID }, set: { sources.select($0) })) {
+                Picker("Library source", selection: Binding(get: { sources.preferredID }, set: { fallback.userSelected($0) })) {
                     ForEach(sources.sources) { source in
                         Text(source.isConfigured() ? source.displayName : "\(source.displayName) (not set up)")
                             .tag(source.id)
@@ -20,6 +21,17 @@ struct LibrarySettingsView: View {
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
                 .accessibilityIdentifier("library.source")
+                if let summary = FallbackText.summary(fallback.status) {
+                    HStack {
+                        Text(summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("library.sourceStatus")
+                        Spacer()
+                        Button("Retry Now") { fallback.retryNow() }
+                            .accessibilityIdentifier("library.sourceRetry")
+                    }
+                }
             } header: {
                 Text("Source")
             } footer: {

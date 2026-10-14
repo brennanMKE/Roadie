@@ -102,20 +102,32 @@ public actor FolderBackend: MusicBackend {
 
     // MARK: Connection
 
-    public func connect() async throws {
-        guard let configured = settings() else {
-            await disconnect()
-            log.info("connect: notConfigured")
+    /// The fallback's probe: the stored folder exists, is a directory and is readable. No index, no scan, no watcher.
+    /// Throws the same `.notConfigured` / `.unreachable` `connect()` would.
+    public nonisolated static func checkReachable(in defaults: UserDefaults = .standard) throws(MusicBackendError) {
+        _ = try validate(storedFolder(in: defaults))
+    }
+
+    private nonisolated static func validate(_ folder: URL?) throws(MusicBackendError) -> URL {
+        guard let folder else {
             throw MusicBackendError.notConfigured("Choose a music folder under Settings \u{203A} Library.")
         }
-        let name = configured.lastPathComponent
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: configured.path, isDirectory: &isDirectory), isDirectory.boolValue,
-              FileManager.default.isReadableFile(atPath: configured.path) else {
-            await disconnect()
-            log.info("connect: unreachable")
-            throw MusicBackendError.unreachable("The music folder \u{201C}\(name)\u{201D} can't be read.")
+        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory), isDirectory.boolValue,
+              FileManager.default.isReadableFile(atPath: folder.path) else {
+            throw MusicBackendError.unreachable("The music folder \u{201C}\(folder.lastPathComponent)\u{201D} can't be read.")
         }
+        return folder
+    }
+
+    public func connect() async throws {
+        let configured: URL
+        do { configured = try Self.validate(settings()) } catch {
+            await disconnect()
+            log.info("connect: not available")
+            throw error
+        }
+        let name = configured.lastPathComponent
         let resolved = configured.standardizedFileURL.resolvingSymlinksInPath()
         if let current = root, current == resolved {
             // Already connected to this folder; wait for a first scan that is still running.

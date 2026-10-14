@@ -192,4 +192,20 @@ struct PagedListTests {
         #expect(await waitFor { list.phase == .loaded })
         #expect(!list.hasMore)
     }
+
+    @Test func onFailureIsCalledForTheFirstAndLaterPages() async {
+        let loader = GatedLoader()
+        let list = makeList(loader)
+        var errors: [MusicBackendError] = []
+        list.onFailure = { if let error = $0 as? MusicBackendError { errors.append(error) } }
+        loader.failNext(.unreachable("first"))
+        list.reload()
+        #expect(await waitFor { errors.count == 1 })
+        list.reload()
+        #expect(await waitFor { list.phase == .loaded })
+        loader.failNext(.unreachable("later"))
+        list.loadMoreIfNeeded(current: list.items[8])
+        #expect(await waitFor { errors.count == 2 })
+        #expect(errors == [.unreachable("first"), .unreachable("later")])
+    }
 }

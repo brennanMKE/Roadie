@@ -15,6 +15,7 @@ struct SkinAmpApp: App {
         Window("Library", id: "library") {
             LibraryWindowView()
                 .environment(appDelegate.model)
+                .environment(appDelegate.model.fallback)
         }
         .keyboardShortcut("l")
         .defaultSize(width: 960, height: 600)
@@ -25,6 +26,7 @@ struct SkinAmpApp: App {
                 .environment(appDelegate.model.cacheSettings)
                 .environment(appDelegate.model.folderSettings)
                 .environment(appDelegate.model.sources)
+                .environment(appDelegate.model.fallback)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

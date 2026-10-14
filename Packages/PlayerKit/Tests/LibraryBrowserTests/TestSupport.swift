@@ -151,7 +151,9 @@ struct SourceFixture {
 
 /// A controller over two stubs standing for Plex (25 artists) and the local folder (3 artists), with a private defaults suite.
 @MainActor
-func makeSources(stored: String? = nil, default defaultID: String = "plex") -> SourceFixture {
+func makeSources(
+    stored: String? = nil, default defaultID: String = "plex", folderProbe: SourceProbe? = nil
+) -> SourceFixture {
     let suiteName = "LibraryBrowserTests-\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     if let stored { defaults.set(stored, forKey: LibrarySourceController.defaultsKey) }
@@ -162,7 +164,7 @@ func makeSources(stored: String? = nil, default defaultID: String = "plex") -> S
     let controller = LibrarySourceController(
         sources: [
             LibrarySource(backend: plex, isConfigured: { plexFlag.value }),
-            LibrarySource(backend: folder, isConfigured: { folderFlag.value }),
+            LibrarySource(backend: folder, isConfigured: { folderFlag.value }, probe: folderProbe),
         ],
         defaultSourceID: defaultID, defaults: defaults, searchDelay: .milliseconds(20))
     return SourceFixture(
@@ -173,4 +175,123 @@ func makeSources(stored: String? = nil, default defaultID: String = "plex") -> S
 /// A playing snapshot with `title`.
 func snapshot(title: String, on output: OutputDevice.ID = OutputDevice.thisMacID) -> NowPlaying {
     NowPlaying(output: output, state: .playing, title: title)
+}
+
+// MARK: Fallback
+
+/// A clock the test advances by hand. `sleep` parks until `advance(by:)` passes its deadline; cancellation ends it.
+final class ManualClock: Clock, @unchecked Sendable {
+    struct Instant: InstantProtocol {
+        var offset: Duration
+        func advanced(by duration: Duration) -> Instant { Instant(offset: offset + duration) }
+        func duration(to other: Instant) -> Duration { other.offset - offset }
+        static func < (lhs: Instant, rhs: Instant) -> Bool { lhs.offset < rhs.offset }
+    }
+
+    private struct Sleeper {
+        var deadline: Instant
+        var continuation: CheckedContinuation<Void, any Error>
+    }
+
+    private struct State {
+        var now = Instant(offset: .zero)
+        var sleepers: [UUID: Sleeper] = [:]
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var now: Instant { state.withLock { $0.now } }
+    var minimumResolution: Duration { .zero }
+    var sleeperCount: Int { state.withLock { $0.sleepers.count } }
+
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                enum Outcome { case wait, resume, cancel }
+                let outcome = state.withLock { s -> Outcome in
+                    if Task.isCancelled { return .cancel }
+                    if deadline <= s.now { return .resume }
+                    s.sleepers[id] = Sleeper(deadline: deadline, continuation: continuation)
+                    return .wait
+                }
+                switch outcome {
+                case .wait: break
+                case .resume: continuation.resume()
+                case .cancel: continuation.resume(throwing: CancellationError())
+                }
+            }
+        } onCancel: {
+            let sleeper = state.withLock { $0.sleepers.removeValue(forKey: id) }
+            sleeper?.continuation.resume(throwing: CancellationError())
+        }
+    }
+
+    /// Moves time forward and wakes every sleeper whose deadline has passed, earliest first.
+    func advance(by duration: Duration) {
+        let due = state.withLock { s -> [Sleeper] in
+            s.now = s.now.advanced(by: duration)
+            let ready = s.sleepers.filter { $0.value.deadline <= s.now }
+            for key in ready.keys { s.sleepers.removeValue(forKey: key) }
+            return ready.values.sorted { $0.deadline < $1.deadline }
+        }
+        for sleeper in due { sleeper.continuation.resume() }
+    }
+}
+
+/// What a test's folder probe answers, and how often it was asked.
+final class FolderCheck: @unchecked Sendable {
+    private let lock = OSAllocatedUnfairLock(initialState: (error: MusicBackendError?.none, count: 0))
+    var error: MusicBackendError? {
+        get { lock.withLock { $0.error } }
+        set { lock.withLock { $0.error = newValue } }
+    }
+    var count: Int { lock.withLock { $0.count } }
+    func run() throws {
+        let error = lock.withLock { s -> MusicBackendError? in
+            s.count += 1
+            return s.error
+        }
+        if let error { throw error }
+    }
+}
+
+@MainActor
+final class NoticeLog {
+    var notices: [FallbackNotice] = []
+}
+
+struct FallbackFixture {
+    var sources: SourceFixture
+    var clock: ManualClock
+    var fallback: LibraryFallbackController
+    var notices: NoticeLog
+    var folderCheck: FolderCheck
+
+    var plex: StubMusicBackend { sources.plex }
+    var folder: StubMusicBackend { sources.folder }
+    var controller: LibrarySourceController { sources.controller }
+    var defaults: UserDefaults { sources.defaults }
+
+    @MainActor func cleanUp() {
+        fallback.stop()
+        sources.cleanUp()
+    }
+}
+
+/// Two stubs behind a controller, a `ManualClock` and the fallback driver. Nothing is started: call `fallback.start()`.
+@MainActor
+func makeFallback(
+    stored: String? = nil, plexConfigured: Bool = true, folderConfigured: Bool = true,
+    schedule: RetrySchedule = .default
+) -> FallbackFixture {
+    let check = FolderCheck()
+    let sources = makeSources(stored: stored, folderProbe: SourceProbes.checking { try check.run() })
+    sources.plexConfigured.value = plexConfigured
+    sources.folderConfigured.value = folderConfigured
+    let clock = ManualClock()
+    let fallback = LibraryFallbackController(sources: sources.controller, schedule: schedule, clock: clock)
+    let log = NoticeLog()
+    fallback.onNotice = { log.notices.append($0) }
+    return FallbackFixture(sources: sources, clock: clock, fallback: fallback, notices: log, folderCheck: check)
 }
