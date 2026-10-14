@@ -16,11 +16,15 @@ public struct Skin: @unchecked Sendable {
     public let fallbacks: [String]
     /// `pledit.txt`: the playlist window's colours and font; `.defaults` when the file is absent.
     public let playlistStyle: PlaylistStyle
+    /// The skin's `.cur` files under Winamp's cursor names; `.empty` when it ships none.
+    public let cursors: SkinCursors
 
     public init(
         sheets: [String: CGImage], visColors: [RGBColor], region: SkinRegion = .empty,
-        playlistStyle: PlaylistStyle = .defaults, warnings: [String], fallbacks: [String] = []
+        playlistStyle: PlaylistStyle = .defaults, warnings: [String], fallbacks: [String] = [],
+        cursors: SkinCursors = .empty
     ) {
+        self.cursors = cursors
         self.playlistStyle = playlistStyle
         self.sheets = sheets
         self.visColors = visColors

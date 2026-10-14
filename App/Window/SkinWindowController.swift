@@ -53,6 +53,15 @@ enum SkinWindowKind {
         }
     }
 
+    /// The cursor-region description of this window in `mode`.
+    func cursorWindow(_ mode: SkinWindowController.Mode) -> CursorRegions.Window {
+        switch self {
+        case .main: .main(mode == .shade ? .shade : .normal)
+        case .equalizer: .equalizer(shaded: mode == .shade)
+        case .playlist(let steps): .playlist(steps, shaded: mode == .shade)
+        }
+    }
+
     var titleBarHeight: CGFloat {
         switch self {
         case .main: MainWindowLayout.titleBar.height
@@ -103,6 +112,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     private let model: PlayerModel
     private let shape: SkinShapeView
+    private let cursorController = SkinCursorController()
     private let hosting: NSHostingView<AnyView>
     private let dragView = TitleBarDragView()
     private var hasBeenShown = false
@@ -119,6 +129,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         shape = SkinShapeView(frame: NSRect(origin: .zero, size: window.frame.size))
         hosting = NSHostingView(rootView: AnyView(EmptyView()))
         super.init()
+        shape.cursorController = cursorController
         hosting.rootView = AnyView(rootView.environment(model).environment(\.skinWindow, self))
         hosting.sizingOptions = []
         shape.addSubview(hosting)
@@ -232,6 +243,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
             CGRect(x: $0.minX * scale, y: $0.minY * scale, width: $0.width * scale, height: $0.height * scale)
         }
         window.invalidateShadow()
+        cursorController.apply(cursors: model.skin?.cursors ?? .empty, window: kind.cursorWindow(mode), scale: scale)
         // Winamp lets an unshaded window hang off the bottom of the screen; here it is pushed back on.
         if modeChanged, window.isVisible, let screen = window.screen {
             window.setFrame(window.constrainFrameRect(window.frame, to: screen), display: true)

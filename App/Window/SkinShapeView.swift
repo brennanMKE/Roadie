@@ -8,6 +8,9 @@ final class SkinShapeView: NSView {
     /// The region in view coordinates (y up); nil = rectangular.
     private var regionPath: CGPath?
     private let maskLayer = CALayer()
+    /// Shows the skin's cursors over this window's regions; set by the owning `SkinWindowController`.
+    var cursorController: SkinCursorController?
+    private var cursorTrackingArea: NSTrackingArea?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -39,6 +42,45 @@ final class SkinShapeView: NSView {
     override func layout() {
         super.layout()
         maskLayer.frame = bounds
+    }
+
+    // MARK: Cursors
+
+    /// One tracking area over the whole view, active even while the app or window is not key (Winamp shows its
+    /// cursors over an inactive window). A point lookup in `CursorRegions` picks the cursor; tracking areas deliver
+    /// to their owner regardless of `hitTest`, so clicks still reach the SwiftUI buttons and the drag view.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let cursorTrackingArea { removeTrackingArea(cursorTrackingArea) }
+        let area = NSTrackingArea(
+            rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .cursorUpdate, .activeInActiveApp, .inVisibleRect],
+            owner: self, userInfo: nil)
+        addTrackingArea(area)
+        cursorTrackingArea = area
+    }
+
+    /// The pointer in view points with the origin at the top-left (this view is not flipped).
+    private func topLeftPoint(of event: NSEvent) -> CGPoint {
+        let local = convert(event.locationInWindow, from: nil)
+        return CGPoint(x: local.x, y: bounds.height - local.y)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        cursorController?.pointerMoved(toViewPoint: topLeftPoint(of: event))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        cursorController?.pointerMoved(toViewPoint: topLeftPoint(of: event))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        cursorController?.pointerExited()
+    }
+
+    /// No `super`: AppKit's default sets the arrow, which would undo the skin cursor over SwiftUI subviews.
+    override func cursorUpdate(with event: NSEvent) {
+        cursorController?.pointerMoved(toViewPoint: topLeftPoint(of: event))
+        cursorController?.reapply()
     }
 
     /// `point` is in the superview's coordinates.

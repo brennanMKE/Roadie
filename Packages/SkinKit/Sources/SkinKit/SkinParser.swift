@@ -74,10 +74,13 @@ public enum SkinParser {
             fallbacks.append("pledit.txt missing; Webamp default playlist colours")
         }
 
-        // TODO: cursors, base-skin fallback.
+        // Unreadable cursors are cosmetic: recorded in `cursors.unreadable`, never a warning.
+        let cursors = SkinCursors.load(from: archive)
+
+        // TODO: base-skin fallback.
         return Skin(
             sheets: sheets, visColors: visColors, region: region, playlistStyle: playlistStyle, warnings: warnings,
-            fallbacks: fallbacks)
+            fallbacks: fallbacks, cursors: cursors)
     }
 }
 
