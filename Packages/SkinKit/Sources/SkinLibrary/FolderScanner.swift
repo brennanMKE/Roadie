@@ -27,7 +27,10 @@ public enum FolderScanner {
             guard extensions.contains(url.pathExtension.lowercased()) else { continue }
             guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
             let path = url.path
-            guard let prefix = prefixes.first(where: { path.hasPrefix($0) }) else { continue }
+            // Never skip silently: a pass over an empty listing would remove every file from the index.
+            guard let prefix = prefixes.first(where: { path.hasPrefix($0) }) else {
+                throw SkinLibraryError.folderUnreadable("unexpected path outside the folder")
+            }
             stamps.append(
                 FileStamp(
                     path: String(path.dropFirst(prefix.count)),

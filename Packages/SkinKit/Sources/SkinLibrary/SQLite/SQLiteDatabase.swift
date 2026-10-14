@@ -83,7 +83,10 @@ final class SQLiteDatabase {
 
     var userVersion: Int32 {
         get {
-            guard let statement = try? statement("PRAGMA user_version"), (try? statement.step()) == true else { return 0 }
+            guard let statement = try? statement("PRAGMA user_version") else { return 0 }
+            // Reset so the cached statement does not hold a read transaction open (it would pin the WAL).
+            defer { statement.reset() }
+            guard (try? statement.step()) == true else { return 0 }
             return Int32(statement.int64(0))
         }
         set { try? execute("PRAGMA user_version = \(newValue)") }

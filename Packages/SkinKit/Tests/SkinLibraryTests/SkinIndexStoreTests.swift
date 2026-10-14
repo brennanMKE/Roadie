@@ -32,6 +32,18 @@ func linkedOutcome(_ path: String, hash: String, size: Int64 = 10, mtime: Double
         #expect(try await again.counts().skins == 1)
     }
 
+    @Test func checkpointTruncatesTheWAL() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let url = dir.appending("index.sqlite")
+        let store = try await SkinIndexStore.open(at: url)
+        _ = try await store.apply((0..<200).map { parsedOutcome("s\($0).wsz", hash: "h\($0)", readme: String(repeating: "x", count: 2000)) })
+        // No statement may be left holding a read transaction: the checkpoint must not report busy, and the WAL empties.
+        #expect(try await store.strings("PRAGMA wal_checkpoint(TRUNCATE)") == ["0"])
+        let wal = try FileManager.default.attributesOfItem(atPath: url.path + "-wal")[.size] as? Int
+        #expect(wal == 0)
+    }
+
     @Test func newerSchemaThrowsIncompatible() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }

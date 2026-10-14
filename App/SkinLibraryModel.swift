@@ -156,6 +156,8 @@ final class SkinLibraryModel {
             isIndexing = false
             progress = nil
             passFinished?()
+            // The folder changed while this pass ran (setFolder cancelled it, and its scan() was skipped): index the new one.
+            if let current = folderPath, current != path { scan() }
         }
         do {
             guard let store = try await openStoreIfNeeded() else { return }
