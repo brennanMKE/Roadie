@@ -1,4 +1,4 @@
-This project includes sprite coordinate data and default visualizer colours ported from Webamp
+This project includes sprite coordinate data, the `region.txt`/INI parsers and default visualizer colours ported from Webamp
 (https://github.com/captbaritone/webamp), used under the MIT License:
 
 The MIT License (MIT)

@@ -4,7 +4,7 @@ import TrackCache
 
 @main
 struct SkinAmpApp: App {
-    @State private var model = PlayerModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var plexSettings = PlexSettingsModel(
         tokenStore: KeychainPlexTokenStore(),
         connectionTest: PlexConnectionTest(clientIdentifier: PlexClientIdentifier.stored()),
@@ -12,26 +12,9 @@ struct SkinAmpApp: App {
         openURL: { NSWorkspace.shared.open($0) })
 
     var body: some Scene {
-        Window("SkinAmp", id: "main") {
-            PlayerView()
-                .environment(model)
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
-        .commands {
-            CommandGroup(replacing: .newItem) {
-                Button("Open…") { model.openFiles(replace: true) }
-                    .keyboardShortcut("o")
-                Button("Add to Playlist…") { model.openFiles(replace: false) }
-                    .keyboardShortcut("o", modifiers: [.command, .option])
-                Button("Open Skin…") { model.openSkin() }
-                    .keyboardShortcut("o", modifiers: [.command, .shift])
-            }
-        }
-
         Window("Library", id: "library") {
             LibraryWindowView()
-                .environment(model)
+                .environment(appDelegate.model)
         }
         .keyboardShortcut("l")
         .defaultSize(width: 960, height: 600)
@@ -39,7 +22,21 @@ struct SkinAmpApp: App {
         Settings {
             SettingsView()
                 .environment(plexSettings)
-                .environment(model.cacheSettings)
+                .environment(appDelegate.model.cacheSettings)
+        }
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Open…") { appDelegate.model.openFiles(replace: true) }
+                    .keyboardShortcut("o")
+                Button("Add to Playlist…") { appDelegate.model.openFiles(replace: false) }
+                    .keyboardShortcut("o", modifiers: [.command, .option])
+                Button("Open Skin…") { appDelegate.model.openSkin() }
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
+            }
+            CommandGroup(after: .windowArrangement) {
+                Button("Player") { appDelegate.player.show() }
+                    .keyboardShortcut("1")
+            }
         }
     }
 }

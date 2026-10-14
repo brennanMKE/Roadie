@@ -19,6 +19,7 @@ struct PlayerView: View {
                     Button("Open Skin…") { model.openSkin() }
                 }
                 .frame(width: 275 * model.scale, height: 116 * model.scale)
+                .background(.windowBackground, in: .rect(cornerRadius: 8))
             }
         }
         .dropDestination(for: URL.self) { urls, _ in

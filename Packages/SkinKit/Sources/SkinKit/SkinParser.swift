@@ -62,8 +62,11 @@ public enum SkinParser {
             fallbacks.append("viscolor.txt missing; Webamp defaults")
         }
 
-        // TODO: pledit.txt, region.txt, TEXT font sprites, cursors, base-skin fallback.
-        return Skin(sheets: sheets, visColors: visColors, warnings: warnings, fallbacks: fallbacks)
+        // A region file with no usable section is normal (all-comment files ship in real skins): no warning.
+        let region = archive.file("region", extensions: ["txt"]).map(RegionParser.parse) ?? .empty
+
+        // TODO: pledit.txt, TEXT font sprites, cursors, base-skin fallback.
+        return Skin(sheets: sheets, visColors: visColors, region: region, warnings: warnings, fallbacks: fallbacks)
     }
 }
 

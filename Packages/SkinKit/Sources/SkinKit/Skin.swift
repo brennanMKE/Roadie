@@ -7,15 +7,18 @@ public struct Skin: @unchecked Sendable {
     public let sheets: [String: CGImage]
     /// Always 24 entries: viscolor.txt lines over Webamp's base-skin defaults.
     public let visColors: [RGBColor]
+    /// `region.txt`: the window shapes. `.empty` when the file is absent or has no usable section.
+    public let region: SkinRegion
     /// Things that will render wrong (missing or undecodable required sheets, no number sheet at all).
     public let warnings: [String]
     /// Substitutions that keep the skin whole (balance from volume, digits from one number sheet,
     /// default viscolors...).
     public let fallbacks: [String]
 
-    public init(sheets: [String: CGImage], visColors: [RGBColor], warnings: [String], fallbacks: [String] = []) {
+    public init(sheets: [String: CGImage], visColors: [RGBColor], region: SkinRegion = .empty, warnings: [String], fallbacks: [String] = []) {
         self.sheets = sheets
         self.visColors = visColors
+        self.region = region
         self.warnings = warnings
         self.fallbacks = fallbacks
     }

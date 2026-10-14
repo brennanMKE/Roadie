@@ -11,8 +11,7 @@ struct MainWindowView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             SpriteImage(skin: skin, name: "MAIN_WINDOW_BACKGROUND")
-            // TODO: borderless window with title-bar dragging and region.txt shape (AppKit).
-            SpriteImage(skin: skin, name: "MAIN_TITLE_BAR_SELECTED")
+            TitleBarView(skin: skin)
 
             MainWindowStatusLayer(skin: skin, status: model.mainWindowStatus, toggleTimeMode: model.toggleTimeMode)
 
