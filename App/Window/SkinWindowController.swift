@@ -131,6 +131,10 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         shape.addSubview(dragView)
         window.contentView = shape
         window.delegate = self
+        window.onLeftMouseDown = { [weak self] in
+            guard let self else { return }
+            coordinator?.raiseGroup(around: self)
+        }
         applyLayout()
         observe()
     }
@@ -258,6 +262,11 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     func windowDidChangeBackingProperties(_ notification: Notification) {
         applyLayout()
+    }
+
+    /// A skinned window coming to the front brings the rest of the group with it.
+    func windowDidBecomeKey(_ notification: Notification) {
+        coordinator?.raiseGroup(around: self)
     }
 
     /// A playlist menu closes when the window stops being key.

@@ -98,6 +98,26 @@ final class WindowDockingCoordinator {
         layoutDidChange()
     }
 
+    // MARK: Z-order
+
+    /// Brings the visible skinned windows forward together, directly beneath `controller`'s window and in their current
+    /// order (Winamp's owned windows; Webamp's `windowOrder`). Ordering only: nothing is made key, nothing outside the
+    /// group is touched, windows on other Spaces stay there.
+    func raiseGroup(around controller: SkinWindowController) {
+        guard isVisible(controller) else { return }
+        var kinds: [ObjectIdentifier: WindowKind] = [:]
+        for (kind, other) in controllers where isVisible(other) && other.window.isOnActiveSpace {
+            kinds[ObjectIdentifier(other.window)] = kind
+        }
+        let frontToBack = NSApp.orderedWindows.compactMap { kinds[ObjectIdentifier($0)] }
+        let steps = WindowStacking.raise(
+            group: Set(kinds.values), key: controller.kind.windowKind, frontToBack: frontToBack)
+        for step in steps {
+            guard let window = controllers[step.window]?.window, let anchor = controllers[step.below]?.window else { continue }
+            window.order(.below, relativeTo: anchor.windowNumber)
+        }
+    }
+
     // MARK: Size changes
 
     /// Runs `change` (which resizes `controller`'s window, keeping its top-left corner) and moves the windows that were

@@ -15,6 +15,16 @@ final class SkinWindow: NSWindow {
         animationBehavior = .documentWindow
     }
 
+    /// Called after a left mouse-down anywhere in the window has been handled.
+    var onLeftMouseDown: (() -> Void)?
+
+    /// A click anywhere in the window (Webamp's `FocusTarget`), after AppKit has handled it, so a window that is already
+    /// key can still pull its group forward.
+    override func sendEvent(_ event: NSEvent) {
+        super.sendEvent(event)
+        if event.type == .leftMouseDown { onLeftMouseDown?() }
+    }
+
     /// AppKit answers `false` for borderless windows, which would leave menus without a key window.
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
