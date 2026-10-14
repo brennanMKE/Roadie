@@ -49,6 +49,37 @@ final class PlayerModel {
     }
 
     private static let lastSkinKey = "lastSkinPath"
+    private static let timeModeKey = "timeMode"
+
+    /// Elapsed or remaining time in the main window; Winamp keeps it in winamp.ini.
+    var timeMode: TimeMode = UserDefaults.standard.string(forKey: PlayerModel.timeModeKey)
+        .flatMap(TimeMode.init(rawValue:)) ?? .elapsed
+
+    func toggleTimeMode() {
+        timeMode = timeMode == .elapsed ? .remaining : .elapsed
+        UserDefaults.standard.set(timeMode.rawValue, forKey: Self.timeModeKey)
+    }
+
+    /// What the main window's time, kbps/kHz and mono/stereo area shows. On This Mac the position, track
+    /// metadata and opened file format come from the local player (read every 100 ms tick); other
+    /// outputs only report the `NowPlaying` snapshot, which has no bitrate or format.
+    var mainWindowStatus: MainWindowStatus {
+        let transport: Transport = switch nowPlaying.state {
+        case .stopped: .stopped
+        case .loading: .loading
+        case .playing: .playing
+        case .paused: .paused
+        }
+        let isLocal = selectedOutput == OutputDevice.thisMacID
+        let track = isLocal ? player.queue.current : nil
+        return MainWindowStatus(
+            transport: transport, timeMode: timeMode,
+            elapsed: isLocal ? player.currentTime : nowPlaying.elapsed(at: Date()),
+            duration: nowPlaying.duration ?? track?.duration ?? 0,
+            bitrateKbps: track?.bitrate,
+            sampleRate: (isLocal ? player.currentFormat?.sampleRate : nil) ?? track?.sampleRate,
+            channels: (isLocal ? player.currentFormat?.channels : nil) ?? track?.channels)
+    }
 
     init() {
         let stack = PlexPlaybackStack.standard()

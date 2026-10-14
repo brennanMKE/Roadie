@@ -12,6 +12,8 @@ public final class Player: NowPlayingCommandTarget {
         didSet { emit(.stateChanged(state)) }
     }
     public private(set) var currentTime: TimeInterval = 0
+    /// File format of the loaded track; nil while loading or stopped.
+    public private(set) var currentFormat: PlaybackFormat?
     public private(set) var errorMessage: String?
 
     /// 0...1. Clamped on assignment; backed by an ignored stored value so the
@@ -223,6 +225,7 @@ public final class Player: NowPlayingCommandTarget {
         discardSchedule()
         _graph?.playerNode.stop()
         file = nil
+        currentFormat = nil
         currentTime = 0
         state = .stopped
     }
@@ -280,6 +283,7 @@ public final class Player: NowPlayingCommandTarget {
         discardSchedule()   // bumps the generation: any older load is now stale
         _graph?.playerNode.stop()
         file = nil   // seek / reschedule / device change must not act on the previous track's file
+        currentFormat = nil
         currentTime = 0
         errorMessage = nil
         autoplayAfterLoad = autoplay
@@ -299,12 +303,17 @@ public final class Player: NowPlayingCommandTarget {
         }
     }
 
+    private static func format(of file: AVAudioFile) -> PlaybackFormat {
+        PlaybackFormat(sampleRate: file.fileFormat.sampleRate, channels: Int(file.fileFormat.channelCount))
+    }
+
     private func begin(_ file: AVAudioFile) throws {
         let graph = ensureGraph()
         discardSchedule()
         graph.playerNode.stop()
         try graph.start()
         self.file = file
+        currentFormat = Self.format(of: file)
         schedule(file, from: 0)
         currentTime = 0
         if autoplayAfterLoad {
@@ -410,6 +419,7 @@ public final class Player: NowPlayingCommandTarget {
                 return
             }
             file = next
+            currentFormat = Self.format(of: next)
             nextFile = nil
             scheduleNextIfNeeded()
         case .reachedEnd:

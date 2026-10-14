@@ -14,8 +14,7 @@ struct MainWindowView: View {
             // TODO: borderless window with title-bar dragging and region.txt shape (AppKit).
             SpriteImage(skin: skin, name: "MAIN_TITLE_BAR_SELECTED")
 
-            SpriteImage(skin: skin, name: playIndicator)
-                .offset(x: 26, y: 28)
+            MainWindowStatusLayer(skin: skin, status: model.mainWindowStatus, toggleTimeMode: model.toggleTimeMode)
 
             transportButton("MAIN_PREVIOUS_BUTTON", x: 16, y: 88, action: model.previous)
             transportButton("MAIN_PLAY_BUTTON", x: 39, y: 88, action: model.play)
@@ -27,16 +26,7 @@ struct MainWindowView: View {
             MarqueeView(skin: skin, text: model.marqueeText)
         }
         .frame(width: 275, height: 116, alignment: .topLeading)
-        // TODO: time digits, position/volume/balance sliders, shuffle/repeat, visualizer.
-    }
-
-    private var playIndicator: String {
-        switch model.playbackState {
-        // Winamp shows the play glyph while a file is opening.
-        case .playing, .loading: "MAIN_PLAYING_INDICATOR"
-        case .paused: "MAIN_PAUSED_INDICATOR"
-        case .stopped: "MAIN_STOPPED_INDICATOR"
-        }
+        // TODO: position/volume/balance sliders, shuffle/repeat, visualizer.
     }
 
     private func transportButton(_ name: String, x: CGFloat, y: CGFloat, action: @escaping () -> Void) -> some View {
