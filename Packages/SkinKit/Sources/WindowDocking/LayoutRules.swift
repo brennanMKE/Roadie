@@ -42,18 +42,60 @@ public enum LayoutRules {
 
         let chosen = ScreenSelection.bounds(for: bounding, among: screenList, fallback: primary)
         guard bounding.width <= chosen.width, bounding.height <= chosen.height else { return .reset }
+        return .shift(shift(toFit: bounding, in: chosen))
+    }
+
+    /// Webamp's constant shift (actionCreators/windows.ts 283-306): `top <= bounds.top` moves down, else
+    /// `bottom > bounds.bottom` moves up; the same for x. Shared by `recovery` and `dragRecovery`.
+    static func shift(toFit bounding: Box, in bounds: Box) -> Offset {
         var moveX: CGFloat = 0
         var moveY: CGFloat = 0
-        if bounding.top <= chosen.top {
-            moveY = chosen.top - bounding.top
-        } else if bounding.bottom > chosen.bottom {
-            moveY = chosen.bottom - bounding.bottom
+        if bounding.top <= bounds.top {
+            moveY = bounds.top - bounding.top
+        } else if bounding.bottom > bounds.bottom {
+            moveY = bounds.bottom - bounding.bottom
         }
-        if bounding.left <= chosen.left {
-            moveX = chosen.left - bounding.left
-        } else if bounding.right > chosen.right {
-            moveX = chosen.right - bounding.right
+        if bounding.left <= bounds.left {
+            moveX = bounds.left - bounding.left
+        } else if bounding.right > bounds.right {
+            moveX = bounds.right - bounding.right
         }
-        return .shift(Offset(x: moveX, y: moveY))
+        return Offset(x: moveX, y: moveY)
+    }
+
+    /// How much of a drag strip must show side to side for the window to count as grabbable (all of it when narrower).
+    public static let minimumGrabWidth: CGFloat = 50
+
+    /// True when some screen's work area shows the full height of the window's top `titleBarHeight` points over at least
+    /// `minimumGrabWidth` of its width. A strip partly under the menu bar, the Dock or in a gap between displays is not.
+    public static func isGrabbable(_ box: Box, titleBarHeight: CGFloat, on screens: [Box]) -> Bool {
+        let strip = Box(x: box.x, y: box.y, width: box.width, height: min(titleBarHeight, box.height))
+        let needed = min(strip.width, minimumGrabWidth)
+        return screens.contains { screen in
+            let width = min(strip.right, screen.right) - max(strip.left, screen.left)
+            let height = min(strip.bottom, screen.bottom) - max(strip.top, screen.top)
+            return height >= strip.height && width >= needed
+        }
+    }
+
+    /// After (and during) a drag. nil when every window in `moving` is grabbable. Otherwise the offset that moves the
+    /// group as one onto the nearest screen: the whole bounding box when it fits that screen, else its top-left corner
+    /// (`minimumGrabWidth` wide, the topmost window's strip tall; ties to the first window). Never `.reset`.
+    public static func dragRecovery(
+        moving: [DockedWindow], titleBarHeights: [WindowKind: CGFloat], screens: [Box], primary: Box
+    ) -> Offset? {
+        let screenList = screens.isEmpty ? [primary] : screens
+        func stripHeight(_ window: DockedWindow) -> CGFloat { titleBarHeights[window.kind] ?? 0 }
+        if moving.allSatisfy({ isGrabbable($0.box, titleBarHeight: stripHeight($0), on: screenList) }) { return nil }
+        guard let bounding = SnapUtils.boundingBoxOrNil(moving.map(\.box)) else { return nil }
+        let chosen = ScreenSelection.nearest(to: bounding, among: screenList, fallback: primary)
+        if bounding.width <= chosen.width && bounding.height <= chosen.height {
+            return shift(toFit: bounding, in: chosen)
+        }
+        var topmost = moving[0]
+        for window in moving where window.box.top < topmost.box.top { topmost = window }
+        let corner = Box(
+            x: bounding.x, y: bounding.y, width: min(bounding.width, minimumGrabWidth), height: stripHeight(topmost))
+        return shift(toFit: corner, in: chosen)
     }
 }

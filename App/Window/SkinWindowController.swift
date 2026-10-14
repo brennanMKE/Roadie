@@ -94,6 +94,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     weak var coordinator: WindowDockingCoordinator?
     /// Whether the window has a position (restored, or set by its first `show`).
     var isPositioned = false
+    /// The height of the strip the window is dragged by, in points (the title bar, or the whole window in shade).
+    var dragStripHeight: CGFloat { dragView.frame.height }
     /// The scale `applyLayout` last laid out at; a change in it (or in shade mode) keeps docked neighbours docked.
     private var layoutScale: CGFloat = 0
     /// Called from `windowWillClose`; a window the model tracks tells it that the window is no longer open.

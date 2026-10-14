@@ -38,12 +38,10 @@ final class WindowDockingCoordinator {
     private static let unbounded = Box(x: -100_000, y: -100_000, width: 200_000, height: 200_000)
     private var primaryBox: Box { screenBoxes.first ?? Self.unbounded }
 
-    /// Where a dragged group may go: the one screen's work area, or with several displays the area they span together
-    /// (so a window can cross from one to the next; only the outer edges attract).
-    private var dragBounds: Box {
-        let screens = screenBoxes
-        if screens.count > 1 { return SnapUtils.boundingBox(screens) }
-        return screens.first ?? Self.unbounded
+    /// What limits a drag: the area the screens span (so a window can cross from one display to the next; only the
+    /// outer edges attract) and the screens each window's title bar must stay on.
+    private var dragLimits: DragLimits {
+        DragLimits(screens: screenBoxes, primary: primaryBox, titleBarHeights: controllers.mapValues(\.dragStripHeight))
     }
 
     private func isVisible(_ controller: SkinWindowController) -> Bool {
@@ -77,12 +75,25 @@ final class WindowDockingCoordinator {
         }
         // AppKit's y grows upward, the engine's downward.
         let delta = Offset(x: proposedOrigin.x - dragStartOrigin.x, y: -(proposedOrigin.y - dragStartOrigin.y))
-        for (kind, position) in session.positions(forMouseDelta: delta, within: dragBounds) {
+        for (kind, position) in session.positions(forMouseDelta: delta, limits: dragLimits) {
             move(kind, toTopLeft: position)
         }
     }
 
     func dragEnded(_ controller: SkinWindowController) {
+        // The safety net for the persisted layout: no moving window is left with its title bar off every screen.
+        if let session {
+            let kinds = Set(session.moving.map(\.kind))
+            let moving = dockedWindows().filter { kinds.contains($0.kind) }
+            let limits = dragLimits
+            if let shift = LayoutRules.dragRecovery(
+                moving: moving, titleBarHeights: limits.titleBarHeights, screens: limits.screens, primary: limits.primary)
+            {
+                for window in moving {
+                    move(window.kind, toTopLeft: Offset(x: window.box.x + shift.x, y: window.box.y + shift.y))
+                }
+            }
+        }
         session = nil
         layoutDidChange()
     }
