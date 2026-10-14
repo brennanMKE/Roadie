@@ -188,6 +188,8 @@ struct SkinFallbackTests {
             let skin = try SkinParser.parse(url: url)
             #expect(skin.warnings.isEmpty, "\(url.lastPathComponent): \(skin.warnings) fallbacks: \(skin.fallbacks)")
             #expect(skin.visColors.count == 24, "\(url.lastPathComponent)")
+            // Every sample cursor under a Winamp name (static .cur and RIFF ACON alike) decodes.
+            #expect(skin.cursors.unreadable.isEmpty, "\(url.lastPathComponent): \(skin.cursors.unreadable)")
         }
     }
 }

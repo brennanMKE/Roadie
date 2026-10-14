@@ -17,6 +17,14 @@ final class SkinCursorController {
     private var currentKey: String?
     /// The pointer in skin pixels (y down), nil while it is outside the window.
     private var lastPoint: CGPoint?
+    /// The window these regions belong to. AppKit sends no `mouseExited` when a window is ordered out or minimized
+    /// under the pointer, so nothing is set (and the animation stops) once it is no longer on screen.
+    weak var hostWindow: NSWindow?
+
+    private var isShowing: Bool {
+        guard let hostWindow else { return false }
+        return hostWindow.isVisible && !hostWindow.isMiniaturized
+    }
 
     /// Called whenever the skin, scale, mode or size changes (`SkinWindowController.performLayout`). Cursors stay at
     /// one point per cursor pixel regardless of `scale`, as in Winamp; `scale` only converts view points to skin pixels.
@@ -49,6 +57,10 @@ final class SkinCursorController {
     }
 
     private func update(at point: CGPoint, force: Bool) {
+        guard isShowing else {
+            pointerExited()
+            return
+        }
         let candidates = CursorRegions.candidates(at: point, window: window)
         let key = candidates.first ?? ""
         if !force, key == currentKey { return }
@@ -78,6 +90,10 @@ final class SkinCursorController {
     }
 
     private func step(at stepIndex: Int) {
+        guard isShowing else {
+            pointerExited()
+            return
+        }
         guard let (name, cursor) = animating else { return }
         let nsCursors = self.nsCursors(for: name, cursor)
         guard !nsCursors.isEmpty else { return }

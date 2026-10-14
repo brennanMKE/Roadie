@@ -130,6 +130,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         hosting = NSHostingView(rootView: AnyView(EmptyView()))
         super.init()
         shape.cursorController = cursorController
+        cursorController.hostWindow = window
         hosting.rootView = AnyView(rootView.environment(model).environment(\.skinWindow, self))
         hosting.sizingOptions = []
         shape.addSubview(hosting)
