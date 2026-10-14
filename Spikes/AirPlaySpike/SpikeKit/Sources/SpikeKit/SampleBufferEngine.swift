@@ -56,6 +56,8 @@ public final class SampleBufferEngine: SpikeEngine {
     private func installFeed() {
         let ctx = self.ctx
         let name = kind.shortName
+        // play() after pause() reinstalls the feed; never leave two requests pending on one renderer.
+        ctx.renderer.stopRequestingMediaData()
         ctx.renderer.requestMediaDataWhenReady(on: ctx.queue) {
             guard let source = ctx.source else { ctx.renderer.stopRequestingMediaData(); return }
             while ctx.renderer.isReadyForMoreMediaData {

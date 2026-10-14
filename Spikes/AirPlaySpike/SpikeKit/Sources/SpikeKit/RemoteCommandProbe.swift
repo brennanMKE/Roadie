@@ -28,6 +28,7 @@ public final class RemoteCommandProbe {
                 guard let self, let engine = self.engine else { return }
                 self.note("changePlaybackPosition \(seconds)")
                 engine.seek(by: seconds - engine.currentTime)
+                self.publish(engine: engine, duration: nil)
             }
             return .success
         }
@@ -40,7 +41,10 @@ public final class RemoteCommandProbe {
             Task { @MainActor in
                 guard let self else { return }
                 self.note(name)
-                if let engine = self.engine { action(engine) }
+                if let engine = self.engine {
+                    action(engine)
+                    self.publish(engine: engine, duration: nil)
+                }
             }
             return .success
         }
