@@ -126,4 +126,32 @@ struct DragRecoveryTests {
             #expect(shaded.positions(forMouseDelta: Offset(x: dx, y: 0), limits: shortLimits)[.main] == Offset(x: 1390, y: 872))
         }
     }
+
+    @Test func dragSessionKeepsADockedGroupContinuousAtGapEdges() {
+        // Bottom edge: the EQ docked below main stops with its strip on the laptop's bottom edge, beside a taller display.
+        let tall = b(1440, 25, 2560, 1415)
+        let tallLimits = DragLimits(screens: [primary, tall], primary: primary, titleBarHeights: strips)
+        let stacked = DragSession(dragging: .main, windows: [w(.main, 300, 400), w(.equalizer, 300, 632)])
+        for dy: CGFloat in [240, 241, 242, 300, 500] {
+            let positions = stacked.positions(forMouseDelta: Offset(x: 0, y: dy), limits: tallLimits)
+            #expect(positions[.main] == Offset(x: 300, y: 640))
+            #expect(positions[.equalizer] == Offset(x: 300, y: 872))
+        }
+        // Side edge: shaded main and EQ side by side along the primary's bottom, sliding right beside a shorter display.
+        let shortLimits = DragLimits(screens: [primary, rightShorter], primary: primary, titleBarHeights: strips)
+        let row = DragSession(dragging: .main, windows: [w(.main, 340, 872, 550, 28), w(.equalizer, 890, 872, 550, 28)])
+        for dx: CGFloat in [500, 501, 502, 600] {
+            let positions = row.positions(forMouseDelta: Offset(x: dx, y: 0), limits: shortLimits)
+            #expect(positions[.main] == Offset(x: 840, y: 872))
+            #expect(positions[.equalizer] == Offset(x: 1390, y: 872))
+        }
+        // Top edge: the group stops with main's strip just under the primary's menu bar, beside a higher display.
+        let higherLimits = DragLimits(screens: [primary, rightHigher], primary: primary, titleBarHeights: strips)
+        let group = DragSession(dragging: .main, windows: [w(.main, 300, 100), w(.equalizer, 300, 332)])
+        for dy: CGFloat in [-75, -76, -77, -100] {
+            let positions = group.positions(forMouseDelta: Offset(x: 0, y: dy), limits: higherLimits)
+            #expect(positions[.main] == Offset(x: 300, y: 25))
+            #expect(positions[.equalizer] == Offset(x: 300, y: 257))
+        }
+    }
 }
