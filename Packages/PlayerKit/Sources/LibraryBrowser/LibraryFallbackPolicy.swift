@@ -179,17 +179,24 @@ public struct LibraryFallbackPolicy: Hashable, Sendable {
             health[id] = h
             if id == preferred { reason = .notConfigured }
         }
-        if id == active || rank(id) > rank(active) { return advance(from: id, configured: configured) }
+        if id == active || rank(id) > rank(active) { return advance(from: id, configured: configured, now: now) }
         // Ahead of the active source: look again later, unless it needs the user (not configured).
         guard case .unreachable = outcome, health[id]?.hasTimer == false else { return [] }
         health[id]?.hasTimer = true
         return [.schedule(id, after: schedule.delay(afterFailures: health[id]?.failures ?? 1))]
     }
 
-    /// The first configured candidate after `id` that is not already being probed.
-    private mutating func advance(from id: String, configured: (String) -> Bool) -> [Effect] {
+    /// The first configured candidate after `id` that is not already being probed and was not probed within the
+    /// minimum spacing. The spacing matters because `configuredChanged` re-advances on every defaults write while
+    /// the active source is not set up; without it a source that answers quickly would be probed back to back.
+    private mutating func advance(from id: String, configured: (String) -> Bool, now: Duration) -> [Effect] {
         let after = candidates.dropFirst(rank(id) + 1)
-        guard let next = after.first(where: { configured($0) && health[$0]?.isProbing == false }) else { return [] }
+        let next = after.first { candidate in
+            guard configured(candidate), let h = health[candidate], !h.isProbing else { return false }
+            guard let ended = h.lastProbeEnded else { return true }
+            return now - ended >= schedule.minimumSpacing
+        }
+        guard let next else { return [] }
         health[next]?.isProbing = true
         return [.probe(next)]
     }

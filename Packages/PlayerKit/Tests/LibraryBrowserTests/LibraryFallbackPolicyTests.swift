@@ -203,6 +203,20 @@ struct LibraryFallbackPolicyTests {
         #expect(run.policy.active == "plex")
     }
 
+    @Test func anUnconfiguredActiveSourceDoesNotReprobeTheNextOneOnEverySettingsChange() {
+        var run = Run()
+        run.send(.start)
+        run.send(.userSelected("folder"))
+        run.configured["folder"] = false
+        #expect(run.send(.configuredChanged, at: 10) == [.probe("plex")])
+        #expect(run.send(.probeResult("plex", .unreachable("down")), at: 11) == [])
+        // Any later defaults write (a window frame, the time mode) within the spacing probes nothing.
+        #expect(run.send(.configuredChanged, at: 12) == [])
+        #expect(run.send(.configuredChanged, at: 15) == [])
+        #expect(run.send(.configuredChanged, at: 16) == [.probe("plex")])
+        #expect(run.policy.active == "folder")
+    }
+
     @Test func retryRequestedResetsTheBackoffAndProbesNow() {
         var run = Run()
         run.enterFallback()
