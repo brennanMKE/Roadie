@@ -24,4 +24,9 @@ final class SkinWindow: NSWindow {
     override func performClose(_ sender: Any?) {
         if delegate?.windowShouldClose?(self) ?? true { close() }
     }
+
+    /// Window > Minimize (⌘M) beeps on a window without a minimize button; minimize directly.
+    override func performMiniaturize(_ sender: Any?) {
+        miniaturize(sender)
+    }
 }
