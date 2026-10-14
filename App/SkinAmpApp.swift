@@ -40,6 +40,8 @@ struct SkinAmpApp: App {
             CommandGroup(after: .windowArrangement) {
                 Button("Player") { appDelegate.player.show() }
                     .keyboardShortcut("1")
+                Button("Equalizer") { appDelegate.model.toggleEQWindow() }
+                    .keyboardShortcut("2")
             }
         }
     }

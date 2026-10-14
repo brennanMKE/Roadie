@@ -23,6 +23,13 @@ public struct EQPreset: Codable, Equatable, Sendable, Identifiable {
         return (db * 10).rounded() / 10
     }
 
+    /// Inverse of `decibels(fromWinampValue:)`: 33 + round(db * 31/12) above 0 dB, 33 + round(db * 32/12) below; 1...64.
+    public static func winampValue(fromDecibels db: Float) -> Int {
+        let clamped = EQState.clamped(db)
+        let steps = clamped >= 0 ? clamped * 31 / 12 : clamped * 32 / 12
+        return min(max(33 + Int(steps.rounded()), 1), 64)
+    }
+
     private init(name: String, winamp values: [Int]) {
         self.init(name: name, preamp: Self.decibels(fromWinampValue: 33), gains: values.map(Self.decibels(fromWinampValue:)))
     }

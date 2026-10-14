@@ -33,6 +33,12 @@ public final class LocalPlayerOutput {
     /// Live now-playing subscriptions (tests).
     public var subscriberCount: Int { subscriptions.count }
 
+    /// The equalizer is a property of this Mac's audio graph; this passes through to the player.
+    public var eq: EQState {
+        get { player.eq }
+        set { player.eq = newValue }
+    }
+
     public init(player: Player) {
         self.player = player
     }

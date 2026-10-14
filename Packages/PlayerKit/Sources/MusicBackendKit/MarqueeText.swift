@@ -56,4 +56,18 @@ public enum MarqueeText {
         let f = min(max(fraction, 0), 1)
         return "Seek to: \(time(f * duration))/\(time(duration)) (\(Int(f * 100))%)"
     }
+
+    /// Webamp getEqText: "EQ: 60HZ +3.4 DB", "EQ: 1KHZ -12 DB", "EQ: Preamp 0 DB". `bandHz` nil is the preamp. Hz under 1000
+    /// prints as "60HZ", else "1KHZ"/"12KHZ"; dB is rounded to tenths with a trailing ".0" dropped and a "+" on positives.
+    public static func equalizer(bandHz: Int?, gain: Float) -> String {
+        let label: String
+        if let bandHz {
+            label = bandHz < 1000 ? "\(bandHz)HZ" : "\(bandHz / 1000)KHZ"
+        } else {
+            label = "Preamp"
+        }
+        let tenths = (Double(gain) * 10 + 0.5).rounded(.down) / 10  // JS Math.round: halves go up
+        let number = tenths == tenths.rounded() ? String(Int(tenths)) : String(tenths)
+        return "EQ: \(label) \(tenths > 0 ? "+" : "")\(number) DB"
+    }
 }

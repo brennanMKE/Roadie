@@ -62,14 +62,17 @@ final class PlayerModel {
     var marqueeOverride: String?
     /// Which slider the pointer is holding. `position` carries the scrub fraction, which the thumb follows
     /// instead of the clock until release.
-    enum SliderFocus: Equatable { case volume, balance, position(fraction: Double) }
+    /// `equalizer(band:)` is an equalizer-window slider; band nil is the preamp.
+    enum SliderFocus: Equatable { case volume, balance, position(fraction: Double), equalizer(band: Int?) }
     private(set) var sliderFocus: SliderFocus?
     /// The volume and balance sliders' values. Changed by the sliders (sent to the output as commands)
     /// and followed from the output's `NowPlaying.volume` when the slider is not held.
     private(set) var volume: Float = 1
     private(set) var balance: Float = 0
-    /// EQ and playlist toggles only record state until M5 adds the windows; M5 swaps in their visibility.
-    private(set) var isEQWindowOpen = false
+    /// Whether the equalizer window is open: the source of truth for the main window's EQ button, the Window menu and the
+    /// window itself (`AppDelegate` follows it). Persisted so the window comes back after a relaunch, like Winamp.
+    /// The playlist toggle only records state until #0029 adds its window.
+    private(set) var isEQWindowOpen = UserDefaults.standard.bool(forKey: PlayerModel.eqWindowOpenKey)
     private(set) var isPlaylistWindowOpen = false
     /// Shuffle and repeat live in the local player's queue, so they read as off for other outputs.
     var isShuffled: Bool { selectedOutput == OutputDevice.thisMacID && player.isShuffled }
@@ -108,6 +111,8 @@ final class PlayerModel {
         notice = nil
     }
 
+    static let eqWindowOpenKey = "eqWindowOpen"
+    static let equalizerKey = "equalizer"
     private static let lastSkinKey = "lastSkinPath"
     private static let timeModeKey = "timeMode"
 
@@ -176,6 +181,12 @@ final class PlayerModel {
         }
         volume = stack.player.volume
         balance = stack.player.balance
+        // Restore the equalizer before anything plays; the setter reaches the live graph once it exists.
+        if let data = UserDefaults.standard.data(forKey: Self.equalizerKey),
+            let saved = try? JSONDecoder().decode(EQState.self, from: data)
+        {
+            stack.player.eq = saved
+        }
         Task { [weak self] in
             for await (command, output) in commands {
                 guard let self else { return }
@@ -271,6 +282,13 @@ final class PlayerModel {
         send(.setBalance(snapped))
     }
 
+    /// Marks `focus` as held and shows `text` in the marquee until `endSliderDrag()`. The equalizer window's
+    /// sliders (`PlayerModel+Equalizer.swift`) go through this, since `sliderFocus` is settable only here.
+    func holdSlider(_ focus: SliderFocus, marquee text: String) {
+        sliderFocus = focus
+        marqueeOverride = text
+    }
+
     /// Volume and balance are applied live, so releasing only clears the marquee text.
     func endSliderDrag() {
         sliderFocus = nil
@@ -301,7 +319,14 @@ final class PlayerModel {
 
     func toggleShuffle() { send(.setShuffle(!isShuffled)) }
     func toggleRepeat() { send(.setRepeat(player.repeatMode.toggled != .off)) }
-    func toggleEQWindow() { isEQWindowOpen.toggle() }
+    func toggleEQWindow() { setEQWindowOpen(!isEQWindowOpen) }
+
+    /// Also called by the equalizer window when it closes itself.
+    func setEQWindowOpen(_ open: Bool) {
+        guard open != isEQWindowOpen else { return }
+        isEQWindowOpen = open
+        UserDefaults.standard.set(open, forKey: Self.eqWindowOpenKey)
+    }
     func togglePlaylistWindow() { isPlaylistWindowOpen.toggle() }
 
     private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playback")

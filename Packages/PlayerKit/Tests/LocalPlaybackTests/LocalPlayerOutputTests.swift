@@ -110,4 +110,16 @@ struct LocalPlayerOutputTests {
         task.cancel()
         #expect(await waitFor { output.subscriberCount == 0 })
     }
+
+
+    @Test func eqPassesThroughToThePlayer() {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        output.eq[band: 3] = 6
+        #expect(player.eq[band: 3] == 6)
+        player.eq.preamp = -4
+        #expect(output.eq.preamp == -4)
+        output.eq = EQState(isEnabled: false)
+        #expect(player.eq == EQState(isEnabled: false))
+    }
 }

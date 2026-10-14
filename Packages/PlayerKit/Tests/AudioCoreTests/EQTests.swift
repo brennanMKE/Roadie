@@ -169,4 +169,15 @@ import Testing
         #expect(abs(disabled / flat - 1) < 0.05)
         #expect(abs(elsewhere / flat - 1) < 0.15)
     }
+
+    @Test func winampValueRoundTripsAllSixtyFourValues() {
+        for v in 1...64 {
+            #expect(EQPreset.winampValue(fromDecibels: EQPreset.decibels(fromWinampValue: v)) == v)
+        }
+        #expect(EQPreset.winampValue(fromDecibels: 12) == 64)
+        #expect(EQPreset.winampValue(fromDecibels: -12) == 1)
+        #expect(EQPreset.winampValue(fromDecibels: 0) == 33)
+        #expect(EQPreset.winampValue(fromDecibels: 40) == 64)
+        #expect(EQPreset.winampValue(fromDecibels: -40) == 1)
+    }
 }

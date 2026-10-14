@@ -29,17 +29,25 @@ struct TitleBarView: View {
     }
 }
 
-/// Webamp's ClickedDiv: nothing until first pressed, then `name`; `name_DEPRESSED` while pressed.
+/// Webamp's ClickedDiv: nothing until first pressed, then `name` (nil = stays blank, the equalizer's shade button);
+/// `pressedName` while pressed, `name_DEPRESSED` by default.
 struct TitleBarButtonStyle: ButtonStyle {
     let skin: Skin
-    let name: String
+    let name: String?
+    let pressedName: String
     @State private var clicked = false
+
+    init(skin: Skin, name: String?, pressedName: String? = nil) {
+        self.skin = skin
+        self.name = name
+        self.pressedName = pressedName ?? "\(name ?? "")_DEPRESSED"
+    }
 
     func makeBody(configuration: Configuration) -> some View {
         ZStack {
             if configuration.isPressed {
-                SpriteImage(skin: skin, name: "\(name)_DEPRESSED")
-            } else if clicked {
+                SpriteImage(skin: skin, name: pressedName)
+            } else if clicked, let name {
                 SpriteImage(skin: skin, name: name)
             } else {
                 Color.clear.frame(width: MainWindowLayout.rect(.options).width, height: MainWindowLayout.rect(.options).height)

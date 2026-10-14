@@ -70,4 +70,14 @@ public struct Skin: @unchecked Sendable {
         guard frameRect.maxY <= CGFloat(image.height), frameRect.maxY <= rect.maxY else { return nil }
         return image.cropping(to: frameRect)
     }
+
+    /// Crops frame `bandFrame` (0...27) of the 14x63 equalizer band backgrounds out of `EQ_SLIDER_BACKGROUND`, through
+    /// the same `resolve` as `image(for:)`. nil when the frame lies outside the sheet (a short `eqmain.bmp`), never a crash.
+    public func image(for spriteName: String, bandFrame: Int) -> CGImage? {
+        guard (0..<EQLayout.frameCount).contains(bandFrame), let (sheet, rect) = resolve(spriteName), let image = sheets[sheet]
+        else { return nil }
+        let frameRect = EQLayout.bandFrameRect(in: rect, frame: bandFrame)
+        guard frameRect.maxX <= CGFloat(image.width), frameRect.maxY <= CGFloat(image.height) else { return nil }
+        return image.cropping(to: frameRect)
+    }
 }

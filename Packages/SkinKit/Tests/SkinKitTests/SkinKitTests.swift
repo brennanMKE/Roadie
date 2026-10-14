@@ -61,6 +61,31 @@ struct SkinKitTests {
         #expect(short.image(for: "MAIN_VOLUME_BACKGROUND", frame: 26) != nil)
     }
 
+    @Test func bandFrameCropReadsFourteenBySixtyThree() {
+        /// A sheet whose 28 band cells (15x65 from (13, 164)) are filled with gray 10 + n.
+        func sheet(height: Int) -> CGImage {
+            let context = CGContext(
+                data: nil, width: 275, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            for n in 0..<28 {
+                let gray = CGFloat(10 + n) / 255
+                context.setFillColor(red: gray, green: gray, blue: gray, alpha: 1)
+                context.fill(CGRect(x: 13 + (n % 14) * 15, y: height - (164 + (n / 14) * 65) - 65, width: 15, height: 65))
+            }
+            return context.makeImage()!
+        }
+        let skin = Skin(sheets: ["EQMAIN": sheet(height: 315)], visColors: [], warnings: [])
+        let frame14 = skin.image(for: "EQ_SLIDER_BACKGROUND", bandFrame: 14)
+        #expect(frame14?.width == 14 && frame14?.height == 63)
+        #expect(frame14.map { TestBitmaps.pixel($0, x: 0, y: 0) } == RGBColor(red: 24, green: 24, blue: 24))
+        let frame27 = skin.image(for: "EQ_SLIDER_BACKGROUND", bandFrame: 27)
+        #expect(frame27.map { TestBitmaps.pixel($0, x: 13, y: 62) } == RGBColor(red: 37, green: 37, blue: 37))
+        #expect(skin.image(for: "EQ_SLIDER_BACKGROUND", bandFrame: 28) == nil)
+        // Asian Dragon's 275x163 eqmain.bmp has no band cells at all: nil for every frame, no crash.
+        let short = Skin(sheets: ["EQMAIN": sheet(height: 163)], visColors: [], warnings: [])
+        for frame in 0..<28 { #expect(short.image(for: "EQ_SLIDER_BACKGROUND", bandFrame: frame) == nil) }
+    }
+
     /// Set SKIN_CORPUS_DIR to a folder of .wsz files to run against the real corpus.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["SKIN_CORPUS_DIR"] != nil))
     func corpusNeverCrashes() throws {

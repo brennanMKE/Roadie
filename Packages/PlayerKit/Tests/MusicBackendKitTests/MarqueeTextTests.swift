@@ -45,4 +45,14 @@ import Testing
         plex.state = .playing
         #expect(MarqueeText.display(plex, number: 2) == "2. B - Two (1:01)")
     }
+
+
+    @Test func formatsEqualizerTextLikeWebamp() {
+        #expect(MarqueeText.equalizer(bandHz: 60, gain: 3.4) == "EQ: 60HZ +3.4 DB")
+        #expect(MarqueeText.equalizer(bandHz: 1000, gain: -12) == "EQ: 1KHZ -12 DB")
+        #expect(MarqueeText.equalizer(bandHz: 12000, gain: 0) == "EQ: 12KHZ 0 DB")
+        #expect(MarqueeText.equalizer(bandHz: nil, gain: 2) == "EQ: Preamp +2 DB")
+        #expect(MarqueeText.equalizer(bandHz: 170, gain: -0.04) == "EQ: 170HZ 0 DB")
+        #expect(MarqueeText.equalizer(bandHz: 310, gain: -1.25) == "EQ: 310HZ -1.2 DB")
+    }
 }
