@@ -117,4 +117,16 @@ private func cellColour(row: Int, column: Int) -> [UInt8] { [UInt8(column * 8), 
         #expect(MarqueeLayout.stepOffset(text: long, step: 2, pixels: 7) == 17)
         #expect(MarqueeLayout.stepOffset(text: long, step: -1, pixels: 0) == 185)
     }
+
+    @Test func countsDecomposedTextAsItRenders() {
+        // 30 "e" + U+0301 pairs: 60 UTF-16 units decomposed, 30 cells after NFC, so it is short.
+        let decomposed = String(repeating: "e\u{301}", count: 30)
+        #expect(!MarqueeLayout.isLong(decomposed))
+        #expect(TextFont.cells(for: MarqueeLayout.loopText(decomposed)).count == 31)
+        // 31 pairs: long, and the period is (31 + 7) * 5 like the precomposed text.
+        let long = String(repeating: "e\u{301}", count: 31)
+        #expect(MarqueeLayout.isLong(long))
+        #expect(MarqueeLayout.stepOffset(text: long, step: 38, pixels: 0) == 0)
+        #expect(TextFont.cells(for: MarqueeLayout.loopText(long)).count == 69)
+    }
 }
