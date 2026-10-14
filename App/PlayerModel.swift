@@ -1,5 +1,6 @@
 import AppKit
 import AudioCore
+import FolderBackendKit
 import Foundation
 import LibraryBrowser
 import MusicBackendKit
@@ -24,6 +25,10 @@ final class PlayerModel {
     let artwork: ArtworkCache
     let cache: TrackCache
     let cacheSettings: CacheSettingsModel
+    /// The local-folder source. Built here but not selected: the source picker (#0063) chooses between it and `backend`.
+    /// Shares Plex's "This Mac" output, so both play through the one `Player`.
+    let folderBackend: FolderBackend
+    let folderSettings: FolderSettingsModel
     /// Still public for the skinned window's time and spectrum bindings and for local files.
     let player: Player
     /// Keeps the current and next tracks pinned in the cache; lives as long as the model.
@@ -111,6 +116,8 @@ final class PlayerModel {
         visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors)
         pinner = stack.pinner
         cacheSettings = CacheSettingsModel(cache: stack.cache)
+        folderBackend = FolderBackend(settings: FolderBackend.settingsProvider(), output: stack.output)
+        folderSettings = FolderSettingsModel(backend: folderBackend)
         let cache = stack.cache
         Task {
             do { try await cache.prepare() } catch {

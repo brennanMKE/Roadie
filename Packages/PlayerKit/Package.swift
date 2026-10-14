@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "MusicBackendKit", targets: ["MusicBackendKit"]),
         .library(name: "LocalPlayback", targets: ["LocalPlayback"]),
         .library(name: "PlexBackendKit", targets: ["PlexBackendKit"]),
+        .library(name: "FolderBackendKit", targets: ["FolderBackendKit"]),
         .library(name: "LibraryBrowser", targets: ["LibraryBrowser"]),
         .library(name: "MusicBackendStub", targets: ["MusicBackendStub"]),
         .library(name: "MusicLibraryKit", targets: ["MusicLibraryKit"]),
@@ -41,6 +42,9 @@ let package = Package(
             "PlexBackendKit", "MusicBackendKit", "LocalPlayback", "PlexKit", "PlexKitStub", "TrackCache", "AudioCore",
             "MusicLibraryKit",
         ]),
+        // A local folder behind MusicBackend. Indexes Artist/Album/<tracks> with LocalTrackLoader; plays through LocalPlayback.
+        .target(name: "FolderBackendKit", dependencies: ["MusicBackendKit", "LocalPlayback", "AudioCore"]),
+        .testTarget(name: "FolderBackendKitTests", dependencies: ["FolderBackendKit", "MusicBackendKit", "LocalPlayback", "AudioCore"]),
         // Browser view models. Foundation + Observation; depends on the protocol only, never on a backend.
         .target(name: "LibraryBrowser", dependencies: ["MusicBackendKit"]),
         // In-memory MusicBackend for tests of the browser and of anything that drives a backend.
