@@ -29,6 +29,8 @@ struct TrackRow: View {
 /// The tracks of the selected album or playlist.
 struct TrackListView: View {
     let library: LibraryBrowserModel
+    @Environment(PlayerModel.self) private var player
+    @State private var selection = Set<MediaID>()
 
     private var heading: String {
         library.selectedAlbum?.title ?? library.selectedPlaylist?.name ?? ""
@@ -64,9 +66,10 @@ struct TrackListView: View {
                         }
                         .padding([.horizontal, .top])
                         .padding(.bottom, 8)
-                        List(tracks) { track in
+                        List(tracks, selection: $selection) { track in
                             TrackRow(track: track, albumArtist: albumArtist)
                         }
+                        .libraryTrackActions(rows: tracks, album: library.selectedAlbum?.id, model: player)
                     }
                 }
             }

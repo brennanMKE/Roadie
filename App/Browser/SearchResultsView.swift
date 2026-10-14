@@ -4,6 +4,8 @@ import SwiftUI
 
 struct SearchResultsView: View {
     let library: LibraryBrowserModel
+    @Environment(PlayerModel.self) private var player
+    @State private var selection = Set<MediaID>()
 
     var body: some View {
         Group {
@@ -23,7 +25,7 @@ struct SearchResultsView: View {
                 if results.isEmpty {
                     ContentUnavailableView.search(text: library.searchText)
                 } else {
-                    List {
+                    List(selection: $selection) {
                         if !results.artists.isEmpty {
                             Section("Artists") {
                                 ForEach(ArtistGrouper.group(results.artists)) { group in
@@ -45,6 +47,7 @@ struct SearchResultsView: View {
                                         AlbumRow(album: album).frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
+                                    .libraryAlbumMenu(album.id, model: player)
                                 }
                             }
                         }
@@ -59,6 +62,7 @@ struct SearchResultsView: View {
                             }
                         }
                     }
+                    .libraryTrackActions(rows: results.tracks, album: nil, model: player)
                 }
             }
         }

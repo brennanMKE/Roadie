@@ -27,6 +27,8 @@ public struct PlexTrack: Codable, Hashable, Sendable, Identifiable {
     public var id: String { ratingKey }
     public var durationSeconds: TimeInterval? { duration.map { Double($0) / 1000 } }
     public var primaryPart: PlexPart? { media.first?.parts.first }
+    /// The first audio stream of the primary part, when the server sent `Stream` entries.
+    public var audioStream: PlexStream? { primaryPart?.streams.first(where: \.isAudio) }
 
     enum CodingKeys: String, CodingKey {
         case ratingKey, key, title, parentRatingKey, grandparentRatingKey, parentTitle, grandparentTitle
@@ -92,7 +94,25 @@ public struct PlexPart: Codable, Hashable, Sendable, Identifiable {
     /// Bytes. A download can be checked against it.
     public var size: Int?
     public var container: String?
+    /// `Stream` entries, [] when the server sent none (listings usually do not).
+    public var streams: [PlexStream]
     // `file` (the server's filesystem path) is deliberately not decoded.
+
+    enum CodingKeys: String, CodingKey {
+        case id, key, duration, size, container
+        case streams = "Stream"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        key = try c.decode(String.self, forKey: .key)
+        duration = try c.decodeIfPresent(Int.self, forKey: .duration)
+        size = try c.decodeIfPresent(Int.self, forKey: .size)
+        container = try c.decodeIfPresent(String.self, forKey: .container)
+        // A stream of an unexpected shape yields no streams, never a failed track.
+        streams = (try? c.decodeIfPresent([PlexStream].self, forKey: .streams)) ?? []
+    }
 
     /// The numeric path component after the part id in `key` (Plex's change stamp).
     public var keyStamp: Int? {
@@ -103,4 +123,19 @@ public struct PlexPart: Codable, Hashable, Sendable, Identifiable {
 
     /// "mp3", "m4a", ...
     public var fileExtension: String { (key as NSString).pathExtension }
+}
+
+/// One `Part.Stream` entry. Only the audio stream (`streamType == 2`) is used; video and lyric
+/// streams decode too so a listing never fails on them.
+public struct PlexStream: Codable, Hashable, Sendable, Identifiable {
+    public var id: Int
+    public var streamType: Int?
+    public var codec: String?
+    /// Hz, audio streams only.
+    public var samplingRate: Int?
+    public var channels: Int?
+    /// kbps.
+    public var bitrate: Int?
+
+    public var isAudio: Bool { streamType == 2 }
 }

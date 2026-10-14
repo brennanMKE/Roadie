@@ -135,4 +135,86 @@ struct PlexBackendPlaybackTests {
         #expect(sawLoading)
         #expect(await waitFor { f.player.errorMessage != nil })
     }
+
+    // MARK: Albums that span pages (#0018)
+
+    private static let albumPath = "/library/metadata/3684/children"
+
+    /// The `tracks-page` fixture with `totalSize` 4, then `tracks-last-page`: four tracks over two requests.
+    private static func pagedAlbumRoutes() throws -> [StubURLProtocol.Route] {
+        var json = try #require(JSONSerialization.jsonObject(with: PlexFixture.tracksPage.data) as? [String: Any])
+        var container = try #require(json["MediaContainer"] as? [String: Any])
+        container["totalSize"] = 4
+        json["MediaContainer"] = container
+        let first = try JSONSerialization.data(withJSONObject: json)
+        return [
+            .init(path: albumPath, containerStart: 0, body: first),
+            .init(path: albumPath, containerStart: 3, body: try PlexFixture.tracksLastPage.data),
+        ]
+    }
+
+    private static func pagedTitles() throws -> [String] {
+        func titles(_ fixture: PlexFixture) throws -> [String] {
+            let root = try #require(JSONSerialization.jsonObject(with: fixture.data) as? [String: Any])
+            let container = try #require(root["MediaContainer"] as? [String: Any])
+            return ((container["Metadata"] as? [[String: Any]]) ?? []).compactMap { $0["title"] as? String }
+        }
+        return try titles(.tracksPage) + titles(.tracksLastPage)
+    }
+
+    private func connectedPaged() async throws -> BackendFixture {
+        let f = try BackendFixture()
+        try f.register(try Self.pagedAlbumRoutes())
+        try await f.backend.connect()
+        return f
+    }
+
+    private func childrenRequests(_ f: BackendFixture) -> Int {
+        f.handle.recorded.filter { $0.url.path == Self.albumPath }.count
+    }
+
+    @Test func playAlbumQueuesEveryTrackInOrderAcrossPages() async throws {
+        let f = try await connectedPaged(); defer { f.cleanup() }
+        try await f.backend.play([MediaID(.album, "3684")], on: OutputDevice.thisMacID, mode: .replace())
+        let expected = try Self.pagedTitles()
+        #expect(expected.count == 4)
+        #expect(f.player.queue.tracks.map(\.title) == expected)
+        #expect(f.player.queue.currentIndex == 0)
+        for track in f.player.queue.tracks {
+            guard case .plex(_, let cacheKey, _) = track.source else { Issue.record("not a Plex source"); continue }
+            #expect(cacheKey.hasPrefix(testMachine))
+        }
+        #expect(childrenRequests(f) == 2)
+    }
+
+    @Test func playFromARowStartsAtThatIndex() async throws {
+        let f = try await connectedPaged(); defer { f.cleanup() }
+        let rows = try await f.backend.tracks(of: MediaID(.album, "3684"))
+        #expect(childrenRequests(f) == 2)
+        try await f.backend.play(rows.map(\.id), on: OutputDevice.thisMacID, mode: .replace(startIndex: 2))
+        #expect(f.player.queue.tracks.count == 4)
+        #expect(f.player.queue.currentIndex == 2)
+        #expect(childrenRequests(f) == 2)
+    }
+
+    @Test func appendAnAlbumKeepsTheCurrentTrackAndOrder() async throws {
+        let f = try await connectedPaged(); defer { f.cleanup() }
+        try await f.backend.play([MediaID(.album, "3684")], on: OutputDevice.thisMacID, mode: .replace())
+        let index = f.player.queue.currentIndex
+        try await f.backend.play([MediaID(.album, "3684")], on: OutputDevice.thisMacID, mode: .append)
+        let expected = try Self.pagedTitles()
+        #expect(f.player.queue.tracks.count == 8)
+        #expect(f.player.queue.currentIndex == index)
+        #expect(f.player.queue.tracks.map(\.title) == expected + expected)
+    }
+
+    @Test func playWithAnUnknownIdQueuesNothing() async throws {
+        let f = try await connectedPaged(); defer { f.cleanup() }
+        let rows = try await f.backend.tracks(of: MediaID(.album, "3684"))
+        let unknown = MediaID(.track, "999")
+        await #expect(throws: MusicBackendError.notFound(unknown)) {
+            try await f.backend.play([rows[0].id, unknown], on: OutputDevice.thisMacID, mode: .replace())
+        }
+        #expect(f.player.queue.tracks.isEmpty)
+    }
 }

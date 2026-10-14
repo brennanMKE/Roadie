@@ -29,7 +29,9 @@ extension LibraryTrack {
             artistName: track.grandparentTitle ?? "",
             albumID: track.parentRatingKey.map { MediaID(.album, $0) }, albumName: track.parentTitle,
             trackNumber: track.index, discNumber: track.parentIndex, duration: track.durationSeconds,
-            bitrate: media?.bitrate, sampleRate: nil, channels: media?.audioChannels,
+            bitrate: media?.bitrate ?? track.audioStream?.bitrate,
+            sampleRate: track.audioStream?.samplingRate.map(Double.init),
+            channels: media?.audioChannels ?? track.audioStream?.channels,
             artwork: (track.thumb ?? track.parentThumb).map { ArtworkRef($0) })
     }
 }

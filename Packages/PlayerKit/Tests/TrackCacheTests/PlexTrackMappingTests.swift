@@ -56,4 +56,25 @@ struct PlexTrackMappingTests {
             try Track(plexTrack: plex, machineIdentifier: "abc")
         }
     }
+
+    private static func json(audioChannels: String, streamChannels: Int) -> Data {
+        Data("""
+        {"ratingKey":"7","key":"/library/metadata/7","title":"T","Media":[{"id":1,"bitrate":320\(audioChannels),
+        "Part":[{"id":9,"key":"/library/parts/9/1/file.mp3","Stream":[
+        {"id":2,"streamType":2,"codec":"mp3","samplingRate":44100,"channels":\(streamChannels),"bitrate":256}]}]}]}
+        """.utf8)
+    }
+
+    @Test func sampleRateAndChannelsFallBackToTheAudioStream() throws {
+        let both = try JSONDecoder().decode(PlexTrack.self, from: Self.json(audioChannels: #","audioChannels":2"#, streamChannels: 1))
+        let first = try Track(plexTrack: both, machineIdentifier: "abc")
+        #expect(first.sampleRate == 44100)
+        #expect(first.channels == 2)
+        #expect(first.bitrate == 320)
+
+        let noMediaChannels = try JSONDecoder().decode(PlexTrack.self, from: Self.json(audioChannels: "", streamChannels: 1))
+        let second = try Track(plexTrack: noMediaChannels, machineIdentifier: "abc")
+        #expect(second.channels == 1)
+        #expect(second.sampleRate == 44100)
+    }
 }

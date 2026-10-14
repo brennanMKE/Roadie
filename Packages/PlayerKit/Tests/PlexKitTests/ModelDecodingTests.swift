@@ -106,4 +106,31 @@ struct ModelDecodingTests {
         #expect(page.next == nil)
         #expect(page.offset + page.items.count == page.totalSize)
     }
+
+    private static func trackJSON(streams: String) -> Data {
+        Data("""
+        {"ratingKey":"7","key":"/library/metadata/7","title":"T","Media":[{"id":1,"bitrate":320,"audioChannels":2,
+        "Part":[{"id":9,"key":"/library/parts/9/1/file.mp3"\(streams)}]}]}
+        """.utf8)
+    }
+
+    @Test func trackDecodesTheAudioStreamWhenPresent() throws {
+        let decoder = JSONDecoder()
+        let withStreams = try decoder.decode(PlexTrack.self, from: Self.trackJSON(streams: """
+            ,"Stream":[{"id":1,"streamType":1,"codec":"mjpeg"},
+            {"id":2,"streamType":2,"codec":"mp3","samplingRate":44100,"channels":2,"bitrate":320}]
+            """))
+        let audio = try #require(withStreams.audioStream)
+        #expect(audio.samplingRate == 44100)
+        #expect(audio.channels == 2)
+        #expect(audio.bitrate == 320)
+        #expect(withStreams.primaryPart?.streams.count == 2)
+
+        let bad = try decoder.decode(PlexTrack.self, from: Self.trackJSON(streams: #","Stream":[{"id":"bad"}]"#))
+        #expect(bad.primaryPart?.streams == [])
+        #expect(bad.audioStream == nil)
+
+        let fixture = try #require(container(.albumChildren, as: PlexTrack.self).metadata)
+        #expect(fixture.allSatisfy { $0.audioStream == nil })
+    }
 }

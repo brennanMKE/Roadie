@@ -31,6 +31,7 @@ struct AlbumListView: View {
     let library: LibraryBrowserModel
     let list: PagedList<LibraryAlbum>
     var showsArtist = true
+    @Environment(PlayerModel.self) private var player
 
     var body: some View {
         PagedListView(
@@ -38,6 +39,7 @@ struct AlbumListView: View {
             selectedID: library.selectedAlbum?.id, onSelect: { library.select($0) }
         ) { album in
             AlbumRow(album: album, showsArtist: showsArtist)
+                .libraryAlbumActions(album.id, model: player)
         }
         .accessibilityIdentifier(showsArtist ? "library.albums" : "library.artistAlbums")
     }

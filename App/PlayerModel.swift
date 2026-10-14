@@ -112,6 +112,27 @@ final class PlayerModel {
         }
     }
 
+    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playback")
+
+    /// The browser's entry point. nil (nothing selected) is a no-op. Errors such as `.notConnected`,
+    /// `.notFound` and "no file on the server" land in `errorMessage`, as transport errors do.
+    func playFromLibrary(_ request: PlayRequest?) {
+        guard let request else { return }
+        let mode: String
+        switch request.mode {
+        case .replace: mode = "replace"
+        case .append: mode = "append"
+        }
+        Self.log.info("play from library: \(request.items.count, privacy: .public) item(s), \(mode, privacy: .public)")
+        let backend = backend
+        let output = selectedOutput
+        Task {
+            do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     /// Winamp's eject button opens the file dialog.
     func eject() { openFiles(replace: true) }
 
