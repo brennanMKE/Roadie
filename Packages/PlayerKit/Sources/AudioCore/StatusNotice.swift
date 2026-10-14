@@ -37,4 +37,14 @@ public struct StatusNotice: Equatable, Sendable {
     public static func skinFailed(_ name: String, shownAt: ContinuousClock.Instant = .now) -> StatusNotice {
         StatusNotice(text: "Could not load \(name)", shownAt: shownAt)
     }
+
+    /// "Could not play <title>", or "Could not play 3 tracks" when a run of failures ended in a stop.
+    /// The error text is `detail` only: it is shown where there is room (the placeholder) and logged,
+    /// never scrolled through the marquee.
+    public static func playbackFailed(_ failure: PlaybackFailure, shownAt: ContinuousClock.Instant = .now) -> StatusNotice {
+        let text = !failure.skipped && failure.consecutiveFailures > 1
+            ? "Could not play \(failure.consecutiveFailures) tracks"
+            : "Could not play \(failure.track?.title ?? "this track")"
+        return StatusNotice(text: text, detail: failure.message, shownAt: shownAt)
+    }
 }

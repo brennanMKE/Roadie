@@ -200,6 +200,8 @@ struct PlexBackendPlaybackTests {
     @Test func appendAnAlbumKeepsTheCurrentTrackAndOrder() async throws {
         let f = try await connectedPaged(); defer { f.cleanup() }
         try await f.backend.play([MediaID(.album, "3684")], on: OutputDevice.thisMacID, mode: .replace())
+        // The tracks have no server behind them, so the player skips through them (#0068); let it stop first.
+        #expect(await waitFor { f.player.state == .stopped })
         let index = f.player.queue.currentIndex
         try await f.backend.play([MediaID(.album, "3684")], on: OutputDevice.thisMacID, mode: .append)
         let expected = try Self.pagedTitles()

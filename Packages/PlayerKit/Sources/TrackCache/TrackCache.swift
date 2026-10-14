@@ -1,3 +1,4 @@
+import AudioCore
 import Foundation
 import PlexKit
 import os
@@ -33,6 +34,17 @@ public enum TrackCacheError: Error, Hashable, Sendable, LocalizedError {
         case .download(let error): error.errorDescription
         case .sizeMismatch: "The download was incomplete."
         case .io(let detail): "The track could not be saved to the cache (\(detail))."
+        }
+    }
+}
+
+extension TrackCacheError: SourceScopedError {
+    /// Whole source: nothing in the queue will fare better until Settings or the server change.
+    public var affectsWholeSource: Bool {
+        switch self {
+        case .noServer, .serverMismatch, .io: true
+        case .download(.transport), .download(.unauthorized), .download(.invalidBaseURL): true
+        case .notPlexTrack, .sizeMismatch, .download: false
         }
     }
 }

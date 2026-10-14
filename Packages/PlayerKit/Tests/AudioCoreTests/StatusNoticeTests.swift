@@ -43,4 +43,36 @@ import Testing
         #expect(n.detail == nil)
         #expect(n != StatusNotice.skinFailed("Pika_Amp", shownAt: t0 + .seconds(1)))
     }
+
+    @Test func playbackFailedNamesTheTrack() {
+        let t0 = makeTracks(1)[0]
+        let skipped = StatusNotice.playbackFailed(
+            PlaybackFailure(track: t0, message: "boom", consecutiveFailures: 1, skipped: true))
+        #expect(skipped.text == "Could not play t0")
+        #expect(skipped.detail == "boom")
+        #expect(StatusNotice.playbackFailed(
+            PlaybackFailure(track: t0, message: "boom", consecutiveFailures: 1, skipped: false)).text == "Could not play t0")
+        #expect(StatusNotice.playbackFailed(
+            PlaybackFailure(track: nil, message: "boom", consecutiveFailures: 1, skipped: false)).text
+            == "Could not play this track")
+    }
+
+    @Test func playbackFailedCountsARun() {
+        let t0 = makeTracks(1)[0]
+        #expect(StatusNotice.playbackFailed(
+            PlaybackFailure(track: t0, message: "x", consecutiveFailures: 3, skipped: false)).text
+            == "Could not play 3 tracks")
+        #expect(StatusNotice.playbackFailed(
+            PlaybackFailure(track: t0, message: "x", consecutiveFailures: 3, skipped: true)).text
+            == "Could not play t0")
+    }
+
+    @Test func playbackFailedTextNeverCarriesTheMessage() {
+        let message = "http://example.test/?X-Plex-Token=abc"
+        let n = StatusNotice.playbackFailed(
+            PlaybackFailure(track: makeTracks(1)[0], message: message, consecutiveFailures: 1, skipped: false))
+        #expect(!n.text.contains("http"))
+        #expect(!n.text.contains("Token"))
+        #expect(n.detail == message)
+    }
 }

@@ -160,13 +160,17 @@ final class PlayerModel {
         commandStream = continuation
         nowPlayingBridge = NowPlayingBridge(player: stack.player)
         nowPlayingBridge.install()
+        stack.player.addEventObserver { [weak self] event in
+            guard case .failed(let failure) = event else { return }
+            self?.showPlaybackFailure(failure)
+        }
         volume = stack.player.volume
         balance = stack.player.balance
         let transportBackend = stack.backend
         Task { [weak self] in
             for await (command, output) in commands {
                 do { try await transportBackend.transport(command, on: output) } catch {
-                    self?.post(StatusNotice(text: error.localizedDescription))
+                    self?.showBackendFailure(error)
                 }
             }
         }
@@ -283,8 +287,23 @@ final class PlayerModel {
 
     private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playback")
 
+    /// A track the local player could not play: the marquee says which (or how many), Console says why.
+    private func showPlaybackFailure(_ failure: PlaybackFailure) {
+        Self.log.error("could not play \(failure.track?.title ?? "-", privacy: .public): \(failure.message, privacy: .public)")
+        post(.playbackFailed(failure))
+    }
+
+    /// A backend refused to play or to take a transport command. `MusicBackendError` describes itself for the
+    /// user (no URL, token or header by contract); anything else shows a generic text with its description as detail.
+    private func showBackendFailure(_ error: any Error) {
+        guard !(error is CancellationError) else { return }
+        let text = (error as? MusicBackendError)?.errorDescription ?? "Could not play"
+        Self.log.error("backend: \(error.localizedDescription, privacy: .public)")
+        post(StatusNotice(text: text, detail: error is MusicBackendError ? nil : error.localizedDescription))
+    }
+
     /// The browser's entry point. nil (nothing selected) is a no-op. Errors such as `.notConnected`,
-    /// `.notFound` and "no file on the server" land in `errorMessage`, as transport errors do.
+    /// `.notFound` and "no file on the server" land in the marquee notice, as transport errors do.
     func playFromLibrary(_ request: PlayRequest?) {
         guard let request else { return }
         let mode: String
@@ -297,7 +316,7 @@ final class PlayerModel {
         let output = selectedOutput
         Task {
             do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
-                post(StatusNotice(text: error.localizedDescription))
+                showBackendFailure(error)
             }
         }
     }

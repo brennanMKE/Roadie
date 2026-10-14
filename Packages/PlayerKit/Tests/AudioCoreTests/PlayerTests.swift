@@ -102,7 +102,7 @@ import Testing
             switch event {
             case .trackChanged(let t): events.append("track:\(t?.title ?? "nil")@\(p.currentTime)")
             case .stateChanged(let s): events.append("state:\(s)")
-            case .seeked: break
+            case .seeked, .failed: break
             }
         }
         p.play(at: 0)
@@ -303,7 +303,7 @@ import Testing
     }
 
     @Test func restartingSameTrackSupersedesLoad() async {
-        let (p, gate, tracks) = makePlayer(honorsCancellation: false)
+        let (p, gate, tracks) = makePlayer(1, honorsCancellation: false)
         p.play(at: 0)
         #expect(await gate.waitForCalls(1))
         p.previous()   // restarts track 0
@@ -331,8 +331,9 @@ import Testing
         #expect(p.errorMessage == nil)
     }
 
+    /// One track: nowhere to skip to. `PlaybackFailureTests` covers the skip.
     @Test func loadFailureStops() async {
-        let (p, gate, tracks) = makePlayer()
+        let (p, gate, tracks) = makePlayer(1)
         p.play(at: 0)
         #expect(await gate.waitForCalls(1))
         await gate.release(tracks[0].id, with: .failure(AudioCoreError.unresolvableSource(tracks[0].source)))

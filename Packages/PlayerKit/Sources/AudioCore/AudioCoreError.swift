@@ -13,3 +13,19 @@ public enum AudioCoreError: Error, LocalizedError {
         }
     }
 }
+
+/// Adopted by errors a `TrackResolver` can throw when they know whether the whole source is unavailable
+/// (the player stops) or only this track is unplayable (the player skips it, like Winamp). Errors that
+/// do not conform count as per-track.
+public protocol SourceScopedError: Error {
+    var affectsWholeSource: Bool { get }
+}
+
+extension AudioCoreError: SourceScopedError {
+    public var affectsWholeSource: Bool {
+        switch self {
+        case .engineStart: true
+        case .unresolvableSource: false
+        }
+    }
+}

@@ -98,6 +98,7 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
             case .trackChanged(let t): events.append("track:\(t?.title ?? "nil")")
             case .stateChanged(let s): events.append("state:\(s)")
             case .seeked: events.append("seeked")
+            case .failed: events.append("failed")
             }
         }
         try renderSilently(player)

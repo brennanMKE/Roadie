@@ -262,6 +262,13 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         let idle = await iterator.next()
         #expect(idle?.state == .stopped)
 
+        // Every file is missing, so the player skips through the album (#0068). The stream keeps only the
+        // newest snapshot, so record each item from the event observer instead.
+        var seenItems: [MediaID] = []
+        let output = fixture.output
+        fixture.player.addEventObserver { _ in
+            if let item = output.snapshot().item { seenItems.append(item) }
+        }
         try await fixture.backend.play([albumID(white)], on: OutputDevice.thisMacID, mode: .replace())
         let queue = fixture.player.queue
         #expect(queue.tracks.map(\.title) == ["Back in the U.S.S.R.", "Dear Prudence", "Birthday"])
@@ -275,12 +282,7 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         #expect(await waitFor { fixture.player.state == .stopped && fixture.player.errorMessage != nil })
         let snapshot = fixture.output.snapshot()
         #expect(snapshot.title != nil)
-        var sawItem = false
-        for _ in 0..<20 {
-            guard let next = await iterator.next() else { break }
-            if next.item == trackID(backDisc1) { sawItem = true; break }
-        }
-        #expect(sawItem)
+        #expect(seenItems.contains(trackID(backDisc1)))
     }
 
     @Test func playArtistQueuesEveryAlbumInOrder() async throws {

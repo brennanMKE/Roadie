@@ -14,7 +14,11 @@ public final class Player: NowPlayingCommandTarget {
     public private(set) var currentTime: TimeInterval = 0
     /// File format of the loaded track; nil while loading or stopped.
     public private(set) var currentFormat: PlaybackFormat?
+    /// The last failure's message: set by every failure, cleared when a track opens. Listeners that need
+    /// each failure observe `PlayerEvent.failed`.
     public private(set) var errorMessage: String?
+    /// Failures in a row since a track last opened or the player last stopped; bounds the skip run to one pass.
+    @ObservationIgnored private(set) var consecutiveFailures = 0
 
     /// 0...1. Clamped on assignment; backed by an ignored stored value so the
     /// setter never re-enters itself (a `didSet` that reassigns recurses under `@Observable`).
@@ -220,6 +224,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func stop() {
+        consecutiveFailures = 0
         loadTask?.cancel()
         timeTask?.cancel()
         discardSchedule()
@@ -285,7 +290,6 @@ public final class Player: NowPlayingCommandTarget {
         file = nil   // seek / reschedule / device change must not act on the previous track's file
         currentFormat = nil
         currentTime = 0
-        errorMessage = nil
         autoplayAfterLoad = autoplay
         state = .loading   // synchronous: observers and a repeated Play see the load immediately
         let generation = scheduler.generation
@@ -298,7 +302,7 @@ public final class Player: NowPlayingCommandTarget {
                 try begin(file)
             } catch {
                 guard !Task.isCancelled, scheduler.generation == generation else { return }
-                fail(error)
+                trackFailed(error)
             }
         }
     }
@@ -312,6 +316,8 @@ public final class Player: NowPlayingCommandTarget {
         discardSchedule()
         graph.playerNode.stop()
         try graph.start()
+        errorMessage = nil
+        consecutiveFailures = 0
         self.file = file
         currentFormat = Self.format(of: file)
         schedule(file, from: 0)
@@ -525,10 +531,33 @@ public final class Player: NowPlayingCommandTarget {
         }
     }
 
-    private func fail(_ error: any Error) {
+    /// A track could not be resolved or opened. Winamp skips it and plays on; Webamp turns a media error
+    /// into "ended". The player stops instead when the error says the whole source is down, when repeat is
+    /// `.one` (the same track would fail again), or when every queued track has failed in a row (one pass).
+    private func trackFailed(_ error: any Error) {
+        let sourceWide = (error as? any SourceScopedError)?.affectsWholeSource ?? false
+        let count = consecutiveFailures + 1
+        guard !sourceWide, queue.repeatMode != .one, count < queue.tracks.count,
+              let failed = queue.current, queue.indexAfterCurrentEnds() != nil else {
+            fail(error)
+            return
+        }
+        consecutiveFailures = count
         let message = error.localizedDescription
-        stop()
         errorMessage = message
+        emit(.failed(PlaybackFailure(track: failed, message: message, consecutiveFailures: count, skipped: true)))
+        queue.advanceAfterTrackEnd()   // emits .trackChanged after .failed
+        startCurrentTrack(autoplay: autoplayAfterLoad)
+    }
+
+    private func fail(_ error: any Error) {
+        consecutiveFailures += 1
+        let failure = PlaybackFailure(
+            track: queue.current, message: error.localizedDescription,
+            consecutiveFailures: consecutiveFailures, skipped: false)
+        stop()   // resets consecutiveFailures; the event above already captured it
+        errorMessage = failure.message
+        emit(.failed(failure))
     }
 }
 
@@ -542,6 +571,24 @@ public enum PlayerEvent: Sendable {
     case trackChanged(Track?)
     case stateChanged(PlaybackState)
     case seeked(TimeInterval)
+    case failed(PlaybackFailure)
+}
+
+/// One track that could not be resolved or opened, or an engine failure. `skipped` says the player moved on
+/// to the next track; `consecutiveFailures` counts this run of failures (resets when a track opens or the
+/// player stops), so a listener can say "3 tracks" when a whole pass failed.
+public struct PlaybackFailure: Sendable, Equatable {
+    public let track: Track?
+    public let message: String
+    public let consecutiveFailures: Int
+    public let skipped: Bool
+
+    public init(track: Track?, message: String, consecutiveFailures: Int, skipped: Bool) {
+        self.track = track
+        self.message = message
+        self.consecutiveFailures = consecutiveFailures
+        self.skipped = skipped
+    }
 }
 
 /// One `scheduleSegment` call as seen on the player node's timeline (tests, #0055).
