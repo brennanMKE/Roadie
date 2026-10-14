@@ -3,6 +3,7 @@ import AudioCore
 import FolderBackendKit
 import Foundation
 import LibraryBrowser
+import LocalPlayback
 import MusicBackendKit
 import MusicLibraryKit
 import Observation
@@ -57,6 +58,8 @@ final class PlayerModel {
     let player: Player
     /// Keeps the current and next tracks pinned in the cache; lives as long as the model.
     private let pinner: CachePinner
+    /// Saves the queue to Application Support a moment after each change and on quit (#0071); lives as long as the model.
+    private let queueAutosaver: QueueAutosaver
     /// Media keys and Control Center; lives as long as the model.
     private let nowPlayingBridge: NowPlayingBridge
     var selectedOutput: OutputDevice.ID = OutputDevice.thisMacID {
@@ -200,6 +203,11 @@ final class PlayerModel {
         }
         let (commands, continuation) = AsyncStream.makeStream(of: (TransportCommand, OutputDevice.ID).self)
         commandStream = continuation
+        // Restore the queue stopped at the saved track (nothing plays, no audio device opens), then start saving changes.
+        let queueStore = QueueStore(fileURL: QueueStore.defaultURL())
+        if let saved = queueStore.load() { stack.output.restore(saved) }
+        queueAutosaver = QueueAutosaver(output: stack.output, store: queueStore)
+        queueAutosaver.start()
         nowPlayingBridge = NowPlayingBridge(player: stack.player)
         nowPlayingBridge.install()
         stack.player.addEventObserver { [weak self] event in
@@ -256,6 +264,9 @@ final class PlayerModel {
             }
         }
     }
+
+    /// Writes the queue now; called on quit so the last second of changes is not lost.
+    func flushQueue() { queueAutosaver.flush() }
 
     func loadSkin(from url: URL) {
         // Two quick applies (holding the Next Skin shortcut) race; the newest request wins and the older parse is dropped.

@@ -65,6 +65,25 @@ public final class LocalPlayerOutput {
         prune()
     }
 
+    /// The queue as it is now (tracks, their library ids, index, repeat, shuffle).
+    public func queueSnapshot() -> QueueSnapshot {
+        QueueSnapshot(
+            items: player.queue.tracks.map { LocalQueueItem(track: $0, id: ids[$0.id]) },
+            currentIndex: player.queue.currentIndex,
+            repeatMode: player.repeatMode,
+            isShuffled: player.isShuffled)
+    }
+
+    /// Fills an empty, stopped player from `snapshot` without starting anything; false (no change) otherwise.
+    @discardableResult
+    public func restore(_ snapshot: QueueSnapshot) -> Bool {
+        let restored = player.restoreQueue(
+            snapshot.items.map(\.track), currentIndex: snapshot.currentIndex,
+            repeatMode: snapshot.repeatMode, isShuffled: snapshot.isShuffled)
+        if restored { register(snapshot.items) }
+        return restored
+    }
+
     public func perform(_ command: TransportCommand) {
         switch command {
         case .play: player.play()

@@ -458,3 +458,35 @@ import Testing
         p.stop()
     }
 }
+
+@MainActor
+struct PlayerRestoreQueueTests {
+    @Test func restoreQueueSelectsWithoutOpeningTheEngine() {
+        let p = Player()
+        #expect(p.restoreQueue(makeTracks(3), currentIndex: 2, repeatMode: .one, isShuffled: false))
+        #expect(p.queue.current?.title == "t2")
+        #expect(p.state == .stopped)
+        #expect(p._graph == nil)
+        #expect(p.queue.repeatMode == .one)
+        #expect(p.currentTime == 0)
+    }
+
+    @Test func restoreQueueIsIgnoredUnlessStoppedAndEmpty() {
+        let p = Player()
+        p.enqueue(makeTracks(1))
+        #expect(!p.restoreQueue(makeTracks(3), currentIndex: 1, repeatMode: .all, isShuffled: false))
+        #expect(p.queue.tracks.count == 1)
+        #expect(p.queue.repeatMode == .off)
+        #expect(!Player().restoreQueue([], currentIndex: nil, repeatMode: .off, isShuffled: false))
+    }
+
+    @Test func restoreQueueWithShuffleHeadsThePassWithTheCurrentTrack() throws {
+        let p = Player()
+        #expect(p.restoreQueue(makeTracks(4), currentIndex: 1, repeatMode: .off, isShuffled: true))
+        #expect(p.queue.current?.title == "t1")
+        #expect(p.isShuffled)
+        let next = try #require(p.queue.indexAfterCurrentEnds())
+        #expect(next != 1)
+        #expect(p._graph == nil)
+    }
+}
