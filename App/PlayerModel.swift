@@ -8,6 +8,7 @@ import MusicLibraryKit
 import Observation
 import PlexBackendKit
 import SkinKit
+import SkinLibrary
 import TrackCache
 import os
 
@@ -39,6 +40,8 @@ final class PlayerModel {
     let cacheSettings: CacheSettingsModel
     /// The skins folder and its SQLite index (Settings › Skins). Opens nothing until a folder is chosen.
     let skinLibrary = SkinLibraryModel()
+    /// Main-window thumbnails keyed by content hash, rendered lazily on request (#0034). Does no I/O until the first request.
+    let skinThumbnails = SkinThumbnailCache(directory: SkinThumbnailCache.defaultDirectory())
     /// The local-folder source; Settings › Library chooses and indexes its folder. Shares Plex's "This Mac" output, so both play through the one `Player`.
     let folderBackend: FolderBackend
     let folderSettings: FolderSettingsModel
