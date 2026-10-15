@@ -5,6 +5,8 @@ struct SettingsView: View {
         TabView {
             LibrarySettingsView()
                 .tabItem { Label("Library", systemImage: "music.note.house") }
+            MusicAssistantSettingsView()
+                .tabItem { Label("Music Assistant", systemImage: "hifispeaker.2") }
             PlexSettingsView()
                 .tabItem { Label("Plex", systemImage: "server.rack") }
             CacheSettingsView()

@@ -247,4 +247,33 @@ struct LibrarySourceControllerTests {
         #expect(await waitFor { reports.count == 2 })
         #expect(reports[1] == "folder unreachable(\"gone\") browse")
     }
+
+    // MARK: #0063
+
+    @Test func reloadRebuildsTheSelectedSourceOnly() async {
+        let f = makeSources()
+        defer { f.cleanUp() }
+        let c = f.controller
+        let log = TitleLog(c.nowPlaying(on: OutputDevice.thisMacID))
+        defer { log.task?.cancel() }
+        #expect(await waitFor { c.nowPlayingSubscriberCount == 1 && log.titles.count == 1 })
+        let oldLibrary = c.library
+        let oldArtwork = c.artwork
+        #expect(c.reload("plex") == true)
+        #expect(c.generation == 1)
+        #expect(c.library !== oldLibrary)
+        #expect(c.artwork !== oldArtwork)
+        #expect(c.selectedID == "plex")
+        #expect(c.preferredID == "plex")
+        #expect(f.defaults.string(forKey: LibrarySourceController.defaultsKey) == nil)
+        #expect(c.nowPlayingSubscriberCount == 1)
+        // The stream was re-pointed at the same backend and still yields.
+        #expect(await waitFor { await f.plex.emit(snapshot(title: "R")); return log.last == "R" })
+
+        let current = c.library
+        #expect(c.reload("folder") == false)
+        #expect(c.reload("nonexistent") == false)
+        #expect(c.library === current)
+        #expect(c.generation == 1)
+    }
 }

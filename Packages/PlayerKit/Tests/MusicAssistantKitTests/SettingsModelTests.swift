@@ -1,0 +1,498 @@
+import Foundation
+import MusicAssistantKitStub
+import Security
+import Testing
+@testable import MusicAssistantKit
+
+/// `/info` that waits until the test releases it, so a test can change an input while Test Connection is in flight.
+final class GatedHTTP: MAHTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var enteredCount = 0
+    private let inner = StubHTTPTransport()
+
+    var entered: Int { lock.withLock { enteredCount } }
+
+    func get(_ url: URL, headers: [String: String], timeout: Duration) async throws -> MAHTTPResponse {
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                enteredCount += 1
+                waiters.append(continuation)
+            }
+        }
+        return try await inner.get(url, headers: headers, timeout: timeout)
+    }
+
+    func release() {
+        let all = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            defer { waiters = [] }
+            return waiters
+        }
+        for waiter in all { waiter.resume() }
+    }
+}
+
+/// `waitFor` for main-actor tests: the condition runs on the main actor.
+@MainActor
+func pollUntil(timeout: TimeInterval = 5, _ condition: @MainActor () -> Bool) async -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if condition() { return true }
+        try? await Task.sleep(for: .milliseconds(5))
+    }
+    return condition()
+}
+
+@MainActor
+final class SettingsRig {
+    let suite = "ma-settings-" + UUID().uuidString
+    let defaults: UserDefaults
+    let store: MusicAssistantServerStore
+    let stores = InMemoryMusicAssistantTokenStores()
+    let stub = StubHTTPTransport()
+    let factory: StubTransportFactory
+    let active: MusicAssistantActiveServer
+    let tokenStoreCalls = CallCounter()
+    let model: MusicAssistantSettingsModel
+    var hookCalls = 0
+
+    init(servers: [MusicAssistantServerConfiguration] = [], http: (any MAHTTPTransport)? = nil) throws {
+        defaults = UserDefaults(suiteName: suite)!
+        store = MusicAssistantServerStore(defaults: defaults)
+        store.save(servers)
+        factory = StubTransportFactory(script: try FixtureScript.recorded(token: testToken))
+        active = MusicAssistantActiveServer(MusicAssistantActiveServer.firstVerified(in: servers))
+        let stores = stores
+        let calls = tokenStoreCalls
+        model = MusicAssistantSettingsModel(
+            store: store,
+            tokenStore: { calls.hit(); return stores.store(for: $0) },
+            test: MusicAssistantConnectionTest(http: http ?? stub, transports: factory, clock: ManualClock()),
+            active: active)
+        model.onActiveServerChanged = { [unowned self] in hookCalls += 1 }
+    }
+
+    func cleanUp() { defaults.removePersistentDomain(forName: suite) }
+
+    func tokens(for server: MusicAssistantServerConfiguration) -> InMemoryMusicAssistantTokenStore {
+        stores.store(for: server.keychainAccount)
+    }
+
+    /// The test ran to its end.
+    func runTest() async {
+        model.testConnection()
+        await model.waitForTest()
+    }
+
+    func renameServerInfo(to name: String) throws {
+        guard var object = try JSONSerialization.jsonObject(with: try MAFixture.infoHTTP.data) as? [String: Any] else { return }
+        object["name"] = name
+        stub.setResponse(
+            pathPrefix: "/info",
+            MAHTTPResponse(status: 200, contentType: "application/json", body: try JSONSerialization.data(withJSONObject: object)))
+    }
+}
+
+@MainActor
+struct SettingsModelTests {
+    @Test func initDoesNoIO() throws {
+        let rig = try SettingsRig(servers: [makeServer()])
+        defer { rig.cleanUp() }
+        #expect(rig.tokenStoreCalls.count == 0)
+        #expect(rig.stub.requests.isEmpty)
+        #expect(rig.factory.made == 0)
+        #expect(rig.model.servers.isEmpty)
+        #expect(rig.model.tokenText.isEmpty)
+    }
+
+    @Test func appearedChecksExistenceButNeverLoadsTheToken() throws {
+        let a = makeServer(name: "A")
+        let b = makeServer(name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: a).save(testToken)
+        rig.model.appeared()
+        #expect(rig.model.servers == [a, b])
+        #expect(rig.model.hasStoredToken[a.id] == true)
+        #expect(rig.model.hasStoredToken[b.id] == false)
+        #expect(rig.tokens(for: a).existsChecks == 1)
+        #expect(rig.tokens(for: b).existsChecks == 1)
+        #expect(rig.tokens(for: a).loads == 0)
+        #expect(rig.tokens(for: b).loads == 0)
+        #expect(rig.model.tokenText.isEmpty)
+        #expect(rig.model.selectedID == a.id)
+        #expect(rig.model.addressText == "http://ma.local:8095")
+    }
+
+    @Test func addSelectsANewUnverifiedServer() throws {
+        let rig = try SettingsRig()
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.addServer()
+        let added = try #require(rig.model.servers.first)
+        #expect(rig.model.servers.count == 1)
+        #expect(!added.isVerified)
+        #expect(added.name == "Music Assistant")
+        #expect(rig.model.selectedID == added.id)
+        #expect(rig.model.addressText.isEmpty)
+        #expect(rig.model.addressProblem == nil)
+        #expect(rig.store.load() == [added])
+        #expect(rig.active.current == nil)
+        #expect(rig.hookCalls == 0)
+        #expect(!rig.model.canTest)
+    }
+
+    @Test func removeDeletesOnlyThatServersItem() throws {
+        let a = makeServer(name: "A")
+        let b = makeServer(name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.removeServer(b.id)
+        #expect(rig.model.servers == [a])
+        #expect(rig.store.load() == [a])
+        #expect(rig.tokens(for: b).deletes == 1)
+        #expect(rig.tokens(for: a).deletes == 0)
+        #expect(rig.model.selectedID == a.id)
+    }
+
+    @Test func moveReordersAndPersists() throws {
+        let a = makeServer(name: "A")
+        let b = makeServer(name: "B")
+        let c = makeServer(name: "C")
+        let rig = try SettingsRig(servers: [a, b, c])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.move(fromOffsets: [2], toOffset: 0)
+        #expect(rig.model.servers.map(\.name) == ["C", "A", "B"])
+        #expect(rig.store.load().map(\.name) == ["C", "A", "B"])
+        #expect(rig.active.current?.name == "C")
+        rig.model.move(fromOffsets: [0], toOffset: 3)
+        #expect(rig.model.servers.map(\.name) == ["A", "B", "C"])
+        #expect(rig.store.load().map(\.name) == ["A", "B", "C"])
+        #expect(rig.hookCalls == 2)
+    }
+
+    @Test func invalidAddressIsNotPersistedAndShowsTheProblem() async throws {
+        let server = makeServer()
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.addressText = "http://music.example.test"
+        #expect(rig.model.addressProblem == .httpsRequired)
+        rig.model.disappeared()
+        #expect(rig.store.load() == [server])
+        rig.model.addressText = "ma local"
+        #expect(rig.model.addressProblem == .invalid)
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .failed(.invalidAddress(.invalid)))
+        #expect(rig.stub.requests.isEmpty)
+        #expect(rig.factory.made == 0)
+    }
+
+    @Test func editingAddressKeepsServerIDAndCancelsATest() async throws {
+        let server = makeServer()
+        let gate = GatedHTTP()
+        let rig = try SettingsRig(servers: [server], http: gate)
+        defer { rig.cleanUp() }
+        try rig.tokens(for: server).save(testToken)
+        rig.model.appeared()
+        rig.model.testConnection()
+        #expect(rig.model.selectedStatus == .testing)
+        #expect(await pollUntil { gate.entered == 1 })
+        rig.model.addressText = "http://other.local:8095"
+        #expect(rig.model.selectedStatus == .untested)
+        rig.model.disappeared()
+        gate.release()
+        await rig.model.waitForTest()
+        let saved = try #require(rig.store.load().first)
+        #expect(saved.address.baseURL == URL(string: "http://other.local:8095"))
+        #expect(saved.address.serverID == fixtureServerID)
+        #expect(rig.model.selectedStatus == .untested)
+        #expect(rig.factory.made == 0)
+    }
+
+    @Test func testWithoutTokenStopsAfterInfo() async throws {
+        let server = makeServer(id: nil)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .failed(.needsToken(foundName: "Music Assistant")))
+        #expect(rig.model.statusMessage == "Found Music Assistant. Enter a token.")
+        #expect(rig.factory.made == 0)
+        #expect(rig.stub.requests.count == 1)
+        #expect(rig.stub.requests[0].url.path == "/info")
+        #expect(rig.stub.requests[0].headers.isEmpty)
+        #expect(!rig.model.servers[0].isVerified)
+    }
+
+    @Test func testLearnsServerIDAndSavesTheTypedToken() async throws {
+        let server = makeServer(id: nil, name: MusicAssistantServerConfiguration.defaultName)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Living Room")
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .connected(name: "Living Room", version: "2.10.6"))
+        #expect(rig.model.servers[0].address.serverID == fixtureServerID)
+        #expect(rig.model.servers[0].name == "Living Room")
+        #expect(rig.store.load() == rig.model.servers)
+        #expect(rig.tokens(for: server).saves == 1)
+        #expect(rig.tokens(for: server).token == testToken)
+        #expect(rig.model.hasStoredToken[server.id] == true)
+        #expect(rig.model.tokenText.isEmpty)
+        #expect(rig.factory.made == 1)
+        #expect(!rig.factory.transports[0].closeCodes.isEmpty)
+        #expect(rig.active.current?.id == server.id)
+        #expect(rig.hookCalls == 1)
+    }
+
+    @Test func testUsesTheStoredTokenWhenTheFieldIsEmpty() async throws {
+        let server = makeServer()
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: server).save(testToken)
+        rig.model.appeared()
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .connected(name: "Music Assistant", version: "2.10.6"))
+        #expect(rig.tokens(for: server).loads == 1)
+        #expect(rig.tokens(for: server).saves == 1)  // the seeding save only
+        #expect(rig.tokens(for: server).deletes == 0)
+    }
+
+    @Test func mismatchNeverReadsOrSendsTheToken() async throws {
+        let server = makeServer(id: "other-server-id")
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: server).save(testToken)
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .failed(.serverMismatch(foundName: "Music Assistant")))
+        #expect(rig.tokens(for: server).loads == 0)
+        #expect(rig.factory.made == 0)
+        #expect(rig.model.servers[0].address.serverID == "other-server-id")
+    }
+
+    @Test func replaceIdentityClearsServerIDAndDeletesTheToken() async throws {
+        let server = makeServer(id: "other-server-id")
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: server).save(testToken)
+        rig.model.appeared()
+        #expect(rig.active.current?.id == server.id)
+        await rig.runTest()
+        rig.model.replaceIdentity()
+        #expect(rig.model.servers[0].address.serverID == nil)
+        #expect(rig.store.load()[0].address.serverID == nil)
+        #expect(rig.tokens(for: server).deletes == 1)
+        #expect(rig.tokens(for: server).token == nil)
+        #expect(rig.model.hasStoredToken[server.id] == false)
+        #expect(rig.model.selectedStatus == .untested)
+        #expect(rig.active.current == nil)
+        #expect(rig.hookCalls == 1)
+    }
+
+    @Test func tokenRejectedKeepsTokenAndIdentity() async throws {
+        let server = makeServer()
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: server).save(testToken)
+        rig.model.appeared()
+        rig.model.tokenText = "ma-WRONG-TOKEN"
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .failed(.tokenRejected))
+        #expect(rig.tokens(for: server).deletes == 0)
+        #expect(rig.tokens(for: server).token == testToken)
+        #expect(rig.model.servers[0].address.serverID == fixtureServerID)
+        #expect(rig.factory.made == 1)
+    }
+
+    @Test func keychainReadFailureNeverDeletes() async throws {
+        let server = makeServer()
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: server).save(testToken)
+        rig.tokens(for: server).failLoad = errSecInteractionNotAllowed
+        rig.model.appeared()
+        await rig.runTest()
+        guard case .failed(.keychain(let text)) = rig.model.selectedStatus else {
+            Issue.record("expected a keychain failure, got \(rig.model.selectedStatus)")
+            return
+        }
+        #expect(text.contains("\(errSecInteractionNotAllowed)"))
+        #expect(rig.tokens(for: server).deletes == 0)
+        #expect(rig.tokens(for: server).token == testToken)
+        #expect(rig.factory.made == 0)
+    }
+
+    @Test func existsFailureLeavesStateUnknown() throws {
+        let server = makeServer()
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        rig.tokens(for: server).failExists = errSecInteractionNotAllowed
+        rig.model.appeared()
+        #expect(rig.model.hasStoredToken[server.id] == nil)
+        #expect(rig.model.selectedHasStoredToken == nil)
+        #expect(rig.model.tokenStoreError != nil)
+        #expect(rig.tokens(for: server).deletes == 0)
+        #expect(rig.tokens(for: server).loads == 0)
+    }
+
+    @Test func emptyDirtyFieldKeepsTheStoredToken() throws {
+        let a = makeServer(name: "A")
+        let b = makeServer(name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: a).save(testToken)
+        rig.model.appeared()
+        rig.model.tokenText = "typed"
+        rig.model.tokenText = ""
+        rig.model.disappeared()
+        rig.model.tokenText = "typed"
+        rig.model.tokenText = ""
+        rig.model.selectedID = b.id
+        for server in [a, b] {
+            #expect(rig.tokens(for: server).deletes == 0)
+        }
+        #expect(rig.tokens(for: a).saves == 1)  // the seeding save only
+        #expect(rig.tokens(for: a).token == testToken)
+    }
+
+    @Test func removeTokenDeletes() throws {
+        let server = makeServer()
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: server).save(testToken)
+        rig.model.appeared()
+        #expect(rig.model.selectedHasStoredToken == true)
+        rig.model.removeToken()
+        #expect(rig.tokens(for: server).deletes == 1)
+        #expect(rig.tokens(for: server).token == nil)
+        #expect(rig.model.selectedHasStoredToken == false)
+    }
+
+    @Test func dirtyTokenCommitsOnSelectionChange() throws {
+        let a = makeServer(name: "A")
+        let b = makeServer(name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.tokenText = "  typed-token  "
+        rig.model.selectedID = b.id
+        #expect(rig.tokens(for: a).saves == 1)
+        #expect(rig.tokens(for: a).token == MusicAssistantToken("typed-token"))
+        #expect(rig.tokens(for: b).saves == 0)
+        #expect(rig.model.tokenText.isEmpty)
+        #expect(rig.model.hasStoredToken[a.id] == true)
+    }
+
+    @Test func cancelledTestWritesNothing() async throws {
+        let server = makeServer(id: nil)
+        let gate = GatedHTTP()
+        let rig = try SettingsRig(servers: [server], http: gate)
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        rig.model.testConnection()
+        #expect(await pollUntil { gate.entered == 1 })
+        rig.model.tokenText = testToken.rawValue + "x"
+        gate.release()
+        await rig.model.waitForTest()
+        #expect(rig.model.selectedStatus == .untested)
+        #expect(rig.model.servers[0].address.serverID == nil)
+        #expect(rig.store.load() == [server])
+        #expect(rig.tokens(for: server).saves == 0)
+        #expect(rig.tokens(for: server).loads == 0)
+        #expect(rig.factory.made == 0)
+        #expect(rig.hookCalls == 0)
+    }
+
+    @Test func activeChangeCallsTheHookOnceAndOnlyOnIdentityChange() async throws {
+        let server = makeServer(id: nil)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        #expect(rig.hookCalls == 1)
+        rig.model.name = "Renamed"
+        #expect(rig.hookCalls == 1)
+        #expect(rig.active.current?.name == "Renamed")
+        await rig.runTest()
+        #expect(rig.hookCalls == 1)
+        rig.model.addressText = "http://elsewhere.local:8095"
+        rig.model.disappeared()
+        #expect(rig.hookCalls == 2)
+        #expect(rig.active.current?.address.baseURL == URL(string: "http://elsewhere.local:8095"))
+    }
+
+    @Test func aTransportBlockedByATSIsNamedAsSuch() async throws {
+        let server = makeServer(id: nil)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        rig.stub.setFailure(pathPrefix: "/info", code: .appTransportSecurityRequiresSecureConnection)
+        rig.model.appeared()
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .failed(.blockedByATS))
+        #expect(rig.model.statusMessage?.contains("https") == true)
+    }
+
+    @Test func noStatusTextContainsTheTokenHostOrServerID() async throws {
+        let secrets = ["ma-UNIT-TEST-TOKEN", "secret-host.local", "srv-UNIT"]
+        var messages: [String] = []
+
+        // Unreachable, token rejected, mismatch, keychain failure, needs token, connected.
+        let server = makeServer("http://secret-host.local:8095", id: "srv-UNIT")
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        func note() {
+            messages.append(rig.model.statusMessage ?? "")
+            messages.append(String(describing: rig.model.selectedStatus))
+        }
+        rig.stub.setFailure(pathPrefix: "/info", code: .cannotConnectToHost)
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        note()
+        rig.stub.setFailure(pathPrefix: "/info", code: .timedOut)
+        await rig.runTest()
+        note()
+        // The recorded server id differs from "srv-UNIT": a mismatch.
+        rig.stub.setResponse(
+            pathPrefix: "/info", MAHTTPResponse(status: 200, contentType: "application/json", body: try MAFixture.infoHTTP.data))
+        await rig.runTest()
+        note()
+        rig.tokens(for: server).failLoad = errSecInteractionNotAllowed
+        rig.model.replaceIdentity()
+        rig.model.tokenText = ""
+        await rig.runTest()
+        note()
+        for failure: MusicAssistantConnectionFailure in [
+            .invalidAddress(.httpsRequired), .blockedByATS, .tokenRejected, .needsToken(foundName: nil),
+            .serverMismatch(foundName: nil), .schema("This Music Assistant server is too old for SkinAmp (schema 3; needs 28 or later)."),
+        ] {
+            messages.append(failure.message)
+        }
+        messages.append(String(reflecting: rig.model))
+        messages.append(String(describing: rig.model))
+        #expect(messages.count >= 8)
+        for text in messages {
+            for secret in secrets { #expect(!text.contains(secret), "\(text)") }
+        }
+    }
+
+    @Test func descriptionIsRedacted() throws {
+        let rig = try SettingsRig(servers: [makeServer("http://secret-host.local:8095", id: "srv-UNIT")])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        for text in [String(describing: rig.model), String(reflecting: rig.model)] {
+            #expect(text.contains("redacted"))
+            for secret in ["ma-UNIT-TEST-TOKEN", "secret-host.local", "srv-UNIT"] { #expect(!text.contains(secret)) }
+        }
+        #expect(Mirror(reflecting: rig.model).children.isEmpty)
+    }
+}

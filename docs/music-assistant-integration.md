@@ -121,7 +121,8 @@ Recorded in the notes: `players/all`, the `players/cmd/*` transport commands, `m
 - Artwork: items carry `metadata.images[].proxy_id`; fetch `/imageproxy/<proxy_id>?size=<0|80|160|256|512|1024>` with no credentials (recorded in the notes).
 
 ### Discovery
-- The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060); use a manual host:port field.
+- The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060); there is no discovery; Settings › Music Assistant takes a manual address (#0063).
+- Address rules (#0063): App Transport Security stays at the local-network exemption, so plain `http`/`ws` works for `.local` names, unqualified names and IP addresses (Tailscale `100.x` included). Any other address, a public DNS name or a Tailscale MagicDNS `*.ts.net` name, must be `https` (reached as `wss`), for example through `tailscale serve`. A bare non-local host defaults to `https`.
 
 ### Reference implementations worth reading
 - `github.com/music-assistant/client`: official Python client (handshake, models, every controller). Primary source for message shapes.
@@ -147,7 +148,7 @@ protocol MusicBackend {
 final class MusicAssistantBackend: MusicBackend { … }  // default
 final class PlexBackend: MusicBackend { … }            // existing/alternate
 ```
-- Settings > Library Source: **Music Assistant (default)** | Plex. Store server URL and token per backend; tokens in Keychain.
+- Settings > Library Source: **Music Assistant (default)** | Plex. Settings › Music Assistant holds a list of servers (URL, learned `server_id`, one Keychain token item per server, keyed by the configuration's UUID); the first tested server is used (#0063, #0075 adds automatic choice).
 - Skin/UI layer depends only on `MusicBackend` and domain models, never on MA or Plex types.
 
 ### 5.2 Two output modes under MA

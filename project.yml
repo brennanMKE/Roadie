@@ -55,7 +55,7 @@ targets:
       properties:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: SkinAmp connects to your Plex Media Server on your local network to browse and play your music.
+        NSLocalNetworkUsageDescription: SkinAmp connects to your Music Assistant server and your Plex Media Server on your local network to browse and play your music.
         CFBundleDocumentTypes:
           - CFBundleTypeName: Winamp Classic Skin
             CFBundleTypeRole: Viewer

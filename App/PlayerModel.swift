@@ -4,6 +4,7 @@ import FolderBackendKit
 import Foundation
 import LibraryBrowser
 import LocalPlayback
+import MusicAssistantKit
 import MusicBackendKit
 import MusicLibraryKit
 import Observation
@@ -54,6 +55,10 @@ final class PlayerModel {
     /// The local-folder source; Settings › Library chooses and indexes its folder. Shares Plex's "This Mac" output, so both play through the one `Player`.
     let folderBackend: FolderBackend
     let folderSettings: FolderSettingsModel
+    /// The Music Assistant source (#0063): the backend, the server Settings chose, and Settings › Music Assistant's model.
+    let musicAssistant: MusicAssistantBackend
+    let musicAssistantActive: MusicAssistantActiveServer
+    let musicAssistantSettings: MusicAssistantSettingsModel
     /// Still public for the skinned window's time and spectrum bindings and for local files.
     let player: Player
     /// Keeps the current and next tracks pinned in the cache; lives as long as the model.
@@ -185,14 +190,28 @@ final class PlayerModel {
         cacheSettings = CacheSettingsModel(cache: stack.cache)
         folderBackend = FolderBackend(settings: FolderBackend.settingsProvider(), output: stack.output)
         folderSettings = FolderSettingsModel(backend: folderBackend)
+        // Music Assistant is the default source. Defaults only here: no Keychain, network or prompt at launch.
+        let maStore = MusicAssistantServerStore()
+        let maActive = MusicAssistantActiveServer(MusicAssistantActiveServer.firstVerified(in: maStore.load()))
+        let ma = MusicAssistantBackend(
+            server: { maActive.current },
+            token: { try KeychainMusicAssistantTokenStore(account: $0.keychainAccount).load() })
+        musicAssistant = ma
+        musicAssistantActive = maActive
+        musicAssistantSettings = MusicAssistantSettingsModel(
+            store: maStore, tokenStore: { KeychainMusicAssistantTokenStore(account: $0) }, test: MusicAssistantConnectionTest(),
+            active: maActive)
         sources = LibrarySourceController(
             sources: [
+                LibrarySource(
+                    backend: ma, isConfigured: { MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) },
+                    probe: SourceProbes.checking { try await ma.probe() }),
                 LibrarySource(backend: stack.backend, isConfigured: { PlexBackend.isConfigured() }),
                 LibrarySource(
                     backend: folderBackend, isConfigured: { FolderBackend.storedFolder() != nil },
                     probe: SourceProbes.checking { try FolderBackend.checkReachable() }),
             ],
-            defaultSourceID: stack.backend.sourceID)
+            defaultSourceID: ma.sourceID)
         fallback = LibraryFallbackController(sources: sources)
         let cache = stack.cache
         Task {
@@ -238,6 +257,7 @@ final class PlayerModel {
             loadSkin(from: URL(filePath: path))
         }
         skinLibrary.passFinished = { [weak self] in self?.skinBrowser.indexDidChange() }
+        musicAssistantSettings.onActiveServerChanged = { [weak self] in self?.activeMusicAssistantServerChanged() }
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()
         // The model lives as long as the app, so these observers are never removed.
@@ -247,6 +267,17 @@ final class PlayerModel {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.fallback.retryNow() } }
+    }
+
+    /// The server the backend uses changed: drop the connection (the next browse reconnects to the new one) and rebuild
+    /// the Library if Music Assistant is what it shows. A track playing on This Mac is not touched.
+    private func activeMusicAssistantServerChanged() {
+        let ma = musicAssistant
+        let sources = sources
+        Task {
+            await ma.disconnect()
+            sources.reload(ma.sourceID)
+        }
     }
 
     /// Follows the selected output's now-playing stream. Never connects: the stream for This Mac

@@ -39,7 +39,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>SkinAmp connects to your Plex Media Server on your local network to browse and play your music.</string>
+	<string>SkinAmp connects to your Music Assistant server and your Plex Media Server on your local network to browse and play your music.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

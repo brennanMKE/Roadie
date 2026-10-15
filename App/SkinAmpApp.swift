@@ -1,3 +1,4 @@
+import MusicAssistantKit
 import PlexKit
 import SwiftUI
 import TrackCache
@@ -30,6 +31,7 @@ struct SkinAmpApp: App {
         Settings {
             SettingsView()
                 .environment(plexSettings)
+                .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.cacheSettings)
                 .environment(appDelegate.model.folderSettings)
                 .environment(appDelegate.model.sources)

@@ -84,21 +84,36 @@ public final class LibrarySourceController {
             defaults.set(id, forKey: Self.defaultsKey)
             return true
         }
-        library.disappeared()
         selectedID = id
-        backend = source.backend
-        library = LibraryBrowserModel(
-            backend: source.backend, pageSize: pageSize, searchDelay: searchDelay, searchLimit: searchLimit)
-        installFailureHook(on: library, id: id)
-        artwork = ArtworkCache(backend: source.backend, limitBytes: artworkLimitBytes, limitCount: artworkLimitCount)
-        generation += 1
+        rebuild(for: source)
         if persist {
             preferredID = id
             defaults.set(id, forKey: Self.defaultsKey)
         }
-        for key in Array(subscribers.keys) { resubscribe(key) }
         Self.log.info("switched to \(id, privacy: .public)")
         return true
+    }
+
+    /// Rebuilds the browser model and artwork cache of the source in use, for the same backend, when its settings
+    /// changed under it (#0063: the active Music Assistant server). Touches neither `preferredID` nor defaults and
+    /// never connects or disconnects. false, with nothing changed, when `id` is not the source in use.
+    @discardableResult
+    public func reload(_ id: String) -> Bool {
+        guard id == selectedID, let source = sources.first(where: { $0.id == id }) else { return false }
+        rebuild(for: source)
+        Self.log.info("reloaded \(id, privacy: .public)")
+        return true
+    }
+
+    private func rebuild(for source: LibrarySource) {
+        library.disappeared()
+        backend = source.backend
+        library = LibraryBrowserModel(
+            backend: source.backend, pageSize: pageSize, searchDelay: searchDelay, searchLimit: searchLimit)
+        installFailureHook(on: library, id: source.id)
+        artwork = ArtworkCache(backend: source.backend, limitBytes: artworkLimitBytes, limitCount: artworkLimitCount)
+        generation += 1
+        for key in Array(subscribers.keys) { resubscribe(key) }
     }
 
     /// Forwards the active backend's `nowPlaying(on:)` and follows `select`. Ends when the subscriber cancels.

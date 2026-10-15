@@ -40,4 +40,16 @@ struct TokenStoreTests {
         #expect(a.baseQuery[kSecAttrService as String] as? String == "com.brennanmke.SkinAmp.musicAssistant")
         #expect(a.baseQuery[kSecAttrService as String] as? String == b.baseQuery[kSecAttrService as String] as? String)
     }
+
+    @Test func inMemoryExistsDoesNotCountAsALoad() throws {
+        let store = InMemoryMusicAssistantTokenStore()
+        #expect(try store.exists() == false)
+        try store.save(testToken)
+        #expect(try store.exists() == true)
+        #expect(store.existsChecks == 2)
+        #expect(store.loads == 0)
+        store.failExists = -25308
+        #expect(throws: MusicAssistantTokenStoreError.keychain(-25308)) { try store.exists() }
+        #expect(store.token == testToken)
+    }
 }

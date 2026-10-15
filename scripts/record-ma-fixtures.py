@@ -85,7 +85,17 @@ def read_env():
         die(".env must define MUSIC_ASSISTANT_URL and MUSIC_ASSISTANT_TOKEN")
     if "://" not in url:
         url = "http://" + url
+    # ws:// and wss:// name the same server as http:// and https://.
+    scheme, rest = url.split("://", 1)
+    url = {"ws": "http", "wss": "https"}.get(scheme.lower(), scheme.lower()) + "://" + rest
+    if not url.startswith(("http://", "https://")):
+        die("MUSIC_ASSISTANT_URL must be http(s):// or ws(s)://")
     return url, token
+
+
+# One TLS context for every https/wss connection (a Tailscale `tailscale serve` address, a reverse proxy).
+# create_default_context() verifies the certificate chain and the host name; never relax it here.
+TLS = ssl.create_default_context()
 
 
 # ---------------------------------------------------------------- HTTP
@@ -101,8 +111,13 @@ def http_get(base, path_or_url, bearer=None, timeout=10, maxbytes=4000000):
         b = urllib.parse.urlsplit(base)
         scheme, netloc = b.scheme, b.netloc
         target = path_or_url
-    cls = http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
-    conn = cls(netloc, timeout=timeout)
+    prefix = urllib.parse.urlsplit(base).path.rstrip("/")  # a reverse-proxy path prefix, if any
+    if prefix and not target.startswith(prefix + "/"):
+        target = prefix + target
+    if scheme == "https":
+        conn = http.client.HTTPSConnection(netloc, timeout=timeout, context=TLS)
+    else:
+        conn = http.client.HTTPConnection(netloc, timeout=timeout)
     headers = {"Accept": "*/*", "User-Agent": "SkinAmp-recorder"}
     if bearer:
         headers["Authorization"] = "Bearer " + bearer
@@ -134,11 +149,11 @@ class WS:
         port = u.port or (443 if secure else 80)
         sock = socket.create_connection((u.hostname, port), timeout=10)
         if secure:
-            sock = ssl.create_default_context().wrap_socket(sock, server_hostname=u.hostname)
+            sock = TLS.wrap_socket(sock, server_hostname=u.hostname)
         self.sock = sock
         key = base64.b64encode(os.urandom(16)).decode()
-        req = ("GET /ws HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-               "Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n" % (u.netloc, key))
+        req = ("GET %s/ws HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+               "Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n" % (u.path.rstrip("/"), u.netloc, key))
         sock.sendall(req.encode())
         head = b""
         deadline = time.time() + 10
@@ -1104,5 +1119,17 @@ def main(argv):
         record(args)
 
 
+def run(argv):
+    """main() with network errors reduced to a class name: a TLS or DNS message can carry the host name."""
+    try:
+        main(argv)
+    except ssl.SSLCertVerificationError:
+        die("TLS certificate verification failed (the certificate or host name does not match; verification stays on)")
+    except ssl.SSLError:
+        die("TLS error")
+    except (OSError, http.client.HTTPException, Closed) as e:
+        die("network error: " + type(e).__name__)
+
+
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    run(sys.argv[1:])

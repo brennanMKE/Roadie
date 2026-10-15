@@ -9,14 +9,24 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     public typealias AddressProvider = @Sendable () -> MusicAssistantServerAddress?
     /// Reads the token for that address (the Keychain). Called only from `connect()`.
     public typealias TokenProvider = @Sendable (MusicAssistantServerAddress) throws -> MusicAssistantToken?
+    /// The active server (#0063): defaults only, never the Keychain.
+    public typealias ServerProvider = @Sendable () async -> MusicAssistantServerConfiguration?
+    /// The token for that server (the Keychain). Called only from `connect()`, and never for an unverified server.
+    public typealias ServerTokenProvider = @Sendable (MusicAssistantServerConfiguration) throws -> MusicAssistantToken?
+
+    /// Which init built the backend: they differ in the messages and in whether an unverified server may connect.
+    private enum Mode { case address, server }
+    /// The id the address-based init gives its one configuration.
+    private static let addressConfigurationID = UUID(uuidString: "00000000-0000-0000-0000-00000000A0DD")!
 
     public nonisolated let sourceID = "musicAssistant"
     public nonisolated let displayName = "Music Assistant"
     /// #0064 adds `.remoteOutputs`, #0066 `.localOutput`.
     public nonisolated let capabilities: BackendCapabilities = [.search, .playlists, .artwork]
 
-    private let addressProvider: AddressProvider
-    private let tokenProvider: TokenProvider
+    private let mode: Mode
+    private let serverProvider: ServerProvider
+    private let tokenProvider: ServerTokenProvider
     private let transports: any MAWebSocketTransportFactory
     private let http: any MAHTTPTransport
     private let clock: any Clock<Duration>
@@ -25,15 +35,36 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// #0064 subscribes to events and states through it.
     public private(set) var client: MusicAssistantClient?
     private var connectedBaseURL: URL?
+    private var connectedConfiguration: MusicAssistantServerConfiguration?
     private var counts: [String: Int] = [:]
 
+    /// One fixed address, trust on first use when it has no `serverID`. For tests: the app must use `init(server:token:...)`,
+    /// which refuses to connect to a server whose identity has not been learned and verified.
     public init(
         address: @escaping AddressProvider, token: @escaping TokenProvider,
         transports: any MAWebSocketTransportFactory = URLSessionWebSocketTransportFactory(),
         http: any MAHTTPTransport = URLSessionHTTPTransport(), clock: any Clock<Duration> = ContinuousClock()
     ) {
-        self.addressProvider = address
-        self.tokenProvider = token
+        mode = .address
+        serverProvider = {
+            address().map { MusicAssistantServerConfiguration(id: Self.addressConfigurationID, address: $0) }
+        }
+        tokenProvider = { try token($0.address) }
+        self.transports = transports
+        self.http = http
+        self.clock = clock
+    }
+
+    /// The app's init (#0063): the active server from Settings. `https` and `http` addresses reach the socket as
+    /// `wss` and `ws`. A server whose `server_id` has not been learned by Test Connection is not connected to.
+    public init(
+        server: @escaping ServerProvider, token: @escaping ServerTokenProvider,
+        transports: any MAWebSocketTransportFactory = URLSessionWebSocketTransportFactory(),
+        http: any MAHTTPTransport = URLSessionHTTPTransport(), clock: any Clock<Duration> = ContinuousClock()
+    ) {
+        mode = .server
+        serverProvider = server
+        tokenProvider = token
         self.transports = transports
         self.http = http
         self.clock = clock
@@ -47,11 +78,26 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     // MARK: Connection
 
-    public func connect() async throws {
-        guard let address = addressProvider() else {
-            throw MusicBackendError.notConfigured("Add a Music Assistant server under Settings \u{203A} Library.")
+    private func requireConfiguration() async throws -> MusicAssistantServerConfiguration {
+        guard let configuration = await serverProvider() else {
+            throw MusicBackendError.notConfigured(
+                mode == .server
+                    ? "Add a Music Assistant server under Settings \u{203A} Music Assistant."
+                    : "Add a Music Assistant server under Settings \u{203A} Library.")
         }
-        if let client, connectedBaseURL == address.baseURL {
+        if mode == .server, configuration.address.serverID == nil {
+            throw MusicBackendError.notConfigured(
+                "Test the connection to \(configuration.name) under Settings \u{203A} Music Assistant.")
+        }
+        return configuration
+    }
+
+    public func connect() async throws {
+        let configuration = try await requireConfiguration()
+        let address = configuration.address
+        // Same id, address and server id: the live connection is the right one. Two locations that both use
+        // `homeassistant.local:8095` differ by id, so a change of the active one reconnects.
+        if let client, let connected = connectedConfiguration, connected.sameIdentity(as: configuration) {
             switch await client.state {
             case .connected, .reconnecting: return
             default: break
@@ -59,18 +105,22 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         }
         let token: MusicAssistantToken?
         do {
-            token = try tokenProvider(address)
+            token = try tokenProvider(configuration)
         } catch {
             throw MusicBackendError.backend(
                 (error as? any LocalizedError)?.errorDescription ?? "The Music Assistant token could not be read.")
         }
         guard let token else {
-            throw MusicBackendError.notConfigured("Enter the Music Assistant token under Settings \u{203A} Library.")
+            throw MusicBackendError.notConfigured(
+                mode == .server
+                    ? "Enter the Music Assistant token under Settings \u{203A} Music Assistant."
+                    : "Enter the Music Assistant token under Settings \u{203A} Library.")
         }
         if let old = client {
             await old.disconnect()
             client = nil
             connectedBaseURL = nil
+            connectedConfiguration = nil
             counts = [:]
         }
         let fresh = MusicAssistantClient(baseURL: address.baseURL, transports: transports, http: http, clock: clock)
@@ -84,6 +134,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         let raced = client
         client = fresh
         connectedBaseURL = address.baseURL
+        connectedConfiguration = configuration
         counts = [:]
         log.info("connected")
         if let raced, raced !== fresh { await raced.disconnect() }
@@ -93,15 +144,14 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         let old = client
         client = nil
         connectedBaseURL = nil
+        connectedConfiguration = nil
         counts = [:]
         await old?.disconnect()
     }
 
     /// `GET /info` and the server-id comparison. No socket, no token, no Keychain read.
     public func probe() async throws {
-        guard let address = addressProvider() else {
-            throw MusicBackendError.notConfigured("Add a Music Assistant server under Settings \u{203A} Library.")
-        }
+        let address = try await requireConfiguration().address
         let info: MAServerInfo
         do {
             info = try await MusicAssistantClient.serverInfo(at: address.baseURL, http: http)

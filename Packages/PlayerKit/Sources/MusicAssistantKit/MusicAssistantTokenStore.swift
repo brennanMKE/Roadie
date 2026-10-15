@@ -9,6 +9,9 @@ public protocol MusicAssistantTokenStore: Sendable {
     func save(_ token: MusicAssistantToken) throws
     /// No error when there is none.
     func delete() throws
+    /// Whether an item is stored, without reading it. The Keychain version asks for attributes only, so it never
+    /// decrypts the secret and never shows a prompt.
+    func exists() throws -> Bool
 }
 
 public enum MusicAssistantTokenStoreError: Error, Hashable, Sendable, LocalizedError {
@@ -55,6 +58,17 @@ public struct KeychainMusicAssistantTokenStore: MusicAssistantTokenStore {
         guard status == errSecSuccess else { throw MusicAssistantTokenStoreError.keychain(status) }
         guard let data = result as? Data, let text = String(data: data, encoding: .utf8) else { return nil }
         return MusicAssistantToken(text)
+    }
+
+    public func exists() throws -> Bool {
+        var query = baseQuery
+        query[kSecReturnAttributes as String] = true  // deliberately no kSecReturnData
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else { throw MusicAssistantTokenStoreError.keychain(status) }
+        return true
     }
 
     public func save(_ token: MusicAssistantToken) throws {

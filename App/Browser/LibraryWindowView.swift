@@ -1,4 +1,5 @@
 import LibraryBrowser
+import MusicAssistantKit
 import MusicBackendKit
 import SwiftUI
 
@@ -21,7 +22,7 @@ struct LibraryWindowView: View {
         .task(id: ObjectIdentifier(player.library)) { library.appeared() }
         .onDisappear { library.disappeared() }
         .navigationTitle("Library")
-        .navigationSubtitle(FallbackText.subtitle(fallback.status))
+        .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { library.refresh() }
@@ -30,6 +31,15 @@ struct LibraryWindowView: View {
             }
         }
         .frame(minWidth: 720, minHeight: 420)
+    }
+
+    /// The source in use; with Music Assistant, the server's name too.
+    private var subtitle: String {
+        let base = FallbackText.subtitle(fallback.status)
+        if player.sources.selectedID == player.musicAssistant.sourceID, let server = player.musicAssistantActive.current {
+            return base + " \u{00B7} " + server.name
+        }
+        return base
     }
 
     @ViewBuilder

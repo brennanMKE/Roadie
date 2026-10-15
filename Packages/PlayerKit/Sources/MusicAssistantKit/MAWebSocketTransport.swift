@@ -40,10 +40,13 @@ public final class URLSessionWebSocketTransport: MAWebSocketTransport, @unchecke
     private let task: URLSessionWebSocketTask?
 
     init(baseURL: URL, session: URLSession) {
-        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
-            task = nil
-            return
-        }
+        task = Self.socketURL(for: baseURL).map { session.webSocketTask(with: $0) }
+    }
+
+    /// `https` becomes `wss` (TLS, including a Tailscale `tailscale serve` address) and `http` becomes `ws`; a path
+    /// prefix is kept and `/ws` appended; the query is dropped.
+    static func socketURL(for baseURL: URL) -> URL? {
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { return nil }
         switch components.scheme?.lowercased() {
         case "https", "wss": components.scheme = "wss"
         default: components.scheme = "ws"
@@ -52,7 +55,7 @@ public final class URLSessionWebSocketTransport: MAWebSocketTransport, @unchecke
         if path.hasSuffix("/") { path.removeLast() }
         components.path = path + "/ws"
         components.query = nil
-        task = components.url.map { session.webSocketTask(with: $0) }
+        return components.url
     }
 
     public func connect() async throws {
