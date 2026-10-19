@@ -56,6 +56,86 @@ private func writeWAV(to url: URL, seconds: Double, sampleRate: Double = 44_100,
         #expect(result.skipped.isEmpty)
     }
 
+    @Test func nestedPlaylistExpandsInPlaceRelativeToItsFolder() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for path in ["a.wav", "c.wav", "sub/b.wav"] { try writeWAV(to: dir.appending(path: path), seconds: 0.2) }
+        try Data("b.wav\n".utf8).write(to: dir.appending(path: "sub/inner.m3u"))
+        let top = dir.appending(path: "top.m3u8")
+        try Data("a.wav\nsub/inner.m3u\nc.wav\n".utf8).write(to: top)
+
+        let result = await LocalTrackLoader.load([top])
+        #expect(result.tracks.map(\.title) == ["a", "b", "c"])
+        #expect(result.skipped.isEmpty)
+    }
+
+    @Test func twoLevelNestingMixesFormats() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeWAV(to: dir.appending(path: "one.wav"), seconds: 0.2)
+        try writeWAV(to: dir.appending(path: "l1/two.wav"), seconds: 0.2)
+        try writeWAV(to: dir.appending(path: "l1/l2/three.wav"), seconds: 0.2)
+        try Data("three.wav\n".utf8).write(to: dir.appending(path: "l1/l2/deep.m3u"))
+        try Data("[playlist]\nFile1=two.wav\nFile2=l2/deep.m3u\nNumberOfEntries=2\n".utf8)
+            .write(to: dir.appending(path: "l1/mid.pls"))
+        let top = dir.appending(path: "top.m3u")
+        try Data("one.wav\nl1/mid.pls\n".utf8).write(to: top)
+
+        let result = await LocalTrackLoader.load([top])
+        #expect(result.tracks.map(\.title) == ["one", "two", "three"])
+        #expect(result.skipped.isEmpty)
+    }
+
+    @Test func playlistCycleIsSkipped() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for name in ["x", "y"] { try writeWAV(to: dir.appending(path: "\(name).wav"), seconds: 0.2) }
+        try Data("x.wav\nb.m3u\n".utf8).write(to: dir.appending(path: "a.m3u"))
+        try Data("y.wav\na.m3u\n".utf8).write(to: dir.appending(path: "b.m3u"))
+
+        let result = await LocalTrackLoader.load([dir.appending(path: "a.m3u")])
+        #expect(result.tracks.map(\.title) == ["x", "y"])
+        #expect(result.skipped.map(\.reason) == ["playlist cycle"])
+    }
+
+    @Test func selfReferencingPlaylistIsSkipped() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for name in ["x", "y"] { try writeWAV(to: dir.appending(path: "\(name).wav"), seconds: 0.2) }
+        let list = dir.appending(path: "self.m3u")
+        try Data("x.wav\nself.m3u\ny.wav\n".utf8).write(to: list)
+
+        let result = await LocalTrackLoader.load([list])
+        #expect(result.tracks.map(\.title) == ["x", "y"])
+        #expect(result.skipped.map(\.reason) == ["playlist cycle"])
+    }
+
+    @Test func missingNestedPlaylistIsSkipped() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for name in ["x", "y"] { try writeWAV(to: dir.appending(path: "\(name).wav"), seconds: 0.2) }
+        let top = dir.appending(path: "top.m3u")
+        try Data("x.wav\ngone.m3u\ny.wav\n".utf8).write(to: top)
+
+        let result = await LocalTrackLoader.load([top])
+        #expect(result.tracks.map(\.title) == ["x", "y"])
+        #expect(result.skipped.map(\.reason) == ["could not read playlist"])
+    }
+
+    @Test func nestingDeeperThanEightLevelsIsSkipped() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for n in 1...9 {
+            try writeWAV(to: dir.appending(path: "t\(n).wav"), seconds: 0.2)
+            let body = n < 9 ? "t\(n).wav\np\(n + 1).m3u\n" : "t\(n).wav\n"
+            try Data(body.utf8).write(to: dir.appending(path: "p\(n).m3u"))
+        }
+
+        let result = await LocalTrackLoader.load([dir.appending(path: "p1.m3u")])
+        #expect(result.tracks.map(\.title) == (1...8).map { "t\($0)" })
+        #expect(result.skipped.map(\.reason) == ["playlists nested too deeply"])
+    }
+
     @Test func unreadablePlaylistIsReportedSkipped() async throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

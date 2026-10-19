@@ -88,11 +88,11 @@ private func paths(_ entries: [PlaylistFile.Entry], relativeTo url: URL = listUR
         ])
     }
 
-    @Test func skipsStreamsAndNestedPlaylists() {
+    @Test func skipsStreamsAndResolvesNestedPlaylists() {
         #expect(PlaylistFile.resolve(.init(location: "http://radio.example/stream"), relativeTo: listURL)
             == .skip(location: "http://radio.example/stream", reason: "streams are not supported"))
         #expect(PlaylistFile.resolve(.init(location: "other.pls"), relativeTo: listURL)
-            == .skip(location: "other.pls", reason: "nested playlist"))
+            == .file(URL(filePath: "/tmp/x/other.pls")))
     }
 
     @Test func serializesExtendedM3U() {

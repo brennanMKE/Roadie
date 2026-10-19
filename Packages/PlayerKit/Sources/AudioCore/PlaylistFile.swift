@@ -83,7 +83,6 @@ public enum PlaylistFile {
             let path = location.replacingOccurrences(of: "\\", with: "/")
             url = URL(filePath: path, relativeTo: folder).absoluteURL.standardizedFileURL
         }
-        if isPlaylist(url) { return .skip(location: location, reason: "nested playlist") }
         return .file(url)
     }
 

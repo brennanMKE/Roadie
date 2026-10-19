@@ -18,6 +18,7 @@ public struct LocalImport: Sendable {
 public enum LocalTrackLoader {
     private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LocalTrackLoader")
     private static let maxConcurrent = 4
+    private static let maxPlaylistDepth = 8
 
     public static let audioTypes: [UTType] = [
         .audio, .mp3, .mpeg4Audio, .wav, .aiff, UTType(filenameExtension: "flac"),
@@ -151,7 +152,8 @@ public enum LocalTrackLoader {
     // MARK: Private
 
     /// Replaces each explicitly given playlist file with its entries, at its position. Entries that are playlists
-    /// themselves, streams, and unreadable playlists are reported as skipped.
+    /// themselves are expanded in place, relative to their own folder, up to 8 levels deep. Cycles, deeper nesting,
+    /// streams and unreadable playlists are reported as skipped.
     private static func expandPlaylists(_ urls: [URL]) -> (urls: [URL], skipped: [SkippedFile]) {
         var result: [URL] = []
         var skipped: [SkippedFile] = []
@@ -159,24 +161,40 @@ public enum LocalTrackLoader {
             logger.warning("Skipping \(url.lastPathComponent, privacy: .public): \(reason, privacy: .public)")
             skipped.append(SkippedFile(url: url, reason: reason))
         }
+        func expand(_ playlist: URL, depth: Int, ancestors: Set<String>) {
+            let key = playlist.standardizedFileURL.resolvingSymlinksInPath().path
+            if ancestors.contains(key) {
+                skip(playlist, "playlist cycle")
+                return
+            }
+            if depth > maxPlaylistDepth {
+                skip(playlist, "playlists nested too deeply")
+                return
+            }
+            guard let data = try? Data(contentsOf: playlist) else {
+                skip(playlist, "could not read playlist")
+                return
+            }
+            let format = PlaylistFile.format(for: playlist, data: data)
+            let entries = PlaylistFile.parse(data, format: format, pathExtension: playlist.pathExtension)
+            logger.info("Playlist \(playlist.lastPathComponent, privacy: .public): \(entries.count) entries")
+            for entry in entries {
+                switch PlaylistFile.resolve(entry, relativeTo: playlist) {
+                case .file(let file) where PlaylistFile.isPlaylist(file) && !isDirectory(file):
+                    expand(file, depth: depth + 1, ancestors: ancestors.union([key]))
+                case .file(let file):
+                    result.append(file)
+                case .skip(let location, let reason):
+                    skip(playlist.deletingLastPathComponent().appending(path: location), reason)
+                }
+            }
+        }
         for url in urls {
             guard PlaylistFile.isPlaylist(url), !isDirectory(url) else {
                 result.append(url)
                 continue
             }
-            guard let data = try? Data(contentsOf: url) else {
-                skip(url, "could not read playlist")
-                continue
-            }
-            let format = PlaylistFile.format(for: url, data: data)
-            let entries = PlaylistFile.parse(data, format: format, pathExtension: url.pathExtension)
-            logger.info("Playlist \(url.lastPathComponent, privacy: .public): \(entries.count) entries")
-            for entry in entries {
-                switch PlaylistFile.resolve(entry, relativeTo: url) {
-                case .file(let file): result.append(file)
-                case .skip(let location, let reason): skip(url.deletingLastPathComponent().appending(path: location), reason)
-                }
-            }
+            expand(url, depth: 1, ancestors: [])
         }
         return (result, skipped)
     }
