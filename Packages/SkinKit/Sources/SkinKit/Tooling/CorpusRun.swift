@@ -437,7 +437,9 @@ public final class CorpusRunner: @unchecked Sendable {
             let renderBegin = clock.now
             _ = MainWindowRenderer.render(skin: skin, state: .webampScreenshot)
             outcome.renderMs = millis(clock.now - renderBegin)
-            outcome.mainWindowComplete = requiredSprites.allSatisfy { skin.image(for: $0) != nil }
+            outcome.mainWindowComplete = requiredSprites.allSatisfy {
+                skin.resolve($0).map { !skin.generatedSheets.contains($0.sheet) } ?? false
+            }
         } catch {
             outcome.parseMs = millis(clock.now - begin)
             if let skinError = error as? SkinError, case .modernSkin = skinError { outcome.status = "modern" } else {

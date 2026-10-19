@@ -49,7 +49,8 @@ struct SkinFallbackTests {
         let skin = try makeSkin(["balance.bmp": (47, 420, blue)])
         let background = skin.image(for: "MAIN_BALANCE_BACKGROUND")
         #expect(background.map { TestBitmaps.pixel($0, x: 5, y: 5) } == blue)
-        #expect(skin.image(for: "MAIN_VOLUME_BACKGROUND") == nil)
+        #expect(size(skin.image(for: "MAIN_VOLUME_BACKGROUND")) == [68, 420])
+        #expect(skin.generatedSheets.contains("VOLUME"))
         #expect(skin.warnings.filter { $0.contains("volume") } == ["Missing volume.bmp"])
     }
 
@@ -90,7 +91,8 @@ struct SkinFallbackTests {
 
     @Test func noNumberSheetWarnsOnce() throws {
         let skin = try makeSkin([:])
-        #expect(skin.image(for: "DIGIT_0") == nil)
+        #expect(size(skin.image(for: "DIGIT_0")) == [9, 13])
+        #expect(skin.fallbacks.contains("numbers.bmp missing; generated base"))
         #expect(skin.warnings.filter { $0.contains("numbers") } == ["Missing numbers.bmp and nums_ex.bmp"])
     }
 

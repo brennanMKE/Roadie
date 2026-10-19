@@ -17,6 +17,7 @@ public enum SkinParser {
         var warnings: [String] = []
         var fallbacks: [String] = []
         var missing: Set<String> = []
+        var undecodable: Set<String> = []
         for sheet in SkinSprites.sheets.keys.sorted() {
             guard let data = archive.file(sheet, extensions: ["bmp", "png"]) else {
                 missing.insert(sheet)
@@ -24,11 +25,23 @@ public enum SkinParser {
             }
             guard let image = BitmapLoader.image(from: data) else {
                 warnings.append("Undecodable \(sheet.lowercased()).bmp")
+                undecodable.insert(sheet)
                 continue
             }
             sheets[sheet] = image
         }
         guard !sheets.isEmpty else { throw .noBitmaps }
+
+        // Base-skin fallback: fill absent or undecodable sheets from the generated base. Warnings below still
+        // read `missing`, so a skin without cbuttons.bmp stays partial.
+        var generated: Set<String> = []
+        for sheet in GeneratedBaseSkin.sheetNames.sorted() where sheets[sheet] == nil {
+            if sheet == "NUMBERS", sheets["NUMS_EX"] != nil { continue }
+            guard let image = GeneratedBaseSkin.sheet(sheet) else { continue }
+            sheets[sheet] = image
+            generated.insert(sheet)
+            fallbacks.append("\(sheet.lowercased()).bmp \(undecodable.contains(sheet) ? "undecodable" : "missing"); generated base")
+        }
 
         // Sheets that are required warn; optional ones are covered by a Webamp fallback (see Skin.resolve).
         for sheet in missing.sorted() where !SkinSprites.optionalSheets.contains(sheet) {
@@ -77,10 +90,9 @@ public enum SkinParser {
         // Unreadable cursors are cosmetic: recorded in `cursors.unreadable`, never a warning.
         let cursors = SkinCursors.load(from: archive)
 
-        // TODO: base-skin fallback.
         return Skin(
             sheets: sheets, visColors: visColors, region: region, playlistStyle: playlistStyle, warnings: warnings,
-            fallbacks: fallbacks, cursors: cursors)
+            fallbacks: fallbacks, cursors: cursors, generatedSheets: generated)
     }
 }
 

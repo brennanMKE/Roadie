@@ -12,8 +12,10 @@ public struct Skin: @unchecked Sendable {
     /// Things that will render wrong (missing or undecodable required sheets, no number sheet at all).
     public let warnings: [String]
     /// Substitutions that keep the skin whole (balance from volume, digits from one number sheet,
-    /// default viscolors...).
+    /// default viscolors, sheets from the generated base skin...).
     public let fallbacks: [String]
+    /// Sheets drawn by `GeneratedBaseSkin` because the skin lacked them or they didn't decode.
+    public let generatedSheets: Set<String>
     /// `pledit.txt`: the playlist window's colours and font; `.defaults` when the file is absent.
     public let playlistStyle: PlaylistStyle
     /// The skin's `.cur` files under Winamp's cursor names; `.empty` when it ships none.
@@ -22,8 +24,9 @@ public struct Skin: @unchecked Sendable {
     public init(
         sheets: [String: CGImage], visColors: [RGBColor], region: SkinRegion = .empty,
         playlistStyle: PlaylistStyle = .defaults, warnings: [String], fallbacks: [String] = [],
-        cursors: SkinCursors = .empty
+        cursors: SkinCursors = .empty, generatedSheets: Set<String> = []
     ) {
+        self.generatedSheets = generatedSheets
         self.cursors = cursors
         self.playlistStyle = playlistStyle
         self.sheets = sheets

@@ -112,7 +112,7 @@ struct SpriteImage: View {
             Image(decorative: image, scale: 1)
                 .interpolation(.none)
         } else if let sprite = SkinSprites.byName[name]?.sprite {
-            // TODO: fall back to a generated base skin instead of an empty frame.
+            // Only sheets the generated base doesn't provide (EQ_EX, GEN) reach this; see GeneratedBaseSkin.
             Color.clear.frame(width: CGFloat(sprite.width), height: CGFloat(sprite.height))
         }
     }

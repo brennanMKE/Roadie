@@ -18,7 +18,7 @@ public struct SkinThumbnail: @unchecked Sendable {
 public actor SkinThumbnailCache {
     /// Bump when `MainWindowRenderer.render(state: .idle)` pixels change (renderer, layout, idle preset, parser
     /// fallbacks, visualizer colours). Old `r*` directories are deleted on first use.
-    public static let thumbnailVersion = 1
+    public static let thumbnailVersion = 2
     public static let size = CGSize(width: 275, height: 116)
 
     public struct Statistics: Hashable, Sendable {

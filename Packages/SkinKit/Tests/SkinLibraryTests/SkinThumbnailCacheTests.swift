@@ -228,7 +228,7 @@ import Testing
         let cache = open()
         #expect(await cache.thumbnail(hash: hash, url: url) == nil)
         #expect(await cache.statistics.failures == 1)
-        #expect(FileManager.default.fileExists(atPath: dir.appending("cache/r1/\(hash)-275x116.failed").path))
+        #expect(FileManager.default.fileExists(atPath: dir.appending("cache/r\(SkinThumbnailCache.thumbnailVersion)/\(hash)-275x116.failed").path))
         #expect(await cache.thumbnail(hash: hash, url: url) == nil)
         #expect(await cache.statistics.failures == 1)
         #expect(calls.all.count == 1)
