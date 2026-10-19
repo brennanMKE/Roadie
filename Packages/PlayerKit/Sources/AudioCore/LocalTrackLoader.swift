@@ -30,6 +30,8 @@ public enum LocalTrackLoader {
     private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LocalTrackLoader")
     private static let maxConcurrent = 4
     private static let maxPlaylistDepth = 8
+    static let maxPlaylistReads = 256
+    static let maxPlaylistEntries = 100_000
 
     public static let audioTypes: [UTType] = [
         .audio, .mp3, .mpeg4Audio, .wav, .aiff, UTType(filenameExtension: "flac"),
@@ -206,14 +208,31 @@ public enum LocalTrackLoader {
     /// themselves are expanded in place, relative to their own folder, up to 8 levels deep. Cycles, deeper nesting,
     /// streams and unreadable playlists are reported as skipped. Each track from a playlist carries the title and
     /// duration of the entry that lists it (the innermost playlist); URLs given directly carry no hint.
-    private static func expandPlaylists(_ urls: [URL]) -> (items: [(url: URL, hint: PlaylistHint?)], skipped: [SkippedFile]) {
+    /// One call reads at most `maxReads` playlists and handles at most `maxEntries` entries; past them, further
+    /// playlists are reported as "too many nested playlists" / "too many playlist entries". A diamond (two playlists
+    /// listing the same one) still expands every time; only ancestors count as cycles.
+    static func expandPlaylists(
+        _ urls: [URL],
+        maxReads: Int = maxPlaylistReads,
+        maxEntries: Int = maxPlaylistEntries
+    ) -> (items: [(url: URL, hint: PlaylistHint?)], skipped: [SkippedFile]) {
         var result: [(url: URL, hint: PlaylistHint?)] = []
         var skipped: [SkippedFile] = []
+        var reads = 0
+        var entries = 0
+        var entriesExhausted = false
+        var readsWarned = false
         func skip(_ url: URL, _ reason: String) {
             logger.warning("Skipping \(url.lastPathComponent, privacy: .public): \(reason, privacy: .public)")
             skipped.append(SkippedFile(url: url, reason: reason))
         }
+        func exhaustEntries(_ playlist: URL) {
+            entriesExhausted = true
+            logger.warning("Playlist entry limit of \(maxEntries) reached")
+            skip(playlist, "too many playlist entries")
+        }
         func expand(_ playlist: URL, depth: Int, ancestors: Set<String>) {
+            if entriesExhausted { return }
             let key = playlist.standardizedFileURL.resolvingSymlinksInPath().path
             if ancestors.contains(key) {
                 skip(playlist, "playlist cycle")
@@ -223,14 +242,29 @@ public enum LocalTrackLoader {
                 skip(playlist, "playlists nested too deeply")
                 return
             }
+            if reads >= maxReads {
+                if !readsWarned {
+                    readsWarned = true
+                    logger.warning("Playlist read limit of \(maxReads) reached")
+                }
+                skip(playlist, "too many nested playlists")
+                return
+            }
+            reads += 1
             guard let data = try? Data(contentsOf: playlist) else {
                 skip(playlist, "could not read playlist")
                 return
             }
             let format = PlaylistFile.format(for: playlist, data: data)
-            let entries = PlaylistFile.parse(data, format: format, pathExtension: playlist.pathExtension)
-            logger.info("Playlist \(playlist.lastPathComponent, privacy: .public): \(entries.count) entries")
-            for entry in entries {
+            let parsed = PlaylistFile.parse(data, format: format, pathExtension: playlist.pathExtension)
+            logger.info("Playlist \(playlist.lastPathComponent, privacy: .public): \(parsed.count) entries")
+            for entry in parsed {
+                if entriesExhausted { return }
+                if entries >= maxEntries {
+                    exhaustEntries(playlist)
+                    return
+                }
+                entries += 1
                 switch PlaylistFile.resolve(entry, relativeTo: playlist) {
                 case .file(let file) where PlaylistFile.isPlaylist(file) && !isDirectory(file):
                     expand(file, depth: depth + 1, ancestors: ancestors.union([key]))
@@ -244,6 +278,10 @@ public enum LocalTrackLoader {
         for url in urls {
             guard PlaylistFile.isPlaylist(url), !isDirectory(url) else {
                 result.append((url, nil))
+                continue
+            }
+            if entriesExhausted {
+                skip(url, "too many playlist entries")
                 continue
             }
             expand(url, depth: 1, ancestors: [])

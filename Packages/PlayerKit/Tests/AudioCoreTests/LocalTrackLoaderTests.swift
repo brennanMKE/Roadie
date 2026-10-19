@@ -99,6 +99,66 @@ private func writeWAV(to url: URL, seconds: Double, sampleRate: Double = 44_100,
         #expect(result.skipped.map(\.reason) == ["playlist cycle"])
     }
 
+    @Test func fanOutPlaylistTreeStopsAtReadCap() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for n in 1...7 {
+            let line = "p\(n + 1).m3u\n"
+            try Data(String(repeating: line, count: 10).utf8).write(to: dir.appending(path: "p\(n).m3u"))
+        }
+        try Data("t.wav\n".utf8).write(to: dir.appending(path: "p8.m3u"))
+
+        let clock = ContinuousClock()
+        let start = clock.now
+        let result = LocalTrackLoader.expandPlaylists([dir.appending(path: "p1.m3u")])
+        let elapsed = clock.now - start
+        #expect(result.items.count == 225)
+        #expect(result.skipped.count == 55)
+        #expect(result.skipped.allSatisfy { $0.reason == "too many nested playlists" })
+        #expect(elapsed < .seconds(10))
+    }
+
+    @Test func playlistReadCapSkipsFurtherPlaylists() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data(String(repeating: "a.m3u\n", count: 4).utf8).write(to: dir.appending(path: "top.m3u"))
+        try Data("t.wav\n".utf8).write(to: dir.appending(path: "a.m3u"))
+
+        let result = LocalTrackLoader.expandPlaylists([dir.appending(path: "top.m3u")], maxReads: 3)
+        #expect(result.items.map(\.url.lastPathComponent) == ["t.wav", "t.wav"])
+        #expect(result.skipped.map(\.reason) == ["too many nested playlists", "too many nested playlists"])
+        #expect(result.skipped.map(\.url.lastPathComponent) == ["a.m3u", "a.m3u"])
+    }
+
+    @Test func playlistEntryCapStopsExpansion() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data("inner.m3u\nx1.wav\nx2.wav\n".utf8).write(to: dir.appending(path: "top.m3u"))
+        try Data((1...5).map { "i\($0).wav\n" }.joined().utf8).write(to: dir.appending(path: "inner.m3u"))
+        try Data("o.wav\n".utf8).write(to: dir.appending(path: "other.m3u"))
+
+        let result = LocalTrackLoader.expandPlaylists(
+            [dir.appending(path: "top.m3u"), dir.appending(path: "other.m3u"), dir.appending(path: "z.wav")],
+            maxEntries: 5
+        )
+        #expect(result.items.map(\.url.lastPathComponent) == ["i1.wav", "i2.wav", "i3.wav", "i4.wav", "z.wav"])
+        #expect(result.skipped.map(\.url.lastPathComponent) == ["inner.m3u", "other.m3u"])
+        #expect(result.skipped.map(\.reason) == ["too many playlist entries", "too many playlist entries"])
+    }
+
+    @Test func diamondPlaylistExpandsEachTime() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeWAV(to: dir.appending(path: "s.wav"), seconds: 0.2)
+        try Data("a.m3u\nb.m3u\n".utf8).write(to: dir.appending(path: "top.m3u"))
+        for name in ["a", "b"] { try Data("shared.m3u\n".utf8).write(to: dir.appending(path: "\(name).m3u")) }
+        try Data("s.wav\n".utf8).write(to: dir.appending(path: "shared.m3u"))
+
+        let result = await LocalTrackLoader.load([dir.appending(path: "top.m3u")])
+        #expect(result.tracks.map(\.title) == ["s", "s"])
+        #expect(result.skipped.isEmpty)
+    }
+
     @Test func selfReferencingPlaylistIsSkipped() async throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
