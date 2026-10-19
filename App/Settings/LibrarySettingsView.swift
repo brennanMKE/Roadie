@@ -23,9 +23,9 @@ struct LibrarySettingsView: View {
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
                 .accessibilityIdentifier("library.source")
-                if sources.preferredID == "musicAssistant" {
-                    // Which Music Assistant server is in use and why (#0075).
-                    Text(selection.reasonText)
+                if sources.preferredID == "musicAssistant", let status = selection.statusText {
+                    // Which Music Assistant server is in use and why (#0075); nothing before the first check (#0092).
+                    Text(status)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("library.maReason")

@@ -54,6 +54,7 @@ struct SelectionControllerTests {
         #expect(rig.wifi.authorizationRequests == 0)
         #expect(rig.controller.resolutionCount == 0)
         #expect(rig.controller.reasonText == MusicAssistantServerRanking.notCheckedText)
+        #expect(rig.controller.statusText == nil)
     }
 
     @Test func networkChangeBeforeFirstUseDoesNothing() async throws {
@@ -219,5 +220,108 @@ struct SelectionControllerTests {
         await rig.controller.resolveNow()
         #expect(rig.active.current == a)
         #expect(rig.controller.reasonText == "A \u{2014} first reachable")
+    }
+
+    // MARK: Renames (#0092)
+
+    private func renamed(_ server: MusicAssistantServerConfiguration, _ name: String) -> MusicAssistantServerConfiguration {
+        var copy = server
+        copy.name = name
+        return copy
+    }
+
+    @Test func renameAfterFirstUseRelabelsWithoutProbing() async {
+        let rig = SelectionRig([a])
+        defer { rig.cleanUp() }
+        rig.fake.set("http://a.local:8095", .answer("id-a"))
+        await rig.controller.resolveNow()
+        rig.changes.removeAll()
+        for name in ["At", "Att", "Attic"] {
+            rig.store.save([renamed(a, name)])
+            rig.controller.serversEdited()
+        }
+        await rig.controller.waitForPending()
+        #expect(rig.fake.calls.count == 1)
+        #expect(rig.controller.resolutionCount == 1)
+        #expect(rig.controller.current?.server.name == "Attic")
+        #expect(rig.controller.reasonText == "Attic \u{2014} first reachable")
+        #expect(rig.active.current?.name == "Attic")
+        #expect(rig.changes.isEmpty)
+        #expect(await rig.controller.currentOrResolve()?.name == "Attic")
+        #expect(rig.fake.calls.count == 1)
+    }
+
+    @Test func renameBeforeFirstUseDoesNothing() async {
+        let rig = SelectionRig([a])
+        defer { rig.cleanUp() }
+        rig.store.save([renamed(a, "Attic")])
+        rig.controller.serversEdited()
+        await rig.controller.waitForPending()
+        #expect(rig.fake.calls.isEmpty)
+        #expect(rig.controller.resolutionCount == 0)
+        #expect(rig.controller.statusText == nil)
+    }
+
+    @Test func nonNameEditStillReResolves() async {
+        let rig = SelectionRig([a, b])
+        defer { rig.cleanUp() }
+        rig.fake.set("http://a.local:8095", .answer("id-a"))
+        rig.fake.set("http://b.local:8095", .answer("id-b"))
+        await rig.controller.resolveNow()
+        var tied = a
+        tied.networks = ["X"]
+        rig.store.save([tied, b])
+        rig.controller.serversEdited()
+        await rig.controller.waitForPending()
+        #expect(rig.controller.resolutionCount == 2)
+        rig.store.save([b, tied])
+        rig.controller.serversEdited()
+        await rig.controller.waitForPending()
+        #expect(rig.controller.resolutionCount == 3)
+    }
+
+    @Test func renameDuringAProbeEndsWithTheNewName() async {
+        let rig = SelectionRig([a])
+        defer { rig.cleanUp() }
+        rig.fake.set("http://a.local:8095", .answer("id-a"))
+        await rig.controller.resolveNow()
+        rig.fake.set("http://a.local:8095", .gated("id-a"))
+        rig.controller.activeServerDropped()
+        #expect(await pollUntil { rig.controller.isResolving })
+        rig.store.save([renamed(a, "Attic")])
+        rig.controller.serversEdited()
+        rig.fake.release()
+        await rig.controller.waitForPending()
+        #expect(rig.controller.reasonText == "Attic \u{2014} first reachable")
+        #expect(rig.controller.current?.server.name == "Attic")
+    }
+
+    @Test func renameKeepsAPendingNetworkRecheck() async {
+        let rig = SelectionRig([a])
+        defer { rig.cleanUp() }
+        rig.fake.set("http://a.local:8095", .answer("id-a"))
+        rig.controller.start()
+        await rig.controller.resolveNow()
+        #expect(await rig.networkChanges())
+        #expect(await pollUntil { rig.clock.sleeperCount == 1 })
+        rig.store.save([renamed(a, "Attic")])
+        rig.controller.serversEdited()
+        rig.clock.advance(by: .seconds(2))
+        await rig.controller.waitForPending()
+        #expect(rig.controller.resolutionCount == 2)
+    }
+
+    @Test func statusTextIsNilUntilTheFirstDecision() async {
+        let rig = SelectionRig([a])
+        defer { rig.cleanUp() }
+        #expect(rig.controller.statusText == nil)
+        rig.fake.set("http://a.local:8095", .gated("id-a"))
+        let task = Task { await rig.controller.resolveNow() }
+        #expect(await pollUntil { rig.controller.isResolving })
+        #expect(rig.controller.statusText == MusicAssistantServerRanking.checkingText)
+        rig.fake.release()
+        _ = await task.value
+        #expect(rig.controller.statusText == rig.controller.reasonText)
+        #expect(rig.controller.statusText == "A \u{2014} first reachable")
     }
 }

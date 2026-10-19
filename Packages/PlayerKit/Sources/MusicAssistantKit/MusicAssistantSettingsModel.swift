@@ -39,7 +39,7 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
     /// From `exists()`; an absent key means unknown.
     public private(set) var hasStoredToken: [UUID: Bool] = [:]
     public private(set) var tokenStoreError: String?
-    /// Called (on the main actor) after every change to the stored list (#0075: the selection re-resolves).
+    /// Called (on the main actor) after every change to the stored list (#0075: the selection re-checks unless only names changed, #0092).
     @ObservationIgnored public var onServersChanged: (@MainActor () -> Void)?
     @ObservationIgnored private let wifi: (any WiFiNetworkProvider)?
     /// Why "Use Current Network" added nothing (no Location access, no Wi-Fi). Cleared by the next success or edit.

@@ -33,6 +33,14 @@ public final class MusicAssistantSelectionController {
     /// The last probe round's outcomes, for the Settings status dots.
     public private(set) var lastOutcomes: [UUID: MusicAssistantServerRanking.Outcome] = [:]
     public var isResolving: Bool { resolving > 0 }
+    /// A resolution has decided at least once (a winner or none).
+    public private(set) var hasDecision = false
+    /// For the Library subtitle and Settings › Library: nil before the first decision when nothing is resolving,
+    /// "Finding a server…" while the first one runs, then `reasonText`.
+    public var statusText: String? {
+        if hasDecision { return reasonText }
+        return isResolving ? MusicAssistantServerRanking.checkingText : nil
+    }
     /// Called once per change of the winner's identity (id, address, server id).
     @ObservationIgnored public var onChange:
         (@MainActor (_ old: MusicAssistantServerConfiguration?, _ new: MusicAssistantServerConfiguration?) -> Void)?
@@ -46,6 +54,8 @@ public final class MusicAssistantSelectionController {
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
     @ObservationIgnored private let debounce: Duration
     @ObservationIgnored private var hasResolvedOnce = false
+    /// The stored list the last resolution ranked; a later list differing only in names needs no re-check.
+    @ObservationIgnored private var resolvedServers: [MusicAssistantServerConfiguration]?
     /// For tests: resolutions started and network changes received.
     @ObservationIgnored private(set) var resolutionCount = 0
     @ObservationIgnored private(set) var networkChangesSeen = 0
@@ -102,6 +112,7 @@ public final class MusicAssistantSelectionController {
         hasResolvedOnce = true
         resolutionCount += 1
         let servers = store.load()
+        resolvedServers = servers
         let ssid = wifi.authorization == .authorized ? wifi.currentSSID() : nil
         let candidates = MusicAssistantServerRanking.candidates(servers, ssid: ssid)
         resolving += 1
@@ -113,7 +124,19 @@ public final class MusicAssistantSelectionController {
         return current?.server
     }
 
-    /// Settings changed the list (or the Mac woke): invalidate, and re-resolve only if the choice was ever made.
+    /// The settings hook: a list that differs from the last resolution's only in names relabels `current` and the
+    /// reason without a probe (a rename never changes which server it is); any other edit goes to `serversChanged()`.
+    public func serversEdited() {
+        let servers = store.load()
+        if hasResolvedOnce, let resolvedServers, Self.ignoringNames(servers) == Self.ignoringNames(resolvedServers) {
+            self.resolvedServers = servers
+            relabel(from: servers)
+            return
+        }
+        serversChanged()
+    }
+
+    /// The Mac woke or a list change that matters: invalidate, and re-resolve only if the choice was ever made.
     public func serversChanged() {
         isValid = false
         guard hasResolvedOnce else { return }
@@ -140,6 +163,22 @@ public final class MusicAssistantSelectionController {
         schedule(after: debounce)
     }
 
+    private static func ignoringNames(
+        _ servers: [MusicAssistantServerConfiguration]
+    ) -> [MusicAssistantServerConfiguration] {
+        servers.map { var server = $0; server.name = ""; return server }
+    }
+
+    /// Picks up a renamed `current` from `servers`. No probe, no `onChange`, no log (the name is user data).
+    private func relabel(from servers: [MusicAssistantServerConfiguration]) {
+        guard let current, let updated = servers.first(where: { $0.id == current.server.id }),
+              updated.sameIdentity(as: current.server), updated != current.server else { return }
+        let candidate = MusicAssistantServerRanking.Candidate(server: updated, basis: current.basis)
+        self.current = candidate
+        reasonText = MusicAssistantServerRanking.reason(for: candidate)
+        active.set(updated)
+    }
+
     private func schedule(after delay: Duration?) {
         pendingTask?.cancel()
         let sleep = sleep
@@ -157,10 +196,13 @@ public final class MusicAssistantSelectionController {
         let winner: MusicAssistantServerRanking.Candidate?
         if case .chosen(let candidate) = result.decision { winner = candidate } else { winner = nil }
         current = winner
+        hasDecision = true
         lastOutcomes = result.outcomes
         reasonText = MusicAssistantServerRanking.reason(for: result.decision, hasCandidates: hasCandidates) ?? reasonText
         isValid = true
         active.set(winner?.server)
+        // A rename typed while the probe ran.
+        relabel(from: store.load())
         let changed: Bool
         switch (old, winner?.server) {
         case (nil, nil): changed = false

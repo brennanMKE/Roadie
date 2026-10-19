@@ -35,6 +35,7 @@ public struct MusicAssistantServerRanking: Hashable, Sendable {
     public static let noneReachableText = "No Music Assistant server reachable"
     public static let noVerifiedServerText = "No Music Assistant server tested yet"
     public static let notCheckedText = "Not checked yet"
+    public static let checkingText = "Finding a server\u{2026}"
 
     /// Verified servers only. Those whose `networks` contain `ssid` (exact match after trimming; SSIDs are
     /// case-sensitive) first, in list order, then every other one in list order.

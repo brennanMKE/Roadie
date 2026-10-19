@@ -361,7 +361,7 @@ final class PlayerModel {
             loadSkin(from: URL(filePath: path))
         }
         skinLibrary.passFinished = { [weak self] in self?.skinBrowser.indexDidChange() }
-        musicAssistantSettings.onServersChanged = { [weak selection] in selection?.serversChanged() }
+        musicAssistantSettings.onServersChanged = { [weak selection] in selection?.serversEdited() }
         selection.onChange = { [weak self] old, new in self?.musicAssistantServerChanged(from: old, to: new) }
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()
