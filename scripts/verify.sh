@@ -18,6 +18,9 @@
 #         step's log the failing tests (✘ lines with their ↳ details), crashes and XCTest failures; at most
 #         MAX_LINES (60) lines. Also written to build/vm-tests/<run-id>/failure.txt.
 #   The last line names the results directory, for a human; agents should not read the logs.
+#
+#   scripts/verify.sh --report build/vm-tests/<run-id> [--expect …] [--exit N]
+#     rebuilds the report from a finished run without running anything (exit N defaults to the one in summary.txt).
 
 set -uo pipefail
 
@@ -26,11 +29,15 @@ RUNNER=${VERIFY_RUNNER:-$REPO/scripts/run-tests-vm.sh}  # override only to test 
 MAX_LINES=${VERIFY_MAX_LINES:-60}
 expect=()
 args=()
+REPORT_DIR=""
+REPORT_RC=""
 while (( $# )); do
   case $1 in
     --expect) (( $# >= 2 )) || { print -u2 "verify.sh: --expect needs NAMES"; exit 2; }
               expect+=(${(s:,:)2}); shift 2 ;;
     --expect=*) expect+=(${(s:,:)${1#--expect=}}); shift ;;
+    --report) REPORT_DIR=${2:A}; shift 2 ;;
+    --exit) REPORT_RC=$2; shift 2 ;;
     *) args+=("$1"); shift ;;
   esac
 done
@@ -45,11 +52,18 @@ run_once() {
   if [[ -n "$RESULTS" && -d "$RESULTS" ]]; then mv "$OUT" "$RESULTS/run.out"; OUT="$RESULTS/run.out"; fi
 }
 
-mkdir -p "$REPO/build"
-run_once
-if (( RC == 3 )); then
-  print "==> VERIFY  INFRA (exit 3) in ${RESULTS:t}; retrying once"
+if [[ -n "$REPORT_DIR" ]]; then
+  RESULTS=$REPORT_DIR
+  OUT="$RESULTS/run.out"
+  RC=${REPORT_RC:-$(sed -n 's/^==> Cleaning up (exit \([0-9]*\)).*/\1/p' "$RESULTS/summary.txt" 2>/dev/null | tail -1)}
+  RC=${RC:-1}
+else
+  mkdir -p "$REPO/build"
   run_once
+  if (( RC == 3 )); then
+    print "==> VERIFY  INFRA (exit 3) in ${RESULTS:t}; retrying once"
+    run_once
+  fi
 fi
 
 SUMMARY="$RESULTS/summary.txt"
@@ -89,6 +103,7 @@ report=$(
   if [[ -f "$SUMMARY" ]]; then
     # The summary's own failure lines, with the indented compiler-error block that follows ERRORS.
     awk '/^==> (FAIL|BUILD|INFRA|AUDIO)/ {print; next}
+         /^==> ERRORS  no file:line:col/ {e=0; next}
          /^==> ERRORS/ {print; e=1; next}
          /^==> / {e=0}
          e && /^    / && !/Build complete!|BUILD SUCCEEDED/ {print}' "$SUMMARY"
@@ -100,7 +115,23 @@ report=$(
   for f in "${step_logs[@]}"; do
     step=${f:t:r}
     grep -q "^==> FAIL  $step " "$SUMMARY" 2>/dev/null || continue
-    [[ $step == *-build ]] && continue  # compiler errors are already in the ERRORS block
+    if [[ $step == *-build ]]; then
+      # file:line:col errors are already in the ERRORS block; anything else (macro expansions, linker, SwiftPM
+      # errors) is extracted here: each diagnostic with up to 10 lines of its context.
+      grep -q '^==> ERRORS  no file:line:col' "$SUMMARY" 2>/dev/null || continue
+      lines=$(strip <"$f" | awk '
+        /Failed frontend command|^[[:space:]]*$/ {n=0; next}
+        /error: / && !/SwiftCompile .* failed with a nonzero exit code|^error: Build failed|^error: fatalError/ {print; n=10; next}
+        n > 0 {print; n--}' | awk '!seen[$0]++')
+      if [[ -n "$lines" ]]; then
+        print "==> $step errors:"
+        print -r -- "$lines" | sed 's/^/    /'
+      else
+        print "==> $step: no error lines found; last lines of its log:"
+        strip <"$f" | grep -vE '^[[:space:]]*$|Failed frontend command' | tail -10 | sed 's/^/    /'
+      fi
+      continue
+    fi
     lines=$(strip <"$f" | grep -E '^✘ Test .*(recorded an issue|failed)|^↳ |Fatal error|unexpected signal|error: -\[|Test Case .* failed|: error: |Assertion failed|Precondition failed' \
       | grep -vE '^↳ (Testing Library Version|Target Platform)' | awk '!seen[$0]++')
     if [[ -n "$lines" ]]; then
@@ -112,6 +143,7 @@ report=$(
     fi
   done
 )
+report=$(print -r -- "$report" | cut -c1-300)
 total_lines=$(print -r -- "$report" | wc -l | tr -d ' ')
 print -r -- "$report" | head -$MAX_LINES
 (( total_lines > MAX_LINES )) && print "==> (report cut at $MAX_LINES of $total_lines lines; full report in failure.txt)"
