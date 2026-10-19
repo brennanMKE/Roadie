@@ -155,7 +155,13 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
             }
         }
         applyLayout()
+        applyLevel()
         observe()
+    }
+
+    /// Always on top floats all three skinned windows together; `raiseGroup` orders within the one level.
+    private func applyLevel() {
+        window.level = model.isAlwaysOnTop ? .floating : .normal
     }
 
     private func mainMenu() -> NSMenu {
@@ -164,8 +170,13 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     /// Opens the options menu with its top-left at `p` in skin pixels (the hosting view is flipped).
     func popUpMainMenu(atSkinPoint p: CGPoint) {
+        popUp(mainMenu(), atSkinPoint: p)
+    }
+
+    /// Opens `menu` with its top-left at `p` in skin pixels (the hosting view is flipped).
+    func popUp(_ menu: NSMenu, atSkinPoint p: CGPoint) {
         let scale = model.scale
-        mainMenu().popUp(positioning: nil, at: NSPoint(x: p.x * scale, y: p.y * scale), in: hosting)
+        menu.popUp(positioning: nil, at: NSPoint(x: p.x * scale, y: p.y * scale), in: hosting)
     }
 
     /// Opens the options menu at the pointer, for a right-click or Control-click.
@@ -204,11 +215,13 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         withObservationTracking {
             _ = model.skin
             _ = model.scale
+            _ = model.isAlwaysOnTop
             _ = shadeWanted
             if case .playlist = kind { _ = model.playlist.steps }
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.applyLayout()
+                self?.applyLevel()
                 self?.observe()
             }
         }

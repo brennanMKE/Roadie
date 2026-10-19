@@ -3,7 +3,7 @@
 public enum MainMenuCommand: Hashable, Sendable {
     case about, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow
     case openSkin, nextSkin, previousSkin, randomSkin
-    case timeElapsed, timeRemaining, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle
+    case timeElapsed, timeRemaining, toggleAlwaysOnTop, toggleDoubleSize, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle
     case previous, play, pause, stop, next
     case quit
 }
@@ -19,11 +19,14 @@ public struct MainMenuState: Equatable, Sendable {
     public var isRepeating: Bool
     public var isShuffled: Bool
     public var canNavigateSkins: Bool
+    public var isAlwaysOnTop: Bool
+    public var isDoubleSize: Bool
 
     public init(
         timeMode: TimeMode = .elapsed, isEQWindowOpen: Bool = false, isPlaylistWindowOpen: Bool = false,
         isMainShaded: Bool = false, isEQShaded: Bool = false, isPlaylistShaded: Bool = false,
-        isRepeating: Bool = false, isShuffled: Bool = false, canNavigateSkins: Bool = false
+        isRepeating: Bool = false, isShuffled: Bool = false, canNavigateSkins: Bool = false,
+        isAlwaysOnTop: Bool = false, isDoubleSize: Bool = false
     ) {
         self.timeMode = timeMode
         self.isEQWindowOpen = isEQWindowOpen
@@ -34,6 +37,8 @@ public struct MainMenuState: Equatable, Sendable {
         self.isRepeating = isRepeating
         self.isShuffled = isShuffled
         self.canNavigateSkins = canNavigateSkins
+        self.isAlwaysOnTop = isAlwaysOnTop
+        self.isDoubleSize = isDoubleSize
     }
 }
 
@@ -121,6 +126,8 @@ public enum MainMenu {
         [
             .item(MainMenuItem(.timeElapsed, "Time Elapsed", checked: state.timeMode == .elapsed)),
             .item(MainMenuItem(.timeRemaining, "Time Remaining", checked: state.timeMode == .remaining)),
+            .item(MainMenuItem(.toggleAlwaysOnTop, "Always On Top", checked: state.isAlwaysOnTop)),
+            .item(MainMenuItem(.toggleDoubleSize, "Double Size", checked: state.isDoubleSize)),
             .separator,
             .item(
                 MainMenuItem(

@@ -21,6 +21,7 @@ struct MainWindowView: View {
         ZStack(alignment: .topLeading) {
             baseLayer
             TitleBarView(skin: skin)
+            ClutterBarView(skin: skin)
 
             MainWindowStatusLayer(skin: skin, status: model.mainWindowStatus, toggleTimeMode: model.toggleTimeMode)
 

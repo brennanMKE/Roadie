@@ -74,9 +74,14 @@ final class PlayerModel {
     private var nowPlayingTask: Task<Void, Never>?
     var playbackState: NowPlaying.State { nowPlaying.state }
     var isLoading: Bool { nowPlaying.state == .loading }
-    var scale: CGFloat = 2 {
+    /// Skin points per skin pixel: `baseScale`, or twice that in double size.
+    var scale: CGFloat = PlayerModel.baseScale * (UserDefaults.standard.bool(forKey: PlayerModel.doubleSizeKey) ? 2 : 1) {
         didSet { visualizer.setScale(scale) }
     }
+    /// Whether the skinned windows float above other apps' windows (the clutter bar's A). Persisted.
+    private(set) var isAlwaysOnTop = UserDefaults.standard.bool(forKey: PlayerModel.alwaysOnTopKey)
+    /// Whether the skinned windows are drawn at twice the normal size (the clutter bar's D). Persisted.
+    private(set) var isDoubleSize = UserDefaults.standard.bool(forKey: PlayerModel.doubleSizeKey)
     /// Whether the main window is collapsed to its 14 px shade strip. Persisted, so the window comes back as it was left.
     private(set) var isMainWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.mainWindowShadeKey)
     /// Whether the equalizer and playlist windows are collapsed to their shade strips; persisted like the main window's.
@@ -149,6 +154,39 @@ final class PlayerModel {
     static let equalizerKey = "equalizer"
     private static let lastSkinKey = "lastSkinPath"
     private static let timeModeKey = "timeMode"
+    static let alwaysOnTopKey = "alwaysOnTop"
+    static let doubleSizeKey = "doubleSize"
+    /// The normal size: one skin pixel is two points.
+    static let baseScale: CGFloat = 2
+
+    func toggleAlwaysOnTop() {
+        isAlwaysOnTop.toggle()
+        UserDefaults.standard.set(isAlwaysOnTop, forKey: Self.alwaysOnTopKey)
+    }
+
+    func toggleDoubleSize() {
+        isDoubleSize.toggle()
+        UserDefaults.standard.set(isDoubleSize, forKey: Self.doubleSizeKey)
+        scale = Self.baseScale * (isDoubleSize ? 2 : 1)
+    }
+
+    /// The current track for the File Info panel. Other outputs only report the `NowPlaying` snapshot.
+    var currentTrackInfo: TrackInfo? {
+        if selectedOutput == OutputDevice.thisMacID {
+            return player.queue.current.map { TrackInfo(track: $0, format: player.currentFormat) }
+        }
+        guard let title = nowPlaying.title else { return nil }
+        return TrackInfo(
+            title: title, artist: nowPlaying.artist ?? "", album: nowPlaying.album, duration: nowPlaying.duration)
+    }
+
+    func showFileInfo() {
+        guard let info = currentTrackInfo else {
+            NSSound.beep()
+            return
+        }
+        FileInfoPanel.shared.show(info)
+    }
 
     /// Elapsed or remaining time in the main window; Winamp keeps it in winamp.ini.
     var timeMode: TimeMode = UserDefaults.standard.string(forKey: PlayerModel.timeModeKey)

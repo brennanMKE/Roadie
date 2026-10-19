@@ -23,6 +23,33 @@ public enum MainWindowLayout {
     }
 
     public static let clutterBar = CGRect(x: 10, y: 22, width: 8, height: 43)
+
+    /// The clutter bar's five buttons, top to bottom: O, A, I, D, V.
+    public enum ClutterButton: CaseIterable, Sendable { case mainMenu, alwaysOnTop, fileInfo, doubleSize, visualizer }
+
+    /// From Webamp css `#clutter-bar #button-*` (bar at 10,22): 8 wide; O and D are 8 high, the rest 7.
+    public static func rect(_ button: ClutterButton) -> CGRect {
+        let (y, height): (CGFloat, CGFloat) = switch button {
+        case .mainMenu: (25, 8)
+        case .alwaysOnTop: (33, 7)
+        case .fileInfo: (40, 7)
+        case .doubleSize: (47, 8)
+        case .visualizer: (55, 7)
+        }
+        return CGRect(x: 10, y: y, width: 8, height: height)
+    }
+
+    /// The pressed / selected sprite; the unpressed buttons are part of `MAIN_CLUTTER_BAR_BACKGROUND`.
+    public static func spriteName(_ button: ClutterButton) -> String {
+        let letter = switch button {
+        case .mainMenu: "O"
+        case .alwaysOnTop: "A"
+        case .fileInfo: "I"
+        case .doubleSize: "D"
+        case .visualizer: "V"
+        }
+        return "MAIN_CLUTTER_BAR_BUTTON_\(letter)_SELECTED"
+    }
     /// The sprite is listed 9 wide; Webamp shows 3 px.
     public static let workIndicator = CGRect(x: 24, y: 28, width: 3, height: 9)
     public static let playIndicator = CGPoint(x: 26, y: 28)

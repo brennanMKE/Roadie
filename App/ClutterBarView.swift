@@ -1,0 +1,84 @@
+import AppKit
+import SkinKit
+import SwiftUI
+
+/// The clutter bar's five buttons (Webamp `ClutterBar.tsx`, acting as Winamp's): O options menu, A always on top,
+/// I file info, D double size, V visualizer menu. The unpressed buttons are in the base image; each draws its
+/// `_SELECTED` sprite while pressed, and A and D also while on. Rects are absolute, so this view is not offset.
+struct ClutterBarView: View {
+    let skin: Skin
+    @Environment(PlayerModel.self) private var model
+    @Environment(\.skinWindow) private var window
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            button(.mainMenu) { window?.popUpMainMenu(atSkinPoint: Self.below(.mainMenu)) }
+            button(.alwaysOnTop, selected: model.isAlwaysOnTop, action: model.toggleAlwaysOnTop)
+            button(.fileInfo, action: model.showFileInfo)
+            button(.doubleSize, selected: model.isDoubleSize, action: model.toggleDoubleSize)
+            button(.visualizer) { window?.popUp(visualizerMenu(), atSkinPoint: Self.below(.visualizer)) }
+        }
+    }
+
+    /// The bottom-left of a button: where its menu drops from (Webamp `ContextMenuTarget bottom`).
+    private static func below(_ button: MainWindowLayout.ClutterButton) -> CGPoint {
+        let rect = MainWindowLayout.rect(button)
+        return CGPoint(x: rect.minX, y: rect.maxY)
+    }
+
+    private func visualizerMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let visualizer = model.visualizer
+        for mode in VisualizerModel.Mode.allCases {
+            let item = ActionMenuItem(title: mode.title) { visualizer.setMode(mode) }
+            item.state = visualizer.mode == mode ? .on : .off
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    private func button(
+        _ button: MainWindowLayout.ClutterButton, selected: Bool = false, action: @escaping () -> Void
+    ) -> some View {
+        let origin = MainWindowLayout.rect(button).origin
+        return Button(action: action) { EmptyView() }
+            .buttonStyle(ClutterButtonStyle(skin: skin, button: button, selected: selected))
+            .offset(x: origin.x, y: origin.y)
+    }
+}
+
+struct ClutterButtonStyle: ButtonStyle {
+    let skin: Skin
+    let button: MainWindowLayout.ClutterButton
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        let size = MainWindowLayout.rect(button).size
+        ZStack(alignment: .topLeading) {
+            if configuration.isPressed || selected {
+                SpriteImage(skin: skin, name: MainWindowLayout.spriteName(button))
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .contentShape(Rectangle())
+    }
+}
+
+/// A menu item that is its own target and runs a closure.
+private final class ActionMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    init(title: String, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(fire), keyEquivalent: "")
+        target = self
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    @objc private func fire() { handler() }
+}

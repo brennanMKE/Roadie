@@ -7,7 +7,8 @@ extension PlayerModel {
         MainMenuState(
             timeMode: timeMode, isEQWindowOpen: isEQWindowOpen, isPlaylistWindowOpen: isPlaylistWindowOpen,
             isMainShaded: isMainWindowShaded, isEQShaded: isEQWindowShaded, isPlaylistShaded: isPlaylistWindowShaded,
-            isRepeating: isRepeating, isShuffled: isShuffled, canNavigateSkins: skinBrowser.canNavigate)
+            isRepeating: isRepeating, isShuffled: isShuffled, canNavigateSkins: skinBrowser.canNavigate,
+            isAlwaysOnTop: isAlwaysOnTop, isDoubleSize: isDoubleSize)
     }
 
     func perform(_ command: MainMenuCommand) {
@@ -23,6 +24,8 @@ extension PlayerModel {
         case .randomSkin: skinBrowser.random()
         case .timeElapsed: setTimeMode(.elapsed)
         case .timeRemaining: setTimeMode(.remaining)
+        case .toggleAlwaysOnTop: toggleAlwaysOnTop()
+        case .toggleDoubleSize: toggleDoubleSize()
         case .toggleMainShade: toggleMainWindowShade()
         case .toggleEQShade: toggleEQWindowShade()
         case .togglePlaylistShade: togglePlaylistWindowShade()

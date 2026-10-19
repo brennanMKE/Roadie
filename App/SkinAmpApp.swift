@@ -61,6 +61,14 @@ struct SkinAmpApp: App {
                     .keyboardShortcut("p", modifiers: [.command, .control])
                 Button("Playlist Editor") { appDelegate.model.togglePlaylistWindow() }
                     .keyboardShortcut("3")
+                Toggle(
+                    "Always on Top",
+                    isOn: Binding(
+                        get: { appDelegate.model.isAlwaysOnTop }, set: { _ in appDelegate.model.toggleAlwaysOnTop() }))
+                Toggle(
+                    "Double Size",
+                    isOn: Binding(
+                        get: { appDelegate.model.isDoubleSize }, set: { _ in appDelegate.model.toggleDoubleSize() }))
             }
         }
     }

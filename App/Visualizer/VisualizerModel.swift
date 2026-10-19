@@ -13,7 +13,18 @@ import os
 @Observable
 final class VisualizerModel {
     /// Webamp's VISUALIZER_ORDER: bars, oscilloscope, none.
-    enum Mode: Int, CaseIterable { case spectrum, oscilloscope, off }
+    enum Mode: Int, CaseIterable {
+        case spectrum, oscilloscope, off
+
+        /// The clutter bar's V menu labels.
+        var title: String {
+            switch self {
+            case .spectrum: "Spectrum Analyzer"
+            case .oscilloscope: "Oscilloscope"
+            case .off: "Off"
+            }
+        }
+    }
 
     private static let modeKey = "visualizerMode"
     private static let signposter = OSSignposter(subsystem: "com.brennanmke.SkinAmp", category: "Visualizer")
@@ -53,7 +64,11 @@ final class VisualizerModel {
 
     /// Spectrum, then oscilloscope, then off, then spectrum again.
     func cycleMode() {
-        mode = Mode(rawValue: (mode.rawValue + 1) % Mode.allCases.count) ?? .spectrum
+        setMode(Mode(rawValue: (mode.rawValue + 1) % Mode.allCases.count) ?? .spectrum)
+    }
+
+    func setMode(_ mode: Mode) {
+        self.mode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
         // Off skips the analysis, so the cursor stood still; re-lag it rather than replay old audio.
         if mode == .spectrum { player.analyzer.resetCursor() }

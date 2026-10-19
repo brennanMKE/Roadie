@@ -50,8 +50,10 @@ struct MainMenuTests {
 
     @Test func shadeRepeatShuffleChecksReflectState() {
         let off = MainMenuState()
-        let on = MainMenuState(isMainShaded: true, isEQShaded: true, isPlaylistShaded: true, isRepeating: true, isShuffled: true)
-        for command in [MainMenuCommand.toggleMainShade, .toggleEQShade, .togglePlaylistShade, .toggleRepeat, .toggleShuffle] {
+        let on = MainMenuState(
+            isMainShaded: true, isEQShaded: true, isPlaylistShaded: true, isRepeating: true, isShuffled: true,
+            isAlwaysOnTop: true, isDoubleSize: true)
+        for command in [MainMenuCommand.toggleAlwaysOnTop, .toggleDoubleSize, .toggleMainShade, .toggleEQShade, .togglePlaylistShade, .toggleRepeat, .toggleShuffle] {
             #expect(item(command, off)?.state == .off)
             #expect(item(command, on)?.state == .on)
         }
@@ -69,12 +71,12 @@ struct MainMenuTests {
     @Test func everyCommandAppearsOnce() {
         let commands = items(MainMenu.entries(MainMenuState())).map(\.command)
         #expect(Set(commands).count == commands.count)
-        #expect(commands.count == 22)
+        #expect(commands.count == 24)
     }
 
     @Test func unsupportedEntriesAreAbsent() {
         let titles = items(MainMenu.entries(MainMenuState())).map(\.title)
-        for missing in ["Double Size", "Always On Top", "Play Location"] {
+        for missing in ["Play Location"] {
             #expect(!titles.contains(missing))
         }
     }
