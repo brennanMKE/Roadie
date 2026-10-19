@@ -9,7 +9,14 @@ the golden image itself.
 
 ## Quick start
 
+Agents call `scripts/verify.sh` with the same options instead. It keeps the run's full output out of
+their context: it goes to `build/vm-tests/<run-id>/run.out`, and the agent sees a five-line pass report or
+the filtered failure lines (failing steps, compiler errors, failing tests with their `↳` values, crashes).
+`--expect testA,testB` fails the run unless those tests ran and passed. Exit codes are the run's; INFRA (3)
+is retried once.
+
 ```bash
+scripts/verify.sh --expect newTestName       # what agents run: the fast tier, reported in a few lines
 scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, Info.plist check (slow tests skipped)
 scripts/run-tests-vm.sh --build-only   # compile check only: both packages with their tests, then the app; no tests run, not verification
 scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)

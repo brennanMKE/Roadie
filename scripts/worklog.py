@@ -7,7 +7,8 @@
 
 Cache read/write counts are exact. Output tokens are estimated (assistant characters / 4) because the transcript's
 `usage` is the stream-start snapshot. Wall is first to last timestamp; VM is every Bash call that runs
-scripts/run-tests-vm.sh, from tool_use to its tool_result. Stdlib only.
+scripts/run-tests-vm.sh or scripts/verify.sh, from tool_use to its tool_result. A subagent that hands back and is
+continued later (SendMessage) is idle in between; Wall leaves that out. Stdlib only.
 """
 import argparse
 import collections
@@ -20,11 +21,11 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PRICING = ROOT / "issues" / "model-pricing.json"
-# A command that runs the script (optionally after `cd … &&` or env assignments), not one that greps or reads it.
-VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n|\()\s*(time\s+)?(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/run-tests-vm\.sh\b(?!\s+(-h|--help)\b)")
-VM_SUMMARY = re.compile(r"==> (PASS|FAIL|SKIP|AUDIO|TIER)|Cleaning up \(exit")
+# A command that runs a VM script (optionally after `cd … &&` or env assignments), not one that greps or reads it.
+VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n|\()\s*(time\s+)?(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/(run-tests-vm|verify)\.sh\b(?!\s+(-h|--help)\b)")
+VM_SUMMARY = re.compile(r"==> (PASS|FAIL|SKIP|AUDIO|TIER|VERIFY)|Cleaning up \(exit")
 BACKGROUND_ID = re.compile(r"background with ID: (\w+)")
-DEFAULT_DIR =pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
+DEFAULT_DIR = pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
 
 
 def ts(value):
@@ -43,6 +44,9 @@ def measure(path, pricing):
     vm_tasks = {}
     vm_background = 0  # background runs whose end was not found
     thinking_ms = 0
+    idle_s = 0  # handed back, waiting to be continued
+    handed_back = False
+    previous = None
     for line in open(path, encoding="utf-8"):
         try:
             entry = json.loads(line)
@@ -75,12 +79,20 @@ def measure(path, pricing):
                     tool_input = block.get("input", {})
                     chars += len(json.dumps(tool_input))
                     command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+                    if block.get("name") == "SubagentHandback":
+                        handed_back = True
                     if block.get("name") == "Bash" and VM_COMMAND.search(command):
                         if tool_input.get("run_in_background"):
                             vm_background_calls[block.get("id")] = when
                         else:
                             vm_calls[block.get("id")] = (when, len(VM_COMMAND.findall(command)))
         elif entry.get("type") == "user":
+            raw = message.get("content")
+            continued = isinstance(raw, str) or (content and not any(
+                isinstance(b, dict) and b.get("type") == "tool_result" for b in content))
+            if handed_back and continued and stamp and previous:
+                idle_s += (when - previous).total_seconds()
+                handed_back = False
             for block in content:
                 if not isinstance(block, dict) or block.get("type") != "tool_result":
                     continue
@@ -100,6 +112,8 @@ def measure(path, pricing):
                         vm_tasks[found.group(1)] = started
                     else:
                         vm_background += 1
+        if stamp:
+            previous = when
         # The run's end is its task notification, delivered as a user message or a queued-command attachment.
         if vm_tasks and entry.get("type") in ("user", "attachment") and stamp:
             text = json.dumps(entry)
@@ -133,7 +147,8 @@ def measure(path, pricing):
         "start": first.isoformat() if first else None,
         "model": name,
         "effort": effort.most_common(1)[0][0] if effort else None,
-        "wall_s": (last - first).total_seconds() if first else 0,
+        "wall_s": (last - first).total_seconds() - idle_s if first else 0,
+        "idle_s": idle_s,
         "vm_runs": len(vm_runs),
         "vm_s": sum(vm_runs),
         "vm_background": vm_background,

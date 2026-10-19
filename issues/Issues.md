@@ -171,7 +171,8 @@ Issues move from filed to resolved through a **three-phase pipeline**. Each phas
 | Phase | When | Model | The subagent does | Status after |
 |---|---|---|---|---|
 | **1. Planning** | at issue creation (see "Filing a new issue") | **Opus · medium** | reads conventions + issue, writes `## Plan`; no code | `open` |
-| **2. Implementation** | when the issue is worked | **Opus · low** (medium after a bounce or bail) | follows the plan, fixes, builds + verifies, code commit, drafts resolution sections | `in-progress` |
+| **2. Implementation** | when the issue is worked | **Opus · low** (medium after a bounce or bail) | follows the plan and edits code; hands each build/test to a runner and fixes from its report; after a pass, code commit and resolution drafts | `in-progress` |
+| **2v. Verification runner** | each time the implementer asks for a run | **Haiku · low** | runs `scripts/verify.sh` with the implementer's arguments and returns its short report verbatim; never reads logs or edits | — |
 | **3. Review** | after implementation returns | **Opus · medium** | independently re-verifies the diff, then approves or bounces | `resolved` or `open` |
 
 Fresh context per phase is deliberate: each subagent reloads this guide and `CLAUDE.md` cleanly, so edits to those files take effect on the next dispatch. Each phase runs *only* in a subagent, never in the orchestrator's own context, to keep its large context isolated. Use Fable only when the user asks for it (`AGENTS.md`).
@@ -181,14 +182,19 @@ Fresh context per phase is deliberate: each subagent reloads this guide and `CLA
 1. **Refresh the pricing cache if stale.** If `issues/model-pricing.json` is missing or its `fetched` date isn't today, fetch current model prices and rewrite it (once per day). See "Token usage and cost tracking" below.
 2. **Work milestone by milestone.** Finish the milestone in progress before starting another. Within it, pick the lowest-numbered child whose status is `open` and that carries a `## Plan` from phase 1 (plan it first if not); respect `Blocked by` lines. Skip issues that need what agents can't do (the user's Mac, a live server, hardware, a decision): add or update their `## Notes` and leave them open. Keep the umbrella's `## Children` table in step with each status change.
 3. **Dispatch a fresh Opus subagent at low effort** (phase 2) with the issue id and instructions to follow the implementation steps below. If the issue was bounced or bailed before, dispatch at medium instead. Pass `model` and `effort` explicitly on every dispatch (all three phases).
-4. **When it returns, record its usage** and dispatch a fresh **Opus reviewer at medium effort** (phase 3) for the same issue. Record the reviewer's usage when it returns.
-5. If the reviewer bounced the issue back to `open`, re-dispatch phase 2. Otherwise move on to the next open issue (or stop if only one was requested).
-6. If the issue just resolved was a milestone's last open child, run the milestone-end full tier (see "Build / verify command").
-7. **Overlap where it's safe.** Two VM runs may run at once (two guests; concurrent runs leave each other alone since #0095). A review or milestone run that tests `--head` doesn't see the working tree, so the next issue's implementation can start while it runs. Two implementations, or an implementation and a review that tests the working tree, must not overlap: they share one working tree.
+4. **Run the implement ⇄ verify loop.** The implementer returns either a `VERIFY:` request (a `scripts/verify.sh …` command line) or `DONE`/a bail.
+   - On `VERIFY:`, dispatch a fresh **Haiku runner at low effort** (phase 2v) with that exact command. It can run in the background while you do other orchestration.
+   - When the runner returns, **continue the same implementer** (`SendMessage` to its agent id, so its context is intact) with the runner's report pasted verbatim: `VERIFY PASS …` or `VERIFY FAIL …`. Don't add the logs, and don't summarise the report.
+   - Repeat until the implementer returns `DONE` (it commits after a pass) or bails. After the third failed run on the same issue, tell it to bail instead of trying again.
+   - Record each runner's usage as a `verify` row. The implementer gets one `implement` row covering all its turns when it finishes.
+5. **When the implementer returns `DONE`,** record its usage and dispatch a fresh **Opus reviewer at medium effort** (phase 3) for the same issue. Record the reviewer's usage when it returns.
+6. If the reviewer bounced the issue back to `open`, re-dispatch phase 2. Otherwise move on to the next open issue (or stop if only one was requested).
+7. If the issue just resolved was a milestone's last open child, run the milestone-end full tier (see "Build / verify command").
+8. **Overlap where it’s safe.** Two VM runs may run at once (two guests; concurrent runs leave each other alone since #0095). A review or milestone run that tests `--head` doesn't see the working tree, so the next issue's implementation can start while it runs. Two implementations, or an implementation and a review that tests the working tree, must not overlap: they share one working tree.
 
 Usage is recorded per phase — locate the subagent's transcript, sum token counts (deduped by `requestId`), note the model, compute cost, and append a `## Work log` row. Bails and bounces get a row too. If the user names a specific issue ("fix 0046"), dispatch phase 2 to that id directly.
 
-### Phase 2 — Implementation subagent (Opus, low effort): claim → fix → build → commit
+### Phase 2 — Implementation subagent (Opus, low effort): claim → fix ⇄ verify → commit
 
 A subagent starts with fresh context, so its first job is loading the project's conventions.
 
@@ -201,16 +207,30 @@ A subagent starts with fresh context, so its first job is loading the project's 
 
 2. **Set status to `in-progress`** in the markdown — working copy only, no commit. The Mac app picks it up immediately.
 3. **Make the code changes** required to fix the bug, following the `## Plan`. If you deviate, note why in `## Fix` so the reviewer understands.
-4. **Build *and* run the project's verification command, and confirm tests actually executed and passed.** Mandatory; cannot be shortcutted.
+4. **Hand every build and test run to the runner; never run them yourself.** Mandatory; cannot be shortcutted. You don't run `scripts/run-tests-vm.sh`, `scripts/verify.sh`, `swift` or `xcodebuild`, and you don't read `build/vm-tests/` logs. Full build and test output is thousands of lines and would fill your context. A Haiku runner (phase 2v) runs the build and tests, and only the short report from `scripts/verify.sh` comes back to you.
 
-   - **Compile first, in the VM.** After your code changes, run `scripts/run-tests-vm.sh --build-only`. It builds SkinKit and PlayerKit with their tests and then the app in the guest, stops there, and prints any `file:line:col: error:` lines under `ERRORS`. Fix them and rerun until it passes. It saves a full run per compile error. A build-only pass is not verification and never goes in `## Verification`. The run that counts is a complete `scripts/run-tests-vm.sh` (fast tier, plus `--full` when "Which tier" says so). Skip `--build-only` when you are confident the change compiles; a complete run fails fast on compile errors anyway.
-   - **Quote the evidence.** In `## Verification`, quote the run id, every `==> PASS/FAIL/SKIP` line, the `TIER` and `AUDIO` lines, and the `Test run with N tests … passed` counts that matter, plus new tests by name. The exit code alone is not evidence. Exit 3 (`INFRA`) means the guest was lost, not that the code failed: rerun. Quote from `build/vm-tests/<run-id>/summary.txt`: every run that prints a summary writes it there exactly as printed, ending with `Cleaning up (exit N)`, and the last line of the run's output names the file. Never re-run the VM only to recapture output you didn't keep; read `summary.txt` instead.
-   - **A failure in code you didn't touch.** If the only failure is a test your change can't affect, re-run once and record both runs. If it fails again, or fails on other issues too, file a flaky-test issue under the tooling milestone (M11, #0087) and say so in `## Notes`; don't fix it inside this issue.
-   - **Compilation is not verification.** "It builds" / "no type errors" does not count. Tests must actually run — unit tests execute, UI tests run on a simulator, the app launches, whatever the project defines as proof. A green build with zero tests run is a failure of this step.
-   - **If you wrote or modified tests, you MUST execute those specific tests and observe them pass.** Confirm the test names appear in the output, the counts increased, and the result was success. A test that compiles but never ran proves nothing.
-   - **Read the output, don't just check the exit code.** "0 tests run", "skipped", "no tests found", or "build succeeded" with no test summary are red flags even at exit code 0. iOS in particular reports `xcodebuild` success when no tests ran.
-   - **If verification can't run in your environment** (no simulator, missing credentials, hardware, sandbox), you have not verified the fix. Bail per "When the subagent can't finish", naming the step you couldn't run.
-   - **If the build was already failing before you started**, note it and bail — don't fix unrelated breakage.
+   - **Ask for a run** by ending your turn with exactly one line:
+     `VERIFY: scripts/verify.sh [--build-only] [--full] [--launch] [--expect testA,testB]`
+     Use the tier the plan names (`--full` when "Which tier" says so). List every test you added or changed in `--expect`, by function name: the run then fails unless each of them ran and passed. The orchestrator has the runner execute the command and continues you with its report. Don't edit files while a run is pending.
+   - **Compile first if unsure.** `--build-only` checks only that everything compiles. A compile error shows up in about 1.6 minutes, but a build-only pass is never verification. The run that counts is a complete fast or full run. Skip `--build-only` when you're confident: a complete run reports compile errors too.
+   - **On `VERIFY FAIL`**, fix from the report and ask again. The report holds:
+     - the failing steps;
+     - compiler errors as `file:line:col`;
+     - each failing test's `✘` lines, with the `↳` lines showing the values;
+     - crashes, and expected tests that didn't pass.
+
+     That is the whole failure, so don't go looking for the logs. If the report really isn't enough, which should be rare, say what's missing in `## Notes` and bail. After three failed runs on the same issue, bail.
+   - **Exit 3 (`INFRA`)** means the VM itself failed, not the code; `verify.sh` already retries it once. If the report still says INFRA, ask for the same run again.
+   - **A failure in code you didn't touch.** If the only failure is a test your change can't affect, ask for the same run once more and record both. If it fails again, or fails on other issues too, file a flaky-test issue under the tooling milestone (M11, #0087) and say so in `## Notes`; don't fix it inside this issue.
+   - **Compilation is not verification.** "It builds" doesn't count. A complete run must pass: the `VERIFY PASS` line, a test total above zero, and, when you added tests, `EXPECT  all N expected test(s) passed`. A pass with no `EXPECT` line after adding tests is not verification; ask again with `--expect`.
+   - **If verification can't run** (it needs the user's Mac, credentials or hardware), you haven't verified the fix. Bail per "When the subagent can't finish", naming the step that couldn't run.
+   - **If the build was already failing before you started**, note it and bail; don't fix unrelated breakage.
+   - **Quote the evidence.** In `## Verification`, quote the passing report's lines verbatim:
+     - `VERIFY PASS` with its run id, step count and test total;
+     - the `TIER` and `AUDIO` lines;
+     - the `EXPECT` line.
+
+     The run's `summary.txt` has the full step list if a human wants it. Never ask for a run again just to recapture output.
 
 5. **Make the code commit.** Stage *only the code changes* (not the issue markdown yet). The message starts with `#NNNN` and a short, declarative title — the verb that fits (`Fix`, `Add`, `Refactor`, `Update`, `Remove`, …); not every issue is a bug fix. Blank line, then a paragraph of detail. Example:
 
@@ -233,7 +253,15 @@ A subagent starts with fresh context, so its first job is loading the project's 
      - **`## Files changed`** — one bullet per file, with a short note on what changed.
      - **`## Gotchas`** *(optional)* — surprises, dead ends, non-obvious behavior. Skip if nothing's notable; be specific when present.
 
-8. **Do not commit the markdown draft.** Return to the orchestrator with a one-line summary. The reviewer makes the single resolution commit in phase 3.
+8. **Do not commit the markdown draft.** Return to the orchestrator with `DONE: <one-line summary>`. The reviewer makes the single resolution commit in phase 3.
+
+### Phase 2v — Verification runner (Haiku, low effort)
+
+A mechanical step, so it runs on the cheapest model. The orchestrator gives it one command line from the implementer's `VERIFY:` request.
+
+1. Run exactly that command from the repo root with the Bash tool. Use a timeout of 600000 ms; a `--stress` or `--corpus` run that may take longer goes in the background, and you wait for its completion notification.
+2. Return the command's complete stdout **verbatim**, followed by `exit <code>`. It is short by design (5–10 lines on a pass, at most about 60 on a failure).
+3. Never read the logs under `build/vm-tests/`, run any other command, edit files, re-run on failure (`verify.sh` already retries INFRA once), or interpret the result. Diagnosis is the implementer's job.
 
 ### Phase 3 — Review subagent (Opus): verify → resolve or bounce
 
@@ -241,7 +269,7 @@ An independent reviewer is the gate between "code landed" and "issue resolved". 
 
 1. **Orient** the same way (this file, `CLAUDE.md`, `issues/NNNN.md` including the `## Plan` and the drafted resolution sections).
 2. **Inspect the code commit** — read its diff (`git show <hash>`). Does it actually address the reported bug? Right scope? Any correctness, security, or regression risk?
-3. **Re-run the verification command yourself** and read the output — don't trust the drafted `## Verification`. Use `--head` so the run tests the committed code, not whatever else is in the working tree (the orchestrator may have the next issue's implementation running). Confirm tests actually executed and passed (same standard as phase 2, step 4) and quote the same lines (from that run's `summary.txt`). This independent run is the core of the review.
+3. **Re-run the verification yourself**; don't trust the drafted `## Verification`. Run `scripts/verify.sh --head` with the same tier and `--expect` list as the implementer's passing run. Use the quiet wrapper, not `run-tests-vm.sh`, so the full logs stay out of your context. `--head` tests the committed code, not whatever else is in the working tree (the orchestrator may have the next issue's implementation running). Hold it to the same standard as phase 2, step 4, and quote the same lines. This independent run is the core of the review. If it fails and the report isn't enough to judge, you may read the named step's log under the results directory, since a review needs the diagnosis.
 4. **Decide:**
    - **Approve** (fix is correct, verification passed): change **Status** to `resolved`; add a `**Closed**` row with today's date; ensure the `**Commit**` row is present; add a top-of-resolution `## Resolution notes` blockquote (`> 🟢 Resolved YYYY-MM-DD — <one sentence>.`). **If `issues/` is tracked**, make the resolution commit — stage `issues/NNNN.md`, message `#NNNN Resolve: <title>`, body noting the code commit hash. If ignored, skip; the markdown is the record.
    - **Bounce** (verification failed, fix wrong, scope off): revert **Status** to `open`; add a `## Review notes` section stating exactly what failed and what the next implementation pass must fix. Leave the code commit in place unless you say otherwise in the notes. **If tracked**, commit the markdown with `#NNNN Review: <reason>`. Return to the orchestrator, which re-dispatches phase 2.
@@ -253,8 +281,13 @@ Status flow: `open` (with `## Plan`) → `in-progress` → review → `resolved`
 **Verify in the Tart VM, never on the host.** See [docs/testing-in-vm.md](../docs/testing-in-vm.md).
 
 - Verification command: `scripts/run-tests-vm.sh`, which runs the **fast tier** (add `--launch` to also start the app in the guest). It exports the working tree, generates the project, and runs in a fresh, muted guest with no audio path to the host: `swift test` for SkinKit, `swift test` for PlayerKit (AudioCore, PlexKit and TrackCache), the Debug app build, and a check of the built app's Info.plist. The fast tier skips the slow tests: the three 100k SkinLibrary tests (`SkinIndexScaleTests`, `SkinSearchBudgetTests`) (gate `SKINAMP_SLOW_TESTS=1`) and the real-time AudioCore tests (gate `AUDIOCORE_REALTIME=1`). `scripts/run-tests-vm.sh --full` is the **full tier**: everything above plus those slow tests. It passes only if every step passes and the host logged no audio. Logs are in `build/vm-tests/<run-id>/`, and the summary, with the exit code, is in `summary.txt` there; quote its lines in `## Verification`. Quote the `TIER` line too. The run starts with a build stage (`swift build --build-tests` for each package, then the app's `xcodebuild`), and the test steps reuse it (`swift test --skip-build`). If anything fails to compile, that build step shows `FAIL`, the steps that depend on it show `SKIP` (the other package still builds, so one run reports errors from both), and the compiler errors are printed under `ERRORS`. Exit codes: 0 passed, 1 a step or the audio check failed, 2 bad arguments, 3 infrastructure (`INFRA`: the guest was lost or didn't boot; rerun). A run with `SKIP` lines is a failed run. `scripts/run-tests-vm.sh --build-only` stops after the build stage; use it as a compile check before a complete run (phase 2, step 4), never as verification.
+- **Agents call `scripts/verify.sh`, not `run-tests-vm.sh`.** `verify.sh` takes the same options plus `--expect NAMES`. It sends the run's full output to `build/vm-tests/<run-id>/run.out` and prints only a short report:
+  - **On a pass:** `==> VERIFY  PASS (exit 0) <run-id>: N steps passed, T tests in R test runs`, then the `TIER`/`AUDIO` lines and the `EXPECT` result.
+  - **On a failure:** `==> VERIFY  FAIL (exit N)`, then the `FAIL`/`BUILD`/`ERRORS`/`INFRA`/`AUDIO` lines from `summary.txt` and, from each failed test step's log, the `✘` lines, the `↳` lines with their values, crashes and fatal errors. It stops at 60 lines and keeps the full report in `failure.txt`.
+
+  The exit code is the run's. A missing or failed `--expect` test makes it 1. Exit 3 is retried once automatically. People can still call `run-tests-vm.sh` directly to watch a run.
 - **Which tier.** Phases 2 and 3 run the fast tier. They also run the full tier (`--full`), and quote both summaries, when the change touches code a slow test guards. That means anything under `Packages/SkinKit/Sources/SkinLibrary/` (indexer, store, SQLite/FTS, folder scanner), or anything under `Packages/PlayerKit/Sources/AudioCore/` that affects real-time playback: `Player`, `GaplessScheduler`, `AudioGraph`, `Progressive/`, `Output/`, `NowPlaying/`. When unsure, run `--full`. The plan should say which tier the issue needs.
-- **Milestone end.** When the review of a milestone's last open child resolves it (every issue with `Parent: #M` is `resolved`, `closed` or `wontfix`), the orchestrator runs `scripts/run-tests-vm.sh --full --head` once and records the run id and the `PASS`/`FAIL`/`TIER` lines in the umbrella issue's `## Notes` (commit `#M Notes: full tier <passed|failed>`). If anything fails, file a new cleanup issue with `Parent: #M` for each distinct failure, through the normal filing and planning steps. Never reopen a resolved child for it. The milestone is not done until a full-tier run passes.
+- **Milestone end.** When the review of a milestone's last open child resolves it (every issue with `Parent: #M` is `resolved`, `closed` or `wontfix`), the orchestrator runs `scripts/verify.sh --full --head` once (directly, or through a Haiku runner) and records the run id and the `PASS`/`FAIL`/`TIER` lines in the umbrella issue's `## Notes` (commit `#M Notes: full tier <passed|failed>`). If anything fails, file a new cleanup issue with `Parent: #M` for each distinct failure, through the normal filing and planning steps. Never reopen a resolved child for it. The milestone is not done until a full-tier run passes.
 - Don't run `swift test`, `xcodebuild` or the app on the host to verify a change. `xcodegen generate` on the host is fine (the script runs it into the export itself).
 - **Tests must be silent.** Nothing may play through the host's speakers. Most of the suite renders offline (manual rendering mode, see `renderSilently` in `TestSupport.swift`); real-time tests are opt-in with `AUDIOCORE_REALTIME=1`, mute the main mixer, and are only turned on in the VM's full tier (`--full`). Scratch harnesses and review experiments follow the same rule: run them in a VM clone, or render offline. The script checks the host with `/usr/bin/log show --predicate 'process == "coreaudiod" AND eventMessage CONTAINS "Starting IO"'` (in zsh a bare `log` is a shell builtin).
 - Skin report: `swift run --package-path Packages/SkinKit skintool Skins/`
@@ -274,7 +307,7 @@ Never use `wontfix` or `closed` to escape a stuck issue.
 
 ## Token usage and cost tracking
 
-Every subagent dispatch gets a usage record on the issue it worked: which model did the work, exactly how many tokens it consumed, and an estimated cost. The **orchestrator** records this after the subagent returns — a subagent can't measure its own totals. Under the three-phase workflow each issue accumulates a row per phase — **planning (Opus, medium), recorded at filing time; implementation (Opus, low, or medium after a bounce); review (Opus, medium)** — plus a row for every bounce or bail. Each row also records the effort level, wall-clock duration, and the time spent in VM test runs.
+Every subagent dispatch gets a usage record on the issue it worked: which model did the work, exactly how many tokens it consumed, and an estimated cost. The **orchestrator** records this after the subagent returns — a subagent can't measure its own totals. Under the three-phase workflow each issue accumulates a row per phase — **planning (Opus, medium), recorded at filing time; implementation (Opus, low, or medium after a bounce); one verify row per runner (Haiku, low); review (Opus, medium)** — plus a row for every bounce or bail. Each row also records the effort level, wall-clock duration, and the time spent in VM test runs.
 
 ### Pricing cache (`issues/model-pricing.json`)
 
@@ -308,7 +341,7 @@ cost = (input × input_rate + output × output_rate
 
 If no transcript is available (different harness), record whatever total the harness reported, or `—`. Never fabricate counts.
 
-**Output tokens are not in the transcript.** `message.usage` is the stream-start snapshot: `input_tokens` and `output_tokens` are near zero on every line, while the cache fields are exact. Estimate output as the character count of all assistant content (text, thinking, tool_use input) divided by 4, and mark it `~`. **Effort** is the `effort` field on assistant lines. **Wall** is the span between the first and last `timestamp`. **VM** is the count and total duration of tool_use → tool_result pairs whose command runs `scripts/run-tests-vm.sh`. `scripts/worklog.py <transcript.jsonl>` computes all of these and prints a ready work-log row.
+**Output tokens are not in the transcript.** `message.usage` is the stream-start snapshot: `input_tokens` and `output_tokens` are near zero on every line, while the cache fields are exact. Estimate output as the character count of all assistant content (text, thinking, tool_use input) divided by 4, and mark it `~`. **Effort** is the `effort` field on assistant lines. **Wall** is the span between the first and last `timestamp`. **VM** is the count and total duration of tool_use → tool_result pairs whose command runs `scripts/run-tests-vm.sh` or `scripts/verify.sh`. An implementer that is continued after each runner report has idle gaps while it waits; **Wall** leaves those out (the time between its turn ending and the next continuation). `scripts/worklog.py <transcript.jsonl>` computes all of these and prints a ready work-log row.
 
 ### The `## Work log` section
 
@@ -320,13 +353,15 @@ One row per work session, conventionally the last section of the issue file (alw
 | Date | Phase | Model | Effort | Wall | VM | Turns | Output | Cache read | Cache write | Cost | Outcome |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-10-20 | plan | claude-opus-5-5 | medium | 9m | — | 20 | ~29,400 | 2,088,496 | 157,531 | $2.38 | planned |
-| 2026-10-20 | implement | claude-opus-5-5 | low | 18m | 3 (9.2m) | 41 | ~46,000 | 4,100,000 | 190,000 | $2.70 | reviewed |
+| 2026-10-20 | verify | claude-haiku-5-5 | low | 3m | 1 (2.9m) | 3 | ~300 | 45,000 | 12,000 | $0.00 | failed |
+| 2026-10-20 | verify | claude-haiku-5-5 | low | 3m | 1 (2.7m) | 3 | ~250 | 45,000 | 12,000 | $0.00 | passed |
+| 2026-10-20 | implement | claude-opus-5-5 | low | 18m | — | 41 | ~46,000 | 4,100,000 | 190,000 | $2.70 | reviewed |
 | 2026-10-20 | review | claude-opus-5-5 | medium | 7m | 1 (3.0m) | 27 | ~4,800 | 2,431,182 | 117,810 | $1.19 | resolved |
 
 **Total: $6.27**
 ```
 
-Update the `**Total**` line whenever a row is appended. Outcome is one of `planned`, `reviewed` (implementation handed to review), `resolved`, `bounced`, `bailed`, `stopped`. Older tables keep their columns; when an older issue gets a new row, extend its header to these columns and pad earlier rows with `—`, the one exception to "don't reformat". The `plan` row lands at filing time; the `implement` and `review` rows land as each phase returns. Bails and bounces get a row too. Don't reformat existing rows.
+Update the `**Total**` line whenever a row is appended. Outcome is one of `planned`, `reviewed` (implementation handed to review), `passed`/`failed` (a verify run), `resolved`, `bounced`, `bailed`, `stopped`. A verify row goes in when its runner returns; the implementer's single row goes in when it returns `DONE` or bails, and its VM column is `—` because the runners did the runs. Older tables keep their columns; when an older issue gets a new row, extend its header to these columns and pad earlier rows with `—`, the one exception to "don't reformat". The `plan` row lands at filing time; the `implement` and `review` rows land as each phase returns. Bails and bounces get a row too. Don't reformat existing rows.
 
 ## Attachments
 

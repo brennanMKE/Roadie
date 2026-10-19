@@ -9,12 +9,25 @@ Every issue goes through three phases, each in a fresh subagent dispatched by an
 | Phase | Model · effort | Does | Status after |
 |---|---|---|---|
 | 1. Plan | Opus · medium | Reads the issue and current code, writes `## Plan`: files, approach, tests by name, which tier verifies it, a host checklist. No code. | `open` |
-| 2. Implement | **Opus · low** (medium after a bounce or bail) | Follows the plan, checks it compiles (`--build-only`), runs the fast tier (plus `--full` when guarded code changes), commits the code, drafts Root cause / Fix / Verification / Files changed. | `in-progress` |
+| 2. Implement | **Opus · low** (medium after a bounce or bail) | Follows the plan and edits code. For every build or test run it ends its turn with a `VERIFY:` request and is continued with the runner's short report; after a pass it commits the code and drafts Root cause / Fix / Verification / Files changed. | `in-progress` |
+| 2v. Verify | **Haiku · low** | Runs the requested `scripts/verify.sh` command and returns its report verbatim. Never reads logs, edits or retries. | — |
 | 3. Review | Opus · medium | Reads the diff, re-runs verification itself on `--head`, then resolves or bounces. Only the reviewer sets `resolved`. | `resolved` or `open` |
 
 `model` and `effort` are passed explicitly on every dispatch, and the work log records both. Fable is used only when the user asks. Nobody but the user sets `closed`.
 
 Plans are written close to when the issue is worked, against the code as it stands, and name the tests to add. A low-effort implementer does well with a concrete plan and poorly when it has to explore.
+
+## Keeping logs out of context
+
+A VM run prints thousands of lines: every package's build and every test's start and finish. Before 2026-10-19 that output streamed into the implementer's context. Implementers then read logs on 3–4 turns per issue on average, and every later turn re-read all of it from cache.
+
+Now:
+
+- **`scripts/verify.sh` wraps the run.** The full output goes to `build/vm-tests/<run-id>/run.out`. The exit code says pass or fail. On a pass it prints about five lines: run id, step count, test total, tier, audio, and the `--expect` result. On a failure it prints only the relevant lines, at most 60: failing steps, compiler errors, failing tests with their values, and crashes.
+- **A Haiku runner runs it.** Running a script and copying its output back is mechanical, so it goes to the cheapest model. The implementer asks for a run with a `VERIFY:` line. The orchestrator dispatches the runner, then continues the same implementer (its context intact) with the report. The implementer only ever sees that report.
+- **`--expect` replaces "find your test in the log".** The script checks that every test the change added ran and passed, so nobody has to search a 2,600-line log for the name.
+
+The loop repeats until a pass, which takes at most three failed runs before a bail. The reviewer runs `scripts/verify.sh --head` itself; its report is just as short.
 
 ## Milestones
 
@@ -28,11 +41,11 @@ All builds, tests and app launches run in a fresh, muted Tart VM through `script
 
 | Mode | When | What runs | Typical time |
 |---|---|---|---|
-| `--build-only` | Implementer, after editing, before a full run | Both packages with their tests, then the app. Stops early and prints `ERRORS` with `file:line:col` lines. Never counts as verification. | 1.6 min |
+| `--build-only` | Implementer's runner, after editing, before a full run | Both packages with their tests, then the app. Stops early and prints `ERRORS` with `file:line:col` lines. Never counts as verification. | 1.6 min |
 | Fast tier (default) | Every implementation and every review | Build stage, unit tests that reuse it (`--skip-build`), the app checks, `--launch` when the plan asks | 2.6 min |
 | Full tier (`--full`) | Changes to code a slow test guards (skin-library indexing, AudioCore real-time playback), and each milestone end | Fast tier plus the slow tests: three 100k-row skin-library tests and the real-time audio tests | 3.0 min |
 
-How results are read:
+Agents run every mode through `scripts/verify.sh` (same options plus `--expect`). How results are read:
 
 - Every run writes `build/vm-tests/<run-id>/summary.txt`, the same lines it prints: `==> PASS/FAIL/SKIP` per step, `TIER`, `BUILD`/`ERRORS`, `INFRA`, `AUDIO`, the `Test run with …` counts and the exit code. Quote from it; never re-run only to recapture output.
 - Exit codes: 0 passed, 1 a step or the audio check failed, 2 bad arguments, 3 infrastructure (the guest was lost or didn't boot; rerun, it isn't the code).
@@ -46,12 +59,12 @@ Two VM runs may run at once (two guests; since #0095 a run never deletes a live 
 
 ## Tracking
 
-The orchestrator appends a work-log row per phase, computed by `scripts/worklog.py` from the subagent's transcript:
+The orchestrator appends a work-log row per phase (and one `verify` row per runner), computed by `scripts/worklog.py` from the subagent's transcript:
 
 | Date | Phase | Model | Effort | Wall | VM | Turns | Output | Cache read | Cache write | Cost | Outcome |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 
-Wall is the subagent's elapsed time, VM the time inside VM runs (count and minutes), model time the difference. Output tokens are estimated (characters / 4), because transcripts record only a stream-start snapshot. `scripts/worklog.py --scan` measures every transcript, which is how baselines are built.
+Wall is the subagent's elapsed time minus any idle time between handing back and being continued, VM the time inside VM runs (count and minutes), model time the difference. Output tokens are estimated (characters / 4), because transcripts record only a stream-start snapshot. `scripts/worklog.py --scan` measures every transcript, which is how baselines are built.
 
 ## Benefits
 
