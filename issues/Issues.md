@@ -169,9 +169,9 @@ Issues move from filed to resolved through a **three-phase pipeline**. Each phas
 
 | Phase | When | Model | The subagent does | Status after |
 |---|---|---|---|---|
-| **1. Planning** | at issue creation (see "Filing a new issue") | **Opus** | reads conventions + issue, writes `## Plan`; no code | `open` |
-| **2. Implementation** | when the issue is worked | **Sonnet** | follows the plan, fixes, builds + verifies, code commit, drafts resolution sections | `in-progress` |
-| **3. Review** | after implementation returns | **Opus** | independently re-verifies the diff, then approves or bounces | `resolved` or `open` |
+| **1. Planning** | at issue creation (see "Filing a new issue") | **Opus · medium** | reads conventions + issue, writes `## Plan`; no code | `open` |
+| **2. Implementation** | when the issue is worked | **Opus · low** (medium after a bounce or bail) | follows the plan, fixes, builds + verifies, code commit, drafts resolution sections | `in-progress` |
+| **3. Review** | after implementation returns | **Opus · medium** | independently re-verifies the diff, then approves or bounces | `resolved` or `open` |
 
 Fresh context per phase is deliberate: each subagent reloads this guide and `CLAUDE.md` cleanly, so edits to those files take effect on the next dispatch. Each phase runs *only* in a subagent, never in the orchestrator's own context, to keep its large context isolated. Use Fable only when the user asks for it (`AGENTS.md`).
 
@@ -179,13 +179,13 @@ Fresh context per phase is deliberate: each subagent reloads this guide and `CLA
 
 1. **Refresh the pricing cache if stale.** If `issues/model-pricing.json` is missing or its `fetched` date isn't today, fetch current model prices and rewrite it (once per day). See "Token usage and cost tracking" below.
 2. List `issues/*.md` (skip `Issues.md`). Pick the lowest-numbered file whose status is `open` — it should already carry a `## Plan` from phase 1.
-3. **Dispatch a fresh Sonnet subagent** (phase 2) with the issue id and instructions to follow the implementation steps below.
-4. **When it returns, record its usage** and dispatch a fresh **Opus reviewer** (phase 3) for the same issue. Record the reviewer's usage when it returns.
+3. **Dispatch a fresh Opus subagent at low effort** (phase 2) with the issue id and instructions to follow the implementation steps below. If the issue was bounced or bailed before, dispatch at medium instead. Pass `model` and `effort` explicitly on every dispatch (all three phases).
+4. **When it returns, record its usage** and dispatch a fresh **Opus reviewer at medium effort** (phase 3) for the same issue. Record the reviewer's usage when it returns.
 5. If the reviewer bounced the issue back to `open`, re-dispatch phase 2. Otherwise move on to the next open issue (or stop if only one was requested).
 
 Usage is recorded per phase — locate the subagent's transcript, sum token counts (deduped by `requestId`), note the model, compute cost, and append a `## Work log` row. Bails and bounces get a row too. If the user names a specific issue ("fix 0046"), dispatch phase 2 to that id directly.
 
-### Phase 2 — Implementation subagent (Sonnet): claim → fix → build → commit
+### Phase 2 — Implementation subagent (Opus, low effort): claim → fix → build → commit
 
 A subagent starts with fresh context, so its first job is loading the project's conventions.
 
@@ -266,7 +266,7 @@ Never use `wontfix` or `closed` to escape a stuck issue.
 
 ## Token usage and cost tracking
 
-Every subagent dispatch gets a usage record on the issue it worked: which model did the work, exactly how many tokens it consumed, and an estimated cost. The **orchestrator** records this after the subagent returns — a subagent can't measure its own totals. Under the three-phase workflow each issue accumulates a row per phase — **planning (Opus), recorded at filing time; implementation (Sonnet); review (Opus)** — plus a row for every bounce or bail.
+Every subagent dispatch gets a usage record on the issue it worked: which model did the work, exactly how many tokens it consumed, and an estimated cost. The **orchestrator** records this after the subagent returns — a subagent can't measure its own totals. Under the three-phase workflow each issue accumulates a row per phase — **planning (Opus, medium), recorded at filing time; implementation (Opus, low, or medium after a bounce); review (Opus, medium)** — plus a row for every bounce or bail. Each row also records the effort level, wall-clock duration, and the time spent in VM test runs.
 
 ### Pricing cache (`issues/model-pricing.json`)
 
@@ -300,6 +300,8 @@ cost = (input × input_rate + output × output_rate
 
 If no transcript is available (different harness), record whatever total the harness reported, or `—`. Never fabricate counts.
 
+**Output tokens are not in the transcript.** `message.usage` is the stream-start snapshot: `input_tokens` and `output_tokens` are near zero on every line, while the cache fields are exact. Estimate output as the character count of all assistant content (text, thinking, tool_use input) divided by 4, and mark it `~`. **Effort** is the `effort` field on assistant lines. **Wall** is the span between the first and last `timestamp`. **VM** is the count and total duration of tool_use → tool_result pairs whose command runs `scripts/run-tests-vm.sh`. `scripts/worklog.py <transcript.jsonl>` computes all of these and prints a ready work-log row.
+
 ### The `## Work log` section
 
 One row per work session, conventionally the last section of the issue file (always after `## Description`). The optional **Phase** column (`plan` / `implement` / `review`) makes the three-phase breakdown legible:
@@ -307,16 +309,16 @@ One row per work session, conventionally the last section of the issue file (alw
 ```markdown
 ## Work log
 
-| Date | Phase | Model | Input | Output | Cache read | Cache write | Cost |
-|---|---|---|---|---|---|---|---|
-| 2026-06-03 | plan | claude-fable-5 | 84 | 6,102 | 512,400 | 41,200 | $0.58 |
-| 2026-06-04 | implement | claude-sonnet-4-6 | 120 | 18,530 | 2,904,110 | 98,400 | $1.12 |
-| 2026-06-04 | review | claude-opus-4-8 | 96 | 9,240 | 1,331,200 | 44,800 | $1.05 |
+| Date | Phase | Model | Effort | Wall | VM | Turns | Output | Cache read | Cache write | Cost | Outcome |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-20 | plan | claude-opus-5-5 | medium | 9m | — | 20 | ~29,400 | 2,088,496 | 157,531 | $2.38 | planned |
+| 2026-10-20 | implement | claude-opus-5-5 | low | 18m | 3 (9.2m) | 41 | ~46,000 | 4,100,000 | 190,000 | $2.70 | reviewed |
+| 2026-10-20 | review | claude-opus-5-5 | medium | 7m | 1 (3.0m) | 27 | ~4,800 | 2,431,182 | 117,810 | $1.19 | resolved |
 
-**Total: $2.75**
+**Total: $6.27**
 ```
 
-Update the `**Total**` line whenever a row is appended. The `plan` row lands at filing time; the `implement` and `review` rows land as each phase returns. Bails and bounces get a row too. Don't reformat existing rows.
+Update the `**Total**` line whenever a row is appended. Outcome is one of `planned`, `reviewed` (implementation handed to review), `resolved`, `bounced`, `bailed`, `stopped`. Older tables keep their columns; when an older issue gets a new row, extend its header to these columns and pad earlier rows with `—`, the one exception to "don't reformat". The `plan` row lands at filing time; the `implement` and `review` rows land as each phase returns. Bails and bounces get a row too. Don't reformat existing rows.
 
 ## Attachments
 
