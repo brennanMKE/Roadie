@@ -12,12 +12,15 @@ public struct OutputDevice: Identifiable, Hashable, Sendable {
     public var name: String
     public var kind: Kind
     public var isAvailable: Bool
+    /// A group of speakers (a Music Assistant group player); the output picker lists these separately.
+    public var isGroup: Bool
 
-    public init(id: ID, name: String, kind: Kind, isAvailable: Bool = true) {
+    public init(id: ID, name: String, kind: Kind, isAvailable: Bool = true, isGroup: Bool = false) {
         self.id = id
         self.name = name
         self.kind = kind
         self.isAvailable = isAvailable
+        self.isGroup = isGroup
     }
 
     public static let thisMacID = ID(rawValue: "this-mac")

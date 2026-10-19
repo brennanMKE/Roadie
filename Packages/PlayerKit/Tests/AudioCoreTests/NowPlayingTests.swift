@@ -75,6 +75,38 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         #expect(fake.calls == ["play", "pause", "toggle", "stop", "next", "previous", "seek 42.5"])
     }
 
+    @Test func replacedCommandTargetReceivesCommands() {
+        let bridge = NowPlayingBridge(player: Player())
+        let fake = FakeCommandTarget()
+        bridge.setCommandTarget(fake)
+        bridge.perform(.next)
+        bridge.perform(.seek(3))
+        #expect(fake.calls == ["next", "seek 3.0"])
+        bridge.setCommandTarget(nil)
+        bridge.perform(.previous)
+        #expect(fake.calls == ["next", "seek 3.0"])
+    }
+
+    @Test func externalSnapshotOverridesThePlayer() {
+        let player = Player()
+        let bridge = NowPlayingBridge(player: player, artwork: { _ in nil })
+        let external = NowPlayingSnapshot(
+            title: "Remote", artist: "Speaker", album: nil, duration: 100, elapsed: 5, state: .playing)
+        bridge.showExternal(external, artwork: nil)
+        #expect(bridge.isShowingExternal)
+        // Player events are ignored while the external snapshot is shown.
+        player.stop()
+        #expect(bridge.isShowingExternal)
+    }
+
+    @Test func clearingExternalReturnsToThePlayer() {
+        let bridge = NowPlayingBridge(player: Player(), artwork: { _ in nil })
+        bridge.showExternal(nil, artwork: nil)
+        #expect(bridge.isShowingExternal)
+        bridge.clearExternal()
+        #expect(!bridge.isShowingExternal)
+    }
+
     @Test func snapshotIsNilUntilPlayingThenFollowsTrack() async throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "np-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -212,6 +244,34 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
         #expect(seen > 0)
         let title = url.deletingPathExtension().lastPathComponent
         #expect(await waitUntil { center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == title })
+    }
+
+    @Test func externalSnapshotPublishesToInfoCenterWithArtwork() throws {
+        let player = Player()
+        let center = MPNowPlayingInfoCenter.default()
+        let bridge = NowPlayingBridge(player: player, artwork: { _ in nil })
+        bridge.install()
+        defer { bridge.uninstall() }
+        let external = NowPlayingSnapshot(
+            title: "Remote Song", artist: "Remote Artist", album: "Remote Album", duration: 180, elapsed: 42,
+            state: .playing)
+        bridge.showExternal(external, artwork: try EmbeddedArtworkTests.pngData())
+        #expect(center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == "Remote Song")
+        #expect(center.nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double == 42)
+        #expect(center.nowPlayingInfo?[MPMediaItemPropertyArtwork] != nil)
+        #expect(center.playbackState == .playing)
+        // A player event while external is shown does not replace it.
+        player.stop()
+        #expect(center.nowPlayingInfo?[MPMediaItemPropertyTitle] as? String == "Remote Song")
+        var paused = external
+        paused.state = .paused
+        bridge.showExternal(paused, artwork: nil)
+        #expect(center.playbackState == .paused)
+        bridge.showExternal(nil, artwork: nil)
+        #expect(center.nowPlayingInfo == nil)
+        bridge.clearExternal()
+        #expect(center.nowPlayingInfo == nil)
+        #expect(center.playbackState == .stopped)
     }
 
     /// Artwork attaches to the published info (separate from the timing test so a republish

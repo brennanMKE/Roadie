@@ -59,3 +59,10 @@ struct MusicBackendErrorTests {
         }
     }
 }
+
+struct OutputDeviceTests {
+    @Test func outputDeviceIsNotAGroupByDefault() {
+        #expect(!OutputDevice(id: OutputDevice.ID(rawValue: "x"), name: "X", kind: .remote).isGroup)
+        #expect(!OutputDevice.thisMac.isGroup)
+    }
+}

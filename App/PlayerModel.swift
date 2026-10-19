@@ -67,6 +67,15 @@ final class PlayerModel {
     private let queueAutosaver: QueueAutosaver
     /// Media keys and Control Center; lives as long as the model.
     private let nowPlayingBridge: NowPlayingBridge
+    /// Sends media-key and Control Center commands to the player (This Mac) or to the selected speaker (#0064).
+    @ObservationIgnored private var nowPlayingRouting: NowPlayingRouting?
+    /// Transport and now-playing follow the selected output, not the Library's source (#0064).
+    let router: PlaybackRouter
+    /// The Library's Output menu.
+    let outputPicker: OutputPickerModel
+    /// The artwork shown in Control Center for a remote output, and the fetch for the current ref.
+    @ObservationIgnored private var externalArtwork: (ref: ArtworkRef, data: Data?)?
+    @ObservationIgnored private var externalArtworkTask: Task<Void, Never>?
     var selectedOutput: OutputDevice.ID = OutputDevice.thisMacID {
         didSet { if selectedOutput != oldValue { observeNowPlaying() } }
     }
@@ -277,6 +286,9 @@ final class PlayerModel {
             ],
             defaultSourceID: ma.sourceID)
         fallback = LibraryFallbackController(sources: sources)
+        // This Mac is the folder backend's output (shared with Plex through `LocalPlayerOutput`; no connection needed).
+        router = PlaybackRouter(local: folderBackend, remote: ma)
+        outputPicker = OutputPickerModel(remote: ma, isConnected: { await ma.isConnected })
         let cache = stack.cache
         Task {
             do { try await cache.prepare() } catch {
@@ -308,12 +320,21 @@ final class PlayerModel {
         Task { [weak self] in
             for await (command, output) in commands {
                 guard let self else { return }
-                do { try await self.backend.transport(command, on: output) } catch {
+                do { try await self.router.backend(for: output).transport(command, on: output) } catch {
+                    // A speaker has no balance: the marquee already shows the balance text, so no notice per drag tick.
+                    if case .setBalance = command, output != OutputDevice.thisMacID,
+                        error as? MusicBackendError == .unsupported(.remoteOutputs)
+                    {
+                        continue
+                    }
                     self.showBackendFailure(error)
                 }
             }
         }
         playlist.isLocal = { [weak self] in self?.selectedOutput == OutputDevice.thisMacID }
+        let routing = NowPlayingRouting(player: stack.player, model: self)
+        nowPlayingRouting = routing
+        nowPlayingBridge.setCommandTarget(routing)
         visualizer.setLayout(shaded: isMainWindowShaded, scale: scale)
         visualizer.start()
         observeNowPlaying()
@@ -338,26 +359,86 @@ final class PlayerModel {
     private func activeMusicAssistantServerChanged() {
         let ma = musicAssistant
         let sources = sources
+        // The old server's players are gone with it.
+        if selectedOutput != OutputDevice.thisMacID {
+            selectedOutput = OutputDevice.thisMacID
+            post(StatusNotice(text: "Output switched to This Mac"))
+        }
+        let picker = outputPicker
         Task {
             await ma.disconnect()
             sources.reload(ma.sourceID)
+            await picker.refresh()
         }
     }
 
-    /// Follows the selected output's now-playing stream. Never connects: the stream for This Mac
-    /// works without a server.
+    /// Lists the outputs again (the Library connected, the Output menu opened). A selected speaker that is no longer
+    /// listed falls back to This Mac; a failed or unconnected listing leaves the selection alone.
+    func refreshOutputs() async {
+        await outputPicker.refresh()
+        guard outputPicker.hint == nil else { return }
+        let reconciled = outputPicker.reconcile(selected: selectedOutput)
+        if reconciled != selectedOutput {
+            selectedOutput = reconciled
+            post(StatusNotice(text: "Output switched to This Mac"))
+        }
+    }
+
+    /// Follows the selected output's now-playing stream, from the backend that owns the output. Never connects: the
+    /// stream for This Mac works without a server, and Music Assistant's is idle until the Library connects it.
     private func observeNowPlaying() {
         nowPlayingTask?.cancel()
-        let sources = sources
+        externalArtworkTask?.cancel()
+        externalArtwork = nil
         let output = selectedOutput
+        let backend = router.backend(for: output)
+        let isRemote = output != OutputDevice.thisMacID
         nowPlaying = .idle(on: output)
+        if isRemote {
+            nowPlayingBridge.showExternal(nil, artwork: nil)
+        } else {
+            nowPlayingBridge.clearExternal()
+        }
         nowPlayingTask = Task { [weak self] in
-            for await snapshot in sources.nowPlaying(on: output) {
-                guard !Task.isCancelled else { return }
-                self?.nowPlaying = snapshot
-                if let volume = snapshot.volume, self?.sliderFocus != .volume { self?.volume = volume }
+            for await snapshot in await backend.nowPlaying(on: output) {
+                guard !Task.isCancelled, let self else { return }
+                self.nowPlaying = snapshot
+                if let volume = snapshot.volume, self.sliderFocus != .volume { self.volume = volume }
+                if isRemote { self.publishExternal(snapshot) }
             }
         }
+    }
+
+    /// Control Center for a remote output: the snapshot now, its artwork once fetched (on a change of ref only).
+    private func publishExternal(_ snapshot: NowPlaying) {
+        let ref = snapshot.artwork
+        if ref != externalArtwork?.ref {
+            externalArtworkTask?.cancel()
+            externalArtwork = ref.map { (ref: $0, data: nil as Data?) }
+            if let ref {
+                let ma = musicAssistant
+                externalArtworkTask = Task { [weak self] in
+                    let data = try? await ma.artwork(ref, maxPixels: 512)
+                    guard !Task.isCancelled, let self, self.externalArtwork?.ref == ref else { return }
+                    self.externalArtwork = (ref, data)
+                    self.nowPlayingBridge.showExternal(Self.systemSnapshot(self.nowPlaying), artwork: data)
+                }
+            }
+        }
+        nowPlayingBridge.showExternal(Self.systemSnapshot(snapshot), artwork: externalArtwork?.data)
+    }
+
+    /// `NowPlaying` as the system's Now Playing sees it; nil when stopped.
+    static func systemSnapshot(_ snapshot: NowPlaying, at now: Date = Date()) -> NowPlayingSnapshot? {
+        let state: PlaybackState
+        switch snapshot.state {
+        case .stopped: return nil
+        case .loading, .paused: state = .paused
+        case .playing: state = .playing
+        }
+        return NowPlayingSnapshot(
+            title: snapshot.title ?? "Unknown title", artist: snapshot.artist ?? ArtistName.unknown,
+            album: snapshot.album, duration: snapshot.duration ?? 0, elapsed: snapshot.elapsed(at: now), state: state)
     }
 
     /// Writes the queue now; called on quit so the last second of changes is not lost.
@@ -398,7 +479,7 @@ final class PlayerModel {
     func previous() { send(.previous) }
     func next() { send(.next) }
 
-    private func send(_ command: TransportCommand) {
+    func send(_ command: TransportCommand) {
         commandStream.yield((command, selectedOutput))
     }
 
@@ -558,8 +639,14 @@ final class PlayerModel {
         let backend = backend
         let sourceID = backend.sourceID
         let output = selectedOutput
+        // Local files play only on This Mac. Not a source failure, so the fallback is not told.
+        if output != OutputDevice.thisMacID, !backend.capabilities.contains(.remoteOutputs) {
+            post(StatusNotice(text: "Switch the output to This Mac to play local files."))
+            return
+        }
         Task {
             do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
+                // `.backend` (Music Assistant on This Mac, #0066) is not a source failure; `report` ignores it.
                 fallback.report(error, from: sourceID)
                 showBackendFailure(error)
             }

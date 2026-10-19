@@ -23,7 +23,13 @@ struct LibraryWindowView: View {
         .onDisappear { library.disappeared() }
         .navigationTitle("Library")
         .navigationSubtitle(subtitle)
+        .onChange(of: library.connection == .connected) { _, connected in
+            if connected { Task { await player.refreshOutputs() } }
+        }
         .toolbar {
+            ToolbarItem {
+                OutputPickerView()
+            }
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { library.refresh() }
                     .disabled(library.connection != .connected)

@@ -46,6 +46,8 @@ public actor StubMusicBackend: MusicBackend {
     /// Suspended calls that were cancelled.
     public private(set) var cancelledCount = 0
     public var artworkBytes: [ArtworkRef: Data] = [:]
+    /// What `outputs()` lists.
+    public var outputDevices: [OutputDevice] = [OutputDevice.thisMac]
 
     private let reportsTotals: Bool
     private var errors: [Method: MusicBackendError] = [:]
@@ -101,6 +103,7 @@ public actor StubMusicBackend: MusicBackend {
 
     public func setLibrary(_ library: StubLibrary) { self.library = library }
     public func setArtwork(_ data: Data, for ref: ArtworkRef) { artworkBytes[ref] = data }
+    public func setOutputs(_ devices: [OutputDevice]) { outputDevices = devices }
 
     /// Feeds every live `nowPlaying` stream.
     public func emit(_ snapshot: NowPlaying) {
@@ -199,7 +202,7 @@ public actor StubMusicBackend: MusicBackend {
 
     public func outputs() async throws -> [OutputDevice] {
         try await enter(.outputs)
-        return [OutputDevice.thisMac]
+        return outputDevices
     }
 
     public func play(_ items: [MediaID], on output: OutputDevice.ID, mode: PlayMode) async throws {

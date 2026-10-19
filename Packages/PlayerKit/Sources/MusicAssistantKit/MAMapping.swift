@@ -70,6 +70,9 @@ extension LibraryPlaylist {
 extension OutputDevice {
     init(ma player: MAPlayer) {
         let name = player.displayName.flatMap { $0.isEmpty ? nil : $0 } ?? player.name
-        self.init(id: ID(rawValue: player.playerID), name: name, kind: .remote, isAvailable: player.available)
+        // Groups are unrecorded on the reference server: `type == "group"` or members listed. A `stereo_pair` is one speaker.
+        let isGroup = player.type == "group" || !(player.groupMembers ?? []).isEmpty
+        self.init(
+            id: ID(rawValue: player.playerID), name: name, kind: .remote, isAvailable: player.available, isGroup: isGroup)
     }
 }

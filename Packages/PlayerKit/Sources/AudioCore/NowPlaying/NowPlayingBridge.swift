@@ -36,6 +36,9 @@ public final class NowPlayingBridge {
     private var artworkRequestedFor: UUID?
     private var installed = false
     private var eventToken: PlayerEventToken?
+    /// What another output (a Music Assistant speaker, #0064) is playing. While set, it is published instead of the
+    /// player's state and player events are ignored.
+    private var external: (snapshot: NowPlayingSnapshot?, artwork: MPMediaItemArtwork?)?
     private let log = Logger(subsystem: "SkinAmp", category: "NowPlaying")
 
     public init(
@@ -115,10 +118,33 @@ public final class NowPlayingBridge {
         }
     }
 
+    /// Where media keys and Control Center commands go; nil restores the player. Held weakly, like the player.
+    public func setCommandTarget(_ target: (any NowPlayingCommandTarget)?) {
+        self.target = target ?? player
+    }
+
+    // MARK: External outputs
+
+    /// Publishes `snapshot` (nil: nothing playing) instead of the player's state until `clearExternal()`.
+    public func showExternal(_ snapshot: NowPlayingSnapshot?, artwork: Data?) {
+        external = (snapshot, artwork.flatMap(Self.makeArtwork(from:)))
+        publish()
+    }
+
+    /// Back to the player's own state.
+    public func clearExternal() {
+        guard external != nil else { return }
+        external = nil
+        publish()
+    }
+
+    public var isShowingExternal: Bool { external != nil }
+
     // MARK: State
 
     private func handle(_ event: PlayerEvent) {
         _ = event
+        guard external == nil else { return }
         publish()
     }
 
@@ -133,6 +159,10 @@ public final class NowPlayingBridge {
     }
 
     private func publish() {
+        if let external {
+            publishExternal(external.snapshot, artwork: external.artwork)
+            return
+        }
         guard let snapshot = currentSnapshot() else {
             infoCenter.nowPlayingInfo = nil
             infoCenter.playbackState = .stopped
@@ -148,6 +178,18 @@ public final class NowPlayingBridge {
         infoCenter.playbackState = snapshot.state == .playing ? .playing : .paused
         log.debug("published \(snapshot.title, privacy: .public) \(snapshot.elapsed) rate \(snapshot.state == .playing ? 1 : 0)")
         loadArtworkIfNeeded()
+    }
+
+    private func publishExternal(_ snapshot: NowPlayingSnapshot?, artwork: MPMediaItemArtwork?) {
+        guard let snapshot else {
+            infoCenter.nowPlayingInfo = nil
+            infoCenter.playbackState = .stopped
+            return
+        }
+        var info = NowPlayingInfoBuilder.info(for: snapshot)
+        if let artwork { info[MPMediaItemPropertyArtwork] = artwork }
+        infoCenter.nowPlayingInfo = info
+        infoCenter.playbackState = snapshot.state == .playing ? .playing : .paused
     }
 
     // MARK: Artwork

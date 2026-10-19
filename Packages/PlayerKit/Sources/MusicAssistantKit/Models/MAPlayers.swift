@@ -57,7 +57,7 @@ public struct MAPlayer: Codable, Hashable, Sendable {
     /// Null for universal players.
     public var volumeLevel: Double?
     public var volumeMuted: Bool?
-    /// Grouping is unrecorded on the reference server (#0064).
+    /// Unrecorded on the reference server; a non-empty list marks the player as a group (`OutputDevice.isGroup`).
     public var groupMembers: [String]?
     public var syncedTo: String?
     public var activeGroup: String?

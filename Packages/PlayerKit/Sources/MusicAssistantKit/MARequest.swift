@@ -15,7 +15,6 @@ public enum MAQueueOption: String, Hashable, Sendable {
 }
 
 /// One command and its arguments. Arg names are exactly those in `docs/ma-protocol/commands.json`.
-/// The player and queue builders are the seam #0064 uses; nothing in #0061 sends them.
 public struct MARequest: Hashable, Sendable, CustomStringConvertible {
     public var command: String
     public var args: [String: MAJSON]
@@ -107,7 +106,7 @@ extension MARequest {
         ["item_id": .string(itemID), "provider_instance_id_or_domain": .string(provider)]
     }
 
-    // MARK: Players and queues (#0064)
+    // MARK: Players and queues
 
     public static func playersAll() -> MARequest { MARequest(command: "players/all") }
     public static func player(id: String) -> MARequest {

@@ -16,24 +16,35 @@ struct BackendOutputsAndProbeTests {
         await rig.backend.disconnect()
     }
 
-    @Test func playTransportAndNowPlayingAreNotSupportedYet() async throws {
+    @Test func browsingSendsNoTransportCommands() async throws {
         let rig = try await connectedBackend()
-        let output = OutputDevice.ID(rawValue: "ap82fe09484ac9")
-        await #expect(throws: MusicBackendError.unsupported(.remoteOutputs)) {
-            try await rig.backend.play([MediaID(.album, "library://album/27")], on: output, mode: .replace())
-        }
-        await #expect(throws: MusicBackendError.unknownOutput(OutputDevice.ID(rawValue: "nope"))) {
-            try await rig.backend.play([], on: OutputDevice.ID(rawValue: "nope"), mode: .append)
-        }
-        await #expect(throws: MusicBackendError.unsupported(.remoteOutputs)) {
-            try await rig.backend.transport(.play, on: output)
-        }
-        var received = 0
-        for await _ in await rig.backend.nowPlaying(on: output) { received += 1 }
-        #expect(received == 0)
+        _ = try await rig.backend.outputs()
+        _ = try await rig.backend.artists(page: PageRequest(offset: 0, limit: 50))
+        _ = try await rig.backend.albums(of: nil, page: PageRequest(offset: 0, limit: 50))
+        _ = try await rig.backend.search("a", limit: 5)
         let sent = rig.transport.sentRequests.map(\.command)
         #expect(!sent.contains { $0.hasPrefix("players/cmd/") })
         #expect(!sent.contains("player_queues/play_media"))
+        await rig.backend.disconnect()
+    }
+
+    /// No group exists on the reference server: this `players/all` answer is synthetic (unrecorded).
+    @Test func outputsMarkGroups() async throws {
+        var script = try FixtureScript.recorded(token: testToken)
+        script.override(
+            "players/all",
+            result: [
+                ["player_id": "g1", "type": "group", "name": "Downstairs", "available": true, "group_members": []],
+                ["player_id": "p1", "type": "player", "name": "Kitchen", "available": true,
+                 "group_members": ["p1", "p2"]],
+                ["player_id": "p3", "type": "stereo_pair", "name": "Den", "available": true, "group_members": []],
+                ["player_id": "p4", "type": "player", "name": "Office", "available": false],
+            ])
+        let rig = try await connectedBackend(script: script)
+        let outputs = try await rig.backend.outputs()
+        #expect(Dictionary(uniqueKeysWithValues: outputs.map { ($0.id.rawValue, $0.isGroup) })
+            == ["g1": true, "p1": true, "p3": false, "p4": false])
+        #expect(outputs.first { $0.id.rawValue == "p4" }?.isAvailable == false)
         await rig.backend.disconnect()
     }
 
@@ -89,9 +100,9 @@ struct BackendOutputsAndProbeTests {
         #expect(info.serverID == fixtureServerID)
     }
 
-    @Test func capabilitiesExcludeOutputsUntilControllerMode() throws {
+    @Test func capabilitiesIncludeRemoteOutputs() throws {
         let rig = try makeBackend()
-        #expect(rig.backend.capabilities == [.search, .playlists, .artwork])
+        #expect(rig.backend.capabilities == [.search, .playlists, .artwork, .remoteOutputs])
         #expect(rig.backend.sourceID == "musicAssistant")
         #expect(rig.backend.displayName == "Music Assistant")
     }

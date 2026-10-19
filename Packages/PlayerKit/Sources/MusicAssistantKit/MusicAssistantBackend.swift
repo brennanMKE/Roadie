@@ -2,8 +2,8 @@ import Foundation
 import MusicBackendKit
 import os
 
-/// Music Assistant behind `MusicBackend`. Browsing and search work now; remote transport and now-playing are
-/// #0064 (the `MARequest` builders and `client.events()` / `states()` are its seam), local playback is #0066.
+/// Music Assistant behind `MusicBackend`: browsing, search, and controlling MA players (#0064). Local playback
+/// through Sendspin is #0066.
 public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// Reads the stored address; defaults only, never the Keychain.
     public typealias AddressProvider = @Sendable () -> MusicAssistantServerAddress?
@@ -21,8 +21,8 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     public nonisolated let sourceID = "musicAssistant"
     public nonisolated let displayName = "Music Assistant"
-    /// #0064 adds `.remoteOutputs`, #0066 `.localOutput`.
-    public nonisolated let capabilities: BackendCapabilities = [.search, .playlists, .artwork]
+    /// #0066 adds `.localOutput`.
+    public nonisolated let capabilities: BackendCapabilities = [.search, .playlists, .artwork, .remoteOutputs]
 
     private let mode: Mode
     private let serverProvider: ServerProvider
@@ -30,22 +30,36 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     private let transports: any MAWebSocketTransportFactory
     private let http: any MAHTTPTransport
     private let clock: any Clock<Duration>
+    private let policy: MANowPlayingPolicy
     private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantBackend")
 
-    /// #0064 subscribes to events and states through it.
+    /// The now-playing watchers subscribe to its events and states.
     public private(set) var client: MusicAssistantClient?
     private var connectedBaseURL: URL?
     private var connectedConfiguration: MusicAssistantServerConfiguration?
     private var counts: [String: Int] = [:]
+    /// Players by id, from `outputs()`, `players/get` and the watchers: commands never list every player.
+    private var players: [String: MAPlayer] = [:]
+
+    private struct Watcher {
+        var output: OutputDevice.ID
+        var continuation: AsyncStream<NowPlaying>.Continuation
+        var task: Task<Void, Never>?
+    }
+
+    /// One per `nowPlaying(on:)` subscriber.
+    private var watchers: [UUID: Watcher] = [:]
 
     /// One fixed address, trust on first use when it has no `serverID`. For tests: the app must use `init(server:token:...)`,
     /// which refuses to connect to a server whose identity has not been learned and verified.
     public init(
         address: @escaping AddressProvider, token: @escaping TokenProvider,
         transports: any MAWebSocketTransportFactory = URLSessionWebSocketTransportFactory(),
-        http: any MAHTTPTransport = URLSessionHTTPTransport(), clock: any Clock<Duration> = ContinuousClock()
+        http: any MAHTTPTransport = URLSessionHTTPTransport(), clock: any Clock<Duration> = ContinuousClock(),
+        policy: MANowPlayingPolicy = .standard
     ) {
         mode = .address
+        self.policy = policy
         serverProvider = {
             address().map { MusicAssistantServerConfiguration(id: Self.addressConfigurationID, address: $0) }
         }
@@ -60,9 +74,11 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     public init(
         server: @escaping ServerProvider, token: @escaping ServerTokenProvider,
         transports: any MAWebSocketTransportFactory = URLSessionWebSocketTransportFactory(),
-        http: any MAHTTPTransport = URLSessionHTTPTransport(), clock: any Clock<Duration> = ContinuousClock()
+        http: any MAHTTPTransport = URLSessionHTTPTransport(), clock: any Clock<Duration> = ContinuousClock(),
+        policy: MANowPlayingPolicy = .standard
     ) {
         mode = .server
+        self.policy = policy
         serverProvider = server
         tokenProvider = token
         self.transports = transports
@@ -117,11 +133,13 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
                     : "Enter the Music Assistant token under Settings \u{203A} Library.")
         }
         if let old = client {
+            stopWatchers()
             await old.disconnect()
             client = nil
             connectedBaseURL = nil
             connectedConfiguration = nil
             counts = [:]
+            players = [:]
         }
         let fresh = MusicAssistantClient(baseURL: address.baseURL, transports: transports, http: http, clock: clock)
         do {
@@ -136,7 +154,9 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         connectedBaseURL = address.baseURL
         connectedConfiguration = configuration
         counts = [:]
+        players = [:]
         log.info("connected")
+        restartWatchers()
         if let raced, raced !== fresh { await raced.disconnect() }
     }
 
@@ -146,6 +166,8 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         connectedBaseURL = nil
         connectedConfiguration = nil
         counts = [:]
+        players = [:]
+        stopWatchers()
         await old?.disconnect()
     }
 
@@ -263,37 +285,142 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     // MARK: Outputs
 
     /// Enabled, visible players. Unavailable ones are listed with `isAvailable == false`; hidden and disabled ones
-    /// are not (the Sendspin web player is `hide_in_ui`). Groups are listed like players; their semantics are #0064's.
+    /// are not (the Sendspin web player is `hide_in_ui`). Groups have `isGroup` set.
     public func outputs() async throws -> [OutputDevice] {
         try await guarded {
             let client = try requireClient()
-            let players = try await client.call(.playersAll(), as: [MAPlayer].self)
-            return players.filter { $0.enabled != false && $0.hideInUI != true }.map(OutputDevice.init(ma:))
+            let all = try await client.call(.playersAll(), as: [MAPlayer].self)
+            players = Dictionary(all.map { ($0.playerID, $0) }, uniquingKeysWith: { _, last in last })
+            return all.filter { $0.enabled != false && $0.hideInUI != true }.map(OutputDevice.init(ma:))
         }
     }
 
+    /// Plays on a Music Assistant player. `queue_id == player_id` for every recorded player; a group's queue is
+    /// unrecorded, so the player id is sent and MA redirects.
     public func play(_ items: [MediaID], on output: OutputDevice.ID, mode: PlayMode) async throws {
-        try await requireOutput(output)
-        // #0064: `MARequest.playMedia(queueID:media:option:startItem:)` with `.replace` / `.add`, `startItem` for
-        // `PlayMode.replace(startIndex:)`; `queue_id == player_id` unless `activeQueue(playerID:)` says otherwise.
-        throw MusicBackendError.unsupported(.remoteOutputs)
+        if output == OutputDevice.thisMacID {
+            // Playing Music Assistant on this Mac needs Sendspin (#0066).
+            throw MusicBackendError.backend("Choose a speaker in the Library's Output menu to play from Music Assistant.")
+        }
+        guard !items.isEmpty else { return }
+        try await guarded {
+            let client = try requireClient()
+            try await requireOutput(output)
+            let media = items.map(\.rawValue)
+            let request: MARequest
+            switch mode {
+            case .replace(let startIndex):
+                let start = startIndex > 0 && startIndex < items.count ? items[startIndex].rawValue : nil
+                request = .playMedia(queueID: output.rawValue, media: media, option: .replace, startItem: start)
+            case .append:
+                request = .playMedia(queueID: output.rawValue, media: media, option: .add)
+            }
+            _ = try await client.call(request)
+        }
     }
 
     public func transport(_ command: TransportCommand, on output: OutputDevice.ID) async throws {
-        try await requireOutput(output)
-        // #0064: `playerCommand`, `seek(Int(seconds))`, `volumeSet(Int(volume * 100))`, `shuffle`, `repeat(.all/.off)`;
-        // `.setBalance` stays `.unsupported`.
-        throw MusicBackendError.unsupported(.remoteOutputs)
+        try await guarded {
+            let client = try requireClient()
+            let player = try await requireOutput(output)
+            let id = output.rawValue
+            let request: MARequest
+            switch command {
+            case .play: request = .playerCommand(.play, playerID: id)
+            case .pause: request = .playerCommand(.pause, playerID: id)
+            case .togglePlayPause: request = .playerCommand(.playPause, playerID: id)
+            case .stop: request = .playerCommand(.stop, playerID: id)
+            case .next: request = .playerCommand(.next, playerID: id)
+            case .previous: request = .playerCommand(.previous, playerID: id)
+            case .seek(let seconds):
+                let position = seconds.isFinite ? max(0, Int(seconds.rounded())) : 0
+                request = .seek(playerID: id, position: position)
+            case .setVolume(let volume):
+                let lacksVolumeSet = player.supportedFeatures.map { !$0.contains("volume_set") } ?? false
+                if lacksVolumeSet || player.volumeLevel == nil {
+                    throw MusicBackendError.unsupported(.remoteOutputs)
+                }
+                let level = volume.isFinite ? min(max(Int((volume * 100).rounded()), 0), 100) : 0
+                request = .volumeSet(playerID: id, level: level)
+            case .setShuffle(let enabled): request = .shuffle(playerID: id, enabled: enabled)
+            case .setRepeat(let on): request = .repeat(playerID: id, mode: on ? .all : .off)
+            case .setBalance: throw MusicBackendError.unsupported(.remoteOutputs)
+            }
+            _ = try await client.call(request)
+        }
     }
 
+    /// The current snapshot at once, then one per change: events applied when they decode, refetches and polls as
+    /// the safety net (#0076). Idle while not connected; `connect()` and `disconnect()` restart or idle the stream
+    /// without ending it.
     public func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying> {
-        // #0064: `client.events()` / `states()` plus `queue(id:)`; elapsed time from `elapsedTime` + `elapsedTimeLastUpdated`.
-        AsyncStream { $0.finish() }
+        let (stream, continuation) = AsyncStream<NowPlaying>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let id = UUID()
+        watchers[id] = Watcher(output: output, continuation: continuation, task: nil)
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeWatcher(id) }
+        }
+        startWatcher(id)
+        return stream
     }
 
-    private func requireOutput(_ output: OutputDevice.ID) async throws {
-        let listed = try await outputs()
-        guard listed.contains(where: { $0.id == output }) else { throw MusicBackendError.unknownOutput(output) }
+    private func removeWatcher(_ id: UUID) {
+        watchers.removeValue(forKey: id)?.task?.cancel()
+    }
+
+    private func startWatcher(_ id: UUID) {
+        guard var watcher = watchers[id] else { return }
+        watcher.task?.cancel()
+        watcher.task = nil
+        guard let client, watcher.output != OutputDevice.thisMacID else {
+            watchers[id] = watcher
+            watcher.continuation.yield(.idle(on: watcher.output))
+            return
+        }
+        let continuation = watcher.continuation
+        let watch = MANowPlayingWatch(
+            client: client, output: watcher.output, clock: clock, policy: policy,
+            yield: { continuation.yield($0) },
+            cachePlayer: { [weak self] in await self?.cache($0) })
+        watcher.task = Task { await watch.run() }
+        watchers[id] = watcher
+        log.debug("now playing watch started (\(self.watchers.count, privacy: .public) active)")
+    }
+
+    private func restartWatchers() {
+        for id in watchers.keys { startWatcher(id) }
+    }
+
+    /// Ends every watch and shows idle; the streams stay open for the next `connect()`.
+    private func stopWatchers() {
+        for (id, var watcher) in watchers {
+            watcher.task?.cancel()
+            watcher.task = nil
+            watchers[id] = watcher
+            watcher.continuation.yield(.idle(on: watcher.output))
+        }
+    }
+
+    private func cache(_ player: MAPlayer) {
+        guard client != nil else { return }
+        players[player.playerID] = player
+    }
+
+    /// The cached player, else `players/get` (a null result is an unknown player).
+    @discardableResult
+    private func requireOutput(_ output: OutputDevice.ID) async throws -> MAPlayer {
+        if let cached = players[output.rawValue] { return cached }
+        let client = try requireClient()
+        let json = try await client.call(.player(id: output.rawValue))
+        guard !json.isNull else { throw MusicBackendError.unknownOutput(output) }
+        let player: MAPlayer
+        do {
+            player = try json.decode(as: MAPlayer.self)
+        } catch {
+            throw MusicAssistantError.decoding(command: "players/get", detail: MusicAssistantClient.describe(error))
+        }
+        players[player.playerID] = player
+        return player
     }
 
     // MARK: Helpers
