@@ -1,6 +1,6 @@
 # Verify runner: keeping build and test logs out of the implementer
 
-Revision plan, 2026-10-19 (commit 9836a04). The rules live in [issues/Issues.md](../issues/Issues.md) (phase 2 and phase 2v). [issues-workflow.md](issues-workflow.md) covers the workflow as a whole. This page covers why the change was made, how it works, what it should save, and how we'll know.
+Revision plan, 2026-10-19 (commit 9836a04), with the trial's results at the end ([Results](#results-m12-trial-2026-10-19)). The rules live in [issues/Issues.md](../issues/Issues.md) (phase 2 and phase 2v). [issues-workflow.md](issues-workflow.md) covers the workflow as a whole. This page covers why the change was made, how it works, what it should save, and how we'll know.
 
 ## Problem
 
@@ -92,6 +92,99 @@ Run the next several workable issues on the new flow and compare against the 202
 5. Whether any implementer broke the rule and read logs. Check its transcript for `build/vm-tests`.
 
 Keep the change if turns and cost fall and bounces don't rise. If a failure report repeatedly proves insufficient, extend the filter in `verify.sh` instead of letting implementers read logs again.
+
+## Results: M12 trial, 2026-10-19
+
+### What ran
+
+There were no workable open issues, so five real gaps were filed from TODOs and edge cases in the code as milestone M12 (#0097):
+
+- #0098: BMP fallback decoder;
+- #0099: generated base skin;
+- #0100: nested playlists;
+- #0101: playlist titles;
+- #0102: UTF-16 playlists without a BOM.
+
+The #0100 reviewer filed a sixth, #0103 (a cap on nested-playlist fan-out), which went through the same flow. Each issue was planned, implemented with Haiku verification runs, and reviewed.
+
+- **Elapsed time:** filing to the last resolution took 39 minutes (15:01 to 15:40). Reviews and the next implementation overlapped, and up to two VMs ran at once.
+- **Outcome:** 6 of 6 issues resolved, none bounced, one real follow-up filed.
+- **Milestone-end full tier:** passed (`20261019-154013-16062`, 1428 tests, silent).
+
+The baseline is the 12 Opus-low issues worked earlier on 2026-10-19 (#0083–#0096) under the old flow, in which implementers ran the VM themselves. Figures are medians per issue from `scripts/worklog.py --scan`.
+
+### Implementer (Opus · low)
+
+| | Old flow | Verify runner | Change |
+|---|---|---|---|
+| Turns | 13.5 | 8.5 | −37% |
+| Tool calls | 14.5 | 9 | −38% |
+| Calls touching tests or logs | 9.5 | ~0¹ | gone |
+| Test/log output reaching the implementer | 20.1k chars (37% of tool output) | ~0 | gone |
+| Cache read | 803k | 429k | −47% |
+| Output (estimated) | 5.3k | 3.8k | −28% |
+| Model time | 1.7 min | 1.1 min | −35% |
+| Cost | $0.53 | $0.35 | −34% |
+| Implement elapsed, including test runs | 9.0 min (2.75 runs/issue) | 4.1 min (1.33 runs/issue) | see caveats |
+
+¹ The one match per transcript is the implementer reading the `verify.sh` rule in `Issues.md`, not a run or a log.
+
+Every implementer kept the rule: none ran a build or test or opened a log. On a failed run, the fix arrived in 6 seconds (a compile error) and 12 seconds (a failing test), each written from the report alone.
+
+### Runner (Haiku · low)
+
+| | Per run |
+|---|---|
+| Runs | 8 (6 pass, 2 fail) |
+| Turns | 2 |
+| Cost | $0.003 (all 8: $0.03) |
+| Overhead beyond the VM run | about 6 seconds (2.9 min wall vs 2.8 min in the VM) |
+| Wait from runner finishing to implementer resuming | negligible: implementer idle ≈ runner wall |
+
+### Review (Opus · medium, running `verify.sh --head` itself)
+
+| | Old flow | Verify runner |
+|---|---|---|
+| Test/log output reaching the reviewer | 7.8k chars | 0.6k chars |
+| Cache read | 789k | 681k |
+| Model time | 0.8 min | 0.4 min |
+| Cost | $0.47 | $0.37 |
+
+### Per issue
+
+| | Old flow | Verify runner |
+|---|---|---|
+| Plan + implement + verify + review cost | $1.49 | $1.07 (−28%) |
+| Bounced in review | 0 of 12 | 0 of 6 |
+
+### What the reports caught, and missed
+
+There were two failed runs, both on #0099:
+
+1. **A compile error that `verify.sh` didn't extract.** An `#expect` macro expanded to an ambiguous `==`. Swift reports that as a macro-expansion diagnostic with no `path:line:col` prefix. `run-tests-vm.sh`'s ERRORS block therefore fell back to the log tail, which was mostly a 6 KB "Failed frontend command" line, and the real error wasn't in the report. Fixed the same hour (aff92f7):
+   - failed build steps now print each `error:` line with 10 lines of context, which includes the note naming the real file and line;
+   - report lines are cut at 300 characters;
+   - `verify.sh --report DIR` rebuilds the report from a finished run, so this one didn't have to run again.
+2. **An existing test broken by a cache-version bump.** The report had exactly what was needed: the `✘` line, the `↳` values and the path it expected. The implementer fixed the hardcoded `r1` without opening anything.
+
+So one of the two failure reports needed a tooling fix. This is the risk the plan named ("report gaps"). The answer was to fix the filter, not to let implementers read logs, and that worked.
+
+### Analysis
+
+- **The change did what it was meant to.** Build and test output in the implementer's context fell from about 20k characters per issue to zero, and the 9.5 tool calls that ran tests or tailed logs disappeared. Turns fell by about a third, and cache reads, which multiply turns by context size, nearly halved. The plan predicted 10–20% fewer cache reads; the trial saw 47%. Part of the difference is the issue mix (next point). The rest is that without logs in context, each remaining turn is also smaller: about 50k tokens of context per turn against 59k before.
+- **Allow for the issue mix.** These six issues were smaller than the baseline's tooling issues. Planning, which this change didn't touch, fell from 12 to 9 turns and from $0.52 to $0.35, a reasonable measure of issue size. That's a 25–33% drop. Implementer cost fell 34% and cache reads 47%, so part of the saving is the issues and part is the change. A fair estimate puts the change itself at roughly 15–25% off implementer tokens, at the top of the plan's prediction. Comparing like-for-like issues would settle it.
+- **The orchestration hop is nearly free.** A Haiku run costs a third of a cent, and dispatch plus relay add seconds against minutes of VM time. Overlapping the next implementation with a review on `--head` worked smoothly with two VMs.
+- **Wall time is still VM-bound.** Each run is about 2.8 minutes; a typical issue needs one implementer run and one reviewer run, so about 6 of an issue's minutes are VM time. The model now spends about 1.5 minutes per issue in total across implementer and reviewer. Caching builds between runs, or reusing the implementer's passing run in review when the commit hasn't changed, is the next lever.
+- **Quality held.** No bounces; the reviewers still found a real fan-out bug (#0103). Implementers repaired both failures from the reports alone, in seconds.
+- **Not measured: the orchestrator.** Every relay passes through the orchestrating session, adding a few hundred tokens of report per run to its context. That is small next to what the implementers saved, but it isn't in the work-log totals.
+
+### Recommendation
+
+Keep the verify runner. Also:
+
+- treat every failure report that needed more as a filter bug in `verify.sh`, as with the macro-expansion case;
+- for a fair before/after, compare the next batch of ordinary feature issues against this baseline;
+- try reusing the implementer's passing run in review, which would remove about a third of VM time per issue.
 
 ## Risks and open questions
 
