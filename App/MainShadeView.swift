@@ -13,8 +13,10 @@ struct MainShadeView: View {
             SpriteImage(skin: skin, name: activeState == .key ? "MAIN_SHADE_BACKGROUND_SELECTED" : "MAIN_SHADE_BACKGROUND")
             TitleBarView(skin: skin, shaded: true)
 
-            MiniTimeView(skin: skin, status: model.mainWindowStatus, toggleTimeMode: model.toggleTimeMode)
-                .offset(x: MainShadeLayout.miniTimeOrigin.x, y: MainShadeLayout.miniTimeOrigin.y)
+            RemoteClock(anchor: model.remoteClockAnchor) { now in
+                MiniTimeView(skin: skin, status: model.mainWindowStatus(at: now), toggleTimeMode: model.toggleTimeMode)
+            }
+            .offset(x: MainShadeLayout.miniTimeOrigin.x, y: MainShadeLayout.miniTimeOrigin.y)
 
             VisualizerView(model: model.visualizer, size: MainShadeLayout.visualizerFrame.size)
                 .offset(x: MainShadeLayout.visualizerFrame.minX, y: MainShadeLayout.visualizerFrame.minY)
@@ -26,14 +28,14 @@ struct MainShadeView: View {
             transportButton(.next, action: model.next)
             transportButton(.eject, action: model.eject)
 
-            positionSlider
+            RemoteClock(anchor: model.remoteClockAnchor) { positionSlider(at: $0) }
         }
         .frame(width: MainShadeLayout.size.width, height: MainShadeLayout.size.height, alignment: .topLeading)
     }
 
-    private var positionSlider: some View {
+    private func positionSlider(at now: Date) -> some View {
         let scrub: Double? = if case .position(let fraction) = model.sliderFocus { fraction } else { nil }
-        let fraction = scrub ?? model.positionFraction
+        let fraction = scrub ?? model.positionFraction(at: now)
         return SkinSlider(
             skin: skin, slider: MainSliders.shadePosition, backgroundName: "MAIN_SHADE_POSITION_BACKGROUND",
             thumbName: MainSliders.shadePositionThumbName(fraction: fraction ?? 0),

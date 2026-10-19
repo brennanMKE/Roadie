@@ -92,4 +92,15 @@ public struct NowPlaying: Hashable, Sendable {
         if let duration, duration > 0 { value = min(value, duration) }
         return max(0, value)
     }
+
+    /// How far past a whole second each remote clock tick lands, so a tick never floors to the previous second.
+    public static let clockLead: TimeInterval = 0.05
+
+    /// When a 1 s clock for `selected` should start so that each tick lands just after the elapsed time
+    /// crosses a whole second. nil on This Mac (the local player drives the view) and unless playing, so
+    /// nothing ticks while idle, paused, loading or stopped.
+    public func remoteClockAnchor(selected: OutputDevice.ID) -> Date? {
+        guard selected != OutputDevice.thisMacID, state == .playing else { return nil }
+        return updatedAt.addingTimeInterval(-elapsed.truncatingRemainder(dividingBy: 1) + Self.clockLead)
+    }
 }

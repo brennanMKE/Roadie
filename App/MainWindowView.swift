@@ -23,7 +23,9 @@ struct MainWindowView: View {
             TitleBarView(skin: skin)
             ClutterBarView(skin: skin)
 
-            MainWindowStatusLayer(skin: skin, status: model.mainWindowStatus, toggleTimeMode: model.toggleTimeMode)
+            RemoteClock(anchor: model.remoteClockAnchor) { now in
+                MainWindowStatusLayer(skin: skin, status: model.mainWindowStatus(at: now), toggleTimeMode: model.toggleTimeMode)
+            }
 
             transportButton(.previous, action: model.previous)
             transportButton(.play, action: model.play)
@@ -34,7 +36,7 @@ struct MainWindowView: View {
 
             volumeSlider
             balanceSlider
-            positionSlider
+            RemoteClock(anchor: model.remoteClockAnchor) { positionSlider(at: $0) }
 
             toggleButton(.shuffle, selected: model.isShuffled, action: model.toggleShuffle)
             toggleButton(.repeatAll, selected: model.isRepeating, action: model.toggleRepeat)
@@ -76,12 +78,12 @@ struct MainWindowView: View {
             onChange: { model.setBalance(MainSliders.balance(forFraction: $0)) }, onCommit: { _ in model.endSliderDrag() })
     }
 
-    private var positionSlider: some View {
+    private func positionSlider(at now: Date) -> some View {
         let scrub: Double? = if case .position(let fraction) = model.sliderFocus { fraction } else { nil }
         return SkinSlider(
             skin: skin, slider: MainSliders.position, backgroundName: "MAIN_POSITION_SLIDER_BACKGROUND",
             thumbName: "MAIN_POSITION_SLIDER_THUMB", thumbPressedName: "MAIN_POSITION_SLIDER_THUMB_SELECTED",
-            frame: nil, fraction: scrub ?? model.positionFraction,
+            frame: nil, fraction: scrub ?? model.positionFraction(at: now),
             onChange: { model.scrub(toFraction: $0) }, onCommit: { model.seek(toFraction: $0) })
     }
 

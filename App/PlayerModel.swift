@@ -235,7 +235,10 @@ final class PlayerModel {
     /// What the main window's time, kbps/kHz and mono/stereo area shows. On This Mac the position, track
     /// metadata and opened file format come from the local player (read every 100 ms tick); other
     /// outputs only report the `NowPlaying` snapshot, which has no bitrate or format.
-    var mainWindowStatus: MainWindowStatus {
+    var mainWindowStatus: MainWindowStatus { mainWindowStatus(at: Date()) }
+
+    /// `mainWindowStatus` with a non-local output's elapsed time worked out for `now` (a `RemoteClock` tick).
+    func mainWindowStatus(at now: Date) -> MainWindowStatus {
         let transport: Transport = switch nowPlaying.state {
         case .stopped: .stopped
         case .loading: .loading
@@ -246,7 +249,7 @@ final class PlayerModel {
         let track = isLocal ? player.queue.current : nil
         return MainWindowStatus(
             transport: transport, timeMode: timeMode,
-            elapsed: isLocal ? player.currentTime : nowPlaying.elapsed(at: Date()),
+            elapsed: isLocal ? player.currentTime : nowPlaying.elapsed(at: now),
             duration: nowPlaying.duration ?? track?.duration ?? 0,
             bitrateKbps: track?.bitrate,
             sampleRate: (isLocal ? player.currentFormat?.sampleRate : nil) ?? track?.sampleRate,
@@ -517,8 +520,14 @@ final class PlayerModel {
     }
 
     /// 0...1, or nil when nothing is seekable (stopped, loading, unknown duration); the thumb is hidden then.
-    var positionFraction: Double? {
-        let status = mainWindowStatus
+    var positionFraction: Double? { positionFraction(at: Date()) }
+
+    /// Start of the 1 s clock that re-renders the time and position views while a non-local output plays;
+    /// nil otherwise (This Mac re-renders from the player's own ticks, and idle/paused need no clock).
+    var remoteClockAnchor: Date? { nowPlaying.remoteClockAnchor(selected: selectedOutput) }
+
+    func positionFraction(at now: Date) -> Double? {
+        let status = mainWindowStatus(at: now)
         guard status.transport == .playing || status.transport == .paused, status.duration > 0 else { return nil }
         return min(max(status.elapsed / status.duration, 0), 1)
     }

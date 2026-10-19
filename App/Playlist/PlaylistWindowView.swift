@@ -257,7 +257,11 @@ struct PlaylistMiniTimeView: View {
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
-        let status = model.mainWindowStatus
+        RemoteClock(anchor: model.remoteClockAnchor) { content(at: $0) }
+    }
+
+    @ViewBuilder private func content(at now: Date) -> some View {
+        let status = model.mainWindowStatus(at: now)
         let layout = model.playlist.layout
         let digits = status.digits
         let known = status.duration > 0 || status.timeMode == .elapsed
