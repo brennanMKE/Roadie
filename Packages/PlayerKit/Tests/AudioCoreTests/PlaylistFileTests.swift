@@ -148,4 +148,62 @@ private func paths(_ entries: [PlaylistFile.Entry], relativeTo url: URL = listUR
             #expect(paths(entries, relativeTo: url) == originals)
         }
     }
+
+    @Test func resolvesColonNamesAsRelativePaths() {
+        let entries = ["AC:DC - x.mp3", "AC:DC/Back in Black/01.mp3", "./AC:DC - y.mp3", "a:b.mp3"]
+            .map { PlaylistFile.Entry(location: $0) }
+        #expect(paths(entries) == [
+            "/tmp/x/AC:DC - x.mp3", "/tmp/x/AC:DC/Back in Black/01.mp3", "/tmp/x/AC:DC - y.mp3", "/tmp/x/a:b.mp3",
+        ])
+    }
+
+    @Test func skipsOnlySchemeURLsAsStreams() {
+        for location in ["http://r.example/s", "HTTPS://r.example/s", "mms://r.example/s", "rtsp://r.example/s", "icy://r.example/s"] {
+            #expect(PlaylistFile.resolve(.init(location: location), relativeTo: listURL)
+                == .skip(location: location, reason: "streams are not supported"))
+        }
+        let entries = ["file:///abs/d.mp3", "file:/abs/e.mp3"].map { PlaylistFile.Entry(location: $0) }
+        #expect(paths(entries) == ["/abs/d.mp3", "/abs/e.mp3"])
+    }
+
+    @Test func serializeEscapesHashAndColonNames() {
+        let tracks = ["/tmp/x/#1 Hit.mp3", "/tmp/x/AC:DC - x.mp3", "/tmp/x/AC:DC/01.mp3", "/tmp/x/sub/#b.mp3",
+                      "/elsewhere/AC:DC.mp3", "/elsewhere/#c.mp3"].map { fileTrack($0, title: "t") }
+        let expected = ["./#1 Hit.mp3", "./AC:DC - x.mp3", "./AC:DC/01.mp3", "sub/#b.mp3",
+                        "/elsewhere/AC:DC.mp3", "/elsewhere/#c.mp3"]
+        let m3u = String(decoding: PlaylistFile.serialize(tracks, format: .m3u, playlistURL: listURL).data, as: UTF8.self)
+        #expect(m3u.split(separator: "\n").filter { !$0.hasPrefix("#EXT") }.map(String.init) == expected)
+        let plsURL = URL(filePath: "/tmp/x/list.pls")
+        let pls = String(decoding: PlaylistFile.serialize(tracks, format: .pls, playlistURL: plsURL).data, as: UTF8.self)
+        #expect(pls.split(separator: "\n").filter { $0.hasPrefix("File") }.map { String($0.split(separator: "=", maxSplits: 1)[1]) } == expected)
+    }
+
+    @Test func roundTripsHashAndColonNames() {
+        let originals = ["/tmp/x/#1 Hit.mp3", "/tmp/x/AC:DC - x.mp3", "/tmp/x/AC:DC/01.mp3", "/tmp/x/sub/#b.mp3",
+                         "/elsewhere/AC:DC.mp3", "/elsewhere/#c.mp3"]
+        let tracks = originals.map { fileTrack($0, title: "t", duration: 3) }
+        for (format, name) in [(PlaylistFile.Format.m3u, "list.m3u"), (.m3u, "list.m3u8"), (.pls, "list.pls")] {
+            let url = URL(filePath: "/tmp/x/\(name)")
+            let data = PlaylistFile.serialize(tracks, format: format, playlistURL: url).data
+            let entries = PlaylistFile.parse(data, format: PlaylistFile.format(for: url, data: data), pathExtension: url.pathExtension)
+            #expect(paths(entries, relativeTo: url) == originals)
+        }
+    }
+
+    @Test func decodesUTF16WithBOM() {
+        let text = "#EXTM3U\n#EXTINF:120,Björk - Hunter\nBjörk/01 Hunter.mp3\n"
+        let utf8 = PlaylistFile.parse(Data(text.utf8), format: .m3u)
+        #expect(utf8 == [.init(location: "Björk/01 Hunter.mp3", title: "Björk - Hunter", duration: 120)])
+        let le = Data([0xFF, 0xFE]) + text.data(using: .utf16LittleEndian)!
+        let be = Data([0xFE, 0xFF]) + text.data(using: .utf16BigEndian)!
+        #expect(PlaylistFile.parse(le, format: .m3u) == utf8)
+        #expect(PlaylistFile.parse(be, format: .m3u) == utf8)
+    }
+
+    @Test func plsInUTF16IsDetected() {
+        let text = "[playlist]\nFile1=a.mp3\nNumberOfEntries=1\n"
+        let data = Data([0xFF, 0xFE]) + text.data(using: .utf16LittleEndian)!
+        #expect(PlaylistFile.format(for: listURL, data: data) == .pls)
+        #expect(PlaylistFile.parse(data, format: .pls) == [.init(location: "a.mp3")])
+    }
 }

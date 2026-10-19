@@ -40,10 +40,19 @@ public enum PlaylistFile {
         return url.pathExtension.lowercased() == "pls" ? .pls : .m3u
     }
 
-    /// UTF-8 (BOM stripped); `.m3u8` lossily, other extensions fall back to Windows-1252.
+    /// UTF-8 (BOM stripped), or UTF-16 LE/BE when it starts with a BOM; otherwise `.m3u8` decodes lossily as
+    /// UTF-8 and other extensions fall back to Windows-1252. BOM-less UTF-16 and UTF-32 are not detected.
     public static func decode(_ data: Data, pathExtension: String) -> String {
         var bytes = data
-        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) { bytes = bytes.dropFirst(3) }
+        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
+            bytes = bytes.dropFirst(3)
+        } else if bytes.starts(with: [0xFF, 0xFE]),
+                  let text = String(data: Data(bytes.dropFirst(2)), encoding: .utf16LittleEndian) {
+            return text
+        } else if bytes.starts(with: [0xFE, 0xFF]),
+                  let text = String(data: Data(bytes.dropFirst(2)), encoding: .utf16BigEndian) {
+            return text
+        }
         if let text = String(data: bytes, encoding: .utf8) { return text }
         if pathExtension.lowercased() != "m3u8", let text = String(data: bytes, encoding: .windowsCP1252) {
             return text
@@ -63,9 +72,7 @@ public enum PlaylistFile {
         let location = entry.location
         let folder = playlistURL.deletingLastPathComponent()
         let url: URL
-        if let colon = location.firstIndex(of: ":"),
-           let scheme = Optional(location[..<colon].lowercased()),
-           scheme.count > 1, scheme.allSatisfy({ $0.isLetter || $0 == "+" || $0 == "-" || $0 == "." }) {
+        if let scheme = urlScheme(of: location) {
             guard scheme == "file", let fileURL = URL(string: location), fileURL.isFileURL else {
                 return .skip(location: location, reason: "streams are not supported")
             }
@@ -92,7 +99,7 @@ public enum PlaylistFile {
                 continue
             }
             let path = url.standardizedFileURL.path
-            let written = path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : path
+            let written = path.hasPrefix(prefix) ? escapedRelative(String(path.dropFirst(prefix.count))) : path
             let title = track.artist.isEmpty ? track.title : "\(track.artist) - \(track.title)"
             let seconds = track.duration > 0 ? Int(track.duration.rounded()) : -1
             rows.append((written, title, seconds))
@@ -119,6 +126,26 @@ public enum PlaylistFile {
     }
 
     // MARK: Private
+
+    /// The lowercased scheme when `location` is a URL: `scheme://…` (RFC 3986 scheme of two or more characters) or
+    /// `file:…`. Anything else, such as `AC:DC - x.mp3`, is a path.
+    private static func urlScheme(of location: String) -> String? {
+        if location.lowercased().hasPrefix("file:") { return "file" }
+        guard let range = location.range(of: "://") else { return nil }
+        let scheme = location[..<range.lowerBound]
+        guard scheme.count > 1, let first = scheme.first, first.isASCII, first.isLetter,
+              scheme.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" || $0 == ".") })
+        else { return nil }
+        return scheme.lowercased()
+    }
+
+    /// Prefixes `./` when a relative path would otherwise read back as a comment (`#`), get trimmed (leading
+    /// whitespace) or look like a URL scheme to other players (a `:` in its first component).
+    private static func escapedRelative(_ path: String) -> String {
+        let first = path.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).first ?? ""
+        guard path.hasPrefix("#") || path.first?.isWhitespace == true || first.contains(":") else { return path }
+        return "./" + path
+    }
 
     private static func lines(_ text: String) -> [String] {
         text.replacingOccurrences(of: "\r\n", with: "\n")
