@@ -22,7 +22,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 PRICING = ROOT / "issues" / "model-pricing.json"
 # A command that runs the script (optionally after `cd … &&` or env assignments), not one that greps or reads it.
 VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n)\s*(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/run-tests-vm\.sh\b")
-DEFAULT_DIR = pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
+BACKGROUND_ID = re.compile(r"background with ID: (\w+)")
+DEFAULT_DIR =pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
 
 
 def ts(value):
@@ -37,7 +38,9 @@ def measure(path, pricing):
     first = last = None
     vm_calls = {}
     vm_runs = []
-    vm_background = 0
+    vm_background_calls = {}
+    vm_tasks = {}
+    vm_background = 0  # background runs whose end was not found
     thinking_ms = 0
     for line in open(path, encoding="utf-8"):
         try:
@@ -73,13 +76,28 @@ def measure(path, pricing):
                     command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
                     if block.get("name") == "Bash" and VM_COMMAND.search(command):
                         if tool_input.get("run_in_background"):
-                            vm_background += 1
+                            vm_background_calls[block.get("id")] = when
                         else:
                             vm_calls[block.get("id")] = when
         elif entry.get("type") == "user":
             for block in content:
-                if isinstance(block, dict) and block.get("type") == "tool_result" and block.get("tool_use_id") in vm_calls:
+                if not isinstance(block, dict) or block.get("type") != "tool_result":
+                    continue
+                if block.get("tool_use_id") in vm_calls:
                     vm_runs.append((when - vm_calls.pop(block["tool_use_id"])).total_seconds())
+                elif block.get("tool_use_id") in vm_background_calls:
+                    # "Command running in background with ID: <task>"; timed until that task's notification.
+                    found = BACKGROUND_ID.search(json.dumps(block.get("content", "")))
+                    started = vm_background_calls.pop(block["tool_use_id"])
+                    if found:
+                        vm_tasks[found.group(1)] = started
+                    else:
+                        vm_background += 1
+            if vm_tasks and entry.get("origin", {}).get("kind") == "task-notification":
+                text = json.dumps(message.get("content", ""))
+                for task in [t for t in vm_tasks if f"<task-id>{t}</task-id>" in text]:
+                    vm_runs.append((when - vm_tasks.pop(task)).total_seconds())
+    vm_background += len(vm_tasks) + len(vm_background_calls)
 
     cache_read = sum(u.get("cache_read_input_tokens", 0) for u in requests.values())
     write_5m = write_1h = 0
