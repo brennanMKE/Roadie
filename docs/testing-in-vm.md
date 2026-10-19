@@ -11,6 +11,7 @@ the golden image itself.
 
 ```bash
 scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, Info.plist check (slow tests skipped)
+scripts/run-tests-vm.sh --build-only   # compile check only: both packages with their tests, then the app; no tests run, not verification
 scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s, then quit it
 scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
@@ -29,13 +30,18 @@ A run takes a few minutes: about 15 s to boot, then SwiftPM resolution and the b
 clone starts cold. The summary at the end looks like this:
 
 ```
+==> PASS  skinkit-build
+==> PASS  playerkit-build
+==> PASS  app-build
 ==> PASS  skinkit-tests
 ==> PASS  playerkit-tests
-==> PASS  app-build
 ==> PASS  app-plist
+==> PASS  app-entitlements
 ==> PASS  app-quicklook
 ==> PASS  app-launch
 ==> TIER  fast: 100k scale and real-time audio tests skipped (scripts/run-tests-vm.sh --full runs them)
+    Build complete! (15.52s)
+    Build complete! (23.01s)
     ** BUILD SUCCEEDED **
     ✔ Test run with 50 tests in 6 suites passed after 0.558 seconds.
     ✔ Test run with 94 tests in 12 suites passed after 1.514 seconds.
@@ -44,6 +50,25 @@ clone starts cold. The summary at the end looks like this:
 ==> AUDIO  silent: no host 'Starting IO' events during the run
 ==> Logs: build/vm-tests/<run-id>
 ```
+
+When something does not compile, the run stops after the build stage and prints the errors:
+
+```
+==> PASS  skinkit-build
+==> FAIL  playerkit-build (exit 1)
+==> SKIP  app-build (build failed)
+==> SKIP  skinkit-tests (build failed)
+==> SKIP  playerkit-tests (build failed)
+==> SKIP  app-plist (build failed)
+==> SKIP  app-entitlements (build failed)
+==> SKIP  app-quicklook (build failed)
+==> BUILD  failed: 6 step(s) skipped; fix the errors below and rerun
+==> ERRORS  1 compiler error(s) (first 30; full logs: playerkit-build.log)
+    Packages/PlayerKit/Sources/MusicBackendKit/Example.swift:12:9: error: cannot find 'foo' in scope
+```
+
+A run with `SKIP` lines is a failed run. `--build-only` stops after the build stage; it is a
+compile check before a complete run, never verification.
 
 It exits non-zero if any step fails, or if the host's audio daemon started output during the run.
 The logs for each step, plus the guest's audio device list, are in `build/vm-tests/<run-id>/`
@@ -171,8 +196,8 @@ consolidated on 2026-10-11.
    for up to 120 s.
 6. **Prepare the guest.** Copy `/Volumes/My Shared Files/run/src` to `~/src`, mute the output, and
    record the audio devices.
-7. **Steps.** Each runs in the guest with its output teed to a log: SkinKit tests, PlayerKit tests
-   (with `--full`, `AUDIOCORE_REALTIME=1` so the real-time tests run too, and `SKINAMP_SLOW_TESTS=1` on the SkinKit step for the scale tests), the Debug app build, the Info.plist check of the built app, `app-quicklook` (#0043: `scripts/check-quicklook.sh` registers the embedded Quick Look extensions with Launch Services and `pluginkit`, generates a test `.wsz` with `scripts/make-test-skin.swift`, asks `QLThumbnailGenerator` (`scripts/ql-thumb.swift`; `qlmanage -t` hangs in the headless guest for extension-provided types, so it is informational only) for thumbnails of it and of a corrupt and a modern skin, samples the thumbnail with `scripts/pixel-at.swift`, and runs `qlmanage -p` to start the preview extension, and prints `quicklook: <check> ok|FAIL` lines; its files, including the PNGs, come back in `build/vm-tests/<run-id>/ql/`), and with `--launch`, opening the app, checking
+7. **Steps.** Each runs in the guest with its output teed to a log. **Build stage**: `swift build --build-tests` for SkinKit and PlayerKit, then the Debug app build (and with `--spike` the spike's package and app). If any fails, the steps after it are marked `SKIP` without running, and the summary prints the `file:line:col: error:` lines from the build logs. Then the tests, with `swift test --skip-build` against those builds: SkinKit tests, PlayerKit tests
+   (with `--full`, `AUDIOCORE_REALTIME=1` so the real-time tests run too, and `SKINAMP_SLOW_TESTS=1` on the SkinKit step for the scale tests), the Info.plist check of the built app, `app-quicklook` (#0043: `scripts/check-quicklook.sh` registers the embedded Quick Look extensions with Launch Services and `pluginkit`, generates a test `.wsz` with `scripts/make-test-skin.swift`, asks `QLThumbnailGenerator` (`scripts/ql-thumb.swift`; `qlmanage -t` hangs in the headless guest for extension-provided types, so it is informational only) for thumbnails of it and of a corrupt and a modern skin, samples the thumbnail with `scripts/pixel-at.swift`, and runs `qlmanage -p` to start the preview extension, and prints `quicklook: <check> ok|FAIL` lines; its files, including the PNGs, come back in `build/vm-tests/<run-id>/ql/`), and with `--launch`, opening the app, checking
    it is still running after 5 s, and quitting it. With `--skins` a `skintool-png` step follows `skintool`:
    it renders every skin's main window headless to `build/vm-tests/<run-id>/png/<name>.png`, and with
    `--references DIR` (the host-fetched Webamp screenshots, copied into the export's `Skins/reference/`;
