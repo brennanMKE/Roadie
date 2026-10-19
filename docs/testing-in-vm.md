@@ -41,8 +41,8 @@ clone starts cold. The summary at the end looks like this:
 ==> PASS  app-quicklook
 ==> PASS  app-launch
 ==> TIER  fast: 100k scale and real-time audio tests skipped (scripts/run-tests-vm.sh --full runs them)
-    Build complete! (15.52s)
-    Build complete! (23.01s)
+    Build complete! (15.35 sec)
+    Build complete! (23.01 sec)
     ** BUILD SUCCEEDED **
     ✔ Test run with 50 tests in 6 suites passed after 0.558 seconds.
     ✔ Test run with 94 tests in 12 suites passed after 1.514 seconds.
