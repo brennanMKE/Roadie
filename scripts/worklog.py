@@ -21,7 +21,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PRICING = ROOT / "issues" / "model-pricing.json"
 # A command that runs the script (optionally after `cd … &&` or env assignments), not one that greps or reads it.
-VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n)\s*(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/run-tests-vm\.sh\b")
+VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n|\()\s*(time\s+)?(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/run-tests-vm\.sh\b(?!\s+(-h|--help)\b)")
 VM_SUMMARY = re.compile(r"==> (PASS|FAIL|SKIP|AUDIO|TIER)|Cleaning up \(exit")
 BACKGROUND_ID = re.compile(r"background with ID: (\w+)")
 DEFAULT_DIR =pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
@@ -79,16 +79,19 @@ def measure(path, pricing):
                         if tool_input.get("run_in_background"):
                             vm_background_calls[block.get("id")] = when
                         else:
-                            vm_calls[block.get("id")] = when
+                            vm_calls[block.get("id")] = (when, len(VM_COMMAND.findall(command)))
         elif entry.get("type") == "user":
             for block in content:
                 if not isinstance(block, dict) or block.get("type") != "tool_result":
                     continue
                 if block.get("tool_use_id") in vm_calls:
-                    started = vm_calls.pop(block["tool_use_id"])
-                    # Only a real run prints the script's step summary; --help, syntax checks and heredocs don't.
-                    if VM_SUMMARY.search(json.dumps(block.get("content", ""))):
-                        vm_runs.append((when - started).total_seconds())
+                    started, count = vm_calls.pop(block["tool_use_id"])
+                    # A real run prints the step summary or, with its output redirected, takes a while; --help,
+                    # syntax checks and heredocs that mention the script do neither.
+                    elapsed = (when - started).total_seconds()
+                    if VM_SUMMARY.search(json.dumps(block.get("content", ""))) or elapsed >= 30:
+                        # Several runs in one call share its elapsed time.
+                        vm_runs.extend([elapsed / count] * count)
                 elif block.get("tool_use_id") in vm_background_calls:
                     # "Command running in background with ID: <task>"; timed until that task's notification.
                     found = BACKGROUND_ID.search(json.dumps(block.get("content", "")))
