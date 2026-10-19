@@ -90,5 +90,22 @@ struct MainMenuTests {
         #expect(item(.toggleMainShade)?.shortcut == MainMenuShortcut("w", [.command, .control]))
         #expect(item(.toggleEQShade)?.shortcut == MainMenuShortcut("e", [.command, .control]))
         #expect(item(.togglePlaylistShade)?.shortcut == MainMenuShortcut("p", [.command, .control]))
+        let cc: MainMenuShortcut.Modifiers = [.command, .control]
+        #expect(item(.toggleRepeat)?.shortcut == MainMenuShortcut("r", cc))
+        #expect(item(.toggleShuffle)?.shortcut == MainMenuShortcut("s", cc))
+        #expect(item(.previous)?.shortcut == MainMenuShortcut("z", cc))
+        #expect(item(.play)?.shortcut == MainMenuShortcut("x", cc))
+        #expect(item(.pause)?.shortcut == MainMenuShortcut("c", cc))
+        #expect(item(.stop)?.shortcut == MainMenuShortcut("v", cc))
+        #expect(item(.next)?.shortcut == MainMenuShortcut("b", cc))
+        #expect(item(.nextSkin)?.shortcut == MainMenuShortcut("]"))
+        #expect(item(.previousSkin)?.shortcut == MainMenuShortcut("["))
+        #expect(item(.randomSkin)?.shortcut == MainMenuShortcut("r", [.command, .shift]))
+    }
+
+    @Test func shortcutsAreUnique() {
+        let keys = items(MainMenu.entries(MainMenuState())).compactMap(\.shortcut).map { "\($0.key)|\($0.modifiers.rawValue)" }
+        #expect(!keys.isEmpty)
+        #expect(Set(keys).count == keys.count)
     }
 }

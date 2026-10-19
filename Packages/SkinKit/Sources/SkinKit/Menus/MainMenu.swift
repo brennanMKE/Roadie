@@ -142,18 +142,18 @@ public enum MainMenu {
                     .togglePlaylistShade, "Playlist Windowshade", checked: state.isPlaylistShaded,
                     shortcut: MainMenuShortcut("p", [.command, .control]))),
             .separator,
-            .item(MainMenuItem(.toggleRepeat, "Repeat", checked: state.isRepeating)),
-            .item(MainMenuItem(.toggleShuffle, "Shuffle", checked: state.isShuffled)),
+            .item(MainMenuItem(.toggleRepeat, "Repeat", checked: state.isRepeating, shortcut: MainMenuShortcut("r", [.command, .control]))),
+            .item(MainMenuItem(.toggleShuffle, "Shuffle", checked: state.isShuffled, shortcut: MainMenuShortcut("s", [.command, .control]))),
         ]
     }
 
     public static func playbackEntries(_ state: MainMenuState) -> [MainMenuEntry] {
         [
-            .item(MainMenuItem(.previous, "Previous")),
-            .item(MainMenuItem(.play, "Play")),
-            .item(MainMenuItem(.pause, "Pause")),
-            .item(MainMenuItem(.stop, "Stop")),
-            .item(MainMenuItem(.next, "Next")),
+            .item(MainMenuItem(.previous, "Previous", shortcut: MainMenuShortcut("z", [.command, .control]))),
+            .item(MainMenuItem(.play, "Play", shortcut: MainMenuShortcut("x", [.command, .control]))),
+            .item(MainMenuItem(.pause, "Pause", shortcut: MainMenuShortcut("c", [.command, .control]))),
+            .item(MainMenuItem(.stop, "Stop", shortcut: MainMenuShortcut("v", [.command, .control]))),
+            .item(MainMenuItem(.next, "Next", shortcut: MainMenuShortcut("b", [.command, .control]))),
         ]
     }
 }

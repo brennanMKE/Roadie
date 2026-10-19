@@ -25,7 +25,6 @@ struct SkinAmpApp: App {
             SkinBrowserWindowView()
                 .environment(appDelegate.model)
         }
-        .keyboardShortcut("k")
         .defaultSize(width: 920, height: 640)
 
         Settings {
