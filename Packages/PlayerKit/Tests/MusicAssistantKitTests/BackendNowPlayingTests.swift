@@ -23,9 +23,10 @@ struct BackendNowPlayingTests {
         rig.factory.transports.flatMap(\.sentRequests).filter { $0.command == "players/get" }.count
     }
 
-    /// The ping loop plus the poll loop: the watch is idle and waiting on the clock.
-    private func settled(_ rig: BackendRig, sleepers: Int = 2) async -> Bool {
-        await waitFor { rig.clock.sleeperCount == sleepers }
+    /// The poll loop is asleep for `poll`, so the last refetch, including its queue calls, has finished.
+    /// A bare sleeper count can't tell the poll sleeper from an in-flight call-timeout sleeper (#0088).
+    private func settled(_ rig: BackendRig, poll: Duration = .seconds(1)) async -> Bool {
+        await waitFor { rig.clock.hasSleeper(dueIn: poll) }
     }
 
     private func push(_ rig: BackendRig, _ event: MAJSON) {
@@ -91,8 +92,8 @@ struct BackendNowPlayingTests {
         for _ in 0..<3 {
             push(rig, ["event": "player_updated", "object_id": .string(SyntheticPlayback.playerID), "data": "garbage"])
         }
-        // The debounce sleeper joins the ping and poll loops.
-        #expect(await settled(rig, sleepers: 3))
+        // The debounce sleeper is running.
+        #expect(await waitFor { rig.clock.hasSleeper(dueIn: .milliseconds(150)) })
         try await Task.sleep(for: .milliseconds(50))
         #expect(gets(rig) == before)
         rig.clock.advance(by: .milliseconds(150))
@@ -128,7 +129,7 @@ struct BackendNowPlayingTests {
         var before = gets(rig)
         rig.clock.advance(by: .seconds(1))
         #expect(await waitFor { gets(rig) == before + 1 })
-        #expect(await settled(rig))
+        #expect(await settled(rig, poll: .seconds(10)))
         before = gets(rig)
         rig.clock.advance(by: .seconds(5))
         try await Task.sleep(for: .milliseconds(50))
@@ -215,7 +216,7 @@ struct BackendNowPlayingTests {
         #expect(await settled(rig))
         collector.stop()
         // Only the client's ping loop is left on the clock.
-        #expect(await settled(rig, sleepers: 1))
+        #expect(await waitFor { rig.clock.sleeperCount == 1 })
         let sent = rig.transport.sentRequests.count
         push(rig, ["event": "player_updated", "object_id": .string(SyntheticPlayback.playerID), "data": "garbage"])
         for _ in 0..<5 { rig.clock.advance(by: .seconds(1)) }
