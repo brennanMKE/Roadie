@@ -5,10 +5,11 @@ import Testing
 
 /// The Skins window's 200 ms search budget on 100,000 rows. The assertion is on the median of five runs of the
 /// page query plus its count, after one warm-up run, so one scheduling hiccup in a loaded VM cannot fail it.
+/// Runs only in the VM's full tier (`SKINAMP_SLOW_TESTS=1`, `scripts/run-tests-vm.sh --full`; #0085, #0093).
 @Suite struct SkinSearchBudgetTests {
     static let rows = 100_000
 
-    @Test(.timeLimit(.minutes(5)))
+    @Test(.enabled(if: SlowTests.isEnabled), .timeLimit(.minutes(5)))
     func searchOnHundredThousandRowsStaysUnder200ms() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }

@@ -222,41 +222,47 @@ import Testing
         let dir = try TempDir()
         defer { dir.cleanup() }
         let folder = try dir.skinsFolder()
-        try makeStubFiles(count: 200, in: folder)
+        try makeStubFiles(count: 60, in: folder)
         let store = try await dir.makeStore()
-        let ingester = StubIngester(delayPerFile: 0.005)
         let indexer = SkinIndexer(
-            folder: folder, store: store, ingester: ingester, concurrency: 4, batchSize: 10, progressInterval: .zero)
+            folder: folder, store: store, ingester: StubIngester(), concurrency: 4, batchSize: 10,
+            progressInterval: .zero)
+        // With `progressInterval: .zero` progress fires after every batch, so the cancel lands after batch 2.
         let cancelled = try await indexer.run { progress in
             if progress.phase == .indexing, progress.processed >= 20 { indexer.cancel() }
         }
         #expect(cancelled.cancelled)
-        let committed = try await store.counts().files
-        #expect(committed % 10 == 0 && committed >= 10 && committed < 200)
+        #expect(try await store.counts().files == 20)
         let next = try await indexer.run()
         #expect(!next.cancelled)
-        #expect(next.added == 200 - committed)
-        #expect(next.unchanged == committed)
-        #expect(try await store.counts().files == 200)
+        #expect(next.added == 40)
+        #expect(next.unchanged == 20)
+        #expect(try await store.counts().files == 60)
     }
 
     @Test func concurrentRunThrowsPassAlreadyRunning() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
         let folder = try dir.skinsFolder()
-        try makeStubFiles(count: 60, in: folder)
+        try makeStubFiles(count: 10, in: folder)
         let store = try await dir.makeStore()
-        let indexer = SkinIndexer(
-            folder: folder, store: store, ingester: StubIngester(delayPerFile: 0.02), concurrency: 2, batchSize: 10)
-        let first = Task { try await indexer.run() }
-        var spins = 0
-        while !(await indexer.isRunning), spins < 5000 {
-            try await Task.sleep(for: .milliseconds(1))
-            spins += 1
+        let indexer = SkinIndexer(folder: folder, store: store, ingester: StubIngester(), concurrency: 2, batchSize: 10)
+        // The scanning progress fires on the actor inside pass 1, right before it suspends on the folder scan, so a
+        // task started here reaches the actor while pass 1 is still running. No thread is blocked and nothing waits
+        // on time (a blocking gate starved the cooperative pool alongside the thumbnail tests' latches).
+        let probe = LockedBox<Task<(Bool, Error?), Never>?>(nil)
+        let summary = try await indexer.run { progress in
+            guard progress.phase == .scanning else { return }
+            probe.value = Task {
+                let wasRunning = await indexer.isRunning
+                do { _ = try await indexer.run() } catch { return (wasRunning, error) }
+                return (wasRunning, nil)
+            }
         }
-        await #expect(throws: SkinLibraryError.self) { try await indexer.run() }
-        let summary = try await first.value
-        #expect(summary.added == 60)
+        let (wasRunning, error) = await (try #require(probe.value)).value
+        #expect(wasRunning)
+        #expect(error is SkinLibraryError)
+        #expect(summary.added == 10)
         #expect(await indexer.isRunning == false)
     }
 

@@ -3,7 +3,7 @@ import Testing
 
 @testable import SkinLibrary
 
-/// The browser's query methods on the real store (small seeds; the 100k budget test is `SkinSearchBudgetTests`).
+/// The browser's query methods on the real store (small seeds; the 100k budget test is `SkinSearchBudgetTests`, full tier).
 @Suite struct SkinQueryTests {
     private func seed(_ store: SkinIndexStore, _ rows: [(name: String, readme: String?, status: SkinStatus)]) async throws {
         let batch = rows.enumerated().map { index, row in

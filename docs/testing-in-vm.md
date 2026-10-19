@@ -79,7 +79,7 @@ The logs for each step, plus the guest's audio device list, are in `build/vm-tes
 - **Fast tier** (the default, `scripts/run-tests-vm.sh`): every step, but the slow tests skip
   themselves. Plain `swift test` on its own is also the fast tier, since both gates are off.
 - **Full tier** (`scripts/run-tests-vm.sh --full`): the fast tier plus the slow tests, turned on by
-  two env gates: `SKINAMP_SLOW_TESTS=1` on the SkinKit step (the two 100k `SkinIndexScaleTests`) and
+  two env gates: `SKINAMP_SLOW_TESTS=1` on the SkinKit step (the three 100k SkinLibrary tests (`SkinIndexScaleTests`, `SkinSearchBudgetTests`)) and
   `AUDIOCORE_REALTIME=1` on the PlayerKit step (the six real-time AudioCore tests, muted).
 
 Phases 2 and 3 of an issue run the fast tier, and the full tier too when the change touches code a

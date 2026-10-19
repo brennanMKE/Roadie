@@ -3,7 +3,7 @@ import Testing
 
 @testable import SkinLibrary
 
-/// Opt-in: the 100k scale checks run only in the VM's full tier (`scripts/run-tests-vm.sh --full`, #0085).
+/// Opt-in: the 100k scale checks (`SkinIndexScaleTests`, `SkinSearchBudgetTests`) run only in the VM's full tier (`scripts/run-tests-vm.sh --full`, #0085).
 enum SlowTests { static let isEnabled = ProcessInfo.processInfo.environment["SKINAMP_SLOW_TESTS"] == "1" }
 
 /// Scale checks, opt-in with `SKINAMP_SLOW_TESTS=1` (the VM's full tier, `--full`); plain `swift test` skips them.

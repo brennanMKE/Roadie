@@ -89,20 +89,29 @@ enum SyntheticSkins {
 }
 
 /// An ingester that costs nothing: the hash comes from the path (or an override) and no file is read.
+/// A value shared between a `@Sendable` callback and the test body.
+final class LockedBox<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value: Value
+    init(_ value: Value) { _value = value }
+    var value: Value {
+        get { lock.withLock { _value } }
+        set { lock.withLock { _value = newValue } }
+    }
+}
+
 final class StubIngester: SkinIngesting, @unchecked Sendable {
     private let lock = NSLock()
     private var _hashes = 0, _inspections = 0
     private var _mainThreadCalls = 0
     private var overrides: [String: String] = [:]
-    let delayPerFile: TimeInterval
     let recordThread: Bool
     let inspection: SkinInspection
 
     init(
-        delayPerFile: TimeInterval = 0, recordThread: Bool = false,
+        recordThread: Bool = false,
         inspection: SkinInspection = SkinInspection(readme: nil, status: .ok, warnings: [])
     ) {
-        self.delayPerFile = delayPerFile
         self.recordThread = recordThread
         self.inspection = inspection
     }
@@ -115,7 +124,6 @@ final class StubIngester: SkinIngesting, @unchecked Sendable {
     func override(path: String, hash: String) { lock.withLock { overrides[path] = hash } }
 
     private func note(_ url: URL) {
-        if delayPerFile > 0 { Thread.sleep(forTimeInterval: delayPerFile) }
         if recordThread && Thread.isMainThread { lock.withLock { _mainThreadCalls += 1 } }
     }
 
