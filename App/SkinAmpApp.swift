@@ -46,6 +46,10 @@ struct SkinAmpApp: App {
                     .keyboardShortcut("o", modifiers: [.command, .option])
                 Button("Open Skin…") { appDelegate.model.openSkin() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
+                Divider()
+                Button("Load Playlist…") { appDelegate.model.loadPlaylistFile() }
+                Button("Save Playlist…") { appDelegate.model.savePlaylistFile() }
+                    .keyboardShortcut("s")
             }
             SkinsCommands(model: appDelegate.model)
             PlaybackCommands(model: appDelegate.model)

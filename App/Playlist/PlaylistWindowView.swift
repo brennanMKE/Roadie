@@ -338,8 +338,7 @@ struct PlaylistMenusView: View {
         }
     }
 
-    /// Runs a skinned menu entry. Sort List and Misc Options pop native menus at the pointer; Save/Load List (#0082)
-    /// still highlight and close.
+    /// Runs a skinned menu entry. Sort List and Misc Options pop native menus at the pointer.
     private func run(_ sprite: String) {
         let playlist = model.playlist
         switch sprite {
@@ -350,6 +349,8 @@ struct PlaylistMenusView: View {
         case "PLAYLIST_REMOVE_SELECTED": playlist.removeSelected()
         case "PLAYLIST_CROP": playlist.crop()
         case "PLAYLIST_REMOVE_ALL", "PLAYLIST_NEW_LIST": playlist.removeAll()
+        case "PLAYLIST_SAVE_LIST": model.savePlaylistFile()
+        case "PLAYLIST_LOAD_LIST": model.loadPlaylistFile()
         case "PLAYLIST_INVERT_SELECTION": playlist.invertSelection()
         case "PLAYLIST_SELECT_ZERO": playlist.selectNone()
         case "PLAYLIST_SELECT_ALL": playlist.selectAll()

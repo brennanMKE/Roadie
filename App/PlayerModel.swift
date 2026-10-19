@@ -569,7 +569,7 @@ final class PlayerModel {
     /// Winamp's eject button opens the file dialog.
     func eject() { openFiles(replace: true) }
 
-    /// Shows the open panel for audio files, folders and skins. Open replaces the queue and plays;
+    /// Shows the open panel for audio files, folders, playlists and skins. Open replaces the queue and plays;
     /// Add appends. A chosen `.wsz` loads as the skin. The app is not sandboxed, so the returned
     /// URLs are directly readable.
     func openFiles(replace: Bool) {
@@ -577,8 +577,8 @@ final class PlayerModel {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = LocalTrackLoader.audioTypes + [.wsz]
-        panel.message = "Choose audio files, folders or a skin"
+        panel.allowedContentTypes = LocalTrackLoader.audioTypes + LocalTrackLoader.playlistTypes + [.wsz]
+        panel.message = "Choose audio files, folders, playlists or a skin"
         panel.prompt = replace ? "Open" : "Add"
         Task {
             guard await panel.begin() == .OK else { return }

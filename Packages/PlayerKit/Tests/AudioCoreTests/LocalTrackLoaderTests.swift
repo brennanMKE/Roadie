@@ -31,6 +31,51 @@ private func writeWAV(to url: URL, seconds: Double, sampleRate: Double = 44_100,
 }
 
 @Suite struct LocalTrackLoaderTests {
+    @Test func playlistExpandsInOrderWithMissingFilesSkipped() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeWAV(to: dir.appending(path: "one.wav"), seconds: 0.2)
+        try writeWAV(to: dir.appending(path: "sub/two.wav"), seconds: 0.2)
+        let list = dir.appending(path: "list.m3u8")
+        try Data("#EXTM3U\n#EXTINF:1,X - One\none.wav\nmissing.wav\nsub/two.wav\n".utf8).write(to: list)
+
+        let result = await LocalTrackLoader.load([list])
+        #expect(result.tracks.map(\.title) == ["one", "two"])
+        #expect(result.skipped.map(\.reason) == ["file not found"])
+    }
+
+    @Test func playlistEntriesKeepInputPosition() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for name in ["a", "b", "c", "d"] { try writeWAV(to: dir.appending(path: "\(name).wav"), seconds: 0.2) }
+        let list = dir.appending(path: "list.pls")
+        try Data("[playlist]\nFile1=b.wav\nFile2=c.wav\nNumberOfEntries=2\n".utf8).write(to: list)
+
+        let result = await LocalTrackLoader.load([dir.appending(path: "a.wav"), list, dir.appending(path: "d.wav")])
+        #expect(result.tracks.map(\.title) == ["a", "b", "c", "d"])
+        #expect(result.skipped.isEmpty)
+    }
+
+    @Test func unreadablePlaylistIsReportedSkipped() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let result = await LocalTrackLoader.load([dir.appending(path: "nope.m3u")])
+        #expect(result.tracks.isEmpty)
+        #expect(result.skipped.map(\.reason) == ["could not read playlist"])
+    }
+
+    @Test func folderWalkIgnoresPlaylistFiles() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeWAV(to: dir.appending(path: "x.wav"), seconds: 0.2)
+        try Data("x.wav\n".utf8).write(to: dir.appending(path: "x.m3u"))
+        try Data("[playlist]\nFile1=x.wav\n".utf8).write(to: dir.appending(path: "x.pls"))
+
+        let result = await LocalTrackLoader.load([dir])
+        #expect(result.tracks.count == 1)
+        #expect(result.skipped.isEmpty)
+    }
+
     @Test func wavYieldsTrackWithFormatAndFallbackTitle() async throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

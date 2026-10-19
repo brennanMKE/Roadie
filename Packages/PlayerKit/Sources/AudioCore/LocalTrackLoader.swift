@@ -23,6 +23,11 @@ public enum LocalTrackLoader {
         .audio, .mp3, .mpeg4Audio, .wav, .aiff, UTType(filenameExtension: "flac"),
     ].compactMap { $0 }
 
+    /// M3U, M3U8 and PLS, for open panels. `load` expands these in place.
+    public static let playlistTypes: [UTType] = ["m3u", "m3u8", "pls"].compactMap {
+        UTType(filenameExtension: $0, conformingTo: .data)
+    }
+
     public static func isAudio(_ url: URL) -> Bool {
         if let type = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType {
             return type.conforms(to: .audio)
@@ -45,7 +50,8 @@ public enum LocalTrackLoader {
     }
 
     public static func load(_ urls: [URL]) async -> LocalImport {
-        let all = collectAudioURLs(from: urls)
+        let expanded = expandPlaylists(urls)
+        let all = collectAudioURLs(from: expanded.urls)
         var tracks: [Track?] = Array(repeating: nil, count: all.count)
         var skipped: [Int: SkippedFile] = [:]
 
@@ -86,7 +92,7 @@ public enum LocalTrackLoader {
         }
 
         let loaded = tracks.compactMap { $0 }
-        let skippedList = skipped.keys.sorted().compactMap { skipped[$0] }
+        let skippedList = expanded.skipped + skipped.keys.sorted().compactMap { skipped[$0] }
         logger.info("Imported \(loaded.count) track(s), skipped \(skippedList.count)")
         return LocalImport(tracks: loaded, skipped: skippedList)
     }
@@ -143,6 +149,37 @@ public enum LocalTrackLoader {
     }
 
     // MARK: Private
+
+    /// Replaces each explicitly given playlist file with its entries, at its position. Entries that are playlists
+    /// themselves, streams, and unreadable playlists are reported as skipped.
+    private static func expandPlaylists(_ urls: [URL]) -> (urls: [URL], skipped: [SkippedFile]) {
+        var result: [URL] = []
+        var skipped: [SkippedFile] = []
+        func skip(_ url: URL, _ reason: String) {
+            logger.warning("Skipping \(url.lastPathComponent, privacy: .public): \(reason, privacy: .public)")
+            skipped.append(SkippedFile(url: url, reason: reason))
+        }
+        for url in urls {
+            guard PlaylistFile.isPlaylist(url), !isDirectory(url) else {
+                result.append(url)
+                continue
+            }
+            guard let data = try? Data(contentsOf: url) else {
+                skip(url, "could not read playlist")
+                continue
+            }
+            let format = PlaylistFile.format(for: url, data: data)
+            let entries = PlaylistFile.parse(data, format: format, pathExtension: url.pathExtension)
+            logger.info("Playlist \(url.lastPathComponent, privacy: .public): \(entries.count) entries")
+            for entry in entries {
+                switch PlaylistFile.resolve(entry, relativeTo: url) {
+                case .file(let file): result.append(file)
+                case .skip(let location, let reason): skip(url.deletingLastPathComponent().appending(path: location), reason)
+                }
+            }
+        }
+        return (result, skipped)
+    }
 
     private static func stringValue(_ items: [AVMetadataItem], _ id: AVMetadataIdentifier) async -> String? {
         guard let item = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: id).first,
