@@ -41,7 +41,9 @@ public enum PlaylistFile {
     }
 
     /// UTF-8 (BOM stripped), or UTF-16 LE/BE when it starts with a BOM; otherwise `.m3u8` decodes lossily as
-    /// UTF-8 and other extensions fall back to Windows-1252. BOM-less UTF-16 and UTF-32 are not detected.
+    /// UTF-8 and other extensions fall back to Windows-1252. BOM-less UTF-16 LE/BE is detected from the NUL-byte
+    /// pattern of mostly-ASCII text in the first 512 bytes (a trailing odd byte is ignored); BOM-less UTF-32 is
+    /// not detected.
     public static func decode(_ data: Data, pathExtension: String) -> String {
         var bytes = data
         if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
@@ -52,12 +54,32 @@ public enum PlaylistFile {
         } else if bytes.starts(with: [0xFE, 0xFF]),
                   let text = String(data: Data(bytes.dropFirst(2)), encoding: .utf16BigEndian) {
             return text
+        } else if let encoding = bomlessUTF16Encoding(bytes) {
+            let even = bytes.count & ~1
+            if let text = String(data: Data(bytes.prefix(even)), encoding: encoding) { return text }
         }
         if let text = String(data: bytes, encoding: .utf8) { return text }
         if pathExtension.lowercased() != "m3u8", let text = String(data: bytes, encoding: .windowsCP1252) {
             return text
         }
         return String(decoding: bytes, as: UTF8.self)
+    }
+
+    /// UTF-16 without a BOM, guessed from NULs in the high byte of ASCII characters: ≥ 60 % of the code units
+    /// have a NUL on one side and ≤ 10 % on the other. UTF-8 and Windows-1252 text has no NULs, so never matches.
+    private static func bomlessUTF16Encoding(_ bytes: Data) -> String.Encoding? {
+        let sample = Array(bytes.prefix(512))
+        let n = sample.count & ~1
+        guard n >= 4 else { return nil }
+        let pairs = n / 2
+        var evenNUL = 0, oddNUL = 0
+        for i in stride(from: 0, to: n, by: 2) {
+            if sample[i] == 0 { evenNUL += 1 }
+            if sample[i + 1] == 0 { oddNUL += 1 }
+        }
+        if oddNUL * 10 >= pairs * 6, evenNUL * 10 <= pairs { return .utf16LittleEndian }
+        if evenNUL * 10 >= pairs * 6, oddNUL * 10 <= pairs { return .utf16BigEndian }
+        return nil
     }
 
     public static func parse(_ data: Data, format: Format, pathExtension: String = "m3u") -> [Entry] {

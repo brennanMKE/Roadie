@@ -206,4 +206,43 @@ private func paths(_ entries: [PlaylistFile.Entry], relativeTo url: URL = listUR
         #expect(PlaylistFile.format(for: listURL, data: data) == .pls)
         #expect(PlaylistFile.parse(data, format: .pls) == [.init(location: "a.mp3")])
     }
+
+    @Test func decodesBOMlessUTF16M3U() {
+        let text = "#EXTM3U\n#EXTINF:120,Björk - Hunter\nBjörk/01 Hunter.mp3\n"
+        let expected: [PlaylistFile.Entry] = [.init(location: "Björk/01 Hunter.mp3", title: "Björk - Hunter", duration: 120)]
+        #expect(PlaylistFile.parse(Data(text.utf8), format: .m3u) == expected)
+        for encoding in [String.Encoding.utf16LittleEndian, .utf16BigEndian] {
+            let data = text.data(using: encoding)!
+            #expect(PlaylistFile.parse(data, format: .m3u) == expected)
+            #expect(PlaylistFile.parse(data, format: .m3u, pathExtension: "m3u8") == expected)
+        }
+    }
+
+    @Test func decodesBOMlessUTF16PLS() {
+        let text = "[playlist]\nFile1=Café/a.mp3\nTitle1=Café\nNumberOfEntries=1\n"
+        for encoding in [String.Encoding.utf16LittleEndian, .utf16BigEndian] {
+            let data = text.data(using: encoding)!
+            #expect(PlaylistFile.format(for: URL(filePath: "/tmp/x/list.m3u"), data: data) == .pls)
+            #expect(PlaylistFile.parse(data, format: .pls) == [.init(location: "Café/a.mp3", title: "Café")])
+        }
+    }
+
+    @Test func bomlessUTF16DetectionLeavesUTF8AndWindows1252Alone() {
+        let utf8 = Data("#EXTM3U\nBjörk/a.mp3\n".utf8)
+        #expect(PlaylistFile.parse(utf8, format: .m3u).map(\.location) == ["Björk/a.mp3"])
+        #expect(PlaylistFile.decode(utf8, pathExtension: "m3u") == "#EXTM3U\nBjörk/a.mp3\n")
+        let cp1252 = Data("Caf".utf8) + Data([0xE9]) + Data(".mp3\n".utf8)
+        #expect(PlaylistFile.parse(cp1252, format: .m3u, pathExtension: "m3u").map(\.location) == ["Café.mp3"])
+        let decoded = PlaylistFile.decode(cp1252, pathExtension: "m3u")
+        #expect(decoded == "Café.mp3\n")
+        #expect(!decoded.contains("\u{0}"))
+    }
+
+    @Test func bomlessUTF16ToleratesTinyAndOddLengthData() {
+        for data in [Data(), Data([0x00]), Data([0x61, 0x00]), Data([0x00, 0x61, 0x00])] {
+            #expect(PlaylistFile.decode(data, pathExtension: "m3u").count <= 3)
+        }
+        let odd = "a.mp3\nb.mp3\n".data(using: .utf16LittleEndian)! + Data([0x00])
+        #expect(PlaylistFile.parse(odd, format: .m3u).map(\.location) == ["a.mp3", "b.mp3"])
+    }
 }
