@@ -147,8 +147,30 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
             guard let self else { return }
             coordinator?.raiseGroup(around: self)
         }
+        if case .main = kind {
+            window.onRightMouseDown = { [weak self] event in
+                guard let self else { return false }
+                popUpMainMenu(for: event)
+                return true
+            }
+        }
         applyLayout()
         observe()
+    }
+
+    private func mainMenu() -> NSMenu {
+        MainMenuBuilder.menu(MainMenu.entries(model.mainMenuState)) { [weak model] in model?.perform($0) }
+    }
+
+    /// Opens the options menu with its top-left at `p` in skin pixels (the hosting view is flipped).
+    func popUpMainMenu(atSkinPoint p: CGPoint) {
+        let scale = model.scale
+        mainMenu().popUp(positioning: nil, at: NSPoint(x: p.x * scale, y: p.y * scale), in: hosting)
+    }
+
+    /// Opens the options menu at the pointer, for a right-click or Control-click.
+    func popUpMainMenu(for event: NSEvent) {
+        NSMenu.popUpContextMenu(mainMenu(), with: event, for: hosting)
     }
 
     /// Brings the window forward. The first time, a window with no restored position sits directly under `reference`

@@ -16,7 +16,10 @@ struct TitleBarView: View {
         let isKey = activeState == .key
         ZStack(alignment: .topLeading) {
             if isKey {
-                button("MAIN_OPTIONS_BUTTON", .options) {}
+                button("MAIN_OPTIONS_BUTTON", .options) {
+                    let rect = MainWindowLayout.rect(.options)
+                    window?.popUpMainMenu(atSkinPoint: CGPoint(x: rect.minX, y: rect.maxY))
+                }
                 button("MAIN_MINIMIZE_BUTTON", .minimize) { window?.minimize() }
             }
             if shaded {

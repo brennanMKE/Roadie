@@ -20,7 +20,13 @@ final class SkinWindow: NSWindow {
 
     /// A click anywhere in the window (Webamp's `FocusTarget`), after AppKit has handled it, so a window that is already
     /// key can still pull its group forward.
+    /// A secondary click (right-click, or Control-click); returning true swallows the event.
+    var onRightMouseDown: ((NSEvent) -> Bool)?
+
     override func sendEvent(_ event: NSEvent) {
+        let isSecondary = event.type == .rightMouseDown
+            || (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
+        if isSecondary, let onRightMouseDown, onRightMouseDown(event) { return }
         super.sendEvent(event)
         if event.type == .leftMouseDown { onLeftMouseDown?() }
     }

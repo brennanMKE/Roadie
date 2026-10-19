@@ -159,6 +159,12 @@ final class PlayerModel {
         UserDefaults.standard.set(timeMode.rawValue, forKey: Self.timeModeKey)
     }
 
+    func setTimeMode(_ mode: TimeMode) {
+        guard mode != timeMode else { return }
+        timeMode = mode
+        UserDefaults.standard.set(timeMode.rawValue, forKey: Self.timeModeKey)
+    }
+
     /// What the main window's time, kbps/kHz and mono/stereo area shows. On This Mac the position, track
     /// metadata and opened file format come from the local player (read every 100 ms tick); other
     /// outputs only report the `NowPlaying` snapshot, which has no bitrate or format.
