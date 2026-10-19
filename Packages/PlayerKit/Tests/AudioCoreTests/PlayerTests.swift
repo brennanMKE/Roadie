@@ -471,6 +471,23 @@ struct PlayerRestoreQueueTests {
         #expect(p.currentTime == 0)
     }
 
+    @Test func sortQueueKeepsStateAndCurrentTrack() {
+        let p = Player()
+        #expect(p.restoreQueue(Array(makeTracks(4).reversed()), currentIndex: 1, repeatMode: .off, isShuffled: false))
+        let id = p.queue.current?.id
+        p.sortQueue { $0.title }
+        #expect(p.queue.tracks.map(\.title) == ["t0", "t1", "t2", "t3"])
+        #expect(p.queue.current?.id == id)
+        p.reverseQueue()
+        #expect(p.queue.tracks.map(\.title) == ["t3", "t2", "t1", "t0"])
+        #expect(p.queue.current?.id == id)
+        p.randomizeQueue()
+        #expect(Set(p.queue.tracks.map(\.title)) == ["t0", "t1", "t2", "t3"])
+        #expect(p.queue.current?.id == id)
+        #expect(p.state == .stopped)
+        #expect(p._graph == nil)
+    }
+
     @Test func restoreQueueIsIgnoredUnlessStoppedAndEmpty() {
         let p = Player()
         p.enqueue(makeTracks(1))

@@ -210,6 +210,22 @@ public final class Player: NowPlayingCommandTarget {
         reconcileSchedule()
     }
 
+    /// Sorts the list by `key` (see `PlayQueue.sort`). Playback continues; the schedule is reconciled.
+    public func sortQueue(by key: (Track) -> String) {
+        guard queue.sort(by: key) else { return }
+        reconcileSchedule()
+    }
+
+    public func reverseQueue() {
+        guard queue.reverse() else { return }
+        reconcileSchedule()
+    }
+
+    public func randomizeQueue() {
+        guard queue.randomize() else { return }
+        reconcileSchedule()
+    }
+
     /// Launch-time restore: only while stopped with an empty queue, and only with tracks. Appends, sets repeat,
     /// selects `currentIndex` when in range, then turns shuffle on (so the current track heads the pass).
     /// Never opens the engine or starts a load; emits `.trackChanged` like any queue change.

@@ -228,3 +228,96 @@ import Testing
         #expect(all.currentIndex == nil)
     }
 }
+
+extension PlayQueueTests {
+
+    @Test func reorderRejectsNonPermutations() {
+        var q = queue(3)
+        q.select(1)
+        let before = q
+        let ok1 = q.reorder([0, 1])
+        #expect(!ok1)
+        let ok2 = q.reorder([0, 0, 1])
+        #expect(!ok2)
+        let ok3 = q.reorder([0, 1, 3])
+        #expect(!ok3)
+        let ok4 = q.reorder([0, 1, 2])
+        #expect(!ok4)
+        #expect(q == before)
+        let ok5 = q.reorder([2, 0, 1])
+        #expect(ok5)
+        #expect(titles(q) == ["t2", "t0", "t1"])
+    }
+
+    @Test func sortByKeyIsStableAndFinderOrdered() {
+        let names = ["t10", "c", "t2", "a", "B", "a"]
+        var q = PlayQueue(tracks: names.enumerated().map {
+            Track(title: $0.element, artist: "", duration: 1, source: .file(URL(filePath: "/tmp/\($0.offset).wav")))
+        })
+        let firstA = q.tracks[3].id, secondA = q.tracks[5].id
+        let ok6 = q.sort { $0.title }
+        #expect(ok6)
+        #expect(titles(q) == ["a", "a", "B", "c", "t2", "t10"])
+        #expect(q.tracks[0].id == firstA)
+        #expect(q.tracks[1].id == secondA)
+    }
+
+    @Test func sortKeepsTheCurrentTrack() {
+        var q = PlayQueue(tracks: makeTracks(4).reversed())
+        q.select(1)
+        let id = q.current?.id
+        let ok7 = q.sort { $0.title }
+        #expect(ok7)
+        #expect(titles(q) == ["t0", "t1", "t2", "t3"])
+        #expect(q.current?.id == id)
+        #expect(q.currentIndex == 2)
+    }
+
+    @Test func reverseReversesAndKeepsTheCurrentTrack() {
+        var q = queue(4)
+        q.select(0)
+        let ok8 = q.reverse()
+        #expect(ok8)
+        #expect(titles(q) == ["t3", "t2", "t1", "t0"])
+        #expect(q.current?.title == "t0")
+        #expect(q.currentIndex == 3)
+    }
+
+    @Test func randomizeIsASeededPermutation() {
+        var a = queue(8), b = queue(8)
+        a.select(3); b.select(3)
+        var r1 = SplitMix64(seed: 42), r2 = SplitMix64(seed: 42)
+        let ok9 = a.randomize(using: &r1)
+        #expect(ok9)
+        b.randomize(using: &r2)
+        #expect(titles(a) == titles(b))
+        #expect(Set(titles(a)) == Set(titles(queue(8))))
+        #expect(a.current?.title == "t3")
+    }
+
+    @Test func reorderWhileShuffledKeepsThePlayOrder() {
+        var rng = SplitMix64(seed: 7)
+        var q = queue(6)
+        q.select(0)
+        q.setShuffle(true, using: &rng)
+        q.repeatMode = .all
+        var probe = q
+        let expected = (0..<10).compactMap { _ in probe.next()?.id }
+        let ok10 = q.sort { $0.title == "t0" ? "z" : $0.title }
+        #expect(ok10) // moves t0 to the end
+        q.reverse()
+        let actual = (0..<10).compactMap { _ in q.next()?.id }
+        #expect(actual.count == 10)
+        #expect(Array(actual.prefix(5)) == Array(expected.prefix(5)))
+    }
+
+    @Test func reorderUpdatesIndexAfterCurrentEnds() {
+        var q = queue(3)
+        q.select(2)
+        #expect(q.indexAfterCurrentEnds() == nil)
+        q.reverse()
+        #expect(q.currentIndex == 0)
+        #expect(q.indexAfterCurrentEnds() == 1)
+        #expect(q.tracks[1].title == "t1")
+    }
+}

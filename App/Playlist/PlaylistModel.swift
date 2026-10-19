@@ -74,12 +74,10 @@ final class PlaylistModel {
         let current = currentIndex
         return range.map { index in
             let track = tracks[index]
-            let fileName: String
-            if case .file(let url) = track.source { fileName = url.lastPathComponent } else { fileName = "" }
             return Row(
                 index: index, id: track.id,
                 number: PlaylistText.rowNumber(index, count: tracks.count),
-                name: PlaylistText.displayName(artist: track.artist, title: track.title, fileName: fileName),
+                name: Self.displayName(track),
                 duration: PlaylistText.time(track.duration > 0 ? track.duration : nil),
                 isCurrent: index == current, isSelected: selection.contains(track),
                 position: index - range.lowerBound)
@@ -97,10 +95,14 @@ final class PlaylistModel {
     var shadeTrackName: String? {
         let tracks = tracks
         guard let index = currentIndex, tracks.indices.contains(index) else { return nil }
-        let track = tracks[index]
+        return "\(index + 1). " + Self.displayName(tracks[index])
+    }
+
+    /// The row text: "artist - title", else the title, else the file name.
+    static func displayName(_ track: Track) -> String {
         let fileName: String
         if case .file(let url) = track.source { fileName = url.lastPathComponent } else { fileName = "" }
-        return "\(index + 1). " + PlaylistText.displayName(artist: track.artist, title: track.title, fileName: fileName)
+        return PlaylistText.displayName(artist: track.artist, title: track.title, fileName: fileName)
     }
 
     /// The current track's length for the shade strip; nil without a track or a known length.
@@ -192,5 +194,48 @@ final class PlaylistModel {
     func dragSelected(by offset: Int) {
         guard isLocal(), offset != 0 else { return }
         player.moveTracks(selectedIndices, by: offset)
+    }
+
+    // MARK: Sort List (MISC menu)
+
+    /// Sorts by the row text, so the order matches what the list shows.
+    func sortByTitle() {
+        guard isLocal() else { return }
+        player.sortQueue(by: Self.displayName)
+    }
+
+    func sortByFileName() {
+        guard isLocal() else { return }
+        player.sortQueue(by: PlaylistSortKey.fileName)
+    }
+
+    func sortByPath() {
+        guard isLocal() else { return }
+        player.sortQueue(by: PlaylistSortKey.path)
+    }
+
+    func reverse() {
+        guard isLocal() else { return }
+        player.reverseQueue()
+    }
+
+    /// Winamp's Randomize List: permutes the list itself (shuffle mode only changes play order).
+    func randomize() {
+        guard isLocal() else { return }
+        player.randomizeQueue()
+    }
+
+    // MARK: File Info and HTML playlist
+
+    /// The first selected row, else the current track, else nil.
+    var fileInfoTrack: Track? {
+        let tracks = tracks
+        if let first = selectedIndices.min(), tracks.indices.contains(first) { return tracks[first] }
+        guard let current = currentIndex, tracks.indices.contains(current) else { return nil }
+        return tracks[current]
+    }
+
+    var htmlEntries: [PlaylistHTML.Entry] {
+        tracks.map { PlaylistHTML.Entry(name: Self.displayName($0), duration: $0.duration > 0 ? $0.duration : nil) }
     }
 }

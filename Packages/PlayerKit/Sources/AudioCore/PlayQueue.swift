@@ -105,6 +105,57 @@ public struct PlayQueue: Equatable, Sendable {
                 next += 1
             }
         }
+        apply(newOrder)
+        return true
+    }
+
+    /// Reorders the list so `newOrder[newPosition] = oldIndex`. The current track keeps its identity and a shuffled
+    /// pass keeps its play order over the new indices. Returns false (and changes nothing) unless `newOrder` is a
+    /// permutation of `tracks.indices` other than the identity.
+    @discardableResult
+    public mutating func reorder(_ newOrder: [Int]) -> Bool {
+        guard newOrder.count == tracks.count, newOrder != Array(tracks.indices) else { return false }
+        var seen = [Bool](repeating: false, count: tracks.count)
+        for index in newOrder {
+            guard tracks.indices.contains(index), !seen[index] else { return false }
+            seen[index] = true
+        }
+        apply(newOrder)
+        return true
+    }
+
+    /// Stable sort by `key` in Finder order (`localizedStandardCompare`: case-insensitive, "t2" before "t10").
+    @discardableResult
+    public mutating func sort(by key: (Track) -> String) -> Bool {
+        let keyed = tracks.enumerated().map { (key: key($0.element), index: $0.offset) }
+        let sorted = keyed.sorted { a, b in
+            switch a.key.localizedStandardCompare(b.key) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: return a.index < b.index
+            }
+        }
+        return reorder(sorted.map(\.index))
+    }
+
+    @discardableResult
+    public mutating func reverse() -> Bool {
+        reorder(Array(tracks.indices.reversed()))
+    }
+
+    /// Permutes the list itself (Winamp's Randomize List); separate from shuffle mode, which only changes play order.
+    @discardableResult
+    public mutating func randomize<G: RandomNumberGenerator>(using rng: inout G) -> Bool {
+        reorder(Array(tracks.indices).shuffled(using: &rng))
+    }
+
+    @discardableResult
+    public mutating func randomize() -> Bool {
+        var rng = SystemRandomNumberGenerator()
+        return randomize(using: &rng)
+    }
+
+    private mutating func apply(_ newOrder: [Int]) {
         var newPosition = [Int](repeating: 0, count: tracks.count)
         for (new, old) in newOrder.enumerated() { newPosition[old] = new }
         let old = tracks
@@ -112,7 +163,6 @@ public struct PlayQueue: Equatable, Sendable {
         currentIndex = currentIndex.map { newPosition[$0] }
         shuffleOrder = shuffleOrder.map { newPosition[$0] }
         nextPass = nextPass.map { newPosition[$0] }
-        return true
     }
 
     public mutating func removeAll() {

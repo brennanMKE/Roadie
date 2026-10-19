@@ -188,6 +188,26 @@ final class PlayerModel {
         FileInfoPanel.shared.show(info)
     }
 
+    /// The playlist's MISC › File Info: the given track (local queue), same panel as the clutter bar's I button.
+    func showFileInfo(for track: Track) {
+        let format = player.queue.current?.id == track.id ? player.currentFormat : nil
+        FileInfoPanel.shared.show(TrackInfo(track: track, format: format))
+    }
+
+    /// Winamp's Generate HTML Playlist: writes the page to the temporary directory and opens it in the browser.
+    /// Never touches the queue.
+    func generateHTMLPlaylist() {
+        let url = FileManager.default.temporaryDirectory.appending(path: "SkinAmp Playlist.html")
+        do {
+            try PlaylistHTML.document(entries: playlist.htmlEntries)
+                .write(to: url, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.open(url)
+        } catch {
+            Self.log.error("HTML playlist write failed: \(error.localizedDescription, privacy: .public)")
+            post(StatusNotice(text: "Couldn't write the HTML playlist", detail: error.localizedDescription))
+        }
+    }
+
     /// Elapsed or remaining time in the main window; Winamp keeps it in winamp.ini.
     var timeMode: TimeMode = UserDefaults.standard.string(forKey: PlayerModel.timeModeKey)
         .flatMap(TimeMode.init(rawValue:)) ?? .elapsed
@@ -563,6 +583,20 @@ final class PlayerModel {
         Task {
             guard await panel.begin() == .OK else { return }
             open(panel.urls, replace: replace)
+        }
+    }
+
+    /// The playlist's ADD › Add Dir: folders only, appended.
+    func openFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose folders to add"
+        panel.prompt = "Add"
+        Task {
+            guard await panel.begin() == .OK else { return }
+            importLocalFiles(panel.urls, replace: false)
         }
     }
 
