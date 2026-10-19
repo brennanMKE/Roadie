@@ -15,10 +15,13 @@ import datetime
 import json
 import os
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PRICING = ROOT / "issues" / "model-pricing.json"
+# A command that runs the script (optionally after `cd … &&` or env assignments), not one that greps or reads it.
+VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n)\s*(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/run-tests-vm\.sh\b")
 DEFAULT_DIR = pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
 
 
@@ -68,7 +71,7 @@ def measure(path, pricing):
                     tool_input = block.get("input", {})
                     chars += len(json.dumps(tool_input))
                     command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
-                    if block.get("name") == "Bash" and "run-tests-vm" in command:
+                    if block.get("name") == "Bash" and VM_COMMAND.search(command):
                         if tool_input.get("run_in_background"):
                             vm_background += 1
                         else:
