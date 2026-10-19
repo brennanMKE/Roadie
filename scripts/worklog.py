@@ -22,6 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 PRICING = ROOT / "issues" / "model-pricing.json"
 # A command that runs the script (optionally after `cd … &&` or env assignments), not one that greps or reads it.
 VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n)\s*(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/run-tests-vm\.sh\b")
+VM_SUMMARY = re.compile(r"==> (PASS|FAIL|SKIP|AUDIO|TIER)|Cleaning up \(exit")
 BACKGROUND_ID = re.compile(r"background with ID: (\w+)")
 DEFAULT_DIR =pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
 
@@ -84,7 +85,10 @@ def measure(path, pricing):
                 if not isinstance(block, dict) or block.get("type") != "tool_result":
                     continue
                 if block.get("tool_use_id") in vm_calls:
-                    vm_runs.append((when - vm_calls.pop(block["tool_use_id"])).total_seconds())
+                    started = vm_calls.pop(block["tool_use_id"])
+                    # Only a real run prints the script's step summary; --help, syntax checks and heredocs don't.
+                    if VM_SUMMARY.search(json.dumps(block.get("content", ""))):
+                        vm_runs.append((when - started).total_seconds())
                 elif block.get("tool_use_id") in vm_background_calls:
                     # "Command running in background with ID: <task>"; timed until that task's notification.
                     found = BACKGROUND_ID.search(json.dumps(block.get("content", "")))
