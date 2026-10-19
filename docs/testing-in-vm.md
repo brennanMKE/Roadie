@@ -20,6 +20,7 @@ scripts/run-tests-vm.sh --spike    # also build, test and smoke-launch the AirPl
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
 scripts/run-tests-vm.sh --stress 30 --load  # same, with four CPU hogs running in the guest
+scripts/run-tests-vm.sh --stress 200 --stress-filter 'ClientConnectionTests/pingIsSentEveryIntervalWhileConnected'  # loop another single test instead (#0083)
 scripts/run-tests-vm.sh --corpus ~/Skins/museum                      # every skin under the folder through `skintool corpus` in the guest (#0038)
 scripts/run-tests-vm.sh --corpus ~/Skins/museum --corpus-sample 1000 # the fast loop: a seeded sample of 1000 unique skins
 ```
@@ -178,6 +179,7 @@ consolidated on 2026-10-11.
    the guest has no network) also writes `<name>.diff.png` and prints one `diff` or `noref` line per skin
    (also in the terminal summary). The numbers are documented in [skin-comparison.md](skin-comparison.md), never gated. With `--stress N` a `playerkit-stress` step follows
    the PlayerKit tests: `scripts/stress-realtime-gapless.sh` repeats the real-time gapless test N times
+   (or, with `--stress-filter F`, the tests matching the `swift test --filter` F, without `AUDIOCORE_REALTIME=1`; #0083)
    against the built binary (`--load` adds four `yes` hogs, killed by an `EXIT` trap) and prints
    `stress: <fails>/<N> failed`; it also saves the guest's CoreAudio log as `guest-coreaudio.log`. `set -o pipefail` is set **inside the guest's
    shell**; without it the status is `tee`'s, which is always 0. Changeover reported false passes

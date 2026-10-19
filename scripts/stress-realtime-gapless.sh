@@ -2,10 +2,16 @@
 # stress-realtime-gapless.sh — runs IN THE TART GUEST (see scripts/run-tests-vm.sh --stress).
 # Repeats the real-time gapless test N times against the already-built PlayerKit test binary,
 # optionally with CPU hogs running (--load), and prints "stress: <fails>/<N> failed".
-# Usage: scripts/stress-realtime-gapless.sh N [LOAD]   (LOAD=1 starts four `yes` hogs)
+# Usage: scripts/stress-realtime-gapless.sh N [LOAD] [FILTER]   (LOAD=1 starts four `yes` hogs)
+# FILTER (or $STRESS_FILTER) picks another single test to loop (#0083); AUDIOCORE_REALTIME=1 is set only for the default.
 
 N=${1:?iterations}
 LOAD=${2:-0}
+DEFAULT_FILTER='MixedFormatRealtimeTests/mixedFormatsAdvanceWithoutGapRealtime'
+FILTER=${3:-${STRESS_FILTER:-$DEFAULT_FILTER}}
+rt=()
+[[ "$FILTER" == "$DEFAULT_FILTER" ]] && rt=(AUDIOCORE_REALTIME=1)
+print -- "stress: filter $FILTER"
 RESULTS=${RESULTS:-$HOME/results}
 mkdir -p "$RESULTS"
 
@@ -20,15 +26,15 @@ fi
 fails=0
 for i in {1..$N}; do
   print -- "--- stress iteration $i/$N"
-  if ! AUDIOCORE_REALTIME=1 swift test --package-path Packages/PlayerKit --skip-build \
-      --filter 'MixedFormatRealtimeTests/mixedFormatsAdvanceWithoutGapRealtime' 2>&1 | tee "$RESULTS/stress-iter.tmp" \
-      | grep -E '\[#0055\]|Test run with|✘|✔ Test mixed'; then
+  if ! env $rt swift test --package-path Packages/PlayerKit --skip-build \
+      --filter "$FILTER" 2>&1 | tee "$RESULTS/stress-iter.tmp" \
+      | grep -E '\[#0055\]|Test run with|✘'; then
     :
   fi
   # A crash or a filter that matched nothing prints no ✘; count it as a failure too.
   if grep -q '✘' "$RESULTS/stress-iter.tmp"; then
     fails=$((fails + 1)); print -- "iteration $i FAILED"
-  elif ! grep -qE 'Test run with 1 test( in 1 suite)? passed' "$RESULTS/stress-iter.tmp"; then
+  elif ! grep -qE 'Test run with [1-9][0-9]* tests?( in [0-9]+ suites?)? passed' "$RESULTS/stress-iter.tmp"; then
     fails=$((fails + 1)); print -- "iteration $i FAILED: test did not run or did not finish (check filter)"
   fi
 done

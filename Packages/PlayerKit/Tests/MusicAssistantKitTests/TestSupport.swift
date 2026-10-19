@@ -46,6 +46,14 @@ final class ManualClock: Clock, @unchecked Sendable {
     var now: Instant { state.withLock { $0.now } }
     var minimumResolution: Duration { .zero }
     var sleeperCount: Int { state.withLock { $0.sleepers.count } }
+    /// The pending sleepers' absolute deadlines (offsets from zero), sorted. Tells apart loops sharing the clock (#0083).
+    var sleeperDeadlines: [Duration] { state.withLock { $0.sleepers.values.map(\.deadline.offset).sorted() } }
+
+    /// true when some sleeper's deadline is exactly `duration` from now: a loop that just called `sleep(for: duration)`.
+    func hasSleeper(dueIn duration: Duration) -> Bool {
+        let now = self.now.offset
+        return sleeperDeadlines.contains(now + duration)
+    }
 
     func sleep(until deadline: Instant, tolerance: Duration?) async throws {
         let id = UUID()

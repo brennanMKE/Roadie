@@ -105,7 +105,7 @@ struct ClientConnectionTests {
         #expect(await waitFor { rig.clock.sleeperCount == 1 })
         rig.clock.advance(by: .seconds(25))
         // The ping is out and only the pong timeout is sleeping.
-        #expect(await waitFor { rig.transport.pingCount == 1 && rig.clock.sleeperCount == 1 })
+        #expect(await waitFor { rig.transport.pingCount == 1 && rig.clock.sleeperDeadlines == [.seconds(35)] })
         rig.clock.advance(by: .seconds(10))
         #expect(await waitFor { await rig.client.state == .reconnecting(attempt: 1) })
         await step(rig, by: .seconds(1))
@@ -117,11 +117,13 @@ struct ClientConnectionTests {
     @Test func pingIsSentEveryIntervalWhileConnected() async throws {
         let rig = try makeClient()
         _ = try await rig.connect()
-        #expect(await waitFor { rig.clock.sleeperCount == 1 })
+        // Wait on deadlines, not counts: the pong-timeout sleeper (now + 10 s) can be the lone sleeper
+        // for a moment before the next interval sleeper registers (#0083).
+        #expect(await waitFor { rig.clock.sleeperDeadlines == [.seconds(25)] })
         rig.clock.advance(by: .seconds(25))
-        #expect(await waitFor { rig.transport.pingCount == 1 && rig.clock.sleeperCount == 1 })
+        #expect(await waitFor { rig.transport.pingCount == 1 && rig.clock.sleeperDeadlines == [.seconds(50)] })
         rig.clock.advance(by: .seconds(25))
-        #expect(await waitFor { rig.transport.pingCount == 2 && rig.clock.sleeperCount == 1 })
+        #expect(await waitFor { rig.transport.pingCount == 2 && rig.clock.sleeperDeadlines == [.seconds(75)] })
         rig.transport.closeFromServer()
         #expect(await waitFor { await rig.client.state == .reconnecting(attempt: 1) })
         #expect(await waitFor { rig.clock.sleeperCount == 1 })

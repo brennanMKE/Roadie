@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
+# Usage: scripts/run-tests-vm.sh [--head] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --full    also run the slow tier: the 100k SkinLibrary scale tests (SKINAMP_SLOW_TESTS=1) and the
 #             real-time AudioCore tests (AUDIOCORE_REALTIME=1); default is the fast tier
@@ -16,6 +16,7 @@
 #   --references DIR  with --skins: copy DIR/*.png (scripts/fetch-webamp-references.sh output) into Skins/reference/
 #                     and diff each render against them in skintool-png (numbers only, never gated)
 #   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
+#   --stress-filter F  with --stress: loop the `swift test --filter` F instead (default: the gapless test)
 #   --load      with --stress: run four CPU hogs in the guest during the loop
 #   --corpus DIR  run every .wsz/.zip under DIR (any layout) through `skintool corpus` in the guest (#0038): shared read-only
 #                 as a second virtio-fs share, copied to the guest disk, then steps corpus-run and corpus-report; the
@@ -42,6 +43,7 @@ USE_HEAD=0
 FULL=0
 LAUNCH=0
 STRESS=0
+STRESS_FILTER=""
 LOAD=0
 SPIKE=0
 SKINS_DIR=""
@@ -56,6 +58,7 @@ while (( $#args )); do
     --full) FULL=1 ;;
     --launch) LAUNCH=1 ;;
     --stress) STRESS=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS" == <1-> ]] || { print -r -- "--stress needs a positive count" >&2; exit 2 } ;;
+    --stress-filter) STRESS_FILTER=${args[1]:-}; shift args 2>/dev/null; [[ -n "$STRESS_FILTER" ]] || { print -r -- "--stress-filter needs a test filter" >&2; exit 2 } ;;
     --load) LOAD=1 ;;
     --spike) SPIKE=1 ;;
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
@@ -68,6 +71,7 @@ while (( $#args )); do
 done
 
 (( LOAD && ! STRESS )) && { print -r -- "--load needs --stress N" >&2; exit 2 }
+[[ -n "$STRESS_FILTER" ]] && (( ! STRESS )) && { print -r -- "--stress-filter needs --stress N" >&2; exit 2 }
 TIER=fast; slow_env=""; rt_env=""
 (( FULL )) && { TIER=full; slow_env="SKINAMP_SLOW_TESTS=1 "; rt_env="AUDIOCORE_REALTIME=1 " }
 [[ -n "$REFS_DIR" && -z "$SKINS_DIR" ]] && { print -r -- "--references needs --skins DIR" >&2; exit 2 }
@@ -242,7 +246,7 @@ fi
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
 run_step playerkit-tests "${rt_env}swift test --package-path Packages/PlayerKit"
 if (( STRESS )); then
-  run_step playerkit-stress "scripts/stress-realtime-gapless.sh $STRESS $LOAD"
+  run_step playerkit-stress "scripts/stress-realtime-gapless.sh $STRESS $LOAD ${STRESS_FILTER:+${(q)STRESS_FILTER}}"
 fi
 run_step app-build       "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Debug -derivedDataPath build/DerivedData build"
 run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/SkinAmp.app/Contents/Info.plist"
