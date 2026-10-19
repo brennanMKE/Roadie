@@ -102,6 +102,29 @@ struct BackendServerProviderTests {
         await #expect(throws: MusicBackendError.self) { try await rig.backend.probe() }
     }
 
+    @Test func connectionStatesFollowAReplacedClient() async throws {
+        let first = makeServer("http://homeassistant.local:8095", name: "Home")
+        let second = makeServer("http://homeassistant.local:8095", name: "Office")
+        let rig = try makeProviderBackend(first)
+        let states = Collector(await rig.backend.connectionStates())
+        defer { states.stop() }
+        #expect(await waitFor { states.items == [.disconnected] })
+        try await rig.backend.connect()
+        #expect(await waitFor { states.items.filter { $0 == .connected }.count == 1 })
+        rig.holder.current = second
+        try await rig.backend.connect()
+        #expect(await waitFor { states.items.filter { $0 == .connected }.count == 2 })
+        await rig.backend.disconnect()
+        #expect(await waitFor { states.items.last == .disconnected })
+    }
+
+    @Test func noReachableServerIsUnreachableWhenOneIsConfigured() async throws {
+        let backend = MusicAssistantBackend(
+            server: { nil }, token: { _ in testToken }, hasVerifiedServer: { true }, transports: StubTransportFactory(script: try FixtureScript.recorded(token: testToken)),
+            http: StubHTTPTransport(), clock: ManualClock())
+        await #expect(throws: MusicBackendError.unreachable("No Music Assistant server reachable")) { try await backend.connect() }
+    }
+
     @Test func httpsAddressesReachTheSocketAsWSSAndHTTPAsWS() {
         func socket(_ text: String) -> String? { URLSessionWebSocketTransport.socketURL(for: URL(string: text)!)?.absoluteString }
         #expect(socket("https://box.tail1234.ts.net") == "wss://box.tail1234.ts.net/ws")

@@ -40,6 +40,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>SkinAmp connects to your Music Assistant server and your Plex Media Server on your local network to browse and play your music.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

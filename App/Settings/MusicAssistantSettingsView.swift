@@ -1,9 +1,12 @@
+import AppKit
 import MusicAssistantKit
 import SwiftUI
 
 /// Settings › Music Assistant: the list of servers and the editor for the selected one. All logic is in the model.
 struct MusicAssistantSettingsView: View {
     @Environment(MusicAssistantSettingsModel.self) private var model
+    @Environment(MusicAssistantSelectionController.self) private var selection
+    @State private var networkDraft = ""
 
     var body: some View {
         @Bindable var model = model
@@ -12,7 +15,8 @@ struct MusicAssistantSettingsView: View {
                 List(selection: $model.selectedID) {
                     ForEach(model.servers) { server in
                         ServerRow(
-                            server: server, status: model.status[server.id] ?? .untested, inUse: server.id == model.activeID
+                            server: server, status: model.status[server.id] ?? .untested,
+                            outcome: selection.lastOutcomes[server.id], inUse: server.id == model.activeID
                         )
                         .tag(server.id)
                     }
@@ -33,7 +37,20 @@ struct MusicAssistantSettingsView: View {
             } header: {
                 Text("Servers")
             } footer: {
-                Text("SkinAmp uses the first tested server in this list.")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(
+                        "SkinAmp picks a server automatically: servers tied to the current Wi-Fi network first, then the list from the top. Tailscale servers are tried like any other."
+                    )
+                    HStack {
+                        Text(selection.reasonText)
+                            .accessibilityIdentifier("ma.reason")
+                        if selection.isResolving { ProgressView().controlSize(.mini) }
+                        Spacer()
+                        Button("Check Now") { Task { await selection.resolveNow() } }
+                            .disabled(selection.isResolving)
+                            .accessibilityIdentifier("ma.checkNow")
+                    }
+                }
             }
 
             if model.selected != nil {
@@ -80,11 +97,56 @@ struct MusicAssistantSettingsView: View {
                 } header: {
                     Text("Selected Server")
                 }
+                networksSection
             }
         }
         .formStyle(.grouped)
         .task { model.appeared() }
         .onDisappear { model.disappeared() }
+    }
+
+    /// The selected server's Wi-Fi network names (#0075).
+    private var networksSection: some View {
+        Section {
+            ForEach(model.networks, id: \.self) { name in
+                HStack {
+                    Text(name)
+                    Spacer()
+                    Button("Remove", systemImage: "minus.circle") { model.removeNetwork(name) }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                }
+            }
+            HStack {
+                TextField("Network name", text: $networkDraft)
+                    .autocorrectionDisabled()
+                    .onSubmit(addDraft)
+                    .accessibilityIdentifier("ma.networkName")
+                Button("Add", action: addDraft)
+                    .disabled(networkDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("Use Current Network") { Task { await model.useCurrentNetwork() } }
+                    .accessibilityIdentifier("ma.useCurrentNetwork")
+            }
+            if let message = model.locationMessage {
+                Text(message.text).font(.caption).foregroundStyle(.secondary)
+                if message == .needsLocationAccess {
+                    Button("Open Location Settings\u{2026}") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Wi-Fi Networks")
+        } footer: {
+            Text("On these networks this server is tried first.")
+        }
+    }
+
+    private func addDraft() {
+        model.addNetwork(networkDraft)
+        networkDraft = ""
     }
 
     private var tokenPrompt: String {
@@ -124,11 +186,14 @@ struct MusicAssistantSettingsView: View {
 private struct ServerRow: View {
     var server: MusicAssistantServerConfiguration
     var status: MusicAssistantSettingsModel.Status
+    /// The selection's last probe of this server (#0075), shown when no Test Connection result is newer.
+    var outcome: MusicAssistantServerRanking.Outcome?
     var inUse: Bool
 
     var body: some View {
         HStack {
             statusDot
+                .help(outcome == .mismatch ? "Different server at this address" : "")
             VStack(alignment: .leading) {
                 Text(server.name)
                 Text(server.hasNoAddress ? "No address" : server.address.baseURL.host ?? "")
@@ -152,7 +217,13 @@ private struct ServerRow: View {
         case .testing: ProgressView().controlSize(.mini)
         case .connected: Circle().fill(.green).frame(width: 8, height: 8)
         case .failed: Circle().fill(.red).frame(width: 8, height: 8)
-        case .untested: Circle().fill(.gray).frame(width: 8, height: 8)
+        case .untested:
+            switch outcome {
+            case .reachable: Circle().fill(.green).frame(width: 8, height: 8)
+            case .unreachable, .timedOut: Circle().fill(.gray).frame(width: 8, height: 8)
+            case .mismatch, .schemaUnsupported: Circle().fill(.orange).frame(width: 8, height: 8)
+            case nil: Circle().strokeBorder(.gray).frame(width: 8, height: 8)
+            }
         }
     }
 }

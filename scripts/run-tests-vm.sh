@@ -28,6 +28,7 @@
 #   2. swift test --package-path Packages/PlayerKit   (AUDIOCORE_REALTIME=1, muted)
 #   3. xcodebuild ... build                             (project generated on the host)
 #   4. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
+#      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
 #   5. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
 #   6. optional: launch SkinAmp.app, check it stays up, quit it
 # The script exits non-zero if any step fails, and also if the host's coreaudiod
@@ -237,6 +238,7 @@ if (( STRESS )); then
 fi
 run_step app-build       "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Debug -derivedDataPath build/DerivedData build"
 run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/SkinAmp.app/Contents/Info.plist"
+run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build/Products/Debug/SkinAmp.app"
 run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/SkinAmp.app $GUEST_RESULTS/ql"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/SkinAmp.app && sleep 5 && pgrep -x SkinAmp && osascript -e 'quit app \"SkinAmp\"' && sleep 1 && ! pgrep -x SkinAmp"

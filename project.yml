@@ -56,6 +56,9 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: SkinAmp connects to your Music Assistant server and your Plex Media Server on your local network to browse and play your music.
+        # #0075: macOS returns the Wi-Fi name only with Location access, requested only by "Use Current Network".
+        NSLocationUsageDescription: SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.
+        NSLocationWhenInUseUsageDescription: SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.
         CFBundleDocumentTypes:
           - CFBundleTypeName: Winamp Classic Skin
             CFBundleTypeRole: Viewer
@@ -67,6 +70,11 @@ targets:
             UTTypeConformsTo: [public.zip-archive]
             UTTypeTagSpecification:
               public.filename-extension: [wsz]
+    # Location Services under the hardened runtime needs this entitlement (#0075). Still unsandboxed.
+    entitlements:
+      path: App/SkinAmp.entitlements
+      properties:
+        com.apple.security.personal-information.location: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.brennanmke.SkinAmp

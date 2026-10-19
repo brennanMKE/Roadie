@@ -56,7 +56,9 @@ final class SettingsRig {
     let model: MusicAssistantSettingsModel
     var hookCalls = 0
 
-    init(servers: [MusicAssistantServerConfiguration] = [], http: (any MAHTTPTransport)? = nil) throws {
+    init(
+        servers: [MusicAssistantServerConfiguration] = [], http: (any MAHTTPTransport)? = nil, wifi: StubWiFi? = nil
+    ) throws {
         defaults = UserDefaults(suiteName: suite)!
         store = MusicAssistantServerStore(defaults: defaults)
         store.save(servers)
@@ -68,8 +70,8 @@ final class SettingsRig {
             store: store,
             tokenStore: { calls.hit(); return stores.store(for: $0) },
             test: MusicAssistantConnectionTest(http: http ?? stub, transports: factory, clock: ManualClock()),
-            active: active)
-        model.onActiveServerChanged = { [unowned self] in hookCalls += 1 }
+            active: active, wifi: wifi)
+        model.onServersChanged = { [unowned self] in hookCalls += 1 }
     }
 
     func cleanUp() { defaults.removePersistentDomain(forName: suite) }
@@ -138,7 +140,7 @@ struct SettingsModelTests {
         #expect(rig.model.addressProblem == nil)
         #expect(rig.store.load() == [added])
         #expect(rig.active.current == nil)
-        #expect(rig.hookCalls == 0)
+        #expect(rig.hookCalls == 1)
         #expect(!rig.model.canTest)
     }
 
@@ -166,7 +168,7 @@ struct SettingsModelTests {
         rig.model.move(fromOffsets: [2], toOffset: 0)
         #expect(rig.model.servers.map(\.name) == ["C", "A", "B"])
         #expect(rig.store.load().map(\.name) == ["C", "A", "B"])
-        #expect(rig.active.current?.name == "C")
+        #expect(rig.active.current?.name == "A")
         rig.model.move(fromOffsets: [0], toOffset: 3)
         #expect(rig.model.servers.map(\.name) == ["A", "B", "C"])
         #expect(rig.store.load().map(\.name) == ["A", "B", "C"])
@@ -245,7 +247,7 @@ struct SettingsModelTests {
         #expect(rig.model.tokenText.isEmpty)
         #expect(rig.factory.made == 1)
         #expect(!rig.factory.transports[0].closeCodes.isEmpty)
-        #expect(rig.active.current?.id == server.id)
+        #expect(rig.active.current == nil)
         #expect(rig.hookCalls == 1)
     }
 
@@ -410,23 +412,96 @@ struct SettingsModelTests {
         #expect(rig.hookCalls == 0)
     }
 
-    @Test func activeChangeCallsTheHookOnceAndOnlyOnIdentityChange() async throws {
-        let server = makeServer(id: nil)
+    @Test func listMutationsInvalidateTheSelection() async throws {
+        let server = makeServer()
         let rig = try SettingsRig(servers: [server])
         defer { rig.cleanUp() }
+        // The selection chose this server; the settings model only keeps the copy current.
+        rig.active.set(server)
         rig.model.appeared()
-        rig.model.tokenText = testToken.rawValue
-        await rig.runTest()
-        #expect(rig.hookCalls == 1)
+        #expect(rig.hookCalls == 0)
         rig.model.name = "Renamed"
         #expect(rig.hookCalls == 1)
         #expect(rig.active.current?.name == "Renamed")
-        await rig.runTest()
-        #expect(rig.hookCalls == 1)
+        rig.model.addNetwork("Attic")
+        #expect(rig.hookCalls == 2)
+        #expect(rig.active.current?.networks == ["Attic"])
         rig.model.addressText = "http://elsewhere.local:8095"
         rig.model.disappeared()
-        #expect(rig.hookCalls == 2)
-        #expect(rig.active.current?.address.baseURL == URL(string: "http://elsewhere.local:8095"))
+        #expect(rig.hookCalls == 3)
+        // An identity change clears the copy until the selection resolves again.
+        #expect(rig.active.current == nil)
+        rig.model.removeServer(server.id)
+        #expect(rig.hookCalls == 4)
+    }
+
+    @Test func useCurrentNetworkRequestsAuthorizationOnlyWhenUndetermined() async throws {
+        let wifi = StubWiFi(.notDetermined, ssid: "Attic", grant: .authorized)
+        let rig = try SettingsRig(servers: [makeServer()], wifi: wifi)
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        #expect(wifi.authorizationRequests == 0)
+        await rig.model.useCurrentNetwork()
+        #expect(wifi.authorizationRequests == 1)
+        #expect(rig.model.networks == ["Attic"])
+        rig.model.removeNetwork("Attic")
+        await rig.model.useCurrentNetwork()
+        #expect(wifi.authorizationRequests == 1)
+        #expect(rig.model.networks == ["Attic"])
+    }
+
+    @Test func useCurrentNetworkAddsTheSSIDOnce() async throws {
+        let wifi = StubWiFi(.authorized, ssid: "Attic")
+        let rig = try SettingsRig(servers: [makeServer()], wifi: wifi)
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        await rig.model.useCurrentNetwork()
+        await rig.model.useCurrentNetwork()
+        #expect(rig.model.networks == ["Attic"])
+        #expect(rig.store.load()[0].networks == ["Attic"])
+        #expect(rig.model.locationMessage == nil)
+        #expect(wifi.authorizationRequests == 0)
+    }
+
+    @Test func deniedLocationExplainsAndAddsNothing() async throws {
+        let wifi = StubWiFi(.notDetermined, ssid: "Attic", grant: .denied)
+        let rig = try SettingsRig(servers: [makeServer()], wifi: wifi)
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        await rig.model.useCurrentNetwork()
+        #expect(rig.model.networks.isEmpty)
+        #expect(rig.model.locationMessage == .needsLocationAccess)
+        #expect(rig.model.locationMessage?.text.contains("Location access") == true)
+        #expect(wifi.ssidCalls == 0)
+        wifi.authorization = .restricted
+        await rig.model.useCurrentNetwork()
+        #expect(wifi.authorizationRequests == 1)
+        #expect(rig.model.locationMessage == .needsLocationAccess)
+    }
+
+    @Test func noWiFiSaysSo() async throws {
+        let wifi = StubWiFi(.authorized, ssid: nil)
+        let rig = try SettingsRig(servers: [makeServer()], wifi: wifi)
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        await rig.model.useCurrentNetwork()
+        #expect(rig.model.networks.isEmpty)
+        #expect(rig.model.locationMessage == .notOnWiFi)
+        #expect(rig.model.locationMessage?.text == "Not connected to Wi-Fi.")
+    }
+
+    @Test func addAndRemoveNetworkPersist() async throws {
+        let rig = try SettingsRig(servers: [makeServer()])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.addNetwork("  Attic ")
+        rig.model.addNetwork("Attic")
+        rig.model.addNetwork("")
+        rig.model.addNetwork("Studio")
+        #expect(rig.store.load()[0].networks == ["Attic", "Studio"])
+        rig.model.removeNetwork("Attic")
+        #expect(rig.store.load()[0].networks == ["Studio"])
+        #expect(rig.model.networks == ["Studio"])
     }
 
     @Test func aTransportBlockedByATSIsNamedAsSuch() async throws {

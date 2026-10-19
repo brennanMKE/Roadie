@@ -1,5 +1,5 @@
 #!/bin/zsh
-# check-info-plist.sh — assert the app's Info.plist carries the networking keys (#0012, #0063)
+# check-info-plist.sh — assert the app's Info.plist carries the networking keys (#0012, #0063), the location descriptions (#0075)
 # and still carries the .wsz type (#0047) and claims it as a document type (#0043). Reads only; runs on the host against the
 # regenerated App/Info.plist and in the guest against the built SkinAmp.app.
 # Usage: scripts/check-info-plist.sh <path/to/Info.plist>
@@ -26,6 +26,12 @@ desc="$(get NSLocalNetworkUsageDescription || true)"
 print -r -- "NSLocalNetworkUsageDescription = ${desc:-<absent>}"
 [[ "$desc" == *"Music Assistant"* && "$desc" == *Plex* ]] || {
   print -u2 "!! NSLocalNetworkUsageDescription is missing or does not mention Music Assistant and Plex"; exit 1; }
+# #0075: the Wi-Fi name needs Location access; both descriptions must say why.
+for key in NSLocationUsageDescription NSLocationWhenInUseUsageDescription; do
+  loc="$(get $key || true)"
+  print -r -- "$key = ${loc:-<absent>}"
+  [[ "$loc" == *Wi-Fi* ]] || { print -u2 "!! $key is missing or does not mention Wi-Fi"; exit 1; }
+done
 expect UTExportedTypeDeclarations.0.UTTypeIdentifier com.brennanmke.skinamp.wsz
 # #0047: the open panel filter relies on this conformance.
 expect UTExportedTypeDeclarations.0.UTTypeConformsTo.0 public.zip-archive

@@ -59,6 +59,9 @@ final class PlayerModel {
     let musicAssistant: MusicAssistantBackend
     let musicAssistantActive: MusicAssistantActiveServer
     let musicAssistantSettings: MusicAssistantSettingsModel
+    /// Picks the reachable server automatically (#0075).
+    let musicAssistantSelection: MusicAssistantSelectionController
+    @ObservationIgnored private var maDropTask: Task<Void, Never>?
     /// Still public for the skinned window's time and spectrum bindings and for local files.
     let player: Player
     /// Keeps the current and next tracks pinned in the cache; lives as long as the model.
@@ -268,20 +271,33 @@ final class PlayerModel {
         folderSettings = FolderSettingsModel(backend: folderBackend)
         // Music Assistant is the default source. Defaults only here: no Keychain, network or prompt at launch.
         let maStore = MusicAssistantServerStore()
-        let maActive = MusicAssistantActiveServer(MusicAssistantActiveServer.firstVerified(in: maStore.load()))
+        // #0075: the selection decides which server; the active box starts empty and follows it. Neither adapter
+        // does I/O when constructed, and nothing probes until the Library or #0067 asks for the server.
+        let maActive = MusicAssistantActiveServer()
+        let wifi = SystemWiFiNetwork()
+        let selection = MusicAssistantSelectionController(
+            store: maStore, active: maActive, selector: MusicAssistantServerSelector(fetch: MusicAssistantServerSelector.urlSessionFetcher),
+            wifi: wifi, network: SystemNetworkEvents(), clock: ContinuousClock())
         let ma = MusicAssistantBackend(
-            server: { maActive.current },
-            token: { try KeychainMusicAssistantTokenStore(account: $0.keychainAccount).load() })
+            server: { await selection.currentOrResolve() },
+            token: { try KeychainMusicAssistantTokenStore(account: $0.keychainAccount).load() },
+            hasVerifiedServer: { MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) })
         musicAssistant = ma
         musicAssistantActive = maActive
+        musicAssistantSelection = selection
         musicAssistantSettings = MusicAssistantSettingsModel(
             store: maStore, tokenStore: { KeychainMusicAssistantTokenStore(account: $0) }, test: MusicAssistantConnectionTest(),
-            active: maActive)
+            active: maActive, wifi: wifi)
         sources = LibrarySourceController(
             sources: [
                 LibrarySource(
                     backend: ma, isConfigured: { MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) },
-                    probe: SourceProbes.checking { try await ma.probe() }),
+                    probe: SourceProbes.checking {
+                        guard await selection.resolveNow() != nil else {
+                            throw MusicBackendError.unreachable(MusicAssistantServerRanking.noneReachableText)
+                        }
+                        try await ma.probe()
+                    }),
                 LibrarySource(backend: stack.backend, isConfigured: { PlexBackend.isConfigured() }),
                 LibrarySource(
                     backend: folderBackend, isConfigured: { FolderBackend.storedFolder() != nil },
@@ -345,16 +361,91 @@ final class PlayerModel {
             loadSkin(from: URL(filePath: path))
         }
         skinLibrary.passFinished = { [weak self] in self?.skinBrowser.indexDidChange() }
-        musicAssistantSettings.onActiveServerChanged = { [weak self] in self?.activeMusicAssistantServerChanged() }
+        musicAssistantSettings.onServersChanged = { [weak selection] in selection?.serversChanged() }
+        selection.onChange = { [weak self] old, new in self?.musicAssistantServerChanged(from: old, to: new) }
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()
+        selection.start()
+        // A browse failure on Music Assistant also re-picks the server; the fallback keeps its own handling.
+        let fallbackFailure = sources.onBackendFailure
+        sources.onBackendFailure = { [weak selection] id, error, phase in
+            fallbackFailure?(id, error, phase)
+            guard id == ma.sourceID else { return }
+            switch error {
+            case .unreachable: selection?.activeServerDropped()
+            default: break
+            }
+        }
+        watchMusicAssistantConnection()
         // The model lives as long as the app, so these observers are never removed.
         NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.fallback.settingsChanged() } }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.fallback.retryNow() } }
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.musicAssistantSelection.serversChanged()
+                self?.fallback.retryNow()
+            }
+        }
+    }
+
+    /// The selection picked another server (#0075). Playback on This Mac is never touched.
+    private func musicAssistantServerChanged(from old: MusicAssistantServerConfiguration?, to new: MusicAssistantServerConfiguration?) {
+        let isSelected = sources.selectedID == musicAssistant.sourceID
+        if new == nil {
+            if isSelected {
+                let ma = musicAssistant
+                Task { await ma.disconnect() }
+                fallback.report(MusicBackendError.unreachable(MusicAssistantServerRanking.noneReachableText), from: ma.sourceID)
+            }
+            return
+        }
+        if isSelected {
+            activeMusicAssistantServerChanged()
+        } else {
+            fallback.retryNow()
+        }
+        if old != nil, let new {
+            post(StatusNotice(text: "Music Assistant: " + Self.truncated(new.name, to: 31 - "Music Assistant: ".utf16.count)))
+        }
+    }
+
+    private static func truncated(_ text: String, to units: Int) -> String {
+        var result = ""
+        for character in text {
+            guard result.utf16.count + String(character).utf16.count <= units else { break }
+            result.append(character)
+        }
+        return result
+    }
+
+    /// A Music Assistant client that failed, or kept reconnecting for more than 10 s, makes the selection re-pick.
+    private func watchMusicAssistantConnection() {
+        let ma = musicAssistant
+        maDropTask = Task { [weak self] in
+            var reconnectTimer: Task<Void, Never>?
+            for await state in await ma.connectionStates() {
+                guard let self else { return }
+                switch state {
+                case .failed:
+                    reconnectTimer?.cancel()
+                    reconnectTimer = nil
+                    self.musicAssistantSelection.activeServerDropped()
+                case .reconnecting:
+                    guard reconnectTimer == nil else { continue }
+                    let selection = self.musicAssistantSelection
+                    reconnectTimer = Task {
+                        do { try await Task.sleep(for: .seconds(10)) } catch { return }
+                        selection.activeServerDropped()
+                    }
+                default:
+                    reconnectTimer?.cancel()
+                    reconnectTimer = nil
+                }
+            }
+        }
     }
 
     /// The server the backend uses changed: drop the connection (the next browse reconnects to the new one) and rebuild

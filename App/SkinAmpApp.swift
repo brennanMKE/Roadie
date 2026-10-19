@@ -32,6 +32,7 @@ struct SkinAmpApp: App {
             SettingsView()
                 .environment(plexSettings)
                 .environment(appDelegate.model.musicAssistantSettings)
+                .environment(appDelegate.model.musicAssistantSelection)
                 .environment(appDelegate.model.cacheSettings)
                 .environment(appDelegate.model.folderSettings)
                 .environment(appDelegate.model.sources)

@@ -26,6 +26,8 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     private let mode: Mode
     private let serverProvider: ServerProvider
+    /// A verified server is configured, so a nil from the provider means none is reachable (#0075), not "add one".
+    private let hasVerifiedServer: @Sendable () -> Bool
     private let tokenProvider: ServerTokenProvider
     private let transports: any MAWebSocketTransportFactory
     private let http: any MAHTTPTransport
@@ -49,6 +51,9 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     /// One per `nowPlaying(on:)` subscriber.
     private var watchers: [UUID: Watcher] = [:]
+    /// `connectionStates()` subscribers, and the task forwarding the installed client's states to them (#0075).
+    private var stateContinuations: [UUID: AsyncStream<MusicAssistantClient.ConnectionState>.Continuation] = [:]
+    private var stateForward: Task<Void, Never>?
 
     /// One fixed address, trust on first use when it has no `serverID`. For tests: the app must use `init(server:token:...)`,
     /// which refuses to connect to a server whose identity has not been learned and verified.
@@ -60,6 +65,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     ) {
         mode = .address
         self.policy = policy
+        hasVerifiedServer = { false }
         serverProvider = {
             address().map { MusicAssistantServerConfiguration(id: Self.addressConfigurationID, address: $0) }
         }
@@ -73,11 +79,13 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// `wss` and `ws`. A server whose `server_id` has not been learned by Test Connection is not connected to.
     public init(
         server: @escaping ServerProvider, token: @escaping ServerTokenProvider,
+        hasVerifiedServer: @escaping @Sendable () -> Bool = { false },
         transports: any MAWebSocketTransportFactory = URLSessionWebSocketTransportFactory(),
         http: any MAHTTPTransport = URLSessionHTTPTransport(), clock: any Clock<Duration> = ContinuousClock(),
         policy: MANowPlayingPolicy = .standard
     ) {
         mode = .server
+        self.hasVerifiedServer = hasVerifiedServer
         self.policy = policy
         serverProvider = server
         tokenProvider = token
@@ -96,6 +104,9 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     private func requireConfiguration() async throws -> MusicAssistantServerConfiguration {
         guard let configuration = await serverProvider() else {
+            if mode == .server, hasVerifiedServer() {
+                throw MusicBackendError.unreachable(MusicAssistantServerRanking.noneReachableText)
+            }
             throw MusicBackendError.notConfigured(
                 mode == .server
                     ? "Add a Music Assistant server under Settings \u{203A} Music Assistant."
@@ -133,6 +144,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
                     : "Enter the Music Assistant token under Settings \u{203A} Library.")
         }
         if let old = client {
+            stopForwardingStates()
             stopWatchers()
             await old.disconnect()
             client = nil
@@ -156,11 +168,14 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         counts = [:]
         players = [:]
         log.info("connected")
+        forwardStates(of: fresh)
         restartWatchers()
         if let raced, raced !== fresh { await raced.disconnect() }
     }
 
     public func disconnect() async {
+        stopForwardingStates()
+        broadcast(.disconnected)
         let old = client
         client = nil
         connectedBaseURL = nil
@@ -169,6 +184,48 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         players = [:]
         stopWatchers()
         await old?.disconnect()
+    }
+
+    /// The connection state of whichever client is installed: `.disconnected` first when none is, then every change,
+    /// following a reconnect to another server (#0075 watches it for a dropped server).
+    public func connectionStates() -> AsyncStream<MusicAssistantClient.ConnectionState> {
+        let (stream, continuation) = AsyncStream<MusicAssistantClient.ConnectionState>.makeStream(bufferingPolicy: .unbounded)
+        let id = UUID()
+        stateContinuations[id] = continuation
+        if client == nil { continuation.yield(.disconnected) }
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeStateContinuation(id) }
+        }
+        // Restarting the forward yields the installed client's current state first (others see it again: harmless).
+        if let client { forwardStates(of: client) }
+        return stream
+    }
+
+    private func removeStateContinuation(_ id: UUID) { stateContinuations[id] = nil }
+
+    private func broadcast(_ state: MusicAssistantClient.ConnectionState) {
+        for continuation in stateContinuations.values { continuation.yield(state) }
+    }
+
+    private func forwardStates(of client: MusicAssistantClient) {
+        stateForward?.cancel()
+        stateForward = Task { [weak self] in
+            for await state in await client.states() {
+                guard !Task.isCancelled, let self else { return }
+                await self.forwarded(state, from: client)
+            }
+        }
+    }
+
+    /// Only the installed client's states reach subscribers.
+    private func forwarded(_ state: MusicAssistantClient.ConnectionState, from source: MusicAssistantClient) {
+        guard source === client else { return }
+        broadcast(state)
+    }
+
+    private func stopForwardingStates() {
+        stateForward?.cancel()
+        stateForward = nil
     }
 
     /// `GET /info` and the server-id comparison. No socket, no token, no Keychain read.

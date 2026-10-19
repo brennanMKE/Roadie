@@ -1,3 +1,4 @@
+import MusicAssistantKit
 import AppKit
 import FolderBackendKit
 import LibraryBrowser
@@ -8,6 +9,7 @@ struct LibrarySettingsView: View {
     @Environment(FolderSettingsModel.self) private var model
     @Environment(LibrarySourceController.self) private var sources
     @Environment(LibraryFallbackController.self) private var fallback
+    @Environment(MusicAssistantSelectionController.self) private var selection
 
     var body: some View {
         Form {
@@ -21,6 +23,13 @@ struct LibrarySettingsView: View {
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
                 .accessibilityIdentifier("library.source")
+                if sources.preferredID == "musicAssistant" {
+                    // Which Music Assistant server is in use and why (#0075).
+                    Text(selection.reasonText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("library.maReason")
+                }
                 if let summary = FallbackText.summary(fallback.status) {
                     HStack {
                         Text(summary)

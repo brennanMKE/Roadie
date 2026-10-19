@@ -39,11 +39,11 @@ struct LibraryWindowView: View {
         .frame(minWidth: 720, minHeight: 420)
     }
 
-    /// The source in use; with Music Assistant, the server's name too.
+    /// The source in use; with Music Assistant, which server and why (#0075).
     private var subtitle: String {
         let base = FallbackText.subtitle(fallback.status)
-        if player.sources.selectedID == player.musicAssistant.sourceID, let server = player.musicAssistantActive.current {
-            return base + " \u{00B7} " + server.name
+        if player.sources.selectedID == player.musicAssistant.sourceID {
+            return base + " \u{00B7} " + player.musicAssistantSelection.reasonText
         }
         return base
     }

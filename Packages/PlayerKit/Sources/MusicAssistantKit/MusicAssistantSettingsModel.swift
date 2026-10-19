@@ -39,14 +39,31 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
     /// From `exists()`; an absent key means unknown.
     public private(set) var hasStoredToken: [UUID: Bool] = [:]
     public private(set) var tokenStoreError: String?
-    /// Called (on the main actor) when the server the backend uses changed identity.
-    @ObservationIgnored public var onActiveServerChanged: (@MainActor () -> Void)?
+    /// Called (on the main actor) after every change to the stored list (#0075: the selection re-resolves).
+    @ObservationIgnored public var onServersChanged: (@MainActor () -> Void)?
+    @ObservationIgnored private let wifi: (any WiFiNetworkProvider)?
+    /// Why "Use Current Network" added nothing (no Location access, no Wi-Fi). Cleared by the next success or edit.
+    public private(set) var locationMessage: LocationMessage?
+
+    public enum LocationMessage: Hashable, Sendable {
+        case needsLocationAccess
+        case notOnWiFi
+
+        public var text: String {
+            switch self {
+            case .needsLocationAccess:
+                "Using the network name needs Location access. SkinAmp still finds your server by trying each one."
+            case .notOnWiFi: "Not connected to Wi-Fi."
+            }
+        }
+    }
 
     /// No I/O here: the app's launch must not touch the Keychain, the network or the stored list.
     public init(
         store: MusicAssistantServerStore, tokenStore: @escaping @Sendable (String) -> any MusicAssistantTokenStore,
-        test: MusicAssistantConnectionTest, active: MusicAssistantActiveServer
+        test: MusicAssistantConnectionTest, active: MusicAssistantActiveServer, wifi: (any WiFiNetworkProvider)? = nil
     ) {
+        self.wifi = wifi
         self.store = store
         self.tokenStore = tokenStore
         self.test = test
@@ -203,6 +220,44 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
         persist()
     }
 
+    // MARK: Wi-Fi networks (#0075)
+
+    /// The selected server's Wi-Fi network names.
+    public var networks: [String] { selected?.networks ?? [] }
+
+    /// Adds a network name typed by hand (trimmed; a duplicate or empty name is ignored).
+    public func addNetwork(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let index = selectedIndex, !trimmed.isEmpty, !servers[index].networks.contains(trimmed) else { return }
+        servers[index].networks.append(trimmed)
+        locationMessage = nil
+        persist()
+    }
+
+    public func removeNetwork(_ name: String) {
+        guard let index = selectedIndex, servers[index].networks.contains(name) else { return }
+        servers[index].networks.removeAll { $0 == name }
+        persist()
+    }
+
+    /// "Use Current Network": the only place Location permission is requested, and only when undetermined.
+    public func useCurrentNetwork() async {
+        guard let wifi, selected != nil else { return }
+        var authorization = wifi.authorization
+        if authorization == .notDetermined { authorization = await wifi.requestAuthorization() }
+        switch authorization {
+        case .authorized:
+            guard let ssid = wifi.currentSSID()?.trimmingCharacters(in: .whitespacesAndNewlines), !ssid.isEmpty else {
+                locationMessage = .notOnWiFi
+                return
+            }
+            locationMessage = nil
+            addNetwork(ssid)
+        case .denied, .restricted, .notDetermined:
+            locationMessage = .needsLocationAccess
+        }
+    }
+
     // MARK: Token
 
     /// Return in the token field: commits only an edit that is not empty.
@@ -297,6 +352,7 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
 
     private func select(_ id: UUID?) {
         guard id != selection else { return }
+        locationMessage = nil
         commitEdits()
         cancelTest()
         selection = id
@@ -373,14 +429,22 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
         }
     }
 
+    /// The selection (#0075) owns the choice. Here only the active copy follows a rename; an identity change or a
+    /// removal clears it until the selection resolves again.
     private func refreshActive() {
-        if active.set(MusicAssistantActiveServer.firstVerified(in: servers)) { onActiveServerChanged?() }
+        guard let current = active.current else { return }
+        if let updated = servers.first(where: { $0.id == current.id }), updated.sameIdentity(as: current) {
+            active.set(updated)
+        } else {
+            active.set(nil)
+        }
     }
 
-    /// Saves the list, then recomputes the server the backend uses (the hook fires only when its identity changed).
+    /// Saves the list, refreshes the active copy and tells the selection.
     private func persist() {
         store.save(servers)
         refreshActive()
+        onServersChanged?()
     }
 
     private func noteStoreFailure(_ error: any Error) {

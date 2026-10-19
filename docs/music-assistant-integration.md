@@ -148,7 +148,7 @@ protocol MusicBackend {
 final class MusicAssistantBackend: MusicBackend { … }  // default
 final class PlexBackend: MusicBackend { … }            // existing/alternate
 ```
-- Settings > Library Source: **Music Assistant (default)** | Plex. Settings › Music Assistant holds a list of servers (URL, learned `server_id`, one Keychain token item per server, keyed by the configuration's UUID); the first tested server is used (#0063, #0075 adds automatic choice).
+- Settings > Library Source: **Music Assistant (default)** | Plex. Settings › Music Assistant holds a list of servers (URL, learned `server_id`, one Keychain token item per server, keyed by the configuration's UUID); SkinAmp picks the server automatically (#0075, below).
 - Skin/UI layer depends only on `MusicBackend` and domain models, never on MA or Plex types.
 
 ### 5.2 Two output modes under MA
@@ -180,6 +180,14 @@ Acceptance for milestone 1 (steps 1 to 5): with the Mac on the home LAN, the app
 - Queues/playlists over ~1000 items get slow, especially on a Pi.
 - First sync of a large library is slow (metadata API rate limits); later syncs are faster.
 - Remote (off-LAN) use: Sendspin needs the same network; over Tailscale, controller mode should work against the MA host's tailnet IP, but AirPlay targets are still at home.
+
+### Several servers (#0075)
+
+- **Order.** Only tested servers (with a learned `server_id`) are candidates. Servers tied to the current Wi-Fi network (Settings › Music Assistant › Wi-Fi Networks) come first, in list order; then every other one, in list order. Tailscale addresses need no special case: they are tried like any other.
+- **Probe.** Every candidate gets an unauthenticated `GET /info` at once (3 s timeout each; two servers at one URL share one fetch). The winner is the highest-ranked candidate that answered with **its own stored `server_id`**; a lower-ranked success waits for higher-ranked probes to finish or time out. A different server at the address is a mismatch and never receives the token. The probes reveal to each configured server that the client exists; they carry nothing else.
+- **When.** Never at launch. The first resolution happens when the Library connects or #0067 probes Music Assistant. After that: a network path change (`NWPathMonitor`, debounced 2 s), a Settings edit, the Mac waking, a client that failed or kept reconnecting for more than 10 s, or a browse failure. The same winner causes no reload; a new winner disconnects and reloads the Library (or lets #0067 restore Music Assistant). Playback on This Mac is never touched. None reachable: #0067 falls back to the local folder.
+- **Wi-Fi name.** macOS returns it only with Location access. SkinAmp asks only when the user presses "Use Current Network" (the app has the `com.apple.security.personal-information.location` entitlement, needed under the hardened runtime). Without access, the order is the list order and the probe decides.
+- **Privacy.** The "why" text ("Home — on network X", "Studio — via Tailscale", "No Music Assistant server reachable") is UI only. Logs carry decision kinds and counts, never a name, address, network name, server id or token.
 
 ## Sources
 - HA integration: https://www.home-assistant.io/integrations/music_assistant/
