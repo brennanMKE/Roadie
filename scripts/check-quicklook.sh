@@ -60,6 +60,9 @@ sleep 1
 ctype=$(mdls -name kMDItemContentType -raw "$out/test.wsz" 2>/dev/null)
 print -r -- "quicklook: mdls content type = $ctype"
 [[ "$ctype" == com.brennanmke.skinamp.wsz ]] && ok content-type-registered || bad content-type-registered "(got $ctype)"
+# #0047: the open panel enables a file only when its type conforms to an allowed type (.zip), so check conformance.
+ctree=$(mdls -name kMDItemContentTypeTree -raw "$out/test.wsz" 2>/dev/null)
+[[ "$ctree" == *public.zip-archive* ]] && ok content-type-conforms-zip || bad content-type-conforms-zip "(tree: $ctree)"
 
 # 4. Thumbnail. The public QLThumbnailGenerator API goes through the same extension Finder uses. (`qlmanage -t`
 # hangs for extension-provided types in a headless guest -- "No sandbox token for thumbnail request" -- while it

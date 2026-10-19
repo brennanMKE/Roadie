@@ -27,5 +27,7 @@ print -r -- "NSLocalNetworkUsageDescription = ${desc:-<absent>}"
 [[ "$desc" == *"Music Assistant"* && "$desc" == *Plex* ]] || {
   print -u2 "!! NSLocalNetworkUsageDescription is missing or does not mention Music Assistant and Plex"; exit 1; }
 expect UTExportedTypeDeclarations.0.UTTypeIdentifier com.brennanmke.skinamp.wsz
+# #0047: the open panel filter relies on this conformance.
+expect UTExportedTypeDeclarations.0.UTTypeConformsTo.0 public.zip-archive
 expect CFBundleDocumentTypes.0.LSItemContentTypes.0 com.brennanmke.skinamp.wsz
 print -r -- "Info.plist OK: $P"
