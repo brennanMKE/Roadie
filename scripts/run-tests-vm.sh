@@ -7,8 +7,10 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
+# Usage: scripts/run-tests-vm.sh [--head] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
+#   --full    also run the slow tier: the 100k SkinLibrary scale tests (SKINAMP_SLOW_TESTS=1) and the
+#             real-time AudioCore tests (AUDIOCORE_REALTIME=1); default is the fast tier
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
 #   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds steps skintool and skintool-png, runs sampleSkinsAreOk
 #   --references DIR  with --skins: copy DIR/*.png (scripts/fetch-webamp-references.sh output) into Skins/reference/
@@ -23,9 +25,9 @@
 #            the smoke launch constructs every engine and never plays
 #
 # In the guest, in order:
-#   1. swift test --package-path Packages/SkinKit     (SKIN_SAMPLES_DIR=Skins with --skins)
+#   1. swift test --package-path Packages/SkinKit     (SKIN_SAMPLES_DIR=Skins with --skins; SKINAMP_SLOW_TESTS=1 with --full)
 #      skintool Skins/ (only with --skins; fails unless every skin is ok), then skintool --png into results/png/
-#   2. swift test --package-path Packages/PlayerKit   (AUDIOCORE_REALTIME=1, muted)
+#   2. swift test --package-path Packages/PlayerKit   (with --full: AUDIOCORE_REALTIME=1, muted)
 #   3. xcodebuild ... build                             (project generated on the host)
 #   4. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
 #      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
@@ -37,6 +39,7 @@
 set -euo pipefail
 
 USE_HEAD=0
+FULL=0
 LAUNCH=0
 STRESS=0
 LOAD=0
@@ -50,6 +53,7 @@ while (( $#args )); do
   arg=$args[1]; shift args
   case "$arg" in
     --head) USE_HEAD=1 ;;
+    --full) FULL=1 ;;
     --launch) LAUNCH=1 ;;
     --stress) STRESS=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS" == <1-> ]] || { print -r -- "--stress needs a positive count" >&2; exit 2 } ;;
     --load) LOAD=1 ;;
@@ -58,12 +62,14 @@ while (( $#args )); do
     --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
     --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
     --corpus-sample) CORPUS_SAMPLE=${args[1]:-}; shift args 2>/dev/null; [[ "$CORPUS_SAMPLE" == <1-> ]] || { print -r -- "--corpus-sample needs a positive count" >&2; exit 2 } ;;
-    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,37p' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
 
 (( LOAD && ! STRESS )) && { print -r -- "--load needs --stress N" >&2; exit 2 }
+TIER=fast; slow_env=""; rt_env=""
+(( FULL )) && { TIER=full; slow_env="SKINAMP_SLOW_TESTS=1 "; rt_env="AUDIOCORE_REALTIME=1 " }
 [[ -n "$REFS_DIR" && -z "$SKINS_DIR" ]] && { print -r -- "--references needs --skins DIR" >&2; exit 2 }
 [[ -n "$CORPUS_SAMPLE" && -z "$CORPUS_DIR" ]] && { print -r -- "--corpus-sample needs --corpus DIR" >&2; exit 2 }
 if [[ -n "$CORPUS_DIR" ]]; then
@@ -144,6 +150,7 @@ done
 # change can be verified before it is committed. Never shared read-write.
 
 mkdir -p "$EXPORT/src"
+log "Tier: $TIER"
 if (( USE_HEAD )); then
   log "Exporting HEAD ($(git -C "$REPO" rev-parse --short HEAD))"
   git -C "$REPO" archive HEAD | tar -x -C "$EXPORT/src"
@@ -206,6 +213,7 @@ gx "{ system_profiler SPAudioDataType; print -- '--- output volume settings:'; o
 commit_text="$(git -C "$REPO" rev-parse --short HEAD)"
 (( USE_HEAD )) || git -C "$REPO" diff --quiet HEAD -- 2>/dev/null || commit_text="$commit_text-dirty"
 gx "print -r -- '$commit_text' > $GUEST_RESULTS/commit.txt"
+gx "print -r -- '$TIER' > $GUEST_RESULTS/tier.txt"
 
 # --- Steps -----------------------------------------------------------------
 # `set -o pipefail` inside the guest shell: without it the status is tee's.
@@ -221,18 +229,18 @@ run_step() {
 }
 
 if [[ -n "$SKINS_DIR" ]]; then
-  run_step skinkit-tests "SKIN_SAMPLES_DIR=$GUEST_SRC/Skins swift test --package-path Packages/SkinKit"
+  run_step skinkit-tests "${slow_env}SKIN_SAMPLES_DIR=$GUEST_SRC/Skins swift test --package-path Packages/SkinKit"
   run_step skintool      "swift run --package-path Packages/SkinKit skintool -v Skins/"
   # Headless render of every skin to PNG (and, with --references, a diff against the Webamp screenshots).
   compare=""
   [[ -n "$REFS_DIR" ]] && compare="--compare $GUEST_SRC/Skins/reference"
   run_step skintool-png  "swift run --package-path Packages/SkinKit skintool --png $GUEST_RESULTS/png $compare Skins/"
 else
-  run_step skinkit-tests "swift test --package-path Packages/SkinKit"
+  run_step skinkit-tests "${slow_env}swift test --package-path Packages/SkinKit"
 fi
-# The real-time tests run here too: the guest's virtual output device has no path to
+# With --full the real-time tests run here too: the guest's virtual output device has no path to
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
-run_step playerkit-tests "AUDIOCORE_REALTIME=1 swift test --package-path Packages/PlayerKit"
+run_step playerkit-tests "${rt_env}swift test --package-path Packages/PlayerKit"
 if (( STRESS )); then
   run_step playerkit-stress "scripts/stress-realtime-gapless.sh $STRESS $LOAD"
 fi
@@ -293,6 +301,11 @@ overall=0
 for name in ${(k)step_rc}; do
   if (( step_rc[$name] == 0 )); then log "PASS  $name"; else log "FAIL  $name (exit ${step_rc[$name]})"; overall=1; fi
 done
+if (( FULL )); then
+  log "TIER  full: includes the 100k scale and real-time audio tests"
+else
+  log "TIER  fast: 100k scale and real-time audio tests skipped (scripts/run-tests-vm.sh --full runs them)"
+fi
 grep -hE 'Test run with|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"

@@ -3,11 +3,15 @@ import Testing
 
 @testable import SkinLibrary
 
-/// Scale checks. Wall-clock numbers are printed for the log, never asserted tightly: the VM may be loaded.
+/// Opt-in: the 100k scale checks run only in the VM's full tier (`scripts/run-tests-vm.sh --full`, #0085).
+enum SlowTests { static let isEnabled = ProcessInfo.processInfo.environment["SKINAMP_SLOW_TESTS"] == "1" }
+
+/// Scale checks, opt-in with `SKINAMP_SLOW_TESTS=1` (the VM's full tier, `--full`); plain `swift test` skips them.
+/// Wall-clock numbers are printed for the log, never asserted tightly: the VM may be loaded.
 @Suite struct SkinIndexScaleTests {
     static let scale = 100_000
 
-    @Test(.timeLimit(.minutes(5)))
+    @Test(.enabled(if: SlowTests.isEnabled), .timeLimit(.minutes(5)))
     func hundredThousandStubFilesIndexAndReindexIncrementally() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
@@ -61,7 +65,7 @@ import Testing
         #expect(found.map(\.name) == ["00042"])
     }
 
-    @Test(.timeLimit(.minutes(5)))
+    @Test(.enabled(if: SlowTests.isEnabled), .timeLimit(.minutes(5)))
     func ftsSearchOnHundredThousandRowsIsFast() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }

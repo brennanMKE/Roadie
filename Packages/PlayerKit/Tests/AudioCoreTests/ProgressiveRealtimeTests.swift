@@ -4,7 +4,7 @@ import Testing
 @testable import AudioCore
 
 /// Real-time (muted) check that a progressive track hands over to a pre-scheduled file. Opt-in like the other
-/// real-time tests: `AUDIOCORE_REALTIME=1`, which only the VM run sets.
+/// real-time tests: `AUDIOCORE_REALTIME=1`, which only the VM's full tier sets (`--full`).
 @MainActor
 @Suite(.serialized) struct ProgressiveRealtimeTests {
     @Test(.enabled(if: RealtimeAudio.isAvailable))

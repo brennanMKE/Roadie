@@ -10,7 +10,8 @@ the golden image itself.
 ## Quick start
 
 ```bash
-scripts/run-tests-vm.sh            # working tree: SkinKit tests, PlayerKit tests, app build, Info.plist check
+scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, Info.plist check (slow tests skipped)
+scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s, then quit it
 scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
 scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
@@ -33,6 +34,7 @@ clone starts cold. The summary at the end looks like this:
 ==> PASS  app-plist
 ==> PASS  app-quicklook
 ==> PASS  app-launch
+==> TIER  fast: 100k scale and real-time audio tests skipped (scripts/run-tests-vm.sh --full runs them)
     ** BUILD SUCCEEDED **
     ✔ Test run with 50 tests in 6 suites passed after 0.558 seconds.
     ✔ Test run with 94 tests in 12 suites passed after 1.514 seconds.
@@ -45,6 +47,20 @@ clone starts cold. The summary at the end looks like this:
 It exits non-zero if any step fails, or if the host's audio daemon started output during the run.
 The logs for each step, plus the guest's audio device list, are in `build/vm-tests/<run-id>/`
 (gitignored). This is the verification command for issue work; see `issues/Issues.md`.
+
+## Test tiers
+
+- **Fast tier** (the default, `scripts/run-tests-vm.sh`): every step, but the slow tests skip
+  themselves. Plain `swift test` on its own is also the fast tier, since both gates are off.
+- **Full tier** (`scripts/run-tests-vm.sh --full`): the fast tier plus the slow tests, turned on by
+  two env gates: `SKINAMP_SLOW_TESTS=1` on the SkinKit step (the two 100k `SkinIndexScaleTests`) and
+  `AUDIOCORE_REALTIME=1` on the PlayerKit step (the six real-time AudioCore tests, muted).
+
+Phases 2 and 3 of an issue run the fast tier, and the full tier too when the change touches code a
+slow test guards; at the end of each milestone the orchestrator runs the full tier once. See
+[issues/Issues.md](../issues/Issues.md) ("Build / verify command"). The summary's `TIER` line says
+which tier ran, and `tier.txt` in the run's logs records it. In a fast run the slow tests still
+show by name, as `➜ Test <name>() skipped.` lines in `skinkit-tests.log` and `playerkit-tests.log`.
 
 ## Why a VM
 
@@ -82,9 +98,11 @@ Three layers keep a run silent, and the script checks the result:
 2. **The guest is muted.** Before any step runs, the script sets the guest's output volume to 0 and
    mutes it. `audio-devices.txt` in the run's logs records the device list and the mute state.
 3. **The tests are silent anyway.** Most of the suite renders offline (manual rendering mode) and
-   never opens an output device. The three real-time tests, opt-in with `AUDIOCORE_REALTIME=1`,
-   mute the main mixer. The VM is the one place they are turned on: they play into the guest's
-   muted virtual device, which has no path to the host, so the full suite runs and stays silent.
+   never opens an output device. The real-time tests (six, in `MixedFormatRealtimeTests`,
+   `ProgressiveRealtimeTests`, `OutputDeviceRealtimeTests` and `NowPlayingTests`) are opt-in with
+   `AUDIOCORE_REALTIME=1` and mute the main mixer. The VM's full tier (`--full`) is the one place
+   they are turned on: they play into the guest's muted virtual device, which has no path to the
+   host, so they stay silent.
 
 The check: after the run, the script reads the host's log for `coreaudiod` "Starting IO" events
 since the run started and fails if there are any. Another app playing sound at the same time also
@@ -153,7 +171,7 @@ consolidated on 2026-10-11.
 6. **Prepare the guest.** Copy `/Volumes/My Shared Files/run/src` to `~/src`, mute the output, and
    record the audio devices.
 7. **Steps.** Each runs in the guest with its output teed to a log: SkinKit tests, PlayerKit tests
-   (with `AUDIOCORE_REALTIME=1`, so the real-time tests run too), the Debug app build, the Info.plist check of the built app, `app-quicklook` (#0043: `scripts/check-quicklook.sh` registers the embedded Quick Look extensions with Launch Services and `pluginkit`, generates a test `.wsz` with `scripts/make-test-skin.swift`, asks `QLThumbnailGenerator` (`scripts/ql-thumb.swift`; `qlmanage -t` hangs in the headless guest for extension-provided types, so it is informational only) for thumbnails of it and of a corrupt and a modern skin, samples the thumbnail with `scripts/pixel-at.swift`, and runs `qlmanage -p` to start the preview extension, and prints `quicklook: <check> ok|FAIL` lines; its files, including the PNGs, come back in `build/vm-tests/<run-id>/ql/`), and with `--launch`, opening the app, checking
+   (with `--full`, `AUDIOCORE_REALTIME=1` so the real-time tests run too, and `SKINAMP_SLOW_TESTS=1` on the SkinKit step for the scale tests), the Debug app build, the Info.plist check of the built app, `app-quicklook` (#0043: `scripts/check-quicklook.sh` registers the embedded Quick Look extensions with Launch Services and `pluginkit`, generates a test `.wsz` with `scripts/make-test-skin.swift`, asks `QLThumbnailGenerator` (`scripts/ql-thumb.swift`; `qlmanage -t` hangs in the headless guest for extension-provided types, so it is informational only) for thumbnails of it and of a corrupt and a modern skin, samples the thumbnail with `scripts/pixel-at.swift`, and runs `qlmanage -p` to start the preview extension, and prints `quicklook: <check> ok|FAIL` lines; its files, including the PNGs, come back in `build/vm-tests/<run-id>/ql/`), and with `--launch`, opening the app, checking
    it is still running after 5 s, and quitting it. With `--skins` a `skintool-png` step follows `skintool`:
    it renders every skin's main window headless to `build/vm-tests/<run-id>/png/<name>.png`, and with
    `--references DIR` (the host-fetched Webamp screenshots, copied into the export's `Skins/reference/`;
@@ -222,6 +240,6 @@ Test design for a headless, silent guest:
   build.
 - Disk, not memory, is usually what runs out first. The script refuses to start below 20 GiB free.
 - Every clone resolves SwiftPM packages from the network (ZIPFoundation), so a run needs internet.
-- On the host, the real-time tests stay off. Run them through the VM, where they are silent.
+- On the host, the real-time and scale tests stay off; run them through the VM's full tier, where they are silent.
 - The guest's GPU is paravirtualized. Fine for 2D sprite rendering; don't use it for visualizer
   performance numbers.

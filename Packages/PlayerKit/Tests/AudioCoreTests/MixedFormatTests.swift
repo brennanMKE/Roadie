@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import AudioCore
 
-/// Whether tests may drive the real output device. Opt-in: set `AUDIOCORE_REALTIME=1`. Even then the
+/// Whether tests may drive the real output device. Opt-in: set `AUDIOCORE_REALTIME=1`, which only the VM's full tier sets (`--full`). Even then the
 /// tests mute the main mixer, but starting a real-time engine still opens the output device, so the
 /// default `swift test` run renders offline only and never touches the speaker.
 /// False on machines without an output device (CI, VM guests) or when `AUDIOCORE_SKIP_REALTIME` is set.
