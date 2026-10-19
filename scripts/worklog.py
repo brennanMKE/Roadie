@@ -93,10 +93,11 @@ def measure(path, pricing):
                         vm_tasks[found.group(1)] = started
                     else:
                         vm_background += 1
-            if vm_tasks and entry.get("origin", {}).get("kind") == "task-notification":
-                text = json.dumps(message.get("content", ""))
-                for task in [t for t in vm_tasks if f"<task-id>{t}</task-id>" in text]:
-                    vm_runs.append((when - vm_tasks.pop(task)).total_seconds())
+        # The run's end is its task notification, delivered as a user message or a queued-command attachment.
+        if vm_tasks and entry.get("type") in ("user", "attachment") and stamp:
+            text = json.dumps(entry)
+            for task in [t for t in vm_tasks if f"<task-id>{t}</task-id>" in text]:
+                vm_runs.append((when - vm_tasks.pop(task)).total_seconds())
     vm_background += len(vm_tasks) + len(vm_background_calls)
 
     cache_read = sum(u.get("cache_read_input_tokens", 0) for u in requests.values())
