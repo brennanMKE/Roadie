@@ -1,12 +1,17 @@
 import AppKit
 import AudioCore
 import Foundation
+import LibraryBrowser
 import UniformTypeIdentifiers
 
 /// The playlist window's LIST › Save List / Load List and the File menu's playlist items (#0082).
 extension PlayerModel {
     /// Single playlist file; replaces the queue and plays, like File › Open.
     func loadPlaylistFile() {
+        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+            post(StatusNotice(text: text))
+            return
+        }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false

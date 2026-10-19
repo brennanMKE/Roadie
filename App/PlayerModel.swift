@@ -740,8 +740,8 @@ final class PlayerModel {
         let sourceID = backend.sourceID
         let output = selectedOutput
         // Local files play only on This Mac. Not a source failure, so the fallback is not told.
-        if output != OutputDevice.thisMacID, !backend.capabilities.contains(.remoteOutputs) {
-            post(StatusNotice(text: "Switch the output to This Mac to play local files."))
+        if let text = LocalPlaybackGate.refusal(source: backend.capabilities, output: output) {
+            post(StatusNotice(text: text))
             return
         }
         Task {
@@ -758,7 +758,8 @@ final class PlayerModel {
 
     /// Shows the open panel for audio files, folders, playlists and skins. Open replaces the queue and plays;
     /// Add appends. A chosen `.wsz` loads as the skin. The app is not sandboxed, so the returned
-    /// URLs are directly readable.
+    /// URLs are directly readable. Unlike Add Dir and Load List, the panel still shows while a speaker is
+    /// selected, because it also picks skins; `importLocalFiles` refuses only the audio part (#0084).
     func openFiles(replace: Bool) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -775,6 +776,10 @@ final class PlayerModel {
 
     /// The playlist's ADD › Add Dir: folders only, appended.
     func openFolder() {
+        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+            post(StatusNotice(text: text))
+            return
+        }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -803,6 +808,8 @@ final class PlayerModel {
     /// Routes chosen or dropped URLs: the first `.wsz` loads as the skin (any others are ignored)
     /// and everything else is imported as audio.
     @discardableResult
+    /// Returns true even when the audio was refused on a speaker (#0084): the drop was received and the notice
+    /// says why nothing played.
     func open(_ urls: [URL], replace: Bool) -> Bool {
         let isSkin = { (url: URL) in url.pathExtension.lowercased() == "wsz" }
         let skin = urls.first(where: isSkin)
@@ -813,11 +820,20 @@ final class PlayerModel {
     }
 
     /// Loads files and folders off the main actor, then queues them. Replacing clears the queue
-    /// and starts the first new track; appending only starts playback on an idle, empty player.
+    /// and starts the first new track; appending only starts playback on an idle, empty player. Refused with a
+    /// notice while a speaker is selected, checked again after the load in case the output changed (#0084).
     func importLocalFiles(_ urls: [URL], replace: Bool) {
         guard !urls.isEmpty else { return }
+        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+            post(StatusNotice(text: text))
+            return
+        }
         Task {
             let result = await LocalTrackLoader.load(urls)
+            if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+                post(StatusNotice(text: text))
+                return
+            }
             if let skipped = StatusNotice.skipped(result) { post(skipped) } else { clearNotice() }
             guard !result.tracks.isEmpty else { return }
             let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty

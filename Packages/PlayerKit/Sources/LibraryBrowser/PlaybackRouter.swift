@@ -18,3 +18,19 @@ public final class PlaybackRouter {
         output == OutputDevice.thisMacID ? local : remote
     }
 }
+
+/// Whether local audio may start on the selected output (#0084). Local files play only on This Mac; while a
+/// speaker is selected, opening, adding or dropping them is refused with a notice and the output is left alone.
+public enum LocalPlaybackGate {
+    public static let switchToThisMac = "Switch the output to This Mac to play local files."
+
+    /// nil when local files may play on `output`, else the notice text.
+    public static func refusal(forLocalFilesOn output: OutputDevice.ID) -> String? {
+        output == OutputDevice.thisMacID ? nil : switchToThisMac
+    }
+
+    /// `playFromLibrary`'s rule: a source without `.remoteOutputs` can only play on This Mac.
+    public static func refusal(source: BackendCapabilities, output: OutputDevice.ID) -> String? {
+        output == OutputDevice.thisMacID || source.contains(.remoteOutputs) ? nil : switchToThisMac
+    }
+}
