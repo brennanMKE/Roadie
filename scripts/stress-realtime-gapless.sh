@@ -3,15 +3,18 @@
 # Repeats the real-time gapless test N times against the already-built PlayerKit test binary,
 # optionally with CPU hogs running (--load), and prints "stress: <fails>/<N> failed".
 # Usage: scripts/stress-realtime-gapless.sh N [LOAD] [FILTER]   (LOAD=1 starts four `yes` hogs)
+# PACKAGE (or $STRESS_PACKAGE; default PlayerKit) picks the package under Packages/ to test (#0094).
 # FILTER (or $STRESS_FILTER) picks another single test to loop (#0083); AUDIOCORE_REALTIME=1 is set only for the default.
 
 N=${1:?iterations}
 LOAD=${2:-0}
 DEFAULT_FILTER='MixedFormatRealtimeTests/mixedFormatsAdvanceWithoutGapRealtime'
 FILTER=${3:-${STRESS_FILTER:-$DEFAULT_FILTER}}
+PACKAGE=${4:-${STRESS_PACKAGE:-PlayerKit}}
 rt=()
 [[ "$FILTER" == "$DEFAULT_FILTER" ]] && rt=(AUDIOCORE_REALTIME=1)
 print -- "stress: filter $FILTER"
+print -- "stress: package $PACKAGE"
 RESULTS=${RESULTS:-$HOME/results}
 mkdir -p "$RESULTS"
 
@@ -26,7 +29,7 @@ fi
 fails=0
 for i in {1..$N}; do
   print -- "--- stress iteration $i/$N"
-  if ! env $rt swift test --package-path Packages/PlayerKit --skip-build \
+  if ! env $rt swift test --package-path "Packages/$PACKAGE" --skip-build \
       --filter "$FILTER" 2>&1 | tee "$RESULTS/stress-iter.tmp" \
       | grep -E '\[#0055\]|Test run with|✘'; then
     :

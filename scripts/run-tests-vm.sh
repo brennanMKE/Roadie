@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
+# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --build-only  stop after the build stage (both packages with their tests, the app; with --spike the spike too):
 #                 a quick compile check before a full run, never verification
@@ -19,6 +19,7 @@
 #                     and diff each render against them in skintool-png (numbers only, never gated)
 #   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
 #   --stress-filter F  with --stress: loop the `swift test --filter` F instead (default: the gapless test)
+#   --stress-package P  with --stress: SkinKit or PlayerKit (default PlayerKit); the step is <p>-stress (#0094)
 #   --load      with --stress: run four CPU hogs in the guest during the loop
 #   --corpus DIR  run every .wsz/.zip under DIR (any layout) through `skintool corpus` in the guest (#0038): shared read-only
 #                 as a second virtio-fs share, copied to the guest disk, then steps corpus-run and corpus-report; the
@@ -50,6 +51,7 @@ FULL=0
 LAUNCH=0
 STRESS=0
 STRESS_FILTER=""
+STRESS_PACKAGE=""
 LOAD=0
 SPIKE=0
 SKINS_DIR=""
@@ -66,6 +68,7 @@ while (( $#args )); do
     --launch) LAUNCH=1 ;;
     --stress) STRESS=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS" == <1-> ]] || { print -r -- "--stress needs a positive count" >&2; exit 2 } ;;
     --stress-filter) STRESS_FILTER=${args[1]:-}; shift args 2>/dev/null; [[ -n "$STRESS_FILTER" ]] || { print -r -- "--stress-filter needs a test filter" >&2; exit 2 } ;;
+    --stress-package) STRESS_PACKAGE=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS_PACKAGE" == (SkinKit|PlayerKit) ]] || { print -r -- "--stress-package needs SkinKit or PlayerKit" >&2; exit 2 } ;;
     --load) LOAD=1 ;;
     --spike) SPIKE=1 ;;
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
@@ -79,8 +82,9 @@ done
 
 (( LOAD && ! STRESS )) && { print -r -- "--load needs --stress N" >&2; exit 2 }
 [[ -n "$STRESS_FILTER" ]] && (( ! STRESS )) && { print -r -- "--stress-filter needs --stress N" >&2; exit 2 }
+[[ -n "$STRESS_PACKAGE" ]] && (( ! STRESS )) && { print -r -- "--stress-package needs --stress N" >&2; exit 2 }
 if (( BUILD_ONLY )); then
-  for f v in --stress "$STRESS" --load "$LOAD" --launch "$LAUNCH" --corpus "$CORPUS_DIR" --corpus-sample "$CORPUS_SAMPLE" \
+  for f v in --stress "$STRESS" --stress-package "$STRESS_PACKAGE" --load "$LOAD" --launch "$LAUNCH" --corpus "$CORPUS_DIR" --corpus-sample "$CORPUS_SAMPLE" \
              --skins "$SKINS_DIR" --references "$REFS_DIR" --full "$FULL"; do
     [[ -n "$v" && "$v" != 0 ]] && { print -r -- "--build-only runs no tests; drop $f" >&2; exit 2 }
   done
@@ -286,7 +290,9 @@ fi
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
 run_step playerkit-tests "${rt_env}swift test --skip-build --package-path Packages/PlayerKit"
 if (( STRESS )); then
-  run_step playerkit-stress "scripts/stress-realtime-gapless.sh $STRESS $LOAD ${STRESS_FILTER:+${(q)STRESS_FILTER}}"
+  STRESS_PACKAGE=${STRESS_PACKAGE:-PlayerKit}
+  stress_filter_arg="''"; [[ -n "$STRESS_FILTER" ]] && stress_filter_arg=${(q)STRESS_FILTER}
+  run_step ${STRESS_PACKAGE:l}-stress "scripts/stress-realtime-gapless.sh $STRESS $LOAD $stress_filter_arg $STRESS_PACKAGE"
 fi
 run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/SkinAmp.app/Contents/Info.plist"
 run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build/Products/Debug/SkinAmp.app"

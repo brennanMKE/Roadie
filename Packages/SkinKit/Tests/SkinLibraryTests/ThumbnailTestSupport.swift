@@ -60,20 +60,28 @@ func solidImage(r: UInt8, g: UInt8, b: UInt8) -> CGImage {
     return context.makeImage()!
 }
 
-/// Blocks callers of `wait()` until `open()`.
-final class Latch: @unchecked Sendable {
-    private let condition = NSCondition()
+/// Suspends callers of `wait()` until `open()`, without holding a thread (#0094). `open()` is idempotent.
+final class AsyncLatch: @unchecked Sendable {
+    private let lock = NSLock()
     private var isOpen = false
-    func wait() {
-        condition.lock()
-        while !isOpen { condition.wait() }
-        condition.unlock()
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func wait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resumeNow = lock.withLock { () -> Bool in
+                if isOpen { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if resumeNow { continuation.resume() }
+        }
     }
     func open() {
-        condition.lock()
-        isOpen = true
-        condition.broadcast()
-        condition.unlock()
+        let toResume = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            isOpen = true
+            defer { waiters = [] }
+            return waiters
+        }
+        for continuation in toResume { continuation.resume() }
     }
 }
 
@@ -83,10 +91,10 @@ final class CountingRenderer: @unchecked Sendable {
     private var _started: [String] = []
     private var _current = 0, _max = 0, _finished = 0
     private var _sawMain = false
-    let latch: Latch?
+    let latch: AsyncLatch?
     let color: (UInt8, UInt8, UInt8)
 
-    init(latch: Latch? = nil, color: (UInt8, UInt8, UInt8) = (200, 40, 40)) {
+    init(latch: AsyncLatch? = nil, color: (UInt8, UInt8, UInt8) = (200, 40, 40)) {
         self.latch = latch
         self.color = color
     }
@@ -96,18 +104,18 @@ final class CountingRenderer: @unchecked Sendable {
     var maxSimultaneous: Int { lock.withLock { _max } }
     var sawMainThread: Bool { lock.withLock { _sawMain } }
 
-    var closure: @Sendable (URL) throws(SkinError) -> CGImage {
-        { (url: URL) throws(SkinError) -> CGImage in self.render(url) }
+    var closure: @Sendable (URL) async throws(SkinError) -> CGImage {
+        { (url: URL) async throws(SkinError) -> CGImage in await self.render(url) }
     }
 
-    private func render(_ url: URL) -> CGImage {
+    private func render(_ url: URL) async -> CGImage {
         lock.withLock {
             _started.append(url.lastPathComponent)
             _current += 1
             _max = max(_max, _current)
             if Thread.isMainThread { _sawMain = true }
         }
-        latch?.wait()
+        await latch?.wait()
         lock.withLock {
             _current -= 1
             _finished += 1

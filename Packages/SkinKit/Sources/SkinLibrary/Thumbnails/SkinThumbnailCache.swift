@@ -54,7 +54,7 @@ public actor SkinThumbnailCache {
 
     private let store: ThumbnailStore
     private let gate: RenderQueue
-    private let render: @Sendable (URL) throws(SkinError) -> CGImage
+    private let render: @Sendable (URL) async throws(SkinError) -> CGImage
     private let memoryLimitCount: Int
     private let memoryLimitBytes: Int
     private let diskLimitBytes: Int64
@@ -69,7 +69,7 @@ public actor SkinThumbnailCache {
     private var stats = Statistics()
     private static let negativeLimit = 10_000
 
-    /// `render` is injectable for tests. `sweepOnOpen` trims the disk in the background on first use.
+    /// `render` is injectable for tests and may suspend; the default never does. `sweepOnOpen` trims the disk in the background on first use.
     public init(
         directory: URL,
         version: Int = thumbnailVersion,
@@ -78,7 +78,7 @@ public actor SkinThumbnailCache {
         memoryLimitBytes: Int = 48 << 20,
         diskLimitBytes: Int64 = 1 << 30,
         sweepOnOpen: Bool = true,
-        render: @escaping @Sendable (URL) throws(SkinError) -> CGImage = SkinThumbnailCache.renderIdle
+        render: @escaping @Sendable (URL) async throws(SkinError) -> CGImage = SkinThumbnailCache.renderIdle
     ) {
         store = ThumbnailStore(root: directory, version: version)
         gate = RenderQueue(limit: maxConcurrentRenders)
@@ -192,7 +192,7 @@ public actor SkinThumbnailCache {
                 return nil
             }
             await self.jobStarted(hash: hash, id: id)
-            let outcome = Self.produce(hash: hash, url: url, store: store, render: render)
+            let outcome = await Self.produce(hash: hash, url: url, store: store, render: render)
             gate.release()
             return await self.jobFinished(hash: hash, id: id, outcome: outcome)
         }
@@ -200,13 +200,13 @@ public actor SkinThumbnailCache {
 
     /// The only place pixels are made or files are read: runs on a worker, never on the actor.
     private nonisolated static func produce(
-        hash: String, url: URL, store: ThumbnailStore, render: @Sendable (URL) throws(SkinError) -> CGImage
-    ) -> Outcome {
+        hash: String, url: URL, store: ThumbnailStore, render: @Sendable (URL) async throws(SkinError) -> CGImage
+    ) async -> Outcome {
         if let image = store.readPNG(hash) { return .disk(SkinThumbnail(image: image)) }
         if store.hasFailedMarker(hash) { return .knownFailure }
         guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
         do {
-            let image = try render(url)
+            let image = try await render(url)
             if let data = PNGWriter.data(image) {
                 do {
                     try store.write(data, hash: hash)

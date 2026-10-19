@@ -5,7 +5,7 @@ import Testing
 @testable import SkinKit
 @testable import SkinLibrary
 
-@Suite struct SkinThumbnailCacheTests {
+@Suite(.timeLimit(.minutes(1))) struct SkinThumbnailCacheTests {
     private func makeCache(
         _ dir: TempDir, renderer: CountingRenderer? = nil, version: Int = 1, concurrent: Int = 2,
         memoryCount: Int = 256, memoryBytes: Int = 48 << 20, diskLimit: Int64 = 1 << 30
@@ -102,7 +102,8 @@ import Testing
     @Test func rendersAreBoundedAndOffMain() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
-        let latch = Latch()
+        let latch = AsyncLatch()
+        defer { latch.open() }
         let renderer = CountingRenderer(latch: latch)
         let cache = makeCache(dir, renderer: renderer, concurrent: 2)
         let skins = try (0..<12).map { try fakeSkin(in: dir, "s\($0)") }
@@ -122,7 +123,8 @@ import Testing
     @Test func newestRequestRendersFirst() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
-        let latch = Latch()
+        let latch = AsyncLatch()
+        defer { latch.open() }
         let renderer = CountingRenderer(latch: latch)
         let cache = makeCache(dir, renderer: renderer, concurrent: 1)
         let names = ["holder", "a", "b", "c"]
@@ -143,7 +145,8 @@ import Testing
     @Test func cancelledBeforeStartIsDropped() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
-        let latch = Latch()
+        let latch = AsyncLatch()
+        defer { latch.open() }
         let renderer = CountingRenderer(latch: latch)
         let cache = makeCache(dir, renderer: renderer, concurrent: 1)
         let x = try fakeSkin(in: dir, "x"), y = try fakeSkin(in: dir, "y")
@@ -165,7 +168,8 @@ import Testing
     @Test func cancelledAfterStartStillCaches() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
-        let latch = Latch()
+        let latch = AsyncLatch()
+        defer { latch.open() }
         let renderer = CountingRenderer(latch: latch)
         let cache = makeCache(dir, renderer: renderer)
         let skin = try fakeSkin(in: dir, "late")
@@ -186,7 +190,8 @@ import Testing
     @Test func secondCallerKeepsAQueuedJobAlive() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
-        let latch = Latch()
+        let latch = AsyncLatch()
+        defer { latch.open() }
         let renderer = CountingRenderer(latch: latch)
         let cache = makeCache(dir, renderer: renderer, concurrent: 1)
         let x = try fakeSkin(in: dir, "x"), shared = try fakeSkin(in: dir, "shared")
