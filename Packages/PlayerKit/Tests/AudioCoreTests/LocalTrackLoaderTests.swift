@@ -40,7 +40,8 @@ private func writeWAV(to url: URL, seconds: Double, sampleRate: Double = 44_100,
         try Data("#EXTM3U\n#EXTINF:1,X - One\none.wav\nmissing.wav\nsub/two.wav\n".utf8).write(to: list)
 
         let result = await LocalTrackLoader.load([list])
-        #expect(result.tracks.map(\.title) == ["one", "two"])
+        #expect(result.tracks.map(\.title) == ["One", "two"])
+        #expect(result.tracks.map(\.artist) == ["X", ""])
         #expect(result.skipped.map(\.reason) == ["file not found"])
     }
 
@@ -253,31 +254,125 @@ private func writeWAV(to url: URL, seconds: Double, sampleRate: Double = 44_100,
     @Test func embeddedTitleAndArtistAreRead() async throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
-        let wav = dir.appending(path: "src.wav")
         let m4a = dir.appending(path: "tagged.m4a")
-        try writeWAV(to: wav, seconds: 1)
-
-        let title = AVMutableMetadataItem()
-        title.identifier = .commonIdentifierTitle
-        title.value = "Tagged Title" as NSString
-        title.extendedLanguageTag = "und"
-        let artist = AVMutableMetadataItem()
-        artist.identifier = .commonIdentifierArtist
-        artist.value = "Tagged Artist" as NSString
-        artist.extendedLanguageTag = "und"
-
-        let album = AVMutableMetadataItem()
-        album.identifier = .commonIdentifierAlbumName
-        album.value = "Tagged Album" as NSString
-        album.extendedLanguageTag = "und"
-
-        let session = try #require(AVAssetExportSession(asset: AVURLAsset(url: wav), presetName: AVAssetExportPresetAppleM4A))
-        session.metadata = [title, artist, album]
-        try await session.export(to: m4a, as: .m4a)
+        try await writeTaggedM4A(to: m4a, title: "Tagged Title", artist: "Tagged Artist")
 
         let track = try await LocalTrackLoader.loadTrack(at: m4a)
         #expect(track.title == "Tagged Title")
         #expect(track.artist == "Tagged Artist")
         #expect(track.album == "Tagged Album")
     }
+
+    @Test func playlistTitleFillsUntaggedFile() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeWAV(to: dir.appending(path: "one.wav"), seconds: 0.2)
+        let list = dir.appending(path: "list.m3u8")
+        try Data("#EXTM3U\n#EXTINF:99,Some Artist - Some Title\none.wav\n".utf8).write(to: list)
+
+        let result = await LocalTrackLoader.load([list])
+        let track = try #require(result.tracks.first)
+        #expect(track.title == "Some Title")
+        #expect(track.artist == "Some Artist")
+        #expect(abs(track.duration - 0.2) < 0.05)
+    }
+
+    @Test func plsTitleFillsUntaggedFile() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeWAV(to: dir.appending(path: "one.wav"), seconds: 0.2)
+        let list = dir.appending(path: "list.pls")
+        try Data("[playlist]\nFile1=one.wav\nTitle1=Band - Song\nLength1=5\nNumberOfEntries=1\n".utf8).write(to: list)
+
+        let result = await LocalTrackLoader.load([list])
+        let track = try #require(result.tracks.first)
+        #expect(track.title == "Song")
+        #expect(track.artist == "Band")
+    }
+
+    @Test func embeddedTagsWinOverPlaylistTitle() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try await writeTaggedM4A(to: dir.appending(path: "tagged.m4a"), title: "Tagged Title", artist: "Tagged Artist")
+        let list = dir.appending(path: "list.m3u")
+        try Data("#EXTM3U\n#EXTINF:1,Other - Name\ntagged.m4a\n".utf8).write(to: list)
+
+        let result = await LocalTrackLoader.load([list])
+        let track = try #require(result.tracks.first)
+        #expect(track.title == "Tagged Title")
+        #expect(track.artist == "Tagged Artist")
+    }
+
+    @Test func missingPlaylistTitleKeepsFilename() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for name in ["a", "b"] { try writeWAV(to: dir.appending(path: "\(name).wav"), seconds: 0.2) }
+        let m3u = dir.appending(path: "list.m3u")
+        try Data("a.wav\n".utf8).write(to: m3u)
+        let pls = dir.appending(path: "list.pls")
+        try Data("[playlist]\nFile1=b.wav\nNumberOfEntries=1\n".utf8).write(to: pls)
+
+        let result = await LocalTrackLoader.load([m3u, pls])
+        #expect(result.tracks.map(\.title) == ["a", "b"])
+        #expect(result.tracks.map(\.artist) == ["", ""])
+    }
+
+    @Test func nestedPlaylistEntryTitleIsUsed() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeWAV(to: dir.appending(path: "a.wav"), seconds: 0.2)
+        try Data("#EXTM3U\n#EXTINF:1,Inner Artist - Inner Song\na.wav\n".utf8).write(to: dir.appending(path: "inner.m3u"))
+        let outer = dir.appending(path: "outer.m3u")
+        try Data("#EXTM3U\n#EXTINF:-1,The Inner Playlist\ninner.m3u\n".utf8).write(to: outer)
+
+        let result = await LocalTrackLoader.load([outer])
+        let track = try #require(result.tracks.first)
+        #expect(result.tracks.count == 1)
+        #expect(track.title == "Inner Song")
+        #expect(track.artist == "Inner Artist")
+    }
+
+    @Test func playlistHintMergeRules() {
+        typealias Hint = LocalTrackLoader.PlaylistHint
+        func merge(_ hint: Hint?, _ title: String?, _ artist: String?, _ duration: TimeInterval) -> (String?, String?, TimeInterval) {
+            let r = LocalTrackLoader.applyingPlaylistHint(hint, title: title, artist: artist, duration: duration)
+            return (r.title, r.artist, r.duration)
+        }
+        var r = merge(Hint(title: "Just A Title", duration: nil), nil, nil, 3)
+        #expect(r.0 == "Just A Title" && r.1 == nil && r.2 == 3)
+        r = merge(Hint(title: "A - B - C", duration: nil), nil, nil, 3)
+        #expect(r.0 == "B - C" && r.1 == "A")
+        r = merge(Hint(title: "X - Y", duration: nil), "Tag", nil, 3)
+        #expect(r.0 == "Tag" && r.1 == nil)
+        r = merge(Hint(title: "X - Y", duration: nil), nil, "Tag Artist", 3)
+        #expect(r.0 == "Y" && r.1 == "Tag Artist")
+        r = merge(Hint(title: nil, duration: 42), nil, nil, 0)
+        #expect(r.2 == 42)
+        r = merge(Hint(title: nil, duration: 42), nil, nil, 3)
+        #expect(r.2 == 3)
+        r = merge(nil, nil, nil, 0)
+        #expect(r.0 == nil && r.1 == nil && r.2 == 0)
+    }
+}
+
+private func writeTaggedM4A(to m4a: URL, title titleText: String, artist artistText: String) async throws {
+    let wav = m4a.deletingLastPathComponent().appending(path: "\(UUID().uuidString)-src.wav")
+    try writeWAV(to: wav, seconds: 1)
+
+    let title = AVMutableMetadataItem()
+    title.identifier = .commonIdentifierTitle
+    title.value = titleText as NSString
+    title.extendedLanguageTag = "und"
+    let artist = AVMutableMetadataItem()
+    artist.identifier = .commonIdentifierArtist
+    artist.value = artistText as NSString
+    artist.extendedLanguageTag = "und"
+    let album = AVMutableMetadataItem()
+    album.identifier = .commonIdentifierAlbumName
+    album.value = "Tagged Album" as NSString
+    album.extendedLanguageTag = "und"
+
+    let session = try #require(AVAssetExportSession(asset: AVURLAsset(url: wav), presetName: AVAssetExportPresetAppleM4A))
+    session.metadata = [title, artist, album]
+    try await session.export(to: m4a, as: .m4a)
 }

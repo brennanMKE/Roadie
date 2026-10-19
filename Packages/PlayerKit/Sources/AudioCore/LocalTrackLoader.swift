@@ -16,6 +16,17 @@ public struct LocalImport: Sendable {
 /// Turns files and folders chosen by the user into `Track`s. Never throws from `load`;
 /// files that cannot be opened are reported in `LocalImport.skipped` and logged.
 public enum LocalTrackLoader {
+    /// Title and duration a playlist entry gives for a track (`#EXTINF`, PLS `TitleN`/`LengthN`).
+    public struct PlaylistHint: Equatable, Sendable {
+        public var title: String?
+        public var duration: Int?
+
+        public init(title: String?, duration: Int?) {
+            self.title = title
+            self.duration = duration
+        }
+    }
+
     private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LocalTrackLoader")
     private static let maxConcurrent = 4
     private static let maxPlaylistDepth = 8
@@ -52,7 +63,16 @@ public enum LocalTrackLoader {
 
     public static func load(_ urls: [URL]) async -> LocalImport {
         let expanded = expandPlaylists(urls)
-        let all = collectAudioURLs(from: expanded.urls)
+        var all: [URL] = []
+        var hints: [Int: PlaylistHint] = [:]
+        for item in expanded.items {
+            if let hint = item.hint, !isDirectory(item.url) {
+                hints[all.count] = hint
+                all.append(item.url)
+            } else {
+                all += collectAudioURLs(from: [item.url])
+            }
+        }
         var tracks: [Track?] = Array(repeating: nil, count: all.count)
         var skipped: [Int: SkippedFile] = [:]
 
@@ -79,8 +99,9 @@ public enum LocalTrackLoader {
                 guard next < candidates.count else { return }
                 let index = candidates[next]
                 let url = all[index]
+                let hint = hints[index]
                 next += 1
-                group.addTask { (index, await Result { try await loadTrack(at: url) }) }
+                group.addTask { (index, await Result { try await loadTrack(at: url, hint: hint) }) }
             }
             for _ in 0..<maxConcurrent { addNext() }
             while let (index, result) = await group.next() {
@@ -98,7 +119,7 @@ public enum LocalTrackLoader {
         return LocalImport(tracks: loaded, skipped: skippedList)
     }
 
-    public static func loadTrack(at url: URL) async throws -> Track {
+    public static func loadTrack(at url: URL, hint: PlaylistHint? = nil) async throws -> Track {
         // Opening with AVAudioFile is the playable check: the player uses the same API.
         let sampleRate: Double
         let channels: Int
@@ -132,6 +153,8 @@ public enum LocalTrackLoader {
             logger.debug("Metadata unavailable for \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
 
+        (title, artist, duration) = applyingPlaylistHint(hint, title: title, artist: artist, duration: duration)
+
         if bitrate == nil, duration > 0,
            let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
             bitrate = Int((Double(size) * 8 / duration / 1000).rounded())
@@ -149,13 +172,42 @@ public enum LocalTrackLoader {
         )
     }
 
+    /// Fills a missing title tag (and artist, split on the first " - ") and an unknown duration from a playlist entry.
+    /// Embedded tags and a known file duration win.
+    static func applyingPlaylistHint(
+        _ hint: PlaylistHint?, title: String?, artist: String?, duration: TimeInterval
+    ) -> (title: String?, artist: String?, duration: TimeInterval) {
+        var title = title
+        var artist = artist
+        var duration = duration
+        if title == nil, let text = hint?.title?.trimmingCharacters(in: .whitespaces), !text.isEmpty {
+            var hintTitle = text
+            var hintArtist: String?
+            if let range = text.range(of: " - ") {
+                let before = text[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+                let after = text[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                if !before.isEmpty, !after.isEmpty {
+                    hintArtist = before
+                    hintTitle = after
+                }
+            }
+            title = hintTitle
+            if artist == nil { artist = hintArtist }
+        }
+        if !(duration.isFinite && duration > 0), let seconds = hint?.duration, seconds > 0 {
+            duration = TimeInterval(seconds)
+        }
+        return (title, artist, duration)
+    }
+
     // MARK: Private
 
     /// Replaces each explicitly given playlist file with its entries, at its position. Entries that are playlists
     /// themselves are expanded in place, relative to their own folder, up to 8 levels deep. Cycles, deeper nesting,
-    /// streams and unreadable playlists are reported as skipped.
-    private static func expandPlaylists(_ urls: [URL]) -> (urls: [URL], skipped: [SkippedFile]) {
-        var result: [URL] = []
+    /// streams and unreadable playlists are reported as skipped. Each track from a playlist carries the title and
+    /// duration of the entry that lists it (the innermost playlist); URLs given directly carry no hint.
+    private static func expandPlaylists(_ urls: [URL]) -> (items: [(url: URL, hint: PlaylistHint?)], skipped: [SkippedFile]) {
+        var result: [(url: URL, hint: PlaylistHint?)] = []
         var skipped: [SkippedFile] = []
         func skip(_ url: URL, _ reason: String) {
             logger.warning("Skipping \(url.lastPathComponent, privacy: .public): \(reason, privacy: .public)")
@@ -183,7 +235,7 @@ public enum LocalTrackLoader {
                 case .file(let file) where PlaylistFile.isPlaylist(file) && !isDirectory(file):
                     expand(file, depth: depth + 1, ancestors: ancestors.union([key]))
                 case .file(let file):
-                    result.append(file)
+                    result.append((file, PlaylistHint(title: entry.title, duration: entry.duration)))
                 case .skip(let location, let reason):
                     skip(playlist.deletingLastPathComponent().appending(path: location), reason)
                 }
@@ -191,7 +243,7 @@ public enum LocalTrackLoader {
         }
         for url in urls {
             guard PlaylistFile.isPlaylist(url), !isDirectory(url) else {
-                result.append(url)
+                result.append((url, nil))
                 continue
             }
             expand(url, depth: 1, ancestors: [])
