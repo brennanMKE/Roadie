@@ -50,6 +50,8 @@ clone starts cold. The summary at the end looks like this:
     ✔ Test run with 5 tests in 1 suite passed after 0.001 seconds.
 ==> AUDIO  silent: no host 'Starting IO' events during the run
 ==> Logs: build/vm-tests/<run-id>
+==> Cleaning up (exit 0)
+==> Summary: build/vm-tests/<run-id>/summary.txt
 ```
 
 When something does not compile, the run stops after the build stage and prints the errors:
@@ -88,6 +90,11 @@ It exits non-zero if any step fails, or if the host's audio daemon started outpu
 Exit codes: `0` everything passed and silent; `1` a build/test/check step failed, the host audio
 check tripped, or a preflight check failed; `2` bad arguments; `3` infrastructure (the guest didn't
 boot or was lost mid-run), rerun.
+Every run that prints a summary (a pass, a failure, a build failure, `INFRA`) also writes it, exactly
+as printed and ending with `Cleaning up (exit N)`, to `build/vm-tests/<run-id>/summary.txt`, and the
+last line of the output names that file. Quote from it; never re-run only to see the summary again.
+Bad arguments (exit 2) and preflight failures (exit 1, `!!` on stderr) happen before a run starts
+and write no file.
 The logs for each step, plus the guest's audio device list, are in `build/vm-tests/<run-id>/`
 (gitignored). This is the verification command for issue work; see `issues/Issues.md`.
 
@@ -229,9 +236,10 @@ consolidated on 2026-10-11.
    shell**; without it the status is `tee`'s, which is always 0. Changeover reported false passes
    that way until 2026-10-04.
 8. **Pull results** with `tart exec … tar -cf - . | tar -x`, into `build/vm-tests/<run-id>/`.
-9. **Check the host's audio log**, then print the summary.
+9. **Check the host's audio log**, then print the summary and write it to `summary.txt`.
 10. **Clean up in the `EXIT` trap.** Release the lease first, so a waiting run starts sooner, then
     the memory-signal request; `tart stop` and `tart delete` the clone; `rm -rf` the export.
+    The last line printed is `==> Summary: <path>`.
 
 Run it in the foreground of a terminal. A dropped session costs a clone, not a work session.
 

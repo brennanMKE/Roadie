@@ -25,7 +25,7 @@
 #                 as a second virtio-fs share, copied to the guest disk, then steps corpus-run and corpus-report; the
 #                 corpus never enters git or the export. Results in build/vm-tests/<run-id>/corpus/
 #   --corpus-sample N  with --corpus: only a seeded sample of N unique skins (the fast loop; 1000 is the acceptance sample)
-#   --spike  also build, test and smoke-launch the AirPlay routing spike harness (#0050): steps spike-tests, spike-build, spike-smoke;
+#   --spike  also build, test and smoke-launch the AirPlay routing spike harness (#0050): steps spike-pkg-build, spike-build, spike-tests, spike-smoke;
 #            the smoke launch constructs every engine and never plays
 #
 # In the guest, in order:
@@ -47,6 +47,9 @@
 #   2  bad arguments
 #   3  infrastructure: the guest didn't boot or was lost mid-run (summary line INFRA);
 #      not a code problem, rerun
+# The summary (from the first PASS/FAIL/SKIP line, or the INFRA line if the guest never came up, to the
+# final "Cleaning up (exit N)") is also written to build/vm-tests/<run-id>/summary.txt; the last line printed names it.
+# Usage errors (exit 2) and preflight failures (exit 1, "!!" on stderr) print no summary and write no file.
 
 set -euo pipefail
 
@@ -118,10 +121,19 @@ GUEST_MEM_MB=12288
 LEASE_ID=""
 MEMORY_REQUEST_ID=""
 START_STAMP="$(date '+%Y-%m-%d %H:%M:%S')"
+SUMMARY_FILE=""
 
-log()  { print -r -- "==> $*"; }
+log()  { print -r -- "==> $*"; if [[ -n "$SUMMARY_FILE" ]]; then print -r -- "==> $*" >>"$SUMMARY_FILE"; fi; }
 fail() { print -r -- "!! $*" >&2; exit 1; }
-infra_fail() { log "INFRA  $*"; exit 3; }
+# Start teeing every log line (and the indented summary blocks) into summary.txt.
+summary_start() { mkdir -p "$RESULTS_DIR"; SUMMARY_FILE="$RESULTS_DIR/summary.txt"; : >"$SUMMARY_FILE"; }
+infra_fail() {
+  summary_start
+  cp "$EXPORT/tart-run.log" "$RESULTS_DIR/" 2>/dev/null || true
+  log "INFRA  $*"
+  log "Logs: $RESULTS_DIR"
+  exit 3
+}
 
 MEMORY_LIB="$HOME/Developer/Homelab/protocols/memory-signal/lib/memory-signal.sh"
 [[ -f "$MEMORY_LIB" ]] && source "$MEMORY_LIB"
@@ -138,6 +150,7 @@ cleanup() {
   tart stop "$CLONE" >/dev/null 2>&1 || true
   tart delete "$CLONE" >/dev/null 2>&1 || true
   rm -rf "$EXPORT"
+  if [[ -n "$SUMMARY_FILE" ]]; then log "Summary: $SUMMARY_FILE"; fi
 }
 trap cleanup EXIT
 
@@ -241,7 +254,7 @@ tart_dirs=(--dir=run:"$EXPORT":ro)
 tart run "$CLONE" --no-graphics --no-audio "${tart_dirs[@]}" >"$EXPORT/tart-run.log" 2>&1 &
 boot_deadline=$(( SECONDS + BOOT_TIMEOUT_SECS ))
 until tart exec "$CLONE" true >/dev/null 2>&1; do
-  (( SECONDS < boot_deadline )) || infra_fail "guest not reachable within ${BOOT_TIMEOUT_SECS}s (see $EXPORT/tart-run.log)"
+  (( SECONDS < boot_deadline )) || infra_fail "guest not reachable within ${BOOT_TIMEOUT_SECS}s (see $RESULTS_DIR/tart-run.log)"
   sleep 3
 done
 log "Guest reachable"
@@ -390,6 +403,7 @@ io_events=$(/usr/bin/log show --start "$START_STAMP" \
   | grep -vc '^Timestamp' || true)
 
 print ""
+summary_start
 overall=0
 for name in $step_order; do
   case ${step_rc[$name]} in
@@ -412,11 +426,11 @@ if (( build_failed )); then
     | grep -E '^/.*:[0-9]+:[0-9]+: error: ' | sed "s|^$GUEST_SRC/||" | awk '!seen[$0]++' || true)
   if [[ -n "$errs" ]]; then
     log "ERRORS  $(print -r -- "$errs" | wc -l | tr -d ' ') compiler error(s) (first 30; full logs: ${(j:, :)${failed_logs:t}})"
-    print -r -- "$errs" | head -30 | sed 's/^/    /'
+    print -r -- "$errs" | head -30 | sed 's/^/    /' | tee -a "$SUMMARY_FILE"
   else
     for f in $failed_logs; do
       log "ERRORS  no file:line:col errors; tail of ${f:t}"
-      sed $'s/\e\\[[0-9;]*m//g' "$f" | grep -v '^[[:space:]]*$' | tail -15 | sed 's/^/    /'
+      sed $'s/\e\\[[0-9;]*m//g' "$f" | grep -v '^[[:space:]]*$' | tail -15 | sed 's/^/    /' | tee -a "$SUMMARY_FILE"
     done
   fi
 fi
@@ -431,7 +445,10 @@ elif (( FULL )); then
 else
   log "TIER  fast: 100k scale and real-time audio tests skipped (scripts/run-tests-vm.sh --full runs them)"
 fi
-grep -hE 'Build complete!|Test run with|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
+step_logs=("$RESULTS_DIR"/*.log(N))  # none when the guest was lost before the results pull
+if (( ${#step_logs} )); then
+  grep -hE 'Build complete!|Test run with|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
+fi
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
   (( overall == 3 )) || overall=1
