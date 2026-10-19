@@ -129,3 +129,14 @@ Verdict: the Home Assistant add-on does not advertise `_music-assistant._tcp`. K
 - The image proxy needs a `proxy_id` URL with an allowed size and no auth; `size=200` fails.
 - The server pings the client (about every 25 s); the "55 s heartbeat" is the Python client's own.
 - The add-on is not discoverable as `_music-assistant._tcp`.
+
+## 13. Per-track audio over HTTP (#0089)
+
+Probed read-only from the host on 2026-10-19 with `scripts/record-ma-fixtures.py --probe-audio --write` (scrubbed result: `ma-protocol/track-audio-probe.json`). Server 2.10.6, schema 65.
+
+- **No full-track endpoint for a client that is not a player.** The only per-track audio command is `music/tracks/preview`; the command list has nothing else matching `stream`, `preview`, `builtin_player`, `web_player` or `register` except `dashboard/register|unregister` and `sendspin/pair_web_player`.
+- **`music/tracks/preview`** (scope `library.read`) returns a **relative** URL, `/preview` with a single `token` query parameter, on the API webserver (8095). Both the `library` id and the provider mapping id work. The token is single-purpose and short-lived: the same URL answers 404 65 s later (upstream `PREVIEW_TOKEN_TTL = 60`).
+- **`GET /preview`** answers `200 audio/aac`, chunked, no `Content-Length`, no `Accept-Ranges`, with or without `Authorization`. Upstream it is a 30 s ffmpeg ADTS sample (`-t 30`). On this server (tracks from `filesystem_smb`, MP3) it returned an empty body for every track tried, so even the preview is unusable here.
+- **The stream server (8097)** has no `/info` route (404) and serves full tracks only on `/flow|single/{session}/{queue}/{item}/{player}`, to a registered player in a live queue session.
+
+Verdict: full audio on This Mac needs the Mac to be a player, which on 2.10.6 means Sendspin (#0066). The HTTP path is closed.

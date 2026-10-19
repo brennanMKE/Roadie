@@ -172,6 +172,8 @@ Only if HA is the integration point later: HA WebSocket API, call `music_assista
 5. **Controller mode:** output picker listing MA players (HomePods), play album/track/playlist, transport, volume, now-playing + artwork from events.
 6. **Local playback mode (Sendspin):** separate milestone after 1 through 5 are solid.
 
+   A plain HTTP fetch of a track was ruled out in #0089: Music Assistant 2.10.6 has no full-track URL for a client that is not a player; `music/tracks/preview` gives a 30 s AAC sample at most. See `ma-protocol-notes.md` section 13.
+
 Acceptance for milestone 1 (steps 1 to 5): with the Mac on the home LAN, the app discovers MA, authenticates, browses the Plex-backed library, plays an album on a HomePod, and reflects play/pause/track changes made from the MA web UI within ~1 s.
 
 ## 7. Known gotchas

@@ -4,6 +4,7 @@
 Run:   /usr/bin/python3 -I scripts/record-ma-fixtures.py [--out DIR] [--events-seconds N]
 Check: /usr/bin/python3 -I scripts/record-ma-fixtures.py --check
 Live:  /usr/bin/python3 -I scripts/record-ma-fixtures.py --check-live   (read-only drift check, #0061)
+Audio: /usr/bin/python3 -I scripts/record-ma-fixtures.py --probe-audio [--write] [--no-wait]   (per-track audio over HTTP, #0089)
 
 Reads MUSIC_ASSISTANT_URL and MUSIC_ASSISTANT_TOKEN from .env itself. The token lives in one
 variable, goes only into the `auth` frame and into Authorization headers of artwork probes, and is
@@ -42,6 +43,7 @@ ALLOWED = frozenset([
     "music/tracks/library_items", "music/playlists/library_items",
     "music/artists/artist_albums", "music/albums/album_tracks", "music/albums/get",
     "music/playlists/playlist_tracks", "music/item_by_uri", "music/search",
+    "music/tracks/preview",  # #0089: mints a preview URL; a read (library.read), plays nothing
 ])
 # Error-envelope probes. Harmless: an unknown command, never the real token on a failing path.
 PROBES = frozenset(["skinamp/no_such_command"])
@@ -1091,8 +1093,205 @@ def check_live():
     return rep
 
 
+# ---------------------------------------------------------------- --probe-audio (#0089)
+
+ADTS_RATES = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350]
+
+
+def adts_stats(data):
+    """(frames, sample_rate, channels, seconds) from ADTS headers; (0, None, None, 0.0) if none found."""
+    i, frames, rate, ch, n = 0, 0, None, None, len(data)
+    while i + 7 <= n:
+        if data[i] != 0xFF or (data[i + 1] & 0xF0) != 0xF0:
+            i += 1
+            continue
+        sfi = (data[i + 2] >> 2) & 0x0F
+        c = ((data[i + 2] & 0x01) << 2) | (data[i + 3] >> 6)
+        length = ((data[i + 3] & 0x03) << 11) | (data[i + 4] << 3) | (data[i + 5] >> 5)
+        if length < 7 or sfi >= len(ADTS_RATES):
+            i += 1
+            continue
+        frames += 1
+        rate, ch = ADTS_RATES[sfi], c
+        i += length
+    return frames, rate, ch, (frames * 1024.0 / rate) if rate else 0.0
+
+
+def stream_get(base, target, bearer=None, timeout=45, maxbytes=16000000):
+    """GET target (path+query) on the configured host; never prints it. Returns a dict of safe facts."""
+    b = urllib.parse.urlsplit(base)
+    if b.scheme == "https":
+        conn = http.client.HTTPSConnection(b.netloc, timeout=timeout, context=TLS)
+    else:
+        conn = http.client.HTTPConnection(b.netloc, timeout=timeout)
+    prefix = b.path.rstrip("/")
+    headers = {"Accept": "*/*", "User-Agent": "SkinAmp-recorder"}
+    if bearer:
+        headers["Authorization"] = "Bearer " + bearer
+    t0 = time.time()
+    try:
+        conn.request("GET", prefix + target, headers=headers)
+        r = conn.getresponse()
+        data = bytearray()
+        truncated = False
+        try:
+            data += r.read(maxbytes)
+        except http.client.IncompleteRead as e:  # the chunked body can end without a final chunk
+            data += e.partial
+            truncated = True
+        return {"status": r.status, "content_type": r.getheader("Content-Type", ""),
+                "content_length": r.getheader("Content-Length") is not None,
+                "accept_ranges": r.getheader("Accept-Ranges") is not None,
+                "bytes": len(data), "incomplete_end": truncated, "elapsed_s": round(time.time() - t0, 2), "data": bytes(data)}
+    finally:
+        conn.close()
+
+
+def probe_audio(write, wait):
+    base, token = read_env()
+    out = {}
+
+    def line(name, verdict, detail):
+        print("probe: %s %s %s" % (name, verdict, detail))
+
+    st, _, body = http_get(base, "/info")
+    if st != 200:
+        die("GET /info returned %d" % st)
+    info = json.loads(body)
+    targets = Targets(base, token, info)
+    out["info"] = {"server_version": info.get("server_version"), "schema_version": info.get("schema_version")}
+    line("info", "info", "server %s schema %s" % (info.get("server_version"), info.get("schema_version")))
+
+    st, _, body = http_get(base, "/api-docs/commands.json", maxbytes=20000000)
+    names = []
+    if st == 200:
+        doc = json.loads(body)
+        if isinstance(doc, dict):
+            names = list(doc.keys()) if "music/tracks/preview" in doc or not isinstance(doc.get("commands"), list) else []
+        if isinstance(doc, list) or (isinstance(doc, dict) and isinstance(doc.get("commands"), list)):
+            items = doc if isinstance(doc, list) else doc["commands"]
+            names = [c.get("command") for c in items if isinstance(c, dict)]
+    names = [n for n in names if isinstance(n, str)]
+    hits = sorted(n for n in names if re.search(r"stream|preview|builtin_player|web_player|register", n))
+    out["commands"] = {"status": st, "count": len(names), "has_preview": "music/tracks/preview" in names, "matching": hits}
+    line("commands", "ok" if names else "FAIL", "status %d, %d commands, preview %s, matching: %s" % (
+        st, len(names), "music/tracks/preview" in names, ", ".join(hits) or "none"))
+
+    s = Session(base, NullLog(), token)
+    try:
+        s.first_frame()
+        f = (s.call("auth", {"token": token})["frames"] or [{}])[0]
+        if "error_code" in f:
+            die("auth failed with code %s" % f.get("error_code"))
+        rec = s.call("music/tracks/library_items", {"limit": 20, "offset": 0, "summary": False}, timeout=20)
+        tracks = live_result(rec) or []
+        track = next((t for t in tracks if isinstance(t, dict) and (t.get("duration") or 0) >= 90), None)
+        if not track:
+            line("track", "FAIL", "no track of 90 s or more in the first %d" % len(tracks))
+            return
+        mapping = next(iter(track.get("provider_mappings") or []), {}) or {}
+        fmt = (mapping.get("audio_format") or {}).get("content_type")
+        duration = track.get("duration")
+        out["track"] = {"duration": duration, "provider_domain": mapping.get("provider_domain"), "content_type": fmt}
+        line("track", "ok", "duration %ss, provider %s, format %s" % (duration, mapping.get("provider_domain"), fmt))
+
+        previews = []
+        for label, args in (("a-library", {"provider_instance_id_or_domain": "library", "item_id": str(track.get("item_id"))}),
+                            ("b-mapping", {"provider_instance_id_or_domain": mapping.get("provider_instance"),
+                                           "item_id": mapping.get("item_id")})):
+            rec = s.call("music/tracks/preview", args, timeout=20)
+            fr = rec["frames"][-1] if rec["frames"] else {}
+            if not rec["frames"] or "error_code" in fr:
+                out["preview-cmd-" + label] = {"error_code": fr.get("error_code")}
+                line("preview-cmd-" + label, "FAIL", "error_code %s" % fr.get("error_code"))
+                continue
+            url = result_of(rec)
+            if not isinstance(url, str):
+                line("preview-cmd-" + label, "FAIL", "result is %s" % type(url).__name__)
+                continue
+            u = urllib.parse.urlsplit(url)
+            port = u.port or (443 if u.scheme == "https" else 80)
+            qnames = sorted(set(k for k, _ in urllib.parse.parse_qsl(u.query, keep_blank_values=True)))
+            same = u.hostname in targets.hosts
+            relative = not u.scheme and not u.netloc
+            facts = {"scheme": u.scheme or "(relative)", "same_host": same or relative,
+                     "port": "(api server)" if relative else (port if port in (8095, 8097) else "other"),
+                     "path": u.path if u.path == "/preview" or same or relative else "(external)",
+                     "query_params": qnames}
+            out["preview-cmd-" + label] = facts
+            line("preview-cmd-" + label, "ok", "scheme %s, same host %s, port %s, path %s, params %s" % (
+                facts["scheme"], facts["same_host"], facts["port"], facts["path"], ",".join(qnames) or "none"))
+            previews.append((label, u, qnames, same))
+    finally:
+        s.ws.close()
+
+    for label, u, qnames, same in previews[:1]:
+        target = urllib.parse.urlunsplit(("", "", u.path or "/", u.query, ""))
+        verdicts = []
+        for auth_label, bearer in (("no-auth", None), ("bearer", token)):
+            r = stream_get(base, target, bearer=bearer)
+            frames, rate, ch, secs = adts_stats(r.pop("data"))
+            if r["status"] != 200 or not frames:
+                verdict = "none"
+            elif duration and abs(secs - duration) <= 2:
+                verdict = "full"
+            elif 25 <= secs <= 35:
+                verdict = "preview"
+            else:
+                verdict = "other"
+            r.update({"adts_frames": frames, "sample_rate": rate, "channels": ch, "seconds": round(secs, 1), "verdict": verdict})
+            out["preview-get-" + auth_label] = r
+            verdicts.append(verdict)
+            line("preview-get-" + auth_label, "ok" if r["status"] == 200 else "FAIL",
+                 "status %d, type %s, content-length %s, accept-ranges %s, %d bytes, %ss, %d ADTS frames, %s Hz, %s ch, %.1fs -> %s" % (
+                     r["status"], r["content_type"], r["content_length"], r["accept_ranges"], r["bytes"], r["elapsed_s"],
+                     frames, rate, ch, secs, verdict))
+        if "token" in qnames:
+            if wait:
+                time.sleep(65)
+                r = stream_get(base, target)
+                r.pop("data")
+                out["preview-ttl"] = {"status": r["status"]}
+                line("preview-ttl", "ok" if r["status"] == 404 else "info", "after 65 s: status %d" % r["status"])
+            else:
+                line("preview-ttl", "info", "skipped (--no-wait)")
+
+    h = urllib.parse.urlsplit(base)
+    try:
+        conn = http.client.HTTPConnection(h.hostname, 8097, timeout=10)
+        conn.request("GET", "/info", headers={"User-Agent": "SkinAmp-recorder"})
+        r = conn.getresponse()
+        body = r.read(100000)
+        conn.close()
+        try:
+            keys = sorted(json.loads(body).keys())
+        except Exception:
+            keys = []
+        out["stream-server"] = {"status": r.status, "keys": keys}
+        line("stream-server", "info", "8097 /info status %d, keys: %s" % (r.status, ", ".join(keys) or "none"))
+    except (OSError, http.client.HTTPException) as e:
+        out["stream-server"] = {"error": type(e).__name__}
+        line("stream-server", "info", "8097 unreachable: %s" % type(e).__name__)
+
+    final = [v for k, v in out.items() if k.startswith("preview-get-")]
+    summary = "full" if any(x.get("verdict") == "full" for x in final) else (
+        "preview" if any(x.get("verdict") == "preview" for x in final) else "none")
+    out["verdict"] = summary
+    print("probe: verdict %s" % summary)
+    if write:
+        text = json.dumps(targets.scrub(out, fixture=False), indent=2, sort_keys=True) + "\n"
+        path = os.path.join(ROOT, DOCS_REL, "track-audio-probe.json")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        problems = gate([path], targets, [])
+        if problems:
+            os.remove(path)
+            die("probe file failed the secret gate (%s); removed" % ", ".join(r for _, r in problems))
+        print("probe: wrote %s" % os.path.relpath(path, ROOT))
+
+
 def main(argv):
-    args = {"out": None, "events_seconds": 30, "check": False, "live": False}
+    args = {"out": None, "events_seconds": 30, "check": False, "live": False, "probe": False, "write": False, "wait": True}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -1100,6 +1299,12 @@ def main(argv):
             args["check"] = True
         elif a == "--check-live":
             args["live"] = True
+        elif a == "--probe-audio":
+            args["probe"] = True
+        elif a == "--write":
+            args["write"] = True
+        elif a == "--no-wait":
+            args["wait"] = False
         elif a == "--out":
             i += 1
             args["out"] = argv[i]
@@ -1109,6 +1314,9 @@ def main(argv):
         else:
             die("unknown argument " + a)
         i += 1
+    if args["probe"]:
+        probe_audio(args["write"], args["wait"])
+        return
     if args["live"]:
         rep = check_live()
         print("live: %d checks, %d failed" % (rep.total, rep.failed))

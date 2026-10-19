@@ -1,0 +1,76 @@
+{
+  "commands": {
+    "count": 310,
+    "has_preview": true,
+    "matching": [
+      "dashboard/register",
+      "dashboard/unregister",
+      "music/tracks/preview",
+      "sendspin/pair_web_player"
+    ],
+    "status": 200
+  },
+  "info": {
+    "schema_version": 65,
+    "server_version": "2.10.6"
+  },
+  "preview-cmd-a-library": {
+    "path": "/preview",
+    "port": "(api server)",
+    "query_params": [
+      "token"
+    ],
+    "same_host": true,
+    "scheme": "(relative)"
+  },
+  "preview-cmd-b-mapping": {
+    "path": "/preview",
+    "port": "(api server)",
+    "query_params": [
+      "token"
+    ],
+    "same_host": true,
+    "scheme": "(relative)"
+  },
+  "preview-get-bearer": {
+    "accept_ranges": false,
+    "adts_frames": 0,
+    "bytes": 0,
+    "channels": null,
+    "content_length": false,
+    "content_type": "audio/aac",
+    "elapsed_s": 0.01,
+    "incomplete_end": true,
+    "sample_rate": null,
+    "seconds": 0.0,
+    "status": 200,
+    "verdict": "none"
+  },
+  "preview-get-no-auth": {
+    "accept_ranges": false,
+    "adts_frames": 0,
+    "bytes": 0,
+    "channels": null,
+    "content_length": false,
+    "content_type": "audio/aac",
+    "elapsed_s": 0.01,
+    "incomplete_end": true,
+    "sample_rate": null,
+    "seconds": 0.0,
+    "status": 200,
+    "verdict": "none"
+  },
+  "preview-ttl": {
+    "status": 404
+  },
+  "stream-server": {
+    "keys": [],
+    "status": 404
+  },
+  "track": {
+    "content_type": "mp3",
+    "duration": 1167,
+    "provider_domain": "filesystem_smb"
+  },
+  "verdict": "none"
+}
