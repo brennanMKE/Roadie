@@ -40,8 +40,13 @@
 #      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
 #   7. optional: launch SkinAmp.app, check it stays up, quit it
-# The script exits non-zero if any step fails, and also if the host's coreaudiod
-# logged "Starting IO" during the run, i.e. if anything reached a speaker.
+# Exit codes:
+#   0  everything passed and the host stayed silent
+#   1  a build/test/check step failed, the host's coreaudiod logged "Starting IO" during
+#      the run (anything reached a speaker), or a preflight check failed
+#   2  bad arguments
+#   3  infrastructure: the guest didn't boot or was lost mid-run (summary line INFRA);
+#      not a code problem, rerun
 
 set -euo pipefail
 
@@ -116,6 +121,7 @@ START_STAMP="$(date '+%Y-%m-%d %H:%M:%S')"
 
 log()  { print -r -- "==> $*"; }
 fail() { print -r -- "!! $*" >&2; exit 1; }
+infra_fail() { log "INFRA  $*"; exit 3; }
 
 MEMORY_LIB="$HOME/Developer/Homelab/protocols/memory-signal/lib/memory-signal.sh"
 [[ -f "$MEMORY_LIB" ]] && source "$MEMORY_LIB"
@@ -158,11 +164,28 @@ if typeset -f memory_available_bytes >/dev/null; then
   fi
 fi
 
-# A SIGKILL skips the trap, so sweep clones left by earlier runs. Only names
-# shaped exactly like this script's run IDs are touched; the golden can't match.
-for old in $(tart list | awk '$2 ~ /^skinamp-test-[0-9]{8}-[0-9]{6}-[0-9]+$/ { print $2 }'); do
+# A SIGKILL or OOM kill skips the trap, so sweep clones whose run is gone. Two
+# concurrent runs are expected (tart-lease allows two), so a clone whose <pid> is
+# still a live run-tests-vm.sh is left alone, unless its run id is older than
+# MAX_RUN_HOURS (pid reuse backstop). Only names shaped exactly like this script's
+# run IDs are touched; the golden can't match.
+# Max plausible run: a full --corpus run plus --stress 200 is well under this.
+MAX_RUN_HOURS=8
+run_is_live() {   # true if <pid> is a live run-tests-vm.sh process
+  local cmd
+  cmd=$(ps -p "$1" -o command= 2>/dev/null) || return 1
+  [[ "$cmd" == *run-tests-vm.sh* ]]
+}
+for old in $(tart list --quiet); do
+  [[ "$old" =~ '^skinamp-test-([0-9]{8})-([0-9]{6})-([0-9]+)$' ]] || continue
   [[ "$old" == "$CLONE" || "$old" == "$GOLDEN" ]] && continue
-  log "Sweeping stale clone: $old"
+  pid=$match[3]
+  started=$(date -j -f '%Y%m%d%H%M%S' "$match[1]$match[2]" +%s 2>/dev/null) || started=0
+  age_h=$(( ($(date +%s) - started) / 3600 ))
+  if run_is_live "$pid" && (( age_h < MAX_RUN_HOURS )); then
+    log "Leaving clone of a live run: $old (pid $pid)"; continue
+  fi
+  log "Sweeping stale clone: $old (pid $pid not a live run$( (( age_h >= MAX_RUN_HOURS )) && print -n ", ${age_h}h old"))"
   tart stop "$old" >/dev/null 2>&1 || true
   tart delete "$old" >/dev/null 2>&1 || true
 done
@@ -218,32 +241,38 @@ tart_dirs=(--dir=run:"$EXPORT":ro)
 tart run "$CLONE" --no-graphics --no-audio "${tart_dirs[@]}" >"$EXPORT/tart-run.log" 2>&1 &
 boot_deadline=$(( SECONDS + BOOT_TIMEOUT_SECS ))
 until tart exec "$CLONE" true >/dev/null 2>&1; do
-  (( SECONDS < boot_deadline )) || fail "Guest not reachable within ${BOOT_TIMEOUT_SECS}s (see $EXPORT/tart-run.log)"
+  (( SECONDS < boot_deadline )) || infra_fail "guest not reachable within ${BOOT_TIMEOUT_SECS}s (see $EXPORT/tart-run.log)"
   sleep 3
 done
 log "Guest reachable"
 
 gx() { tart exec "$CLONE" /bin/zsh -lc "$1"; }
+# Probe twice so one transport hiccup doesn't count; a stopped VM fails tart exec at once.
+guest_alive() { tart exec "$CLONE" true >/dev/null 2>&1 && return 0; sleep 2; tart exec "$CLONE" true >/dev/null 2>&1; }
+# gx_prep cmd: a prep command whose failure is fatal; a dead guest is reported as INFRA.
+gx_prep() { gx "$1" && return 0; guest_alive && fail "Guest prepare step failed: $1"; infra_fail "guest lost during prepare"; }
 
-gx "rm -rf $GUEST_SRC $GUEST_RESULTS && mkdir -p $GUEST_RESULTS && cp -R '/Volumes/My Shared Files/run/src' $GUEST_SRC"
+gx_prep "rm -rf $GUEST_SRC $GUEST_RESULTS && mkdir -p $GUEST_RESULTS && cp -R '/Volumes/My Shared Files/run/src' $GUEST_SRC"
 # The guest still has a virtual sound device; --no-audio only cuts its path to the
 # host. Mute it as well, and record the device list and mute state as evidence.
-gx "osascript -e 'set volume output volume 0' -e 'set volume with output muted' >/dev/null 2>&1 || true"
-gx "{ system_profiler SPAudioDataType; print -- '--- output volume settings:'; osascript -e 'get volume settings'; } > $GUEST_RESULTS/audio-devices.txt 2>&1 || true"
+gx_prep "osascript -e 'set volume output volume 0' -e 'set volume with output muted' >/dev/null 2>&1 || true"
+gx_prep "{ system_profiler SPAudioDataType; print -- '--- output volume settings:'; osascript -e 'get volume settings'; } > $GUEST_RESULTS/audio-devices.txt 2>&1 || true"
 
 # The export has no .git; the corpus report wants the commit.
 commit_text="$(git -C "$REPO" rev-parse --short HEAD)"
 (( USE_HEAD )) || git -C "$REPO" diff --quiet HEAD -- 2>/dev/null || commit_text="$commit_text-dirty"
-gx "print -r -- '$commit_text' > $GUEST_RESULTS/commit.txt"
-gx "print -r -- '$TIER' > $GUEST_RESULTS/tier.txt"
+gx_prep "print -r -- '$commit_text' > $GUEST_RESULTS/commit.txt"
+gx_prep "print -r -- '$TIER' > $GUEST_RESULTS/tier.txt"
 
 # --- Steps -----------------------------------------------------------------
 # `set -o pipefail` inside the guest shell: without it the status is tee's.
 
-typeset -A step_rc; typeset -a step_order; build_failed=0
+typeset -A step_rc; typeset -a step_order; build_failed=0; guest_lost=0; lost_step=""
 # run_step name cmd [stage]: stage "build" marks the run failed on error; "test" steps are skipped once it is.
+# A non-zero step whose guest no longer answers is "lost" (infrastructure), never a build failure.
 run_step() {
   local name=$1 cmd=$2 stage=${3:-test}
+  if (( guest_lost )); then skip_step $name; return 0; fi
   step_order+=($name)
   if (( build_failed )) && [[ $stage == test ]]; then step_rc[$name]=skip; log "Skip: $name (build failed)"; return; fi
   log "Guest: $name"
@@ -251,10 +280,19 @@ run_step() {
   gx "set -o pipefail; cd $GUEST_SRC && { $cmd; } 2>&1 | tee $GUEST_RESULTS/$name.log"
   step_rc[$name]=$?
   set -e
+  if (( step_rc[$name] != 0 )) && ! guest_alive; then
+    step_rc[$name]=lost; guest_lost=1; lost_step=$name
+    log "Guest lost during $name"
+    return 0
+  fi
   [[ $stage == build ]] && (( step_rc[$name] != 0 )) && build_failed=1
   return 0
 }
-skip_step() { step_order+=($1); step_rc[$1]=skip; log "Skip: $1 (build failed)"; }
+skip_step() {
+  step_order+=($1)
+  if (( guest_lost )); then step_rc[$1]=lost-skip; log "Skip: $1 (guest lost)"
+  else step_rc[$1]=skip; log "Skip: $1 (build failed)"; fi
+}
 
 # --- Build stage -------------------------------------------------------------
 # Build everything once; the tests below reuse it. Both packages always build so one run reports both.
@@ -308,18 +346,19 @@ if (( SPIKE )); then
   run_step spike-smoke "mkdir -p $GUEST_RESULTS/spike && open -W -n build/DerivedData-spike/Build/Products/Debug/AirPlaySpike.app --args --smoke --log-dir $GUEST_RESULTS/spike && grep -q 'smoke: ok' $GUEST_RESULTS/spike/smoke.log && cat $GUEST_RESULTS/spike/smoke.log && ! pgrep -x AirPlaySpike"
 fi
 
-if [[ -n "$CORPUS_DIR" ]] && (( build_failed )); then
+if [[ -n "$CORPUS_DIR" ]] && (( build_failed || guest_lost )); then
   skip_step corpus-run; skip_step corpus-report
 elif [[ -n "$CORPUS_DIR" ]]; then
   # Copy the read-only share to the guest disk when it fits (corpus size plus 2 GiB free); else read it in place.
   corpus_in_place=1
   corpus_src="/Volumes/My Shared Files/corpus"
-  corpus_kb=$(gx "du -sk '$corpus_src' | cut -f1" | tr -d '[:space:]')
-  guest_free_kb=$(gx "df -k / | awk 'NR == 2 { print \$4 }'" | tr -d '[:space:]')
-  if (( guest_free_kb > corpus_kb + 2 * 1024 * 1024 )); then
+  corpus_kb=$(gx "du -sk '$corpus_src' | cut -f1" | tr -d '[:space:]') || true
+  guest_free_kb=$(gx "df -k / | awk 'NR == 2 { print \$4 }'" | tr -d '[:space:]') || true
+  if (( ${guest_free_kb:-0} > ${corpus_kb:-0} + 2 * 1024 * 1024 )); then
     log "Guest: copying the corpus ($(( corpus_kb / 1024 )) MiB) to the guest disk"
     gx "cp -R '$corpus_src' /Users/admin/corpus" && corpus_in_place=0
   fi
+  guest_alive || { guest_lost=1; lost_step=corpus-prepare; log "Guest lost during corpus-prepare"; }
   if (( corpus_in_place )); then
     log "Guest: reading the corpus in place from the share"
     corpus_guest="$corpus_src"
@@ -338,7 +377,10 @@ fi  # ! BUILD_ONLY
 # --- Results back ----------------------------------------------------------
 
 mkdir -p "$RESULTS_DIR"
-gx "tar -C $GUEST_RESULTS -cf - ." | tar -x -C "$RESULTS_DIR"
+if (( ! guest_lost )); then
+  gx "tar -C $GUEST_RESULTS -cf - ." | tar -x -C "$RESULTS_DIR" \
+    || { guest_alive || { guest_lost=1; lost_step=${lost_step:-results}; log "Guest lost during results"; }; }
+fi
 
 # --- Host audio check ------------------------------------------------------
 # With --no-audio the guest has no path to the host's speakers; prove it.
@@ -353,6 +395,8 @@ for name in $step_order; do
   case ${step_rc[$name]} in
     0) log "PASS  $name" ;;
     skip) log "SKIP  $name (build failed)" ;;
+    lost) log "FAIL  $name (guest lost)" ;;
+    lost-skip) log "SKIP  $name (guest lost)" ;;
     *) log "FAIL  $name (exit ${step_rc[$name]})"; overall=1 ;;
   esac
 done
@@ -376,8 +420,12 @@ if (( build_failed )); then
     done
   fi
 fi
+if (( guest_lost )); then
+  log "INFRA  guest lost during $lost_step: the VM stopped or tart exec lost its transport; not a build or test failure -- rerun"
+  overall=3
+fi
 if (( BUILD_ONLY )); then
-  (( build_failed )) || log "BUILD-ONLY  everything compiles; no tests ran. This is not verification: run scripts/run-tests-vm.sh for that."
+  (( build_failed || guest_lost )) || log "BUILD-ONLY  everything compiles; no tests ran. This is not verification: run scripts/run-tests-vm.sh for that."
 elif (( FULL )); then
   log "TIER  full: includes the 100k scale and real-time audio tests"
 else
@@ -386,7 +434,7 @@ fi
 grep -hE 'Build complete!|Test run with|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "$RESULTS_DIR"/*.log 2>/dev/null | sed 's/^/    /' || true
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
-  overall=1
+  (( overall == 3 )) || overall=1
 else
   log "AUDIO  silent: no host 'Starting IO' events during the run"
 fi

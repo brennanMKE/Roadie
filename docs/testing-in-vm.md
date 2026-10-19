@@ -71,7 +71,23 @@ When something does not compile, the run stops after the build stage and prints 
 A run with `SKIP` lines is a failed run. `--build-only` stops after the build stage; it is a
 compile check before a complete run, never verification.
 
+If the guest goes away mid-run (the VM stopped, or `tart exec` lost its transport), the step it was
+in is reported as lost and the rest are skipped, with no compiler-error block:
+
+```
+==> FAIL  skinkit-build (guest lost)
+==> SKIP  playerkit-build (guest lost)
+==> SKIP  app-build (guest lost)
+==> INFRA  guest lost during skinkit-build: the VM stopped or tart exec lost its transport; not a build or test failure -- rerun
+```
+
+An `INFRA` line (exit 3) means the VM went away, not the code: rerun rather than looking for a
+compile error.
+
 It exits non-zero if any step fails, or if the host's audio daemon started output during the run.
+Exit codes: `0` everything passed and silent; `1` a build/test/check step failed, the host audio
+check tripped, or a preflight check failed; `2` bad arguments; `3` infrastructure (the guest didn't
+boot or was lost mid-run), rerun.
 The logs for each step, plus the guest's audio device list, are in `build/vm-tests/<run-id>/`
 (gitignored). This is the verification command for issue work; see `issues/Issues.md`.
 
@@ -184,8 +200,10 @@ consolidated on 2026-10-11.
    least 20 GiB free on `/`, and memory checked: the guest needs `GUEST_MEM_MB + 4096` (16 GB). If
    the host is short, the script sends a memory-signal request and waits for the observer.
 2. **Sweep stale clones.** A SIGKILL (for example, an OOM kill) skips the `EXIT` trap and leaves a
-   clone behind. The sweep only touches names shaped exactly like this script's run IDs,
-   `skinamp-test-<YYYYMMDD>-<HHMMSS>-<pid>`. A prefix match once deleted a golden image.
+   clone behind. The sweep removes `skinamp-test-<YYYYMMDD>-<HHMMSS>-<pid>` clones whose `<pid>`
+   is no longer a live `run-tests-vm.sh` process, or whose run id is older than 8 h. Clones of a
+   live run (another agent's concurrent run) are left alone, and nothing outside that exact name
+   shape is ever touched. A prefix match once deleted a golden image.
 3. **Export a snapshot.** By default, the working tree: tracked files plus untracked files that
    aren't ignored, so a change can be verified before it is committed. With `--head`,
    `git archive HEAD`. Then `xcodegen generate` runs on the host against the export, because
@@ -253,6 +271,8 @@ Test design for a headless, silent guest:
 
 - To keep a failed clone, comment out the `tart delete` in `cleanup`, then `tart exec <clone> …` to
   look around. Delete it by hand afterwards; a kept clone still counts against the two-guest limit.
+  The next run sweeps it once its run has exited; to keep it longer, `tart rename` it to a name
+  outside the pattern (e.g. `skinamp-keep-<id>`) and delete it by hand later.
 - To see the guest's screen, `tart run <clone> --no-audio` without `--no-graphics`. Memory is the
   constraint on cameron: an idle VM opened with graphics was OOM-killed after about an hour on
   2026-09-12.
@@ -263,7 +283,8 @@ Test design for a headless, silent guest:
 ## Known limits
 
 - Apple allows at most two macOS guests per host, and they are shared with every other project on
-  cameron. `tart-lease status` shows who holds them.
+  cameron. `tart-lease status` shows who holds them. Two runs at once are fine; a third waits for
+  a slot.
 - A run takes 6 CPUs and 12 GB while it lasts. Interactive work on the host will notice during the
   build.
 - Disk, not memory, is usually what runs out first. The script refuses to start below 20 GiB free.
