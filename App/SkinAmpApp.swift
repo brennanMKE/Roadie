@@ -48,6 +48,7 @@ struct SkinAmpApp: App {
                     .keyboardShortcut("o", modifiers: [.command, .shift])
             }
             SkinsCommands(model: appDelegate.model)
+            PlaybackCommands(model: appDelegate.model)
             CommandGroup(after: .windowArrangement) {
                 Button("Player") { appDelegate.player.show() }
                     .keyboardShortcut("1")

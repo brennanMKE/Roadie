@@ -147,6 +147,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
             guard let self else { return }
             coordinator?.raiseGroup(around: self)
         }
+        window.onHotkey = { [weak self] in self?.model.perform($0) }
         if case .main = kind {
             window.onRightMouseDown = { [weak self] event in
                 guard let self else { return false }

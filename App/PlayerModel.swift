@@ -437,6 +437,39 @@ final class PlayerModel {
         send(.seek(min(max(fraction, 0), 1) * mainWindowStatus.duration))
     }
 
+    /// ±5 s from the current position (a Winamp arrow key). No-op unless a track with a known length is playing or paused.
+    func seek(forward: Bool) {
+        guard positionFraction != nil else { return }
+        let status = mainWindowStatus
+        guard let target = WinampHotkeys.seekTarget(elapsed: status.elapsed, duration: status.duration, forward: forward)
+        else { return }
+        send(.seek(target))
+    }
+
+    /// ±1 % (a Winamp arrow key). Leaves `sliderFocus` and the marquee alone, unlike a slider drag.
+    func nudgeVolume(up: Bool) {
+        volume = WinampHotkeys.nudgedVolume(volume, up: up)
+        send(.setVolume(volume))
+    }
+
+    /// One Winamp hotkey, from the Playback menu or a bare key in a skinned window.
+    func perform(_ hotkey: WinampHotkey) {
+        switch hotkey {
+        case .previous: previous()
+        case .play: play()
+        case .pause: pause()
+        case .stop: stop()
+        case .next: next()
+        case .seekBack: seek(forward: false)
+        case .seekForward: seek(forward: true)
+        case .volumeUp: nudgeVolume(up: true)
+        case .volumeDown: nudgeVolume(up: false)
+        case .toggleShuffle: toggleShuffle()
+        case .toggleRepeat: toggleRepeat()
+        case .openFile: openFiles(replace: true)
+        }
+    }
+
     /// Collapses the main window to its shade strip or restores it (the shade button, a title-bar double-click and
     /// Window > Windowshade all come here). `SkinWindowController` follows the flag.
     func toggleMainWindowShade() {

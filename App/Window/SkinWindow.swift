@@ -1,4 +1,5 @@
 import AppKit
+import SkinKit
 
 /// Borderless, non-opaque window for a skinned view. Key and main like a titled window.
 final class SkinWindow: NSWindow {
@@ -29,6 +30,23 @@ final class SkinWindow: NSWindow {
         if isSecondary, let onRightMouseDown, onRightMouseDown(event) { return }
         super.sendEvent(event)
         if event.type == .leftMouseDown { onLeftMouseDown?() }
+    }
+
+    /// A bare Winamp key (Z X C V B, arrows, S R L) pressed while this window is key.
+    var onHotkey: ((WinampHotkey) -> Void)?
+
+    /// Reached only at the end of a skinned window's responder chain, so text fields in other windows never lose keys.
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if let hotkey = WinampHotkeys.hotkey(
+            charactersIgnoringModifiers: event.charactersIgnoringModifiers ?? "",
+            command: flags.contains(.command), control: flags.contains(.control),
+            option: flags.contains(.option), shift: flags.contains(.shift), isRepeat: event.isARepeat),
+            let onHotkey {
+            onHotkey(hotkey)
+            return
+        }
+        super.keyDown(with: event)
     }
 
     /// AppKit answers `false` for borderless windows, which would leave menus without a key window.
