@@ -55,6 +55,30 @@ struct PlaybackRouterTests {
         #expect(router.backend(for: OutputDevice.thisMacID, command: .next) === local)
     }
 
+    @Test func feedFollowsMusicAssistantPlayAndStream() {
+        #expect(ThisMacFeed.local.after(.musicAssistantPlayRequested) == .musicAssistant)
+        #expect(ThisMacFeed.local.after(.streamStarted) == .musicAssistant)
+    }
+
+    @Test func failedMusicAssistantPlayReturnsToLocalUnlessStreaming() {
+        #expect(ThisMacFeed.musicAssistant.after(.musicAssistantPlayFailed(isStreaming: false)) == .local)
+        #expect(ThisMacFeed.musicAssistant.after(.musicAssistantPlayFailed(isStreaming: true)) == .musicAssistant)
+    }
+
+    @Test func streamStopReturnsThisMacToTheLocalBackend() {
+        let local = StubMusicBackend(sourceID: "folder")
+        let remote = StubMusicBackend(sourceID: "musicAssistant")
+        let feed = ThisMacFeedState()
+        feed.feed = .musicAssistant
+        let router = PlaybackRouter(local: local, remote: remote, feed: feed)
+        feed.feed = feed.feed.after(.streamStopped)
+        #expect(router.backend(for: OutputDevice.thisMacID, command: .next) === local)
+    }
+
+    @Test func localPlayTakesThisMacBack() {
+        #expect(ThisMacFeed.musicAssistant.after(.localPlayRequested) == .local)
+    }
+
     @Test func volumeAndBalanceOnThisMacStayLocal() {
         let local = StubMusicBackend(sourceID: "folder")
         let remote = StubMusicBackend(sourceID: "musicAssistant")

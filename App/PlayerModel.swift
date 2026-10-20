@@ -355,13 +355,17 @@ final class PlayerModel {
                 }
             }
         }
-        playlist.isLocal = { [weak self] in self?.playsLocalQueue ?? false }
+        playlist.isLocal = { [weak self] in self?.selectedOutput == OutputDevice.thisMacID }
+        playlist.isPlayingLocalQueue = { [weak self] in self?.playsLocalQueue ?? false }
+        playlist.onPlayLocal = { [weak self] in self?.applyFeed(.localPlayRequested) }
         // Music Assistant started playing on this Mac (from SkinAmp, its own UI, Home Assistant or a phone).
-        stack.sendspin.onStreamStarted = { [weak self] in self?.setThisMacFeed(.musicAssistant) }
+        stack.sendspin.onStreamStarted = { [weak self] in self?.applyFeed(.streamStarted) }
+        // The server ended the stream, or the session dropped or was stopped: This Mac plays its local queue again.
+        stack.sendspin.onStreamStopped = { [weak self] in self?.applyFeed(.streamStopped) }
         // Local playback took the node: Music Assistant stops sending.
         stack.sendspin.onStreamPreempted = { [weak self] in
             guard let self else { return }
-            self.setThisMacFeed(.local)
+            self.applyFeed(.localPlayRequested)
             let ma = self.musicAssistant
             Task { try? await ma.transport(.stop, on: OutputDevice.thisMacID) }
         }
@@ -411,6 +415,9 @@ final class PlayerModel {
             }
         }
     }
+
+    /// Moves the feed of This Mac by the `ThisMacFeed.after` rule (#0114).
+    private func applyFeed(_ event: ThisMacFeedEvent) { setThisMacFeed(thisMacFeed.after(event)) }
 
     /// Switches what feeds This Mac and follows the new owner's now-playing stream.
     func setThisMacFeed(_ feed: ThisMacFeed) {
@@ -773,10 +780,13 @@ final class PlayerModel {
             return
         }
         if output == OutputDevice.thisMacID {
-            setThisMacFeed(sourceID == musicAssistant.sourceID ? .musicAssistant : .local)
+            applyFeed(sourceID == musicAssistant.sourceID ? .musicAssistantPlayRequested : .localPlayRequested)
         }
+        let maOnThisMac = output == OutputDevice.thisMacID && sourceID == musicAssistant.sourceID
         Task {
             do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
+                // A failed Music Assistant play hands This Mac back unless an earlier stream still runs (#0114).
+                if maOnThisMac { applyFeed(.musicAssistantPlayFailed(isStreaming: sendspinController.sendspin.isStreaming)) }
                 // `.backend` (Music Assistant on This Mac, #0066) is not a source failure; `report` ignores it.
                 fallback.report(error, from: sourceID)
                 showBackendFailure(error)
@@ -868,7 +878,7 @@ final class PlayerModel {
             if let skipped = StatusNotice.skipped(result) { post(skipped) } else { clearNotice() }
             guard !result.tracks.isEmpty else { return }
             // Local files take This Mac back from Music Assistant; AudioCore then preempts the stream.
-            setThisMacFeed(.local)
+            applyFeed(.localPlayRequested)
             let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty
             if replace { player.clearQueue() }
             let start = player.queue.tracks.count

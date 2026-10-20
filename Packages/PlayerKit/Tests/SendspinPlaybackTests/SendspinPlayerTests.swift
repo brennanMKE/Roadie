@@ -11,6 +11,7 @@ final class Rig {
     let bridge: SendspinPlayer
     var started = 0
     var preempted = 0
+    var stopped = 0
     var session: FakeSendspinSession { factory.session }
     var player: Player { offline.player }
 
@@ -20,6 +21,7 @@ final class Rig {
         bridge = SendspinPlayer(player: offline.player) { factory.make($0) }
         bridge.onStreamStarted = { [unowned self] in started += 1 }
         bridge.onStreamPreempted = { [unowned self] in preempted += 1 }
+        bridge.onStreamStopped = { [unowned self] in stopped += 1 }
     }
 
     func connect() async throws {
@@ -156,7 +158,7 @@ final class Rig {
         await rig.bridge.stop()
     }
 
-    @Test func localPlaybackPreemptsAndNotifies() async throws {
+    @Test func localPlaybackPreemptsWithoutStopped() async throws {
         let rig = try Rig()
         try await rig.connect()
         await rig.startStream()
@@ -164,6 +166,7 @@ final class Rig {
         rig.player.enqueue([Track(title: "Local", artist: "Test", duration: 1, source: .file(url))])
         rig.player.play(at: 0)
         #expect(rig.preempted == 1)
+        #expect(rig.stopped == 0)
         #expect(!rig.bridge.isStreaming)
         #expect(!rig.player.isStreaming)
         await rig.bridge.stop()
@@ -184,6 +187,38 @@ final class Rig {
         await rig.bridge.stop()
         #expect(rig.bridge.status == .off)
         #expect(await rig.session.stops == [.shutdown])
+    }
+
+    @Test func serverStreamEndNotifiesStopped() async throws {
+        let rig = try Rig()
+        try await rig.connect()
+        await rig.startStream()
+        rig.session.push(.streamEnded)
+        #expect(await waitUntil { rig.stopped == 1 })
+        #expect(rig.preempted == 0)
+        await rig.bridge.stop()
+    }
+
+    @Test func disconnectNotifiesStopped() async throws {
+        let rig = try Rig()
+        try await rig.connect()
+        rig.session.push(.disconnected(.transport("closed")))
+        #expect(await waitUntil { rig.stopped >= 1 })
+        rig.session.push(.connected(try serverHello()))
+        #expect(await waitUntil { rig.bridge.status == .connected(serverName: "Test Server") })
+        await rig.startStream()
+        let before = rig.stopped
+        rig.session.push(.disconnected(.transport("closed")))
+        #expect(await waitUntil { rig.stopped > before })
+        #expect(rig.preempted == 0)
+        await rig.bridge.stop()
+    }
+
+    @Test func stopNotifiesStoppedWithoutAStream() async throws {
+        let rig = try Rig()
+        try await rig.connect()
+        await rig.bridge.stop()
+        #expect(rig.stopped == 1)
     }
 
     @Test func unauthorizedLeavesFailedStatus() async throws {

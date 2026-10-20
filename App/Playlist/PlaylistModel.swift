@@ -5,8 +5,8 @@ import SkinKit
 
 /// The playlist window's state: a view of the local player's queue plus selection, scroll position and size. Owned by
 /// `PlayerModel`. Edits go straight to `Player` (not through `TransportCommand`: that stream exists for transport
-/// ordering, and the queue is only reachable locally). `MusicBackend` has no queue read API, so with a remote output
-/// selected the list is empty.
+/// ordering, and the queue is only reachable locally). `MusicBackend` has no queue read API, so with a speaker
+/// selected the list is empty. With This Mac selected it shows the local queue even while Music Assistant feeds it (#0114).
 @MainActor
 @Observable
 final class PlaylistModel {
@@ -28,6 +28,10 @@ final class PlaylistModel {
     private let player: Player
     /// Whether the selected output is This Mac, the only output whose queue the window can show. Set by `PlayerModel`.
     @ObservationIgnored var isLocal: @MainActor () -> Bool = { true }
+    /// Whether This Mac plays its local queue (not Music Assistant); only then is a row current. Set by `PlayerModel`.
+    @ObservationIgnored var isPlayingLocalQueue: @MainActor () -> Bool = { true }
+    /// Called before a row plays, so This Mac takes its local queue back from Music Assistant (#0114).
+    @ObservationIgnored var onPlayLocal: @MainActor () -> Void = {}
 
     var selection = PlaylistSelection()
     /// Webamp's 0...100 percent of the overflow.
@@ -60,7 +64,7 @@ final class PlaylistModel {
     // MARK: Queue
 
     var tracks: [Track] { isLocal() ? player.queue.tracks : [] }
-    var currentIndex: Int? { isLocal() ? player.queue.currentIndex : nil }
+    var currentIndex: Int? { isLocal() && isPlayingLocalQueue() ? player.queue.currentIndex : nil }
     var count: Int { tracks.count }
 
     var visibleRange: Range<Int> {
@@ -156,6 +160,7 @@ final class PlaylistModel {
 
     func playRow(_ index: Int) {
         guard isLocal() else { return }
+        onPlayLocal()
         player.play(at: index)
     }
 

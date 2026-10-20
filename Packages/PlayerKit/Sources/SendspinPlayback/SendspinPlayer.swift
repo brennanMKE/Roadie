@@ -23,6 +23,9 @@ public final class SendspinPlayer {
     @ObservationIgnored public var onStreamStarted: (() -> Void)?
     /// Called when local playback took the node (the app asks Music Assistant to stop sending, #0109).
     @ObservationIgnored public var onStreamPreempted: (() -> Void)?
+    /// Called when the server ended the stream, or the session dropped or was stopped (#0114); never called for a
+    /// local preemption. Runs on the main actor.
+    @ObservationIgnored public var onStreamStopped: (() -> Void)?
 
     @ObservationIgnored private let makeSession: @Sendable (SendspinConnectionConfiguration) -> any SendspinSessionDriving
     @ObservationIgnored private var session: (any SendspinSessionDriving)?
@@ -84,6 +87,7 @@ public final class SendspinPlayer {
         generation += 1
         endStreamFromServer()
         status = .off
+        onStreamStopped?()
         await session?.stop(reason: reason)
     }
 
@@ -126,7 +130,9 @@ public final class SendspinPlayer {
         case .streamCleared:
             if isStreaming { player.clearStream() }
         case .streamEnded:
+            let wasStreaming = isStreaming
             endStreamFromServer()
+            if wasStreaming { onStreamStopped?() }
         case .setVolume(let value):
             muted = false
             player.volume = Float(min(max(value, 0), 100)) / 100
@@ -144,6 +150,7 @@ public final class SendspinPlayer {
         case .disconnected(let error):
             endStreamFromServer()
             status = error.map { Status.failed($0.localizedDescription) } ?? .connecting
+            onStreamStopped?()
         case .synchronized, .groupUpdated:
             break
         }

@@ -6,6 +6,31 @@ import Observation
 /// for SkinAmp's own MA player, arriving over Sendspin.
 public enum ThisMacFeed: Sendable, Equatable { case local, musicAssistant }
 
+/// What changes the feed of This Mac (#0114).
+public enum ThisMacFeedEvent: Sendable, Equatable {
+    /// SkinAmp asked Music Assistant to play on This Mac.
+    case musicAssistantPlayRequested
+    /// That play failed. While a stream still runs (an earlier play), Music Assistant keeps the feed.
+    case musicAssistantPlayFailed(isStreaming: Bool)
+    /// A Sendspin stream started.
+    case streamStarted
+    /// The server ended the stream, or the Sendspin session dropped or was stopped.
+    case streamStopped
+    /// Local files, the folder source or a playlist double-click.
+    case localPlayRequested
+}
+
+extension ThisMacFeed {
+    /// The feed after `event`.
+    public func after(_ event: ThisMacFeedEvent) -> ThisMacFeed {
+        switch event {
+        case .musicAssistantPlayRequested, .streamStarted: return .musicAssistant
+        case .musicAssistantPlayFailed(let isStreaming): return isStreaming ? .musicAssistant : .local
+        case .streamStopped, .localPlayRequested: return .local
+        }
+    }
+}
+
 @MainActor
 @Observable
 public final class ThisMacFeedState {
