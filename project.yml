@@ -34,6 +34,10 @@ targets:
       - package: PlayerKit
         product: LocalPlayback
       - package: PlayerKit
+        product: SendspinKit
+      - package: PlayerKit
+        product: SendspinPlayback
+      - package: PlayerKit
         product: FolderBackendKit
       - package: PlayerKit
         product: LibraryBrowser

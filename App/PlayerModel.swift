@@ -70,6 +70,14 @@ final class PlayerModel {
     @ObservationIgnored private var nowPlayingRouting: NowPlayingRouting?
     /// Transport and now-playing follow the selected output, not the Library's source (#0064).
     let router: PlaybackRouter
+    /// What feeds This Mac: the local queue or Music Assistant over Sendspin (#0109). Set only through `setThisMacFeed`.
+    let feedState: ThisMacFeedState
+    /// Starts and stops the Sendspin session that makes This Mac a Music Assistant player (#0109).
+    let sendspinController: SendspinController
+    var thisMacFeed: ThisMacFeed { feedState.feed }
+    /// Whether the local queue drives what the windows show: This Mac is the output and AudioCore's queue feeds it.
+    /// `selectedOutput == thisMacID` alone still means "the Mac's own audio" (the local-files gate, balance).
+    var playsLocalQueue: Bool { selectedOutput == OutputDevice.thisMacID && thisMacFeed == .local }
     /// The Library's Output menu.
     let outputPicker: OutputPickerModel
     /// The artwork shown in Control Center for a remote output, and the fetch for the current ref.
@@ -118,8 +126,8 @@ final class PlayerModel {
     /// The playlist window's selection, scroll position and size; a view of `player.queue`.
     let playlist: PlaylistModel
     /// Shuffle and repeat live in the local player's queue, so they read as off for other outputs.
-    var isShuffled: Bool { selectedOutput == OutputDevice.thisMacID && player.isShuffled }
-    var isRepeating: Bool { selectedOutput == OutputDevice.thisMacID && player.repeatMode != .off }
+    var isShuffled: Bool { playsLocalQueue && player.isShuffled }
+    var isRepeating: Bool { playsLocalQueue && player.repeatMode != .off }
     /// Commands go through one serial stream so a fast slider drag reaches the output in order.
     private let commandStream: AsyncStream<(TransportCommand, OutputDevice.ID)>.Continuation
     /// What the main window marquee shows: a notice, else the slider override, else the now-playing text.
@@ -127,7 +135,7 @@ final class PlayerModel {
     var marqueeText: String {
         if let notice { return notice.text }
         if let marqueeOverride { return marqueeOverride }
-        let number = selectedOutput == OutputDevice.thisMacID ? player.queue.currentIndex.map { $0 + 1 } : nil
+        let number = playsLocalQueue ? player.queue.currentIndex.map { $0 + 1 } : nil
         return MarqueeText.display(nowPlaying, number: number)
     }
 
@@ -180,7 +188,7 @@ final class PlayerModel {
 
     /// The current track for the File Info panel. Other outputs only report the `NowPlaying` snapshot.
     var currentTrackInfo: TrackInfo? {
-        if selectedOutput == OutputDevice.thisMacID {
+        if playsLocalQueue {
             return player.queue.current.map { TrackInfo(track: $0, format: player.currentFormat) }
         }
         guard let title = nowPlaying.title else { return nil }
@@ -244,15 +252,17 @@ final class PlayerModel {
         case .playing: .playing
         case .paused: .paused
         }
-        let isLocal = selectedOutput == OutputDevice.thisMacID
+        let isLocal = playsLocalQueue
+        // This Mac fed by Music Assistant: time from the snapshot, format from the stream the player plays (#0109).
+        let isThisMac = selectedOutput == OutputDevice.thisMacID
         let track = isLocal ? player.queue.current : nil
         return MainWindowStatus(
             transport: transport, timeMode: timeMode,
             elapsed: isLocal ? player.currentTime : nowPlaying.elapsed(at: now),
             duration: nowPlaying.duration ?? track?.duration ?? 0,
             bitrateKbps: track?.bitrate,
-            sampleRate: (isLocal ? player.currentFormat?.sampleRate : nil) ?? track?.sampleRate,
-            channels: (isLocal ? player.currentFormat?.channels : nil) ?? track?.channels)
+            sampleRate: (isThisMac ? player.currentFormat?.sampleRate : nil) ?? track?.sampleRate,
+            channels: (isThisMac ? player.currentFormat?.channels : nil) ?? track?.channels)
     }
 
     init() {
@@ -302,7 +312,10 @@ final class PlayerModel {
             defaultSourceID: ma.sourceID)
         fallback = LibraryFallbackController(sources: sources)
         // This Mac is the folder backend's output (`LocalPlaybackStack`; no connection needed).
-        router = PlaybackRouter(local: folderBackend, remote: ma)
+        let feedState = ThisMacFeedState()
+        self.feedState = feedState
+        router = PlaybackRouter(local: folderBackend, remote: ma, feed: feedState)
+        sendspinController = SendspinController(sendspin: stack.sendspin, musicAssistant: ma)
         outputPicker = OutputPickerModel(remote: ma, isConnected: { await ma.isConnected })
         let (commands, continuation) = AsyncStream.makeStream(of: (TransportCommand, OutputDevice.ID).self)
         commandStream = continuation
@@ -331,7 +344,7 @@ final class PlayerModel {
         Task { [weak self] in
             for await (command, output) in commands {
                 guard let self else { return }
-                do { try await self.router.backend(for: output).transport(command, on: output) } catch {
+                do { try await self.router.backend(for: output, command: command).transport(command, on: output) } catch {
                     // A speaker has no balance: the marquee already shows the balance text, so no notice per drag tick.
                     if case .setBalance = command, output != OutputDevice.thisMacID,
                         error as? MusicBackendError == .unsupported(.remoteOutputs)
@@ -342,7 +355,17 @@ final class PlayerModel {
                 }
             }
         }
-        playlist.isLocal = { [weak self] in self?.selectedOutput == OutputDevice.thisMacID }
+        playlist.isLocal = { [weak self] in self?.playsLocalQueue ?? false }
+        // Music Assistant started playing on this Mac (from SkinAmp, its own UI, Home Assistant or a phone).
+        stack.sendspin.onStreamStarted = { [weak self] in self?.setThisMacFeed(.musicAssistant) }
+        // Local playback took the node: Music Assistant stops sending.
+        stack.sendspin.onStreamPreempted = { [weak self] in
+            guard let self else { return }
+            self.setThisMacFeed(.local)
+            let ma = self.musicAssistant
+            Task { try? await ma.transport(.stop, on: OutputDevice.thisMacID) }
+        }
+        sendspinController.start()
         let routing = NowPlayingRouting(player: stack.player, model: self)
         nowPlayingRouting = routing
         nowPlayingBridge.setCommandTarget(routing)
@@ -357,7 +380,10 @@ final class PlayerModel {
         musicAssistantDiscovery.onConfiguredServerMoved = { [weak settings = musicAssistantSettings] id, url in
             settings?.adoptDiscoveredAddress(url, for: id)
         }
-        selection.onChange = { [weak self] old, new in self?.musicAssistantServerChanged(from: old, to: new) }
+        selection.onChange = { [weak self] old, new in
+            self?.sendspinController.serverChanged()
+            self?.musicAssistantServerChanged(from: old, to: new)
+        }
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()
         selection.start()
@@ -384,6 +410,13 @@ final class PlayerModel {
                 self?.fallback.retryNow()
             }
         }
+    }
+
+    /// Switches what feeds This Mac and follows the new owner's now-playing stream.
+    func setThisMacFeed(_ feed: ThisMacFeed) {
+        guard feed != feedState.feed else { return }
+        feedState.feed = feed
+        observeNowPlaying()
     }
 
     /// The selection picked another server (#0075). Playback on This Mac is never touched.
@@ -481,7 +514,7 @@ final class PlayerModel {
         externalArtwork = nil
         let output = selectedOutput
         let backend = router.backend(for: output)
-        let isRemote = output != OutputDevice.thisMacID
+        let isRemote = !playsLocalQueue
         nowPlaying = .idle(on: output)
         if isRemote {
             nowPlayingBridge.showExternal(nil, artwork: nil)
@@ -610,7 +643,7 @@ final class PlayerModel {
 
     /// Start of the 1 s clock that re-renders the time and position views while a non-local output plays;
     /// nil otherwise (This Mac re-renders from the player's own ticks, and idle/paused need no clock).
-    var remoteClockAnchor: Date? { nowPlaying.remoteClockAnchor(selected: selectedOutput) }
+    var remoteClockAnchor: Date? { nowPlaying.remoteClockAnchor(followsLocalPlayer: playsLocalQueue) }
 
     func positionFraction(at now: Date) -> Double? {
         let status = mainWindowStatus(at: now)
@@ -739,6 +772,9 @@ final class PlayerModel {
             post(StatusNotice(text: text))
             return
         }
+        if output == OutputDevice.thisMacID {
+            setThisMacFeed(sourceID == musicAssistant.sourceID ? .musicAssistant : .local)
+        }
         Task {
             do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
                 // `.backend` (Music Assistant on This Mac, #0066) is not a source failure; `report` ignores it.
@@ -831,6 +867,8 @@ final class PlayerModel {
             }
             if let skipped = StatusNotice.skipped(result) { post(skipped) } else { clearNotice() }
             guard !result.tracks.isEmpty else { return }
+            // Local files take This Mac back from Music Assistant; AudioCore then preempts the stream.
+            setThisMacFeed(.local)
             let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty
             if replace { player.clearQueue() }
             let start = player.queue.tracks.count

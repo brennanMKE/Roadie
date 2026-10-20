@@ -135,4 +135,16 @@ struct MusicAssistantThisMacTests {
         #expect(rig.backend.capabilities.contains(.localOutput))
         #expect(rig.backend.capabilities.contains(.remoteOutputs))
     }
+
+    @Test func sendspinEndpointFollowsTheConnection() async throws {
+        let rig = try makeBackend()
+        #expect(await rig.backend.sendspinEndpoint() == nil)
+        try await rig.backend.connect()
+        let endpoint = try #require(await rig.backend.sendspinEndpoint())
+        #expect(endpoint.baseURL == testBaseURL)
+        #expect(endpoint.token == testToken)
+        #expect(!endpoint.description.contains(testToken.rawValue))
+        await rig.backend.disconnect()
+        #expect(await rig.backend.sendspinEndpoint() == nil)
+    }
 }

@@ -26,6 +26,7 @@ struct SkinAmpApp: App {
             SettingsView()
                 .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.musicAssistantSelection)
+                .environment(appDelegate.model.sendspinController)
                 .environment(appDelegate.model.musicAssistantDiscovery)
                 .environment(appDelegate.model.folderSettings)
                 .environment(appDelegate.model.sources)

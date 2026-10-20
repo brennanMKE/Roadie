@@ -100,7 +100,13 @@ public struct NowPlaying: Hashable, Sendable {
     /// crosses a whole second. nil on This Mac (the local player drives the view) and unless playing, so
     /// nothing ticks while idle, paused, loading or stopped.
     public func remoteClockAnchor(selected: OutputDevice.ID) -> Date? {
-        guard selected != OutputDevice.thisMacID, state == .playing else { return nil }
+        remoteClockAnchor(followsLocalPlayer: selected == OutputDevice.thisMacID)
+    }
+
+    /// As above, keyed on whether the local queue drives the view: This Mac fed by Music Assistant (#0109) ticks
+    /// from the snapshot like a speaker.
+    public func remoteClockAnchor(followsLocalPlayer: Bool) -> Date? {
+        guard !followsLocalPlayer, state == .playing else { return nil }
         return updatedAt.addingTimeInterval(-elapsed.truncatingRemainder(dividingBy: 1) + Self.clockLead)
     }
 }

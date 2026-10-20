@@ -35,6 +35,14 @@ struct NowPlayingTests {
         #expect(snapshot.remoteClockAnchor(selected: OutputDevice.thisMacID) == nil)
     }
 
+    @Test func remoteClockTicksForThisMacFedByMusicAssistant() {
+        let snapshot = NowPlaying(
+            output: OutputDevice.thisMacID, state: .playing, duration: 300, elapsed: 10.7, updatedAt: Self.t0)
+        #expect(snapshot.remoteClockAnchor(followsLocalPlayer: false) != nil)
+        #expect(snapshot.remoteClockAnchor(followsLocalPlayer: true) == nil)
+        #expect(snapshot.remoteClockAnchor(followsLocalPlayer: false) == Self.remoteSnapshot(.playing, elapsed: 10.7).remoteClockAnchor(selected: Self.remote))
+    }
+
     @Test func remoteClockAnchorIsNilUnlessPlaying() {
         for state in [NowPlaying.State.paused, .stopped, .loading] {
             #expect(Self.remoteSnapshot(state, elapsed: 10.7).remoteClockAnchor(selected: Self.remote) == nil)

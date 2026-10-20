@@ -35,6 +35,47 @@ struct PlaybackRouterTests {
         #expect(router.backend(for: OutputDevice.ID(rawValue: "ap82fe09484ac9")) === remote)
         #expect(router.backend(for: OutputDevice.ID(rawValue: "group-1")) === remote)
     }
+
+    @Test func defaultFeedIsLocal() {
+        let router = PlaybackRouter(local: StubMusicBackend(sourceID: "folder"), remote: StubMusicBackend(sourceID: "musicAssistant"))
+        #expect(router.feed.feed == .local)
+        #expect(ThisMacFeedState().feed == .local)
+    }
+
+    @Test func thisMacFollowsTheFeed() {
+        let local = StubMusicBackend(sourceID: "folder")
+        let remote = StubMusicBackend(sourceID: "musicAssistant")
+        let feed = ThisMacFeedState()
+        let router = PlaybackRouter(local: local, remote: remote, feed: feed)
+        #expect(router.backend(for: OutputDevice.thisMacID) === local)
+        feed.feed = .musicAssistant
+        #expect(router.backend(for: OutputDevice.thisMacID) === remote)
+        #expect(router.backend(for: OutputDevice.thisMacID, command: .next) === remote)
+        feed.feed = .local
+        #expect(router.backend(for: OutputDevice.thisMacID, command: .next) === local)
+    }
+
+    @Test func volumeAndBalanceOnThisMacStayLocal() {
+        let local = StubMusicBackend(sourceID: "folder")
+        let remote = StubMusicBackend(sourceID: "musicAssistant")
+        let feed = ThisMacFeedState()
+        feed.feed = .musicAssistant
+        let router = PlaybackRouter(local: local, remote: remote, feed: feed)
+        #expect(router.backend(for: OutputDevice.thisMacID, command: .setVolume(0.5)) === local)
+        #expect(router.backend(for: OutputDevice.thisMacID, command: .setBalance(-0.2)) === local)
+    }
+
+    @Test func speakersAlwaysGoRemote() {
+        let local = StubMusicBackend(sourceID: "folder")
+        let remote = StubMusicBackend(sourceID: "musicAssistant")
+        let router = PlaybackRouter(local: local, remote: remote)
+        let speaker = OutputDevice.ID(rawValue: "ap82fe09484ac9")
+        for command in [TransportCommand.setVolume(0.3), .setBalance(0.1), .play, .seek(4)] {
+            #expect(router.backend(for: speaker, command: command) === remote)
+        }
+        router.feed.feed = .musicAssistant
+        #expect(router.backend(for: speaker) === remote)
+    }
 }
 
 @MainActor

@@ -46,6 +46,8 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// The now-playing watchers subscribe to its events and states.
     public private(set) var client: MusicAssistantClient?
     private var connectedBaseURL: URL?
+    /// The token `connect()` used, kept for the Sendspin endpoint (#0109) so the app never reads the Keychain again.
+    private var connectedToken: MusicAssistantToken?
     private var connectedConfiguration: MusicAssistantServerConfiguration?
     private var counts: [String: Int] = [:]
     /// Players by id, from `outputs()`, `players/get` and the watchers: commands never list every player.
@@ -161,6 +163,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             await old.disconnect()
             client = nil
             connectedBaseURL = nil
+            connectedToken = nil
             connectedConfiguration = nil
             counts = [:]
             players = [:]
@@ -177,6 +180,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         let raced = client
         client = fresh
         connectedBaseURL = address.baseURL
+        connectedToken = token
         connectedConfiguration = configuration
         counts = [:]
         players = [:]
@@ -187,12 +191,20 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         if let raced, raced !== fresh { await raced.disconnect() }
     }
 
+    /// Where SkinAmp's Sendspin session connects (#0109): the server the API is connected to, with its token. nil
+    /// when not connected.
+    public func sendspinEndpoint() -> MusicAssistantSendspinEndpoint? {
+        guard client != nil, let baseURL = connectedBaseURL, let token = connectedToken else { return nil }
+        return MusicAssistantSendspinEndpoint(baseURL: baseURL, token: token)
+    }
+
     public func disconnect() async {
         stopForwardingStates()
         broadcast(.disconnected)
         let old = client
         client = nil
         connectedBaseURL = nil
+        connectedToken = nil
         connectedConfiguration = nil
         counts = [:]
         players = [:]
@@ -642,4 +654,17 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         case .server, .decoding, .invalidURL: return MusicBackendError.backend(message)
         }
     }
+}
+
+/// The Music Assistant server SkinAmp's Sendspin session targets (#0109).
+public struct MusicAssistantSendspinEndpoint: Sendable, Equatable, CustomStringConvertible {
+    public let baseURL: URL
+    public let token: MusicAssistantToken
+
+    public init(baseURL: URL, token: MusicAssistantToken) {
+        self.baseURL = baseURL
+        self.token = token
+    }
+
+    public var description: String { "MusicAssistantSendspinEndpoint(token: redacted)" }
 }

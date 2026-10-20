@@ -2,7 +2,7 @@ import AudioCore
 import Foundation
 import MusicBackendKit
 
-/// Media keys and Control Center commands: to the local `Player` while This Mac is the output, else to the selected
+/// Media keys and Control Center commands: to the local `Player` while the local queue feeds This Mac, else to the selected
 /// speaker through `PlayerModel`'s command stream (#0064).
 @MainActor
 final class NowPlayingRouting: NowPlayingCommandTarget {
@@ -15,7 +15,7 @@ final class NowPlayingRouting: NowPlayingCommandTarget {
     }
 
     private var remote: PlayerModel? {
-        guard let model, model.selectedOutput != OutputDevice.thisMacID else { return nil }
+        guard let model, !model.playsLocalQueue else { return nil }
         return model
     }
 

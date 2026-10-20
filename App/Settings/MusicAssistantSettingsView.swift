@@ -7,6 +7,7 @@ struct MusicAssistantSettingsView: View {
     @Environment(MusicAssistantSettingsModel.self) private var model
     @Environment(MusicAssistantSelectionController.self) private var selection
     @Environment(MusicAssistantDiscoveryModel.self) private var discovery
+    @Environment(SendspinController.self) private var sendspin
     @State private var networkDraft = ""
 
     var body: some View {
@@ -55,6 +56,8 @@ struct MusicAssistantSettingsView: View {
             }
 
             DiscoveredServersSection()
+
+            thisMacSection
 
             if model.selected != nil {
                 Section {
@@ -109,6 +112,23 @@ struct MusicAssistantSettingsView: View {
         // #0104: discovery runs only while this tab is on screen.
         .task { discovery.start() }
         .onDisappear { discovery.stop() }
+    }
+
+    /// This Mac as a Music Assistant player over Sendspin (#0109).
+    private var thisMacSection: some View {
+        @Bindable var sendspin = sendspin
+        return Section {
+            Toggle("Play Music Assistant on this Mac", isOn: $sendspin.isEnabled)
+                .accessibilityIdentifier("ma.sendspin.enabled")
+            Text(sendspin.statusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("ma.sendspin.status")
+        } header: {
+            Text("This Mac")
+        } footer: {
+            Text("Music Assistant streams to SkinAmp over Sendspin. Group This Mac with other speakers in Music Assistant.")
+        }
     }
 
     /// The selected server's Wi-Fi network names (#0075).
