@@ -71,4 +71,55 @@ import Testing
             #expect(map.ranges[peak].contains(map.bin(forFrequency: hz)))
         }
     }
+
+    private static func offlineEngine() throws -> AVAudioEngine {
+        let engine = AVAudioEngine()
+        let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!
+        try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 512)
+        _ = engine.mainMixerNode
+        try engine.start()
+        return engine
+    }
+
+    @Test func theTapBlockDoesNotKeepTheAnalyzerAlive() throws {
+        let engine = try Self.offlineEngine()
+        defer { engine.stop() }
+        weak var weakTap: AnalyzerTap?
+        do {
+            let tap = AnalyzerTap()
+            tap.install(on: engine.mainMixerNode, sampleRate: 44_100)
+            #expect(tap.isInstalled)
+            weakTap = tap
+        }
+        #expect(weakTap == nil)
+    }
+
+    @Test func removingTheTapAfterItsNodeWasDetachedDoesNotRaise() throws {
+        let engine = try Self.offlineEngine()
+        defer { engine.stop() }
+        let node = AVAudioMixerNode()
+        engine.attach(node)
+        engine.connect(node, to: engine.mainMixerNode, format: nil)
+        var tap: AnalyzerTap? = AnalyzerTap()
+        tap?.install(on: node, sampleRate: 44_100)
+        engine.detach(node)
+        tap?.remove()
+        #expect(tap?.isInstalled == false)
+        tap = nil
+        withExtendedLifetime(node) {}
+    }
+
+    @Test func releasingTheTapAfterItsEngineIsGoneDoesNotRaise() throws {
+        let tap = AnalyzerTap()
+        let node: AVAudioNode
+        do {
+            let engine = try Self.offlineEngine()
+            node = engine.mainMixerNode
+            tap.install(on: node, sampleRate: 44_100)
+            engine.stop()
+        }
+        tap.remove()
+        #expect(!tap.isInstalled)
+        withExtendedLifetime(node) {}
+    }
 }

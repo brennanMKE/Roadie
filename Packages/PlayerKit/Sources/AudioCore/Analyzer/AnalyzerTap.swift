@@ -8,7 +8,7 @@ import AVFoundation
 /// the app). Only the tap block runs elsewhere, and it touches nothing but the ring and scratch.
 public final class AnalyzerTap: @unchecked Sendable {
     public let fftSize: Int
-    public let ring: VisSampleRing
+    public var ring: VisSampleRing { sink.ring }
     public private(set) var isInstalled = false
     /// Sample rate the current analyzer was built for (0 before the first install).
     public private(set) var sampleRate: Double = 0
@@ -16,7 +16,8 @@ public final class AnalyzerTap: @unchecked Sendable {
     private weak var node: AVAudioNode?
     private var bus: AVAudioNodeBus = 0
     private var analyzer: SpectrumAnalyzer?
-    private let scratch: UnsafeMutablePointer<Float>
+    /// Producer state owned by the tap block, so the block never retains this object.
+    private let sink: TapSink
     private let window: UnsafeMutablePointer<Float>
     private let spectrumOut: UnsafeMutablePointer<Float>
     private let scopeOut: UnsafeMutablePointer<Float>
@@ -26,10 +27,9 @@ public final class AnalyzerTap: @unchecked Sendable {
 
     public init(fftSize: Int = 1024, ringCapacity: Int = 32_768) {
         self.fftSize = fftSize
-        ring = VisSampleRing(capacity: ringCapacity)
-        cursor = VisReadCursor(window: fftSize, readable: ring.capacity - ring.maxChunk)
-        scratch = .allocate(capacity: ring.capacity)
-        scratch.initialize(repeating: 0, count: ring.capacity)
+        let sink = TapSink(ring: VisSampleRing(capacity: ringCapacity))
+        self.sink = sink
+        cursor = VisReadCursor(window: fftSize, readable: sink.ring.capacity - sink.ring.maxChunk)
         window = .allocate(capacity: fftSize)
         window.initialize(repeating: 0, count: fftSize)
         spectrumOut = .allocate(capacity: VisFrame.columnCount)
@@ -40,7 +40,7 @@ public final class AnalyzerTap: @unchecked Sendable {
 
     deinit {
         remove()
-        scratch.deallocate(); window.deallocate(); spectrumOut.deallocate(); scopeOut.deallocate()
+        window.deallocate(); spectrumOut.deallocate(); scopeOut.deallocate()
     }
 
     /// Installs (or re-installs) the tap. Safe to call repeatedly, including after an engine
@@ -53,8 +53,9 @@ public final class AnalyzerTap: @unchecked Sendable {
         prepare(sampleRate: sampleRate)
         self.node = node
         self.bus = bus
-        node.installTap(onBus: bus, bufferSize: 1024, format: nil) { [self] buffer, _ in
-            handle(buffer)
+        let sink = self.sink
+        node.installTap(onBus: bus, bufferSize: 1024, format: nil) { buffer, _ in
+            sink.handle(buffer)
         }
         isInstalled = true
     }
@@ -77,27 +78,10 @@ public final class AnalyzerTap: @unchecked Sendable {
 
     public nonisolated func remove() {
         guard isInstalled else { return }
-        node?.removeTap(onBus: bus)
+        // A node without an engine has already lost its tap; removeTap would raise.
+        if let node, node.engine != nil { node.removeTap(onBus: bus) }
+        node = nil
         isInstalled = false
-    }
-
-    /// Tap block body. Preallocated buffers only.
-    private nonisolated func handle(_ buffer: AVAudioPCMBuffer) {
-        guard let channels = buffer.floatChannelData else { return }
-        let available = Int(buffer.frameLength)
-        guard available > 0 else { return }
-        let n = min(available, ring.capacity)
-        let skip = available - n
-        let left = channels[0] + skip
-        if buffer.format.channelCount >= 2 {
-            let right = channels[1] + skip
-            var half: Float = 0.5
-            vDSP_vadd(left, 1, right, 1, scratch, 1, vDSP_Length(n))
-            vDSP_vsmul(scratch, 1, &half, scratch, 1, vDSP_Length(n))
-        } else {
-            memcpy(scratch, left, n * MemoryLayout<Float>.stride)
-        }
-        ring.write(scratch, count: n)
     }
 
     /// Consumer side, ~30-60 Hz. nil until `fftSize` samples have flowed; if the ring was
@@ -139,4 +123,37 @@ public final class AnalyzerTap: @unchecked Sendable {
 
     /// Column map for the current sample rate (tests / UI).
     public var columnMap: SpectrumColumnMap? { analyzer?.columnMap }
+}
+
+/// Producer side of the tap: the ring plus its scratch buffer. Only the tap block calls `handle`.
+private final class TapSink: @unchecked Sendable {
+    let ring: VisSampleRing
+    private let scratch: UnsafeMutablePointer<Float>
+
+    init(ring: VisSampleRing) {
+        self.ring = ring
+        scratch = .allocate(capacity: ring.capacity)
+        scratch.initialize(repeating: 0, count: ring.capacity)
+    }
+
+    deinit { scratch.deallocate() }
+
+    /// Tap block body. Preallocated buffers only.
+    func handle(_ buffer: AVAudioPCMBuffer) {
+        guard let channels = buffer.floatChannelData else { return }
+        let available = Int(buffer.frameLength)
+        guard available > 0 else { return }
+        let n = min(available, ring.capacity)
+        let skip = available - n
+        let left = channels[0] + skip
+        if buffer.format.channelCount >= 2 {
+            let right = channels[1] + skip
+            var half: Float = 0.5
+            vDSP_vadd(left, 1, right, 1, scratch, 1, vDSP_Length(n))
+            vDSP_vsmul(scratch, 1, &half, scratch, 1, vDSP_Length(n))
+        } else {
+            memcpy(scratch, left, n * MemoryLayout<Float>.stride)
+        }
+        ring.write(scratch, count: n)
+    }
 }
