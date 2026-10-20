@@ -31,6 +31,7 @@ import urllib.parse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE_REL = "Packages/PlayerKit/Sources/MusicAssistantKitStub/Fixtures"
 DOCS_REL = "docs/ma-protocol"
+SENDSPIN_FIXTURE_REL = "Packages/PlayerKit/Tests/SendspinKitTests/Fixtures"
 NOTES_REL = "docs/ma-protocol-notes.md"
 
 # The only commands call() will send. Everything is a read.
@@ -410,7 +411,7 @@ class Targets:
 
 def owned_files(root):
     files = []
-    for rel in (FIXTURE_REL, DOCS_REL):
+    for rel in (FIXTURE_REL, DOCS_REL, SENDSPIN_FIXTURE_REL):
         for dp, _, fns in os.walk(os.path.join(root, rel)):
             for fn in fns:
                 files.append(os.path.join(dp, fn))

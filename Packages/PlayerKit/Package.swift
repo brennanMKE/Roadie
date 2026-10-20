@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "MusicLibraryKit", targets: ["MusicLibraryKit"]),
         .library(name: "MusicAssistantKit", targets: ["MusicAssistantKit"]),
         .library(name: "MusicAssistantKitStub", targets: ["MusicAssistantKitStub"]),
+        .library(name: "SendspinKit", targets: ["SendspinKit"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).
@@ -43,5 +44,9 @@ let package = Package(
         // Scripted WebSocket/HTTP transports replaying #0060's recorded frames, plus an in-memory token store.
         .target(name: "MusicAssistantKitStub", dependencies: ["MusicAssistantKit", "MusicBackendKit"], resources: [.copy("Fixtures")]),
         .testTarget(name: "MusicAssistantKitTests", dependencies: ["MusicAssistantKit", "MusicAssistantKitStub", "MusicBackendKit"]),
+        // Sendspin player protocol client (#0066). Foundation only: no AudioCore, no MusicAssistantKit; the token and
+        // URL come in through `SendspinConnectionConfiguration`.
+        .target(name: "SendspinKit"),
+        .testTarget(name: "SendspinKitTests", dependencies: ["SendspinKit"], resources: [.copy("Fixtures")]),
     ]
 )

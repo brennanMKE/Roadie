@@ -1,0 +1,304 @@
+{
+  "frames": [
+    {
+      "dir": "out",
+      "frame": {
+        "client_id": "skinamp-probe",
+        "token": "<redacted>",
+        "type": "auth"
+      },
+      "recorded": true,
+      "t": 0.0
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "type": "auth_ok"
+      },
+      "recorded": true,
+      "t": 0.004
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_id": "skinamp-probe",
+          "device_info": {
+            "manufacturer": "SkinAmp",
+            "product_name": "SkinAmp",
+            "software_version": "probe"
+          },
+          "name": "SkinAmp probe",
+          "player@v1_support": {
+            "buffer_capacity": 1048576,
+            "supported_commands": [
+              "volume",
+              "mute"
+            ],
+            "supported_formats": [
+              {
+                "bit_depth": 16,
+                "channels": 2,
+                "codec": "pcm",
+                "sample_rate": 48000
+              }
+            ]
+          },
+          "supported_roles": [
+            "player@v1"
+          ],
+          "version": 1
+        },
+        "type": "client/hello"
+      },
+      "recorded": true,
+      "t": 0.004
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "active_roles": [
+            "player@v1"
+          ],
+          "connection_reason": "discovery",
+          "name": "Music Assistant",
+          "server_id": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "version": 1
+        },
+        "type": "server/hello"
+      },
+      "recorded": true,
+      "t": 0.007
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 159628
+        },
+        "type": "client/time"
+      },
+      "recorded": true,
+      "t": 0.007
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 159628,
+          "server_received": 2187807000949,
+          "server_transmitted": 2187807001065
+        },
+        "type": "server/time"
+      },
+      "recorded": true,
+      "t": 0.008
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 160959
+        },
+        "type": "client/time"
+      },
+      "recorded": true,
+      "t": 0.008
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 160959,
+          "server_received": 2187807002228,
+          "server_transmitted": 2187807002290
+        },
+        "type": "server/time"
+      },
+      "recorded": true,
+      "t": 0.009
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 162134
+        },
+        "type": "client/time"
+      },
+      "recorded": true,
+      "t": 0.009
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 162134,
+          "server_received": 2187807003428,
+          "server_transmitted": 2187807003485
+        },
+        "type": "server/time"
+      },
+      "recorded": true,
+      "t": 0.011
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 163379
+        },
+        "type": "client/time"
+      },
+      "recorded": true,
+      "t": 0.011
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 163379,
+          "server_received": 2187807004523,
+          "server_transmitted": 2187807004562
+        },
+        "type": "server/time"
+      },
+      "recorded": true,
+      "t": 0.012
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 164341
+        },
+        "type": "client/time"
+      },
+      "recorded": true,
+      "t": 0.012
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 164341,
+          "server_received": 2187807006292,
+          "server_transmitted": 2187807006441
+        },
+        "type": "server/time"
+      },
+      "recorded": true,
+      "t": 0.014
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "available": true,
+          "player": {
+            "min_buffer_ms": 200,
+            "muted": false,
+            "required_lead_time_ms": 500,
+            "static_delay_ms": 0,
+            "supported_commands": [],
+            "volume": 50
+          }
+        },
+        "type": "client/state"
+      },
+      "recorded": true,
+      "t": 0.014
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "group_id": "ef74e639-9323-41f2-aab1-e2752d8eac22",
+          "playback_state": "stopped"
+        },
+        "type": "group/update"
+      },
+      "recorded": true,
+      "t": 0.017
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "reason": "user_request"
+        },
+        "type": "client/goodbye"
+      },
+      "recorded": true,
+      "t": 6.022
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "player": {
+            "bit_depth": 16,
+            "channels": 2,
+            "codec": "pcm",
+            "sample_rate": 48000
+          },
+          "server_transmitted": 2187807100000
+        },
+        "type": "stream/start"
+      },
+      "recorded": false
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "roles": [
+            "player"
+          ]
+        },
+        "type": "stream/clear"
+      },
+      "recorded": false
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "roles": [
+            "player"
+          ]
+        },
+        "type": "stream/end"
+      },
+      "recorded": false
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "player": {
+            "command": "volume",
+            "volume": 42
+          }
+        },
+        "type": "server/command"
+      },
+      "recorded": false
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "player": {
+            "command": "mute",
+            "mute": true
+          }
+        },
+        "type": "server/command"
+      },
+      "recorded": false
+    }
+  ],
+  "source": "docs/ma-protocol/sendspin-probe.json (recorded) plus hand-written frames from docs/sendspin-notes.md (recorded: false)"
+}

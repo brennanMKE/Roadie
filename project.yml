@@ -176,3 +176,4 @@ schemes:
         - package: PlayerKit/LibraryBrowserTests
         - package: PlayerKit/MusicLibraryKitTests
         - package: PlayerKit/MusicAssistantKitTests
+        - package: PlayerKit/SendspinKitTests
