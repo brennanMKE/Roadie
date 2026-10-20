@@ -57,17 +57,10 @@ struct BackendTransportTests {
         await rig.backend.disconnect()
     }
 
-    @Test func playOnThisMacExplainsHowToPickASpeaker() async throws {
+    @Test func playOnThisMacWithoutSendspinExplains() async throws {
         let rig = try await connectedBackend(script: controlScript())
-        do {
+        await #expect(throws: MusicBackendError.backend(MusicAssistantBackend.thisMacNotRegisteredText)) {
             try await rig.backend.play([MediaID(.album, "library://album/27")], on: OutputDevice.thisMacID, mode: .replace())
-            Issue.record("expected an error")
-        } catch let error as MusicBackendError {
-            guard case .backend(let message) = error else {
-                Issue.record("wrong error \(error)")
-                return
-            }
-            #expect(message.contains("Output menu"))
         }
         #expect(sent(rig, "player_queues/play_media").isEmpty)
         await rig.backend.disconnect()

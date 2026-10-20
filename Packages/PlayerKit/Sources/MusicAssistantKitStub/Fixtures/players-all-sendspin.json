@@ -1,0 +1,1123 @@
+{
+  "command": "players/all",
+  "args": {},
+  "frames": [
+    {
+      "message_id": "5",
+      "result": [
+        {
+          "player_id": "ap223aed81fe30",
+          "provider": "airplay",
+          "type": "player",
+          "name": "4K Apple TV",
+          "available": false,
+          "device_info": {
+            "model": "Apple TV 4K",
+            "manufacturer": "Apple",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "mac_address": "D0:D2:B0:7F:A8:D5",
+              "ip_address": "ma.example",
+              "airplay_id": "ap223aed81fe30"
+            },
+            "mac_address": "D0:D2:B0:7F:A8:D5",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "play_media",
+            "set_members",
+            "pause",
+            "volume_mute",
+            "volume_set",
+            "multi_device_dsp"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": 20,
+          "volume_muted": false,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap0a3090605b50",
+            "ap720a998fd71d",
+            "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "ap223aed81fe30",
+          "source_list": [
+            {
+              "id": "ap223aed81fe30",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "apple-tv",
+          "group_volume": 20,
+          "group_volume_muted": false,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "native",
+          "mute_control": "spb_223aed81fe30",
+          "output_protocols": [
+            {
+              "output_protocol_id": "native",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": true,
+              "priority": 0,
+              "available": false,
+              "derived_from": null
+            },
+            {
+              "output_protocol_id": "spb_223aed81fe30",
+              "name": "Sendspin",
+              "protocol_domain": "sendspin",
+              "is_native": false,
+              "priority": 40,
+              "available": true,
+              "derived_from": "native"
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": true,
+          "setup_reason": "pairing_required",
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "up3d721dc3",
+          "provider": "universal_player",
+          "type": "player",
+          "name": "user-mac-mini-m1",
+          "available": false,
+          "device_info": {
+            "model": "Mac mini (Macmini9,1)",
+            "manufacturer": "Apple",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "mac_address": "22:C2:3D:81:C5:0F",
+              "ip_address": "ma.example",
+              "airplay_id": "ap7a3e2ce56ccd"
+            },
+            "mac_address": "22:C2:3D:81:C5:0F",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "set_members"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": null,
+          "volume_muted": null,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "ap720a998fd71d",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "up3d721dc3",
+          "source_list": [
+            {
+              "id": "up3d721dc3",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "mac",
+          "group_volume": 0,
+          "group_volume_muted": null,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "none",
+          "mute_control": "none",
+          "output_protocols": [
+            {
+              "output_protocol_id": "ap7a3e2ce56ccd",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": false,
+              "priority": 10,
+              "available": false,
+              "derived_from": null
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": true,
+          "setup_reason": "pairing_required",
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "up4bb92533",
+          "provider": "universal_player",
+          "type": "player",
+          "name": "user-mac-mini-m4",
+          "available": false,
+          "device_info": {
+            "model": "Mac (Mac16,11)",
+            "manufacturer": "Apple",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "mac_address": "D2:5B:E0:74:EE:6A",
+              "ip_address": "ma.example",
+              "airplay_id": "apc631d6139652"
+            },
+            "mac_address": "D2:5B:E0:74:EE:6A",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "set_members"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": null,
+          "volume_muted": null,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "ap720a998fd71d",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "up4bb92533",
+          "source_list": [
+            {
+              "id": "up4bb92533",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "mac",
+          "group_volume": 0,
+          "group_volume_muted": null,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "none",
+          "mute_control": "none",
+          "output_protocols": [
+            {
+              "output_protocol_id": "apc631d6139652",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": false,
+              "priority": 10,
+              "available": false,
+              "derived_from": null
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": true,
+          "setup_reason": "pairing_required",
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "upd9b597ac",
+          "provider": "universal_player",
+          "type": "player",
+          "name": "Living Room Display",
+          "available": true,
+          "device_info": {
+            "model": "E65-E1",
+            "manufacturer": "VIZIO",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "ip_address": "ma.example",
+              "mac_address": "9C:92:6B:91:B5:04",
+              "uuid": "2eda7cb2-b4eb-a9ad-a39d-8ab4c43a3d7b",
+              "cast_uuid": "2eda7cb2-b4eb-a9ad-a39d-8ab4c43a3d7b",
+              "airplay_id": "ap9c926b91b504"
+            },
+            "mac_address": "9C:92:6B:91:B5:04",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "volume_mute",
+            "volume_set",
+            "set_members"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": 29,
+          "volume_muted": true,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "ap720a998fd71d",
+            "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "upd9b597ac",
+          "source_list": [
+            {
+              "id": "upd9b597ac",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "speaker",
+          "group_volume": 29,
+          "group_volume_muted": true,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "2eda7cb2-b4eb-a9ad-a39d-8ab4c43a3d7b",
+          "mute_control": "2eda7cb2-b4eb-a9ad-a39d-8ab4c43a3d7b",
+          "output_protocols": [
+            {
+              "output_protocol_id": "ap9c926b91b504",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": false,
+              "priority": 10,
+              "available": false,
+              "derived_from": null
+            },
+            {
+              "output_protocol_id": "2eda7cb2-b4eb-a9ad-a39d-8ab4c43a3d7b",
+              "name": "Chromecast",
+              "protocol_domain": "chromecast",
+              "is_native": false,
+              "priority": 30,
+              "available": true,
+              "derived_from": null
+            },
+            {
+              "output_protocol_id": "spb_9c926b91b504",
+              "name": "Sendspin",
+              "protocol_domain": "sendspin",
+              "is_native": false,
+              "priority": 40,
+              "available": true,
+              "derived_from": "ap9c926b91b504"
+            },
+            {
+              "output_protocol_id": "spb_a06a441e0913",
+              "name": "Sendspin",
+              "protocol_domain": "sendspin",
+              "is_native": false,
+              "priority": 40,
+              "available": false,
+              "derived_from": "2eda7cb2-b4eb-a9ad-a39d-8ab4c43a3d7b"
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": false,
+          "setup_reason": null,
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "ap82fe09484ac9",
+          "provider": "airplay",
+          "type": "player",
+          "name": "Living Room",
+          "available": true,
+          "device_info": {
+            "model": "HomePod Mini",
+            "manufacturer": "Apple",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "mac_address": "04:99:B9:85:0F:D9",
+              "ip_address": "ma.example",
+              "airplay_id": "ap82fe09484ac9"
+            },
+            "mac_address": "04:99:B9:85:0F:D9",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "volume_set",
+            "set_members",
+            "pause",
+            "volume_mute",
+            "play_media",
+            "multi_device_dsp"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": 20,
+          "volume_muted": null,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "ap720a998fd71d",
+            "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+            "upd9b597ac"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "ap82fe09484ac9",
+          "source_list": [
+            {
+              "id": "ap82fe09484ac9",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "homepod-mini",
+          "group_volume": 20,
+          "group_volume_muted": null,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "native",
+          "mute_control": "native",
+          "output_protocols": [
+            {
+              "output_protocol_id": "native",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": true,
+              "priority": 0,
+              "available": true,
+              "derived_from": null
+            },
+            {
+              "output_protocol_id": "spb_82fe09484ac9",
+              "name": "Sendspin",
+              "protocol_domain": "sendspin",
+              "is_native": false,
+              "priority": 40,
+              "available": true,
+              "derived_from": "native"
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": false,
+          "setup_reason": null,
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "ap720a998fd71d",
+          "provider": "airplay",
+          "type": "player",
+          "name": "Kitchen",
+          "available": true,
+          "device_info": {
+            "model": "HomePod Mini",
+            "manufacturer": "Apple",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "mac_address": "04:99:B9:6F:73:4E",
+              "ip_address": "ma.example",
+              "airplay_id": "ap720a998fd71d"
+            },
+            "mac_address": "04:99:B9:6F:73:4E",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "volume_set",
+            "set_members",
+            "pause",
+            "volume_mute",
+            "play_media",
+            "multi_device_dsp"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": 20,
+          "volume_muted": null,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "ap720a998fd71d",
+          "source_list": [
+            {
+              "id": "ap720a998fd71d",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "homepod-mini",
+          "group_volume": 20,
+          "group_volume_muted": null,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "native",
+          "mute_control": "native",
+          "output_protocols": [
+            {
+              "output_protocol_id": "native",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": true,
+              "priority": 0,
+              "available": true,
+              "derived_from": null
+            },
+            {
+              "output_protocol_id": "spb_720a998fd71d",
+              "name": "Sendspin",
+              "protocol_domain": "sendspin",
+              "is_native": false,
+              "priority": 40,
+              "available": true,
+              "derived_from": "native"
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": false,
+          "setup_reason": null,
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "ap0a3090605b50",
+          "provider": "airplay",
+          "type": "player",
+          "name": "user\u2019s Bedroom TV",
+          "available": false,
+          "device_info": {
+            "model": "Apple TV Gen4",
+            "manufacturer": "Apple",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "mac_address": "0A:30:90:60:5B:50",
+              "ip_address": "ma.example",
+              "airplay_id": "ap0a3090605b50"
+            },
+            "mac_address": "0A:30:90:60:5B:50",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "play_media",
+            "set_members",
+            "pause",
+            "volume_mute",
+            "volume_set",
+            "multi_device_dsp"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": 20,
+          "volume_muted": false,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap720a998fd71d",
+            "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "ap0a3090605b50",
+          "source_list": [
+            {
+              "id": "ap0a3090605b50",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "apple-tv",
+          "group_volume": 20,
+          "group_volume_muted": false,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "native",
+          "mute_control": "spb_0a3090605b50",
+          "output_protocols": [
+            {
+              "output_protocol_id": "native",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": true,
+              "priority": 0,
+              "available": false,
+              "derived_from": null
+            },
+            {
+              "output_protocol_id": "spb_0a3090605b50",
+              "name": "Sendspin",
+              "protocol_domain": "sendspin",
+              "is_native": false,
+              "priority": 40,
+              "available": true,
+              "derived_from": "native"
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": true,
+          "setup_reason": "pairing_required",
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "upd1fa36c5",
+          "provider": "universal_player",
+          "type": "player",
+          "name": "user-mac-mini-m2",
+          "available": false,
+          "device_info": {
+            "model": "Mac (Mac14,3)",
+            "manufacturer": "Apple",
+            "software_version": null,
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {
+              "mac_address": "FE:80:E4:99:20:0D",
+              "ip_address": "ma.example",
+              "airplay_id": "ap8e00ed84252c"
+            },
+            "mac_address": "FE:80:E4:99:20:0D",
+            "ip_address": "ma.example"
+          },
+          "supported_features": [
+            "set_members"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "powered": true,
+          "volume_level": null,
+          "volume_muted": null,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "ap720a998fd71d",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "upd1fa36c5",
+          "source_list": [
+            {
+              "id": "upd1fa36c5",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": false,
+              "can_seek": false,
+              "can_next_previous": false,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": null,
+          "enabled": true,
+          "hide_in_ui": false,
+          "private": false,
+          "expose_to_ha": true,
+          "icon": "mac",
+          "group_volume": 0,
+          "group_volume_muted": null,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "none",
+          "mute_control": "none",
+          "output_protocols": [
+            {
+              "output_protocol_id": "ap8e00ed84252c",
+              "name": "AirPlay",
+              "protocol_domain": "airplay",
+              "is_native": false,
+              "priority": 10,
+              "available": false,
+              "derived_from": null
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": true,
+          "setup_reason": "pairing_required",
+          "has_setup_flow": true,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ]
+        },
+        {
+          "player_id": "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+          "provider": "sendspin",
+          "type": "player",
+          "name": "Web (Safari on Mac)",
+          "available": true,
+          "device_info": {
+            "model": "Web Player",
+            "manufacturer": "Apple Computer, Inc.",
+            "software_version": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Safari/605.1.15",
+            "model_id": null,
+            "manufacturer_id": null,
+            "identifiers": {},
+            "mac_address": null,
+            "ip_address": null
+          },
+          "supported_features": [
+            "play_media",
+            "set_members",
+            "volume_mute",
+            "volume_set",
+            "multi_device_dsp"
+          ],
+          "playback_state": "idle",
+          "elapsed_time": 0.0,
+          "elapsed_time_last_updated": 1792015904.5374105,
+          "powered": true,
+          "volume_level": 100,
+          "volume_muted": false,
+          "group_members": [],
+          "static_group_members": [],
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "ap720a998fd71d",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "synced_to": null,
+          "active_sound_mode": null,
+          "sound_mode_list": [],
+          "options": [],
+          "active_source": "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+          "source_list": [
+            {
+              "id": "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "can_play_pause": true,
+              "can_seek": true,
+              "can_next_previous": true,
+              "can_shuffle": false,
+              "can_repeat": false,
+              "shuffle_enabled": null,
+              "repeat_mode": null,
+              "account_id": null
+            }
+          ],
+          "active_group": null,
+          "current_media": {
+            "uri": "library://track/1601",
+            "media_type": "track",
+            "title": "We Are All Made of Stars",
+            "artist": "Moby",
+            "album": "18",
+            "album_artist": "Moby",
+            "image_url": "http://ma.example:8095/imageproxy/9724c3004ae17eeec3f5a856c00879e2005dbd267ca6f18a84185d7bc959fac0?size=512&fmt=jpg",
+            "palette": {
+              "background_dark": [
+                11,
+                60,
+                78
+              ],
+              "background_light": [
+                118,
+                192,
+                218
+              ],
+              "primary": [
+                27,
+                150,
+                194
+              ],
+              "accent": [
+                183,
+                212,
+                217
+              ],
+              "on_dark": [
+                183,
+                212,
+                217
+              ],
+              "on_light": [
+                25,
+                43,
+                50
+              ]
+            },
+            "duration": 272,
+            "stream_duration": null,
+            "source_id": "AslV4UN6Oi7XVxjaNeZpTTX9YfRobkVWH0d5YPAo23U",
+            "queue_item_id": "577ae5a870b44908be4096fa902158f0",
+            "custom_data": null,
+            "elapsed_time": 6,
+            "elapsed_time_last_updated": 1792015903.707499
+          },
+          "enabled": true,
+          "hide_in_ui": true,
+          "private": true,
+          "expose_to_ha": false,
+          "icon": "speaker",
+          "group_volume": 100,
+          "group_volume_muted": false,
+          "extra_attributes": {},
+          "power_control": "none",
+          "volume_control": "native",
+          "mute_control": "native",
+          "output_protocols": [
+            {
+              "output_protocol_id": "native",
+              "name": "Sendspin",
+              "protocol_domain": "sendspin",
+              "is_native": true,
+              "priority": 0,
+              "available": true,
+              "derived_from": null
+            }
+          ],
+          "active_output_protocol": null,
+          "needs_setup": false,
+          "setup_reason": null,
+          "has_setup_flow": false,
+          "sleep_timer_expires_at": null,
+          "active_source_audio": null,
+          "display_name": "user",
+          "state": "idle",
+          "group_childs": [],
+          "extra_data": {},
+          "hide_player_in_ui": [
+            "always"
+          ]
+        },
+        {
+          "active_group": null,
+          "active_output_protocol": null,
+          "active_sound_mode": null,
+          "active_source": "upf00dfeed",
+          "active_source_audio": null,
+          "available": true,
+          "can_group_with": [
+            "ap223aed81fe30",
+            "ap0a3090605b50",
+            "up417d3c77",
+            "ap720a998fd71d",
+            "upd9b597ac",
+            "ap82fe09484ac9"
+          ],
+          "current_media": null,
+          "device_info": {
+            "identifiers": {},
+            "ip_address": null,
+            "mac_address": null,
+            "manufacturer": "SkinAmp",
+            "manufacturer_id": null,
+            "model": "SkinAmp",
+            "model_id": null,
+            "software_version": null
+          },
+          "display_name": null,
+          "elapsed_time": null,
+          "elapsed_time_last_updated": null,
+          "enabled": true,
+          "expose_to_ha": true,
+          "extra_attributes": {},
+          "extra_data": {},
+          "group_childs": [],
+          "group_members": [],
+          "group_volume": 50,
+          "group_volume_muted": false,
+          "has_setup_flow": false,
+          "hide_in_ui": false,
+          "hide_player_in_ui": [
+            "when_unavailable",
+            "when_synced",
+            "when_group_active"
+          ],
+          "icon": "speaker",
+          "mute_control": "skinamp-test",
+          "name": "SkinAmp (Test Mac)",
+          "needs_setup": false,
+          "options": [],
+          "output_protocols": [
+            {
+              "available": true,
+              "derived_from": null,
+              "is_native": false,
+              "name": "Sendspin",
+              "output_protocol_id": "skinamp-test",
+              "priority": 40,
+              "protocol_domain": "sendspin"
+            }
+          ],
+          "playback_state": "idle",
+          "player_id": "upf00dfeed",
+          "power_control": "none",
+          "powered": true,
+          "private": false,
+          "provider": "universal_player",
+          "setup_reason": null,
+          "sleep_timer_expires_at": null,
+          "sound_mode_list": [],
+          "source_list": [
+            {
+              "account_id": null,
+              "can_next_previous": false,
+              "can_play_pause": false,
+              "can_repeat": false,
+              "can_seek": false,
+              "can_shuffle": false,
+              "id": "upf00dfeed",
+              "name": "Music Assistant Queue",
+              "passive": false,
+              "repeat_mode": null,
+              "shuffle_enabled": null
+            }
+          ],
+          "state": "idle",
+          "static_group_members": [],
+          "supported_features": [
+            "volume_mute",
+            "volume_set",
+            "set_members"
+          ],
+          "synced_to": null,
+          "type": "player",
+          "volume_control": "skinamp-test",
+          "volume_level": 50,
+          "volume_muted": false
+        }
+      ],
+      "partial": false
+    }
+  ]
+}

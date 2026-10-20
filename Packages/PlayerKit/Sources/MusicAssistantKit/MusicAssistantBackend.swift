@@ -21,8 +21,16 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     public nonisolated let sourceID = "musicAssistant"
     public nonisolated let displayName = "Music Assistant"
-    /// #0066 adds `.localOutput`.
-    public nonisolated let capabilities: BackendCapabilities = [.search, .playlists, .artwork, .remoteOutputs]
+    /// `.localOutput`: This Mac plays through the MA player wrapping SkinAmp's Sendspin client (#0107).
+    public nonisolated let capabilities: BackendCapabilities = [
+        .search, .playlists, .artwork, .remoteOutputs, .localOutput,
+    ]
+
+    public static let thisMacNotRegisteredText =
+        "This Mac isn't connected to Music Assistant. Turn on Play on this Mac in Settings \u{203A} Music Assistant."
+    public static let thisMacPendingText =
+        "Music Assistant is still setting up this Mac as a player. Try again in a few seconds."
+    public static let thisMacUnavailableText = "This Mac isn't connected to Music Assistant right now."
 
     private let mode: Mode
     private let serverProvider: ServerProvider
@@ -42,6 +50,10 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     private var counts: [String: Int] = [:]
     /// Players by id, from `outputs()`, `players/get` and the watchers: commands never list every player.
     private var players: [String: MAPlayer] = [:]
+    /// SkinAmp's own Sendspin client id, set by the app while its Sendspin session runs (#0109).
+    private var localClientID: String?
+    /// The MA player that wraps `localClientID`, once found.
+    private var localPlayerID: String?
 
     private struct Watcher {
         var output: OutputDevice.ID
@@ -152,6 +164,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             connectedConfiguration = nil
             counts = [:]
             players = [:]
+            localPlayerID = nil
         }
         let fresh = MusicAssistantClient(baseURL: address.baseURL, transports: transports, http: http, clock: clock)
         do {
@@ -167,6 +180,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         connectedConfiguration = configuration
         counts = [:]
         players = [:]
+        localPlayerID = nil
         log.info("connected")
         forwardStates(of: fresh)
         restartWatchers()
@@ -182,6 +196,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         connectedConfiguration = nil
         counts = [:]
         players = [:]
+        localPlayerID = nil
         stopWatchers()
         await old?.disconnect()
     }
@@ -348,29 +363,36 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             let client = try requireClient()
             let all = try await client.call(.playersAll(), as: [MAPlayer].self)
             players = Dictionary(all.map { ($0.playerID, $0) }, uniquingKeysWith: { _, last in last })
-            return all.filter { $0.enabled != false && $0.hideInUI != true }.map(OutputDevice.init(ma:))
+            let local = localClientID
+            return all.filter { player in
+                guard player.enabled != false, player.hideInUI != true else { return false }
+                if let local, player.hosts(sendspinClientID: local) { return false }
+                return true
+            }.map(OutputDevice.init(ma:))
         }
     }
 
     /// Plays on a Music Assistant player. `queue_id == player_id` for every recorded player; a group's queue is
     /// unrecorded, so the player id is sent and MA redirects.
     public func play(_ items: [MediaID], on output: OutputDevice.ID, mode: PlayMode) async throws {
-        if output == OutputDevice.thisMacID {
-            // Playing Music Assistant on this Mac needs Sendspin (#0066).
-            throw MusicBackendError.backend("Choose a speaker in the Library's Output menu to play from Music Assistant.")
-        }
         guard !items.isEmpty else { return }
         try await guarded {
             let client = try requireClient()
-            try await requireOutput(output)
+            let queueID: String
+            if output == OutputDevice.thisMacID {
+                queueID = try await resolveLocalPlayer().playerID
+            } else {
+                try await requireOutput(output)
+                queueID = output.rawValue
+            }
             let media = items.map(\.rawValue)
             let request: MARequest
             switch mode {
             case .replace(let startIndex):
                 let start = startIndex > 0 && startIndex < items.count ? items[startIndex].rawValue : nil
-                request = .playMedia(queueID: output.rawValue, media: media, option: .replace, startItem: start)
+                request = .playMedia(queueID: queueID, media: media, option: .replace, startItem: start)
             case .append:
-                request = .playMedia(queueID: output.rawValue, media: media, option: .add)
+                request = .playMedia(queueID: queueID, media: media, option: .add)
             }
             _ = try await client.call(request)
         }
@@ -379,8 +401,18 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     public func transport(_ command: TransportCommand, on output: OutputDevice.ID) async throws {
         try await guarded {
             let client = try requireClient()
-            let player = try await requireOutput(output)
-            let id = output.rawValue
+            let player: MAPlayer
+            if output == OutputDevice.thisMacID {
+                switch command {
+                case .setVolume, .setBalance:
+                    // The app applies these to the local player, which reports volume through Sendspin (#0108).
+                    throw MusicBackendError.unsupported(.localOutput)
+                default: player = try await resolveLocalPlayer()
+                }
+            } else {
+                player = try await requireOutput(output)
+            }
+            let id = player.playerID
             let request: MARequest
             switch command {
             case .play: request = .playerCommand(.play, playerID: id)
@@ -429,12 +461,30 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         guard var watcher = watchers[id] else { return }
         watcher.task?.cancel()
         watcher.task = nil
-        guard let client, watcher.output != OutputDevice.thisMacID else {
+        let isThisMac = watcher.output == OutputDevice.thisMacID
+        guard let client, !isThisMac || localClientID != nil else {
             watchers[id] = watcher
             watcher.continuation.yield(.idle(on: watcher.output))
             return
         }
         let continuation = watcher.continuation
+        if isThisMac {
+            let clock = clock, policy = policy
+            watcher.task = Task { [weak self] in
+                guard let playerID = await self?.awaitLocalPlayerID(yieldingIdleTo: continuation) else { return }
+                let watch = MANowPlayingWatch(
+                    client: client, output: OutputDevice.ID(rawValue: playerID), clock: clock, policy: policy,
+                    yield: { snapshot in
+                        var snapshot = snapshot
+                        snapshot.output = OutputDevice.thisMacID
+                        continuation.yield(snapshot)
+                    },
+                    cachePlayer: { [weak self] in await self?.cache($0) })
+                await watch.run()
+            }
+            watchers[id] = watcher
+            return
+        }
         let watch = MANowPlayingWatch(
             client: client, output: watcher.output, clock: clock, policy: policy,
             yield: { continuation.yield($0) },
@@ -456,6 +506,64 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             watchers[id] = watcher
             watcher.continuation.yield(.idle(on: watcher.output))
         }
+    }
+
+    /// The local player's id, retrying every 2 s for up to 30 s while MA is still wrapping the client. Idle meanwhile.
+    private func awaitLocalPlayerID(yieldingIdleTo continuation: AsyncStream<NowPlaying>.Continuation) async -> String? {
+        var waited: Duration = .zero
+        var yieldedIdle = false
+        while !Task.isCancelled {
+            do {
+                return try await resolveLocalPlayer().playerID
+            } catch MusicBackendError.backend(let message) where message == Self.thisMacPendingText {
+                if waited >= .seconds(30) { break }
+            } catch {
+                break
+            }
+            if !yieldedIdle {
+                continuation.yield(.idle(on: OutputDevice.thisMacID))
+                yieldedIdle = true
+            }
+            do { try await clock.sleep(for: .seconds(2)) } catch { return nil }
+            waited += .seconds(2)
+        }
+        if !yieldedIdle, !Task.isCancelled { continuation.yield(.idle(on: OutputDevice.thisMacID)) }
+        return nil
+    }
+
+    // MARK: This Mac (#0107)
+
+    /// Called by the app when its Sendspin session starts (the client id) or stops (nil). Restarts This Mac watchers.
+    public func setLocalSendspinClientID(_ id: String?) {
+        guard id != localClientID else { return }
+        localClientID = id
+        localPlayerID = nil
+        for (watcherID, watcher) in watchers where watcher.output == OutputDevice.thisMacID { startWatcher(watcherID) }
+    }
+
+    /// The MA player hosting SkinAmp's Sendspin client: the cache first, else `players/all`.
+    private func resolveLocalPlayer() async throws -> MAPlayer {
+        guard let clientID = localClientID else { throw MusicBackendError.backend(Self.thisMacNotRegisteredText) }
+        if let cachedID = localPlayerID, let cached = players[cachedID], cached.available {
+            return cached
+        }
+        var match = Self.localPlayer(in: Array(players.values), clientID: clientID)
+        if match?.available != true {
+            let client = try requireClient()
+            let all = try await client.call(.playersAll(), as: [MAPlayer].self)
+            guard clientID == localClientID else { throw CancellationError() }
+            for player in all { players[player.playerID] = player }
+            match = Self.localPlayer(in: all, clientID: clientID)
+        }
+        guard let match else { throw MusicBackendError.backend(Self.thisMacPendingText) }
+        guard match.available else { throw MusicBackendError.backend(Self.thisMacUnavailableText) }
+        localPlayerID = match.playerID
+        return match
+    }
+
+    private static func localPlayer(in players: [MAPlayer], clientID: String) -> MAPlayer? {
+        let hosting = players.filter { $0.hosts(sendspinClientID: clientID) }
+        return hosting.first(where: \.available) ?? hosting.first
     }
 
     private func cache(_ player: MAPlayer) {

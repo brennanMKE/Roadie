@@ -64,6 +64,8 @@ public struct MAPlayer: Codable, Hashable, Sendable {
     public var supportedFeatures: [String]?
     public var currentMedia: MAPlayerMedia?
     public var needsSetup: Bool?
+    /// The protocols a universal player plays through; SkinAmp's own Sendspin client shows up here (#0107).
+    public var outputProtocols: [MAOutputProtocol]?
 
     public var state: MAPlaybackState { MAPlaybackState(playbackState) }
 
@@ -85,6 +87,46 @@ public struct MAPlayer: Codable, Hashable, Sendable {
         case supportedFeatures = "supported_features"
         case currentMedia = "current_media"
         case needsSetup = "needs_setup"
+        case outputProtocols = "output_protocols"
+    }
+}
+
+/// One entry of `Player.output_protocols`.
+public struct MAOutputProtocol: Codable, Hashable, Sendable {
+    public var outputProtocolID: String
+    public var name: String?
+    public var protocolDomain: String?
+    public var isNative: Bool?
+    public var available: Bool?
+    public var priority: Int?
+
+    public init(
+        outputProtocolID: String, name: String? = nil, protocolDomain: String? = nil, isNative: Bool? = nil,
+        available: Bool? = nil, priority: Int? = nil
+    ) {
+        self.outputProtocolID = outputProtocolID
+        self.name = name
+        self.protocolDomain = protocolDomain
+        self.isNative = isNative
+        self.available = available
+        self.priority = priority
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case outputProtocolID = "output_protocol_id"
+        case name
+        case protocolDomain = "protocol_domain"
+        case isNative = "is_native"
+        case available, priority
+    }
+}
+
+extension MAPlayer {
+    /// The player plays SkinAmp's Sendspin client `id`: a standalone Sendspin player with that id, or the universal
+    /// player MA wraps it in (docs/sendspin-notes.md section 7).
+    public func hosts(sendspinClientID id: String) -> Bool {
+        if playerID == id { return true }
+        return outputProtocols?.contains { $0.outputProtocolID == id && $0.protocolDomain == "sendspin" } ?? false
     }
 }
 

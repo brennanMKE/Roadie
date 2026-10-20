@@ -102,7 +102,7 @@ struct BackendOutputsAndProbeTests {
 
     @Test func capabilitiesIncludeRemoteOutputs() throws {
         let rig = try makeBackend()
-        #expect(rig.backend.capabilities == [.search, .playlists, .artwork, .remoteOutputs])
+        #expect(rig.backend.capabilities == [.search, .playlists, .artwork, .remoteOutputs, .localOutput])
         #expect(rig.backend.sourceID == "musicAssistant")
         #expect(rig.backend.displayName == "Music Assistant")
     }

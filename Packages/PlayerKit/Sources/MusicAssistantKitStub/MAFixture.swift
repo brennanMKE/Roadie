@@ -17,6 +17,8 @@ public enum MAFixture: String, CaseIterable, Sendable {
     case providers
     case playersAll = "players-all"
     case playersAllUnavailable = "players-all-unavailable"
+    case playersAllSendspin = "players-all-sendspin"
+    case playersAllSendspinUnavailable = "players-all-sendspin-unavailable"
     case playerGet = "player-get"
     case playerQueuesAll = "player-queues-all"
     case playerQueueGet = "player-queue-get"

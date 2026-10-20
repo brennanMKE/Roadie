@@ -7,7 +7,7 @@ struct MAFixtureTests {
     private static let notCalls: Set<MAFixture> = [.serverInfo, .infoHTTP, .artworkProbe, .events]
 
     @Test func everyFixtureLoadsAndParses() throws {
-        #expect(MAFixture.allCases.count == 40)
+        #expect(MAFixture.allCases.count == 42)
         for fixture in MAFixture.allCases {
             _ = try fixture.json
             if Self.notCalls.contains(fixture) { continue }
@@ -23,7 +23,10 @@ struct MAFixtureTests {
     @Test func theRecordedScriptAnswersEveryRecordedCommand() throws {
         let script = try FixtureScript.recorded(token: testToken)
         // The auth fixtures carry a placeholder token, and two others share a command with a fixture that wins the route.
-        let skipped: Set<MAFixture> = [.authOk, .errorAuth, .errorUnauthenticated, .playersAllUnavailable]
+        let skipped: Set<MAFixture> = [
+            .authOk, .errorAuth, .errorUnauthenticated, .playersAllUnavailable,
+            .playersAllSendspin, .playersAllSendspinUnavailable,
+        ]
         var checked = 0
         for fixture in MAFixture.allCases where !Self.notCalls.contains(fixture) && !skipped.contains(fixture) {
             let command = try #require(fixture.command)
