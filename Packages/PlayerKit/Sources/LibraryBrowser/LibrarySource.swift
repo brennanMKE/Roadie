@@ -2,7 +2,7 @@ import MusicBackendKit
 
 /// One selectable library source: the backend plus what Settings shows about it.
 public struct LibrarySource: Identifiable, Sendable {
-    /// `backend.sourceID`: "plex", "folder", "musicAssistant".
+    /// `backend.sourceID`: "musicAssistant", "folder".
     public var id: String
     public var displayName: String
     public var backend: any MusicBackend

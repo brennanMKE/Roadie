@@ -1,6 +1,7 @@
 import AudioCore
 import Foundation
 import MusicBackendKit
+import os
 
 /// The "This Mac" queue as saved to disk. Value type, `Sendable`, equatable; the file format is the private
 /// mirror below, not `Track`'s layout.
@@ -34,13 +35,34 @@ public struct QueueStore: Sendable {
             .appending(path: "queue.json", directoryHint: .notDirectory)
     }
 
+    /// What `loadQueue()` found: the queue minus items of kinds this build cannot play.
+    public struct LoadedQueue: Equatable, Sendable {
+        public var snapshot: QueueSnapshot
+        /// Items dropped because their source kind is unknown (a queue saved with a source kind this build removed).
+        public var droppedItems: Int
+    }
+
+    /// `loadQueue()?.snapshot`.
     public func load() -> QueueSnapshot? {
+        loadQueue()?.snapshot
+    }
+
+    /// nil when the file is missing, corrupt or from a newer version; otherwise the surviving items in order,
+    /// `currentIndex` remapped to the same item (nil when it was dropped). Never writes.
+    public func loadQueue() -> LoadedQueue? {
         guard let data = try? Data(contentsOf: fileURL),
             let stored = try? JSONDecoder().decode(Stored.self, from: data),
             stored.version == QueueSnapshot.currentVersion
         else { return nil }
         var seen = Set<UUID>()
-        let items = stored.items.map { item -> LocalQueueItem in
+        var items: [LocalQueueItem] = []
+        var currentIndex: Int?
+        var dropped = 0
+        for (index, item) in stored.items.enumerated() {
+            guard let storedSource = item.source else {
+                dropped += 1
+                continue
+            }
             // A missing or duplicated id gets a fresh one rather than failing the whole file.
             var id = item.id ?? UUID()
             if !seen.insert(id).inserted {
@@ -48,18 +70,23 @@ public struct QueueStore: Sendable {
                 seen.insert(id)
             }
             let source: Track.Source
-            switch item.source {
+            switch storedSource {
             case .file(let path): source = .file(URL(fileURLWithPath: path))
-            case .plex(let partKey, let cacheKey, let size): source = .plex(partKey: partKey, cacheKey: cacheKey, size: size)
             }
             let track = Track(
                 id: id, title: item.title, artist: item.artist, album: item.album, duration: item.duration,
                 bitrate: item.bitrate, sampleRate: item.sampleRate, channels: item.channels, source: source)
-            return LocalQueueItem(track: track, id: item.mediaID)
+            if index == stored.currentIndex { currentIndex = items.count }
+            items.append(LocalQueueItem(track: track, id: item.mediaID))
         }
-        return QueueSnapshot(
-            items: items, currentIndex: stored.currentIndex,
+        if dropped > 0 {
+            Logger(subsystem: "com.brennanmke.SkinAmp", category: "QueueStore")
+                .info("queue restore dropped \(dropped) item(s) of an unknown kind")
+        }
+        let snapshot = QueueSnapshot(
+            items: items, currentIndex: currentIndex,
             repeatMode: RepeatMode(storedName: stored.repeatName), isShuffled: stored.shuffle)
+        return LoadedQueue(snapshot: snapshot, droppedItems: dropped)
     }
 
     /// Creates the directory, encodes with sorted keys, `Data.write(options: .atomic)`.
@@ -74,7 +101,6 @@ public struct QueueStore: Sendable {
                 let source: StoredSource
                 switch track.source {
                 case .file(let url): source = .file(path: url.path)
-                case .plex(let partKey, let cacheKey, let size): source = .plex(partKey: partKey, cacheKey: cacheKey, size: size)
                 }
                 return StoredItem(
                     id: track.id, title: track.title, artist: track.artist, album: track.album,
@@ -114,26 +140,56 @@ private struct StoredItem: Codable {
     var bitrate: Int?
     var sampleRate: Double?
     var channels: Int?
-    var source: StoredSource
+    var source: StoredSource?
     var mediaID: MediaID?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, artist, album, duration, bitrate, sampleRate, channels, source, mediaID
+    }
+
+    init(
+        id: UUID?, title: String, artist: String, album: String?, duration: TimeInterval, bitrate: Int?,
+        sampleRate: Double?, channels: Int?, source: StoredSource?, mediaID: MediaID?
+    ) {
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.duration = duration
+        self.bitrate = bitrate
+        self.sampleRate = sampleRate
+        self.channels = channels
+        self.source = source
+        self.mediaID = mediaID
+    }
+
+    /// An unknown or malformed source (a kind this build removed) decodes as nil, so the item is dropped
+    /// instead of failing the whole file.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        artist = try c.decode(String.self, forKey: .artist)
+        album = try c.decodeIfPresent(String.self, forKey: .album)
+        duration = try c.decode(TimeInterval.self, forKey: .duration)
+        bitrate = try c.decodeIfPresent(Int.self, forKey: .bitrate)
+        sampleRate = try c.decodeIfPresent(Double.self, forKey: .sampleRate)
+        channels = try c.decodeIfPresent(Int.self, forKey: .channels)
+        source = try? c.decodeIfPresent(StoredSource.self, forKey: .source)
+        mediaID = try c.decodeIfPresent(MediaID.self, forKey: .mediaID)
+    }
 }
 
 private enum StoredSource: Codable {
     case file(path: String)
-    case plex(partKey: String, cacheKey: String, size: Int64?)
 
-    enum CodingKeys: String, CodingKey { case kind, path, partKey, cacheKey, size }
+    enum CodingKeys: String, CodingKey { case kind, path }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(String.self, forKey: .kind) {
         case "file":
             self = .file(path: try c.decode(String.self, forKey: .path))
-        case "plex":
-            self = .plex(
-                partKey: try c.decode(String.self, forKey: .partKey),
-                cacheKey: try c.decode(String.self, forKey: .cacheKey),
-                size: try c.decodeIfPresent(Int64.self, forKey: .size))
         default:
             throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown source kind")
         }
@@ -145,11 +201,6 @@ private enum StoredSource: Codable {
         case .file(let path):
             try c.encode("file", forKey: .kind)
             try c.encode(path, forKey: .path)
-        case .plex(let partKey, let cacheKey, let size):
-            try c.encode("plex", forKey: .kind)
-            try c.encode(partKey, forKey: .partKey)
-            try c.encode(cacheKey, forKey: .cacheKey)
-            try c.encodeIfPresent(size, forKey: .size)
         }
     }
 }

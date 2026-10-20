@@ -28,7 +28,7 @@ struct TrackInfoTests {
     }
 
     @Test func missingValuesShowADash() {
-        let track = Track(title: "Song", artist: "Band", duration: 10, source: .plex(partKey: "p", cacheKey: "c"))
+        let track = Track(title: "Song", artist: "Band", duration: 10, source: .file(URL(filePath: "/a/song")))
         let info = TrackInfo(track: track, format: nil)
         for label in ["Album", "Format", "Bitrate", "Sample rate"] {
             #expect(value(info, label) == "—")

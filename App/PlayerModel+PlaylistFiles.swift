@@ -45,7 +45,7 @@ extension PlayerModel {
             let format: PlaylistFile.Format = url.pathExtension.lowercased() == "pls" ? .pls : .m3u
             let out = PlaylistFile.serialize(tracks, format: format, playlistURL: url)
             guard out.written > 0 else {
-                post(StatusNotice(text: "Nothing to save", detail: "Plex tracks have no local file"))
+                post(StatusNotice(text: "Nothing to save", detail: "The playlist has no local files"))
                 return
             }
             do {
@@ -57,7 +57,7 @@ extension PlayerModel {
             if out.skipped > 0 {
                 post(StatusNotice(
                     text: "Saved \(out.written), skipped \(out.skipped) server tracks",
-                    detail: "Plex tracks have no local file"))
+                    detail: "Server tracks have no local file"))
             } else {
                 post(StatusNotice(text: "Saved \(out.written) track\(out.written == 1 ? "" : "s")"))
             }

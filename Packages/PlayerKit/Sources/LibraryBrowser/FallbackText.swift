@@ -2,8 +2,8 @@ import Foundation
 
 /// What the fallback tells the user, built from display names alone.
 public enum FallbackText {
-    /// The marquee notice for an automatic switch: "Using Local Folder" with detail "Plex can't be reached" or
-    /// "Plex isn't set up"; "Back on Plex" (no detail) on a restore. Every text fits the marquee (31 UTF-16 units).
+    /// The marquee notice for an automatic switch: "Using Local Folder" with detail "Music Assistant can't be reached" or
+    /// "Music Assistant isn't set up"; "Back on Music Assistant" (no detail) on a restore. Every text fits the marquee (31 UTF-16 units).
     public static func notice(kind: LibraryFallbackPolicy.ActivationKind, status: FallbackStatus) -> FallbackNotice {
         switch kind {
         case .restore:

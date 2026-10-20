@@ -39,11 +39,11 @@ import Testing
         for state in [NowPlaying.State.stopped, .loading, .playing, .paused] {
             #expect(MarqueeText.display(local(state), number: 2) == "2. B - Two (1:01)")
         }
-        var plex = local(.loading)
-        plex.item = MediaID(.track, "42")
-        #expect(MarqueeText.display(plex, number: 2) == MarqueeText.buffering)
-        plex.state = .playing
-        #expect(MarqueeText.display(plex, number: 2) == "2. B - Two (1:01)")
+        var remote = local(.loading)
+        remote.item = MediaID(.track, "42")
+        #expect(MarqueeText.display(remote, number: 2) == MarqueeText.buffering)
+        remote.state = .playing
+        #expect(MarqueeText.display(remote, number: 2) == "2. B - Two (1:01)")
     }
 
 

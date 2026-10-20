@@ -14,7 +14,7 @@ public struct LocalQueueItem: Hashable, Sendable {
 }
 
 /// `AudioCore.Player` as the "This Mac" output: queue, transport and the now-playing stream.
-/// Backends that play through AudioCore (Plex, folder) hand it tracks; it knows nothing about them.
+/// Backends that play through AudioCore (the folder; Music Assistant with #0066) hand it tracks; it knows nothing about them.
 @MainActor
 public final class LocalPlayerOutput {
     public let player: Player

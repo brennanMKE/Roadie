@@ -8,11 +8,9 @@ import MusicAssistantKit
 import MusicBackendKit
 import MusicLibraryKit
 import Observation
-import PlexBackendKit
 import SkinBrowser
 import SkinKit
 import SkinLibrary
-import TrackCache
 import os
 
 @MainActor
@@ -29,7 +27,7 @@ final class PlayerModel {
     private(set) var notice: StatusNotice?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
     /// The sources and the active one. `backend`, `library` and `artwork` below follow its choice; only
-    /// `sources.select(_:)` swaps them. The composition in `init` is the one place that names Plex and the folder.
+    /// `sources.select(_:)` swaps them. The composition in `init` is the one place that names Music Assistant and the folder.
     let sources: LibrarySourceController
     var backend: any MusicBackend { sources.backend }
     /// The Library window's state; connects when the window appears, never at launch.
@@ -39,8 +37,6 @@ final class PlayerModel {
     /// Moves the Library to the next usable source when the chosen one is not set up or cannot be reached, and
     /// back when it returns. Playback is never touched.
     let fallback: LibraryFallbackController
-    let cache: TrackCache
-    let cacheSettings: CacheSettingsModel
     /// The skins folder and its SQLite index (Settings › Skins). Opens nothing until a folder is chosen.
     let skinLibrary = SkinLibraryModel()
     /// Main-window thumbnails keyed by content hash, rendered lazily on request (#0034). Does no I/O until the first request.
@@ -52,7 +48,7 @@ final class PlayerModel {
         thumbnails: SkinThumbnailAdapter(cache: skinThumbnails),
         applySkin: { [weak self] in self?.loadSkin(from: $0) })
     @ObservationIgnored private var skinLoadGeneration = 0
-    /// The local-folder source; Settings › Library chooses and indexes its folder. Shares Plex's "This Mac" output, so both play through the one `Player`.
+    /// The local-folder source; Settings › Library chooses and indexes its folder. Owns the "This Mac" output (`LocalPlaybackStack`), which every local track plays through.
     let folderBackend: FolderBackend
     let folderSettings: FolderSettingsModel
     /// The Music Assistant source (#0063): the backend, the server Settings chose, and Settings › Music Assistant's model.
@@ -64,8 +60,6 @@ final class PlayerModel {
     @ObservationIgnored private var maDropTask: Task<Void, Never>?
     /// Still public for the skinned window's time and spectrum bindings and for local files.
     let player: Player
-    /// Keeps the current and next tracks pinned in the cache; lives as long as the model.
-    private let pinner: CachePinner
     /// Saves the queue to Application Support a moment after each change and on quit (#0071); lives as long as the model.
     private let queueAutosaver: QueueAutosaver
     /// Media keys and Control Center; lives as long as the model.
@@ -260,13 +254,11 @@ final class PlayerModel {
     }
 
     init() {
-        let stack = PlexPlaybackStack.standard()
-        cache = stack.cache
+        LegacyDataCleanup.run()
+        let stack = LocalPlaybackStack.standard()
         player = stack.player
         playlist = PlaylistModel(player: stack.player)
         visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors)
-        pinner = stack.pinner
-        cacheSettings = CacheSettingsModel(cache: stack.cache)
         folderBackend = FolderBackend(settings: FolderBackend.settingsProvider(), output: stack.output)
         folderSettings = FolderSettingsModel(backend: folderBackend)
         // Music Assistant is the default source. Defaults only here: no Keychain, network or prompt at launch.
@@ -298,30 +290,25 @@ final class PlayerModel {
                         }
                         try await ma.probe()
                     }),
-                LibrarySource(backend: stack.backend, isConfigured: { PlexBackend.isConfigured() }),
                 LibrarySource(
                     backend: folderBackend, isConfigured: { FolderBackend.storedFolder() != nil },
                     probe: SourceProbes.checking { try FolderBackend.checkReachable() }),
             ],
             defaultSourceID: ma.sourceID)
         fallback = LibraryFallbackController(sources: sources)
-        // This Mac is the folder backend's output (shared with Plex through `LocalPlayerOutput`; no connection needed).
+        // This Mac is the folder backend's output (`LocalPlaybackStack`; no connection needed).
         router = PlaybackRouter(local: folderBackend, remote: ma)
         outputPicker = OutputPickerModel(remote: ma, isConnected: { await ma.isConnected })
-        let cache = stack.cache
-        Task {
-            do { try await cache.prepare() } catch {
-                Logger(subsystem: "com.brennanmke.SkinAmp", category: "TrackCache")
-                    .error("could not prepare the cache: \(error.localizedDescription, privacy: .public)")
-            }
-        }
         let (commands, continuation) = AsyncStream.makeStream(of: (TransportCommand, OutputDevice.ID).self)
         commandStream = continuation
         // Restore the queue stopped at the saved track (nothing plays, no audio device opens), then start saving changes.
         let queueStore = QueueStore(fileURL: QueueStore.defaultURL())
-        if let saved = queueStore.load() { stack.output.restore(saved) }
+        let loaded = queueStore.loadQueue()
+        if let loaded { stack.output.restore(loaded.snapshot) }
         queueAutosaver = QueueAutosaver(output: stack.output, store: queueStore)
         queueAutosaver.start()
+        // A queue saved with a removed source kind lost those items on load; rewrite it once so they leave the disk.
+        if (loaded?.droppedItems ?? 0) > 0 { queueAutosaver.saveNow() }
         nowPlayingBridge = NowPlayingBridge(player: stack.player)
         nowPlayingBridge.install()
         stack.player.addEventObserver { [weak self] event in

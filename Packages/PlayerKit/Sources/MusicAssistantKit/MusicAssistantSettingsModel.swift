@@ -5,7 +5,7 @@ import os
 private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantSettings")
 
 /// Everything Settings › Music Assistant does, apart from drawing it: the server list, one Keychain item per
-/// server, address and token editing, and Test Connection. Modelled on `PlexSettingsModel`.
+/// server, address and token editing, and Test Connection.
 ///
 /// The token is write-only: it is never read back into `tokenText`. An empty field means "keep what is stored".
 /// A failed Keychain read or existence check never deletes anything; only `removeToken()`, `removeServer(_:)` and

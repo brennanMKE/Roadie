@@ -81,4 +81,18 @@ import Testing
         #expect(saver.saveCount == 0)
         #expect(try Data(contentsOf: store.fileURL) == newer)
     }
+
+    @Test func saveNowWritesEvenWithoutChanges() {
+        let (dir, store) = makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let output = LocalPlayerOutput(player: Player())
+        let restored = tracks(2)
+        output.restore(QueueSnapshot(items: restored.map { LocalQueueItem(track: $0, id: nil) }, currentIndex: 0, repeatMode: .off, isShuffled: false))
+        let saver = QueueAutosaver(output: output, store: store, delay: .milliseconds(50))
+        saver.start()
+        saver.saveNow()
+        #expect(FileManager.default.fileExists(atPath: store.fileURL.path))
+        #expect(store.load()?.items.map(\.track.id) == restored.map(\.id))
+        #expect(saver.saveCount == 1)
+    }
 }

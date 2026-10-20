@@ -30,15 +30,9 @@ targets:
       - package: PlayerKit
         product: AudioCore
       - package: PlayerKit
-        product: PlexKit
-      - package: PlayerKit
-        product: TrackCache
-      - package: PlayerKit
         product: MusicBackendKit
       - package: PlayerKit
         product: LocalPlayback
-      - package: PlayerKit
-        product: PlexBackendKit
       - package: PlayerKit
         product: FolderBackendKit
       - package: PlayerKit
@@ -55,7 +49,7 @@ targets:
       properties:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: SkinAmp connects to your Music Assistant server and your Plex Media Server on your local network to browse and play your music.
+        NSLocalNetworkUsageDescription: SkinAmp connects to your Music Assistant server on your local network to browse and play your music.
         # #0075: macOS returns the Wi-Fi name only with Location access, requested only by "Use Current Network".
         NSLocationUsageDescription: SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.
         NSLocationWhenInUseUsageDescription: SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.
@@ -88,7 +82,7 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         # Unsandboxed for now so the app can read a large local skin corpus by path.
         ENABLE_APP_SANDBOX: NO
-        # If the sandbox is ever enabled, add com.apple.security.network.client (docs/plex-music-library.md).
+        # If the sandbox is ever enabled, add com.apple.security.network.client (docs/music-assistant-integration.md).
   SkinAmpThumbnail:
     type: app-extension
     platform: macOS
@@ -171,11 +165,8 @@ schemes:
         - package: SkinKit/SkinLibraryTests
         - package: SkinKit/SkinBrowserTests
         - package: PlayerKit/AudioCoreTests
-        - package: PlayerKit/PlexKitTests
-        - package: PlayerKit/TrackCacheTests
         - package: PlayerKit/MusicBackendKitTests
         - package: PlayerKit/LocalPlaybackTests
-        - package: PlayerKit/PlexBackendKitTests
         - package: PlayerKit/FolderBackendKitTests
         - package: PlayerKit/LibraryBrowserTests
         - package: PlayerKit/MusicLibraryKitTests

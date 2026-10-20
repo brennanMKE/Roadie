@@ -99,8 +99,9 @@ final class TrickleByteSource: ProgressiveByteSource, @unchecked Sendable {
     }
 }
 
-/// Plex tracks resolve to the trickling source; local files and the fallback's `localURL` use real files.
+/// The marker URL resolves to the trickling source; real files resolve to themselves.
 final class TrickleResolver: TrackResolver, @unchecked Sendable {
+    static let marker = URL(filePath: "/trickle/progressive.wav")
     let source: TrickleByteSource
     let wholeFile: URL
 
@@ -110,23 +111,17 @@ final class TrickleResolver: TrackResolver, @unchecked Sendable {
     }
 
     func localURL(for track: Track) async throws -> URL {
-        switch track.source {
-        case .file(let url): url
-        case .plex: wholeFile
-        }
+        guard case .file(let url) = track.source, url != Self.marker else { return wholeFile }
+        return url
     }
 
     func resolve(_ track: Track) async throws -> ResolvedAudio {
-        switch track.source {
-        case .file(let url): .file(url)
-        case .plex: .progressive(source)
-        }
+        guard case .file(let url) = track.source, url != Self.marker else { return .progressive(source) }
+        return .file(url)
     }
 
-    static func plexTrack(for source: TrickleByteSource, duration: TimeInterval = 0.5) -> Track {
-        Track(
-            title: "progressive", artist: "", duration: duration,
-            source: .plex(partKey: "/library/parts/1/file.wav", cacheKey: "k", size: source.finalSize))
+    static func progressiveTrack(for source: TrickleByteSource, duration: TimeInterval = 0.5) -> Track {
+        Track(title: "progressive", artist: "", duration: duration, source: .file(Self.marker))
     }
 }
 

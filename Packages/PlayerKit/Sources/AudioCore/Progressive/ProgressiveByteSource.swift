@@ -9,7 +9,7 @@ public enum ProgressiveWaitOutcome: Sendable {
     case cancelled
 }
 
-/// One file whose bytes arrive in order. Implemented by TrackCache over its temp file.
+/// One file whose bytes arrive in order. Implemented by a resolver over a file that is still being written (tests: `TrickleByteSource`).
 /// `waitForBytes`, `read` and `fetchRange` block the calling thread and are only ever called from a
 /// reader or feeder `Thread`, never from a Swift concurrency task.
 public protocol ProgressiveByteSource: AnyObject, Sendable {

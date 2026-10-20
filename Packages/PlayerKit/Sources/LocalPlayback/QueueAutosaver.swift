@@ -47,6 +47,16 @@ public final class QueueAutosaver {
         }
     }
 
+    /// Writes the current queue now, even when it has not changed since `start()` (a restore that dropped items).
+    public func saveNow() {
+        pending?.cancel()
+        pending = nil
+        saveCount += 1
+        do { try store.save(output.queueSnapshot()) } catch {
+            log.error("could not save the queue: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     private func observe() {
         withObservationTracking {
             _ = output.player.queue

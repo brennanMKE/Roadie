@@ -1,6 +1,6 @@
 # Music Assistant Backend: Setup and Integration Brief
 
-Handoff doc for adding Music Assistant (MA) as the default music backend in the Winamp-skin macOS music player, with Plex kept as an alternate backend selectable in Settings.
+Handoff doc for adding Music Assistant (MA) as the default music backend in the Winamp-skin macOS music player, Plex is reached through MA's Plex provider (the app's own Plex client was removed by #0074).
 
 Researched 2026-10-13 against Music Assistant 2.10.6 and Home Assistant 2026.10.1. Anything marked **VERIFY** was not confirmed from primary docs and must be checked against the running server's `/api-docs` before coding against it.
 
@@ -146,9 +146,9 @@ protocol MusicBackend {
     var nowPlaying: AsyncStream<NowPlaying> { get }
 }
 final class MusicAssistantBackend: MusicBackend { … }  // default
-final class PlexBackend: MusicBackend { … }            // existing/alternate
+final class FolderBackend: MusicBackend { … }          // local folder, the fallback
 ```
-- Settings > Library Source: **Music Assistant (default)** | Plex. Settings › Music Assistant holds a list of servers (URL, learned `server_id`, one Keychain token item per server, keyed by the configuration's UUID); SkinAmp picks the server automatically (#0075, below).
+- Settings > Library Source: **Music Assistant (default)** | Local folder. Settings › Music Assistant holds a list of servers (URL, learned `server_id`, one Keychain token item per server, keyed by the configuration's UUID); SkinAmp picks the server automatically (#0075, below).
 - Skin/UI layer depends only on `MusicBackend` and domain models, never on MA or Plex types.
 
 ### 5.2 Two output modes under MA
@@ -168,7 +168,7 @@ Only if HA is the integration point later: HA WebSocket API, call `music_assista
 1. **Spike script** (Swift CLI or `curl` + `websocat`): connect to `/ws`, log the server info message, authenticate with the token, call `player_queues/all` and one library listing. Record the real message shapes into `docs/ma-protocol-notes.md`. Resolve every VERIFY item above.
 2. **`MusicAssistantKit` Swift package:** `URLSessionWebSocketTask` connection actor, `message_id` correlation with continuations, partial-result assembly, event `AsyncStream`, auto-reconnect with backoff and re-auth, Codable models for Artist/Album/Track/Playlist/Player/Queue. Unit tests with recorded JSON fixtures from step 1.
 3. **Discovery + settings:** Bonjour browse, manual host field, token entry stored in Keychain, connection status indicator, backend picker defaulting to Music Assistant.
-4. **`MusicBackend` protocol** and adapters for MA and Plex; move existing Plex code behind it.
+4. **`MusicBackend` protocol** and adapters for MA and Plex; move existing Plex code behind it (the Plex adapter was removed by #0074).
 5. **Controller mode:** output picker listing MA players (HomePods), play album/track/playlist, transport, volume, now-playing + artwork from events.
 6. **Local playback mode (Sendspin):** separate milestone after 1 through 5 are solid.
 

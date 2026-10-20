@@ -12,7 +12,7 @@ public enum EmbeddedArtworkLoader {
         return try? await item.load(.dataValue)
     }
 
-    /// Default artwork source for the bridge: local files only. Plex art is injected by the app.
+    /// Default artwork source for the bridge: local files only. A library source's art comes from its backend.
     @Sendable public static func artwork(for track: Track) async -> Data? {
         guard case .file(let url) = track.source else { return nil }
         return await artworkData(for: url)

@@ -3,7 +3,7 @@ import MusicBackendKit
 import Observation
 
 /// State behind Settings › Library › Music Folder: the chosen folder, the index status and the actions.
-/// Lives here (as `CacheSettingsModel` lives in TrackCache) so it is unit-tested; the view is thin.
+/// Lives here so it is unit-tested; the view is thin.
 @MainActor
 @Observable
 public final class FolderSettingsModel {

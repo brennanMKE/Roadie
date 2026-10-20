@@ -137,9 +137,9 @@ func makeDefaults() -> UserDefaults {
 }
 
 struct SourceFixture {
-    var plex: StubMusicBackend
+    var server: StubMusicBackend
     var folder: StubMusicBackend
-    var plexConfigured: ConfiguredFlag
+    var serverConfigured: ConfiguredFlag
     var folderConfigured: ConfiguredFlag
     var defaults: UserDefaults
     var controller: LibrarySourceController
@@ -149,26 +149,26 @@ struct SourceFixture {
     func cleanUp() { defaults.removePersistentDomain(forName: suiteName) }
 }
 
-/// A controller over two stubs standing for Plex (25 artists) and the local folder (3 artists), with a private defaults suite.
+/// A controller over two stubs standing for Server (25 artists) and the local folder (3 artists), with a private defaults suite.
 @MainActor
 func makeSources(
-    stored: String? = nil, default defaultID: String = "plex", folderProbe: SourceProbe? = nil
+    stored: String? = nil, default defaultID: String = "server", folderProbe: SourceProbe? = nil
 ) -> SourceFixture {
     let suiteName = "LibraryBrowserTests-\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     if let stored { defaults.set(stored, forKey: LibrarySourceController.defaultsKey) }
-    let plex = StubMusicBackend(library: .sample(artistCount: 25), sourceID: "plex", displayName: "Plex")
+    let server = StubMusicBackend(library: .sample(artistCount: 25), sourceID: "server", displayName: "Server")
     let folder = StubMusicBackend(library: .sample(artistCount: 3), sourceID: "folder", displayName: "Local Folder")
-    let plexFlag = ConfiguredFlag()
+    let serverFlag = ConfiguredFlag()
     let folderFlag = ConfiguredFlag()
     let controller = LibrarySourceController(
         sources: [
-            LibrarySource(backend: plex, isConfigured: { plexFlag.value }),
+            LibrarySource(backend: server, isConfigured: { serverFlag.value }),
             LibrarySource(backend: folder, isConfigured: { folderFlag.value }, probe: folderProbe),
         ],
         defaultSourceID: defaultID, defaults: defaults, searchDelay: .milliseconds(20))
     return SourceFixture(
-        plex: plex, folder: folder, plexConfigured: plexFlag, folderConfigured: folderFlag,
+        server: server, folder: folder, serverConfigured: serverFlag, folderConfigured: folderFlag,
         defaults: defaults, controller: controller, suiteName: suiteName)
 }
 
@@ -268,7 +268,7 @@ struct FallbackFixture {
     var notices: NoticeLog
     var folderCheck: FolderCheck
 
-    var plex: StubMusicBackend { sources.plex }
+    var server: StubMusicBackend { sources.server }
     var folder: StubMusicBackend { sources.folder }
     var controller: LibrarySourceController { sources.controller }
     var defaults: UserDefaults { sources.defaults }
@@ -282,12 +282,12 @@ struct FallbackFixture {
 /// Two stubs behind a controller, a `ManualClock` and the fallback driver. Nothing is started: call `fallback.start()`.
 @MainActor
 func makeFallback(
-    stored: String? = nil, plexConfigured: Bool = true, folderConfigured: Bool = true,
+    stored: String? = nil, serverConfigured: Bool = true, folderConfigured: Bool = true,
     schedule: RetrySchedule = .default
 ) -> FallbackFixture {
     let check = FolderCheck()
     let sources = makeSources(stored: stored, folderProbe: SourceProbes.checking { try check.run() })
-    sources.plexConfigured.value = plexConfigured
+    sources.serverConfigured.value = serverConfigured
     sources.folderConfigured.value = folderConfigured
     let clock = ManualClock()
     let fallback = LibraryFallbackController(sources: sources.controller, schedule: schedule, clock: clock)

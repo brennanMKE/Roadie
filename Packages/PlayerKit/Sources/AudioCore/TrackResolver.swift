@@ -6,11 +6,11 @@ public enum ResolvedAudio: Sendable {
     case progressive(any ProgressiveByteSource)
 }
 
-/// Maps a track to a local file. TrackCache plugs in here at M2.
+/// Maps a track to a local file. A backend's resolver plugs in here.
 public protocol TrackResolver: Sendable {
     func localURL(for track: Track) async throws -> URL
     /// The file, or a progressive source when the bytes are still downloading. The default is
-    /// `.file(localURL(for:))`; TrackCache overrides it for Plex tracks that are not cached yet.
+    /// `.file(localURL(for:))`; a resolver whose bytes are still arriving returns `.progressive`.
     func resolve(_ track: Track) async throws -> ResolvedAudio
 }
 
@@ -26,7 +26,6 @@ public struct FileTrackResolver: TrackResolver {
     public func localURL(for track: Track) async throws -> URL {
         switch track.source {
         case .file(let url): url
-        case .plex: throw AudioCoreError.unresolvableSource(track.source)
         }
     }
 }

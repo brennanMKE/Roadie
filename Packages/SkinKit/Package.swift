@@ -19,7 +19,7 @@ let package = Package(
             name: "SkinKit",
             dependencies: [.product(name: "ZIPFoundation", package: "ZIPFoundation")]
         ),
-        // Folder index in SQLite (system libsqlite3). Depends on SkinKit only; no UI, no audio, no Plex.
+        // Folder index in SQLite (system libsqlite3). Depends on SkinKit only; no UI, no audio, no network.
         .target(name: "SkinLibrary", dependencies: ["SkinKit"], linkerSettings: [.linkedLibrary("sqlite3")]),
         // Skins window and Skins menu view models. Foundation + Observation + CoreGraphics; no UI, no audio.
         .target(name: "SkinBrowser", dependencies: ["SkinLibrary", "SkinKit"]),

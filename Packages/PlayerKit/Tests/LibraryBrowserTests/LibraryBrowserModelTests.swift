@@ -51,7 +51,7 @@ struct LibraryBrowserModelTests {
 
     @Test func notConfiguredShowsTheMessageWithSettings() async {
         let (backend, model) = makeModel()
-        let message = "Add the Plex server address and sign in under Settings \u{203A} Plex."
+        let message = "Add a Music Assistant server under Settings \u{203A} Music Assistant."
         await backend.setError(.notConfigured(message), for: .connect)
         model.appeared()
         #expect(await waitFor { model.connection == .failed(message: message, needsSettings: true) })

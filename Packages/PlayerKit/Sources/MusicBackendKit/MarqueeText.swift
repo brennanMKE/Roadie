@@ -5,7 +5,7 @@ import Foundation
 public enum MarqueeText {
     /// Webamp: "Winamp 2.91".
     public static let idle = "SkinAmp"
-    /// Shown while a backend track is still being fetched (docs/plan.md, TrackCache: a track starts after its download).
+    /// Shown while a backend track is still loading.
     public static let buffering = "Buffering\u{2026}"
 
     /// "Artist - Title", or the title when the artist is empty.

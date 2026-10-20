@@ -4,7 +4,7 @@ public enum MediaKind: String, Hashable, Sendable, Codable, CaseIterable {
     case artist, album, track, playlist
 }
 
-/// A backend's own identifier for an item: a Plex ratingKey, a Music Assistant `library://` URI, a folder path.
+/// A backend's own identifier for an item: a Music Assistant `library://` URI, a folder path.
 public struct MediaID: Hashable, Sendable, Codable, CustomStringConvertible {
     public var kind: MediaKind
     public var rawValue: String

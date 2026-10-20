@@ -68,11 +68,11 @@ import Testing
     }
 
     @Test func playbackFailedTextNeverCarriesTheMessage() {
-        let message = "http://example.test/?X-Plex-Token=abc"
+        let message = "http://example.test/?token=abc"
         let n = StatusNotice.playbackFailed(
             PlaybackFailure(track: makeTracks(1)[0], message: message, consecutiveFailures: 1, skipped: false))
         #expect(!n.text.contains("http"))
-        #expect(!n.text.contains("Token"))
+        #expect(!n.text.contains("token"))
         #expect(n.detail == message)
     }
 }

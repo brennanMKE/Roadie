@@ -11,7 +11,7 @@ struct FallbackTextTests {
     }
 
     @Test func noticesFitTheMarquee() {
-        let names = [("plex", "Plex"), ("folder", "Local Folder"), ("musicAssistant", "Music Assistant")]
+        let names = [("server", "Server"), ("folder", "Local Folder"), ("musicAssistant", "Music Assistant")]
         for preferred in names {
             for active in names where active.0 != preferred.0 {
                 let missing = status(preferred: preferred, active: active, reason: .notConfigured)
@@ -31,14 +31,14 @@ struct FallbackTextTests {
     }
 
     @Test func summaryAndSubtitleDescribeTheFallback() {
-        let same = status(preferred: ("plex", "Plex"), active: ("plex", "Plex"), reason: nil)
+        let same = status(preferred: ("server", "Server"), active: ("server", "Server"), reason: nil)
         #expect(FallbackText.summary(same) == nil)
-        #expect(FallbackText.subtitle(same) == "Plex")
-        let missing = status(preferred: ("plex", "Plex"), active: ("folder", "Local Folder"), reason: .notConfigured)
-        #expect(FallbackText.summary(missing) == "Using Local Folder: Plex isn't set up.")
-        let down = status(preferred: ("plex", "Plex"), active: ("folder", "Local Folder"), reason: .unreachable("x"))
+        #expect(FallbackText.subtitle(same) == "Server")
+        let missing = status(preferred: ("server", "Server"), active: ("folder", "Local Folder"), reason: .notConfigured)
+        #expect(FallbackText.summary(missing) == "Using Local Folder: Server isn't set up.")
+        let down = status(preferred: ("server", "Server"), active: ("folder", "Local Folder"), reason: .unreachable("x"))
         #expect(FallbackText.summary(down)
-            == "Using Local Folder: Plex can't be reached. SkinAmp switches back when it is.")
-        #expect(FallbackText.subtitle(down) == "Local Folder (Plex unavailable)")
+            == "Using Local Folder: Server can't be reached. SkinAmp switches back when it is.")
+        #expect(FallbackText.subtitle(down) == "Local Folder (Server unavailable)")
     }
 }

@@ -18,12 +18,7 @@ private func sampleSnapshot() -> QueueSnapshot {
             title: "B", artist: "Artist", album: "Album", duration: 241.3, bitrate: 320, sampleRate: 44100, channels: 2,
             source: .file(URL(fileURLWithPath: "/Volumes/Music/Artist/Album/01.mp3"))),
         id: MediaID(.track, "Artist/Album/01.mp3"))
-    let c = LocalQueueItem(
-        track: Track(
-            title: "C", artist: "Artist", duration: 180,
-            source: .plex(partKey: "/library/parts/5010/1791856627/file.m4a", cacheKey: "abcdef0123-5010-1791856627", size: 7_147_054)),
-        id: MediaID(.track, "3001"))
-    return QueueSnapshot(items: [a, b, c], currentIndex: 1, repeatMode: .all, isShuffled: true)
+    return QueueSnapshot(items: [a, b], currentIndex: 1, repeatMode: .all, isShuffled: true)
 }
 
 @MainActor
@@ -55,10 +50,8 @@ private func sampleSnapshot() -> QueueSnapshot {
         for item in items { #expect(Set(item.keys).isSubset(of: allowed)) }
         let fileSource = try #require(items[0]["source"] as? [String: Any])
         #expect(Set(fileSource.keys) == ["kind", "path"])
-        let plexSource = try #require(items[2]["source"] as? [String: Any])
-        #expect(Set(plexSource.keys) == ["kind", "partKey", "cacheKey", "size"])
         let text = String(decoding: data, as: UTF8.self)
-        for forbidden in ["token", "http", "X-Plex"] { #expect(!text.contains(forbidden)) }
+        for forbidden in ["token", "http", "Bearer"] { #expect(!text.contains(forbidden)) }
     }
 
     @Test func storeLoadsNilForMissingCorruptOrNewerFiles() throws {
@@ -70,7 +63,6 @@ private func sampleSnapshot() -> QueueSnapshot {
         let bodies = [
             "{",
             #"{"version":2,"items":[],"repeat":"off","shuffle":false}"#,
-            #"{"version":1,"items":[{"title":"x","artist":"","duration":1,"source":{"kind":"stream","url":"x"}}],"repeat":"off","shuffle":false}"#,
         ]
         for body in bodies {
             try body.write(to: file, atomically: true, encoding: .utf8)
@@ -105,12 +97,47 @@ private func sampleSnapshot() -> QueueSnapshot {
         #expect(Set(loaded.items.map(\.track.id)).count == 3)
     }
 
+    @Test func itemsOfRemovedOrUnknownKindsAreDroppedAndTheCurrentIndexFollows() throws {
+        let (dir, file) = tempFile()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let ids = (0..<5).map { _ in UUID() }
+        func item(_ i: Int, _ title: String, _ source: String) -> String {
+            #"{"id":"\#(ids[i].uuidString)","title":"\#(title)","artist":"","duration":1,"source":\#(source)}"#
+        }
+        func fileSource(_ name: String) -> String { #"{"kind":"file","path":"/m/\#(name).wav"}"# }
+        let plex = #"{"kind":"plex","partKey":"/library/parts/1/f.m4a","cacheKey":"k","size":10}"#
+        let items = [
+            item(0, "A", fileSource("a")), item(1, "B", plex), item(2, "C", fileSource("c")),
+            item(3, "D", #"{"kind":"stream","url":"x"}"#), item(4, "E", fileSource("e")),
+        ].joined(separator: ",")
+        let store = QueueStore(fileURL: file)
+        for (current, expected) in [(2, 1), (1, nil), (4, 2)] as [(Int, Int?)] {
+            let body = #"{"version":1,"currentIndex":\#(current),"repeat":"off","shuffle":false,"items":[\#(items)]}"#
+            try body.write(to: file, atomically: true, encoding: .utf8)
+            let loaded = try #require(store.loadQueue())
+            #expect(loaded.snapshot.items.map(\.track.title) == ["A", "C", "E"])
+            #expect(loaded.snapshot.items.map(\.track.id) == [ids[0], ids[2], ids[4]])
+            #expect(loaded.snapshot.currentIndex == expected)
+            #expect(loaded.droppedItems == 2)
+            #expect(store.load() == store.loadQueue()?.snapshot)
+            #expect(try String(contentsOf: file, encoding: .utf8) == body)
+        }
+        let onlyPlex = #"{"version":1,"currentIndex":0,"repeat":"off","shuffle":false,"items":[\#(item(1, "B", plex))]}"#
+        try onlyPlex.write(to: file, atomically: true, encoding: .utf8)
+        let loaded = try #require(store.loadQueue())
+        #expect(loaded.snapshot.items.isEmpty)
+        #expect(loaded.droppedItems == 1)
+        #expect(!LocalPlayerOutput(player: Player()).restore(loaded.snapshot))
+        #expect(try String(contentsOf: file, encoding: .utf8) == onlyPlex)
+    }
+
     @Test func restoreFillsAnEmptyStoppedOutputWithoutStarting() throws {
         let player = Player()
         let output = LocalPlayerOutput(player: player)
         let snapshot = sampleSnapshot()
         #expect(output.restore(snapshot))
-        #expect(player.queue.tracks.count == 3)
+        #expect(player.queue.tracks.count == 2)
         #expect(player.queue.currentIndex == 1)
         #expect(player.state == .stopped)
         #expect(player.currentTime == 0)
@@ -153,7 +180,7 @@ private func sampleSnapshot() -> QueueSnapshot {
         snapshot.currentIndex = 9
         #expect(output.restore(snapshot))
         #expect(player.queue.currentIndex == nil)
-        #expect(player.queue.tracks.count == 3)
+        #expect(player.queue.tracks.count == 2)
     }
 
     @Test func playingARestoredMissingFileSkipsThenStops() async {

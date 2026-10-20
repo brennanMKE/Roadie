@@ -15,7 +15,7 @@ public struct BackendCapabilities: OptionSet, Hashable, Sendable {
 
 /// No case carries a URL, a request, a header or a token; `errorDescription` is user-facing.
 public enum MusicBackendError: Error, Hashable, Sendable, LocalizedError {
-    /// What to do, e.g. "Add the Plex server address and sign in under Settings > Plex."
+    /// What to do, e.g. "Add a Music Assistant server under Settings › Music Assistant."
     case notConfigured(String)
     /// A library call before `connect()`.
     case notConnected
@@ -41,7 +41,7 @@ public enum MusicBackendError: Error, Hashable, Sendable, LocalizedError {
 }
 
 public protocol MusicBackend: AnyObject, Sendable {
-    /// "plex", "musicAssistant", "folder": the key Settings and logs use.
+    /// "musicAssistant", "folder": the key Settings and logs use.
     var sourceID: String { get }
     var displayName: String { get }
     var capabilities: BackendCapabilities { get }

@@ -10,22 +10,22 @@ import Testing
 struct LibrarySourceSelectionTests {
     private func sources() -> [LibrarySource] {
         [
-            LibrarySource(backend: StubMusicBackend(sourceID: "plex", displayName: "Plex"), isConfigured: { true }),
+            LibrarySource(backend: StubMusicBackend(sourceID: "server", displayName: "Server"), isConfigured: { true }),
             LibrarySource(backend: StubMusicBackend(sourceID: "folder", displayName: "Local Folder"), isConfigured: { true }),
         ]
     }
 
     @Test func storedChoiceWinsWhenAvailable() {
-        #expect(LibrarySourceSelection.resolve(stored: "folder", available: sources(), fallback: "plex") == "folder")
+        #expect(LibrarySourceSelection.resolve(stored: "folder", available: sources(), fallback: "server") == "folder")
     }
 
     @Test func missingOrUnknownStoredChoiceFallsBackToTheDefault() {
-        #expect(LibrarySourceSelection.resolve(stored: nil, available: sources(), fallback: "plex") == "plex")
+        #expect(LibrarySourceSelection.resolve(stored: nil, available: sources(), fallback: "server") == "server")
         #expect(LibrarySourceSelection.resolve(stored: "musicAssistant", available: sources(), fallback: "folder") == "folder")
     }
 
     @Test func anUnavailableDefaultFallsBackToTheFirstSource() {
-        #expect(LibrarySourceSelection.resolve(stored: nil, available: sources(), fallback: "musicAssistant") == "plex")
+        #expect(LibrarySourceSelection.resolve(stored: nil, available: sources(), fallback: "musicAssistant") == "server")
     }
 }
 
@@ -67,13 +67,13 @@ struct LibrarySourceControllerTests {
         #expect(c.backend.sourceID == "folder")
         #expect(c.library.backend.sourceID == "folder")
         #expect(c.selected.displayName == "Local Folder")
-        #expect(c.sources.map(\.id) == ["plex", "folder"])
+        #expect(c.sources.map(\.id) == ["server", "folder"])
     }
 
     @Test func initUsesTheDefaultOnAFreshInstallWithoutWritingIt() {
         let f = makeSources()
         defer { f.cleanUp() }
-        #expect(f.controller.selectedID == "plex")
+        #expect(f.controller.selectedID == "server")
         #expect(f.defaults.string(forKey: LibrarySourceController.defaultsKey) == nil)
         #expect(f.controller.generation == 0)
     }
@@ -93,7 +93,7 @@ struct LibrarySourceControllerTests {
         defer { f.cleanUp() }
         let c = f.controller
         let ref = ArtworkRef(rawValue: "art-1")
-        await f.plex.setArtwork(tinyPNG(), for: ref)
+        await f.server.setArtwork(tinyPNG(), for: ref)
         c.library.appeared()
         #expect(await waitFor { c.library.connection == .connected && c.library.artists.phase == .loaded })
         #expect(await c.artwork.image(for: ref) != nil)
@@ -113,7 +113,7 @@ struct LibrarySourceControllerTests {
         let f = makeSources()
         defer { f.cleanUp() }
         let old = f.controller.library
-        #expect(f.controller.select("plex") == false)
+        #expect(f.controller.select("server") == false)
         #expect(f.controller.library === old)
         #expect(f.controller.generation == 0)
         #expect(f.defaults.string(forKey: LibrarySourceController.defaultsKey) == nil)
@@ -125,19 +125,19 @@ struct LibrarySourceControllerTests {
         let old = f.controller.library
         #expect(f.controller.select("musicAssistant") == false)
         #expect(f.controller.library === old)
-        #expect(f.controller.selectedID == "plex")
+        #expect(f.controller.selectedID == "server")
         #expect(f.controller.generation == 0)
     }
 
     @Test func selectCancelsTheOldBrowsersInFlightWork() async {
         let f = makeSources()
         defer { f.cleanUp() }
-        await f.plex.gate(.artists)
+        await f.server.gate(.artists)
         let old = f.controller.library
         old.appeared()
-        #expect(await waitFor { await f.plex.suspendedCount == 1 })
+        #expect(await waitFor { await f.server.suspendedCount == 1 })
         f.controller.select("folder")
-        #expect(await waitFor { await f.plex.cancelledCount == 1 })
+        #expect(await waitFor { await f.server.cancelledCount == 1 })
         #expect(old.artists.phase != .loading)
     }
 
@@ -147,10 +147,10 @@ struct LibrarySourceControllerTests {
         f.controller.library.appeared()
         #expect(await waitFor { f.controller.library.connection == .connected })
         f.controller.select("folder")
-        let plexCalls = await f.plex.calls
-        #expect(!plexCalls.contains(.disconnect))
+        let serverCalls = await f.server.calls
+        #expect(!serverCalls.contains(.disconnect))
         #expect(await f.folder.count(.connect) == 0)
-        #expect(await f.plex.isConnected)
+        #expect(await f.server.isConnected)
     }
 
     @Test func aRebuiltModelConnectsWhenAppearedAgain() async {
@@ -168,7 +168,7 @@ struct LibrarySourceControllerTests {
         defer { log.task?.cancel() }
         #expect(await waitFor { log.titles.count == 1 })
         #expect(log.titles.first == .some(nil))
-        #expect(await waitFor { await f.plex.emit(snapshot(title: "A")); return log.last == "A" })
+        #expect(await waitFor { await f.server.emit(snapshot(title: "A")); return log.last == "A" })
         await f.folder.emit(snapshot(title: "B"))
         let before = log.titles.count
         f.controller.select("folder")
@@ -178,7 +178,7 @@ struct LibrarySourceControllerTests {
         #expect(f.controller.nowPlayingSubscriberCount == 1)
         await f.folder.emit(snapshot(title: "C"))
         #expect(await waitFor { log.last == "C" })
-        await f.plex.emit(snapshot(title: "D"))
+        await f.server.emit(snapshot(title: "D"))
         try? await Task.sleep(for: .milliseconds(30))
         #expect(!log.titles.contains("D"))
         #expect(f.controller.nowPlayingSubscriberCount == 1)
@@ -223,7 +223,7 @@ struct LibrarySourceControllerTests {
         defer { f.cleanUp() }
         #expect(f.controller.select("folder", persist: false))
         #expect(f.controller.selectedID == "folder")
-        #expect(f.controller.preferredID == "plex")
+        #expect(f.controller.preferredID == "server")
         #expect(f.defaults.string(forKey: LibrarySourceController.defaultsKey) == nil)
         #expect(f.controller.generation == 1)
         #expect(f.controller.select("folder", persist: true))
@@ -237,10 +237,10 @@ struct LibrarySourceControllerTests {
         defer { f.cleanUp() }
         var reports: [String] = []
         f.controller.onBackendFailure = { id, error, phase in reports.append("\(id) \(error) \(phase)") }
-        await f.plex.setError(.unreachable("down"), for: .connect)
+        await f.server.setError(.unreachable("down"), for: .connect)
         f.controller.library.appeared()
         #expect(await waitFor { reports.count == 1 })
-        #expect(reports[0] == "plex unreachable(\"down\") connect")
+        #expect(reports[0] == "server unreachable(\"down\") connect")
         f.controller.select("folder")
         await f.folder.setError(.unreachable("gone"), for: .artists)
         f.controller.library.appeared()
@@ -259,16 +259,16 @@ struct LibrarySourceControllerTests {
         #expect(await waitFor { c.nowPlayingSubscriberCount == 1 && log.titles.count == 1 })
         let oldLibrary = c.library
         let oldArtwork = c.artwork
-        #expect(c.reload("plex") == true)
+        #expect(c.reload("server") == true)
         #expect(c.generation == 1)
         #expect(c.library !== oldLibrary)
         #expect(c.artwork !== oldArtwork)
-        #expect(c.selectedID == "plex")
-        #expect(c.preferredID == "plex")
+        #expect(c.selectedID == "server")
+        #expect(c.preferredID == "server")
         #expect(f.defaults.string(forKey: LibrarySourceController.defaultsKey) == nil)
         #expect(c.nowPlayingSubscriberCount == 1)
         // The stream was re-pointed at the same backend and still yields.
-        #expect(await waitFor { await f.plex.emit(snapshot(title: "R")); return log.last == "R" })
+        #expect(await waitFor { await f.server.emit(snapshot(title: "R")); return log.last == "R" })
 
         let current = c.library
         #expect(c.reload("folder") == false)

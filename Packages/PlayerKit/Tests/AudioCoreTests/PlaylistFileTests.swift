@@ -127,17 +127,6 @@ private func paths(_ entries: [PlaylistFile.Entry], relativeTo url: URL = listUR
         """)
     }
 
-    @Test func serializeSkipsPlexTracks() {
-        let tracks = [
-            fileTrack("/tmp/x/a.mp3", title: "A"),
-            Track(title: "P", artist: "", duration: 5, source: .plex(partKey: "/library/parts/99/file.mp3", cacheKey: "k")),
-        ]
-        let out = PlaylistFile.serialize(tracks, format: .m3u, playlistURL: listURL)
-        #expect(out.written == 1)
-        #expect(out.skipped == 1)
-        #expect(!String(decoding: out.data, as: UTF8.self).contains("/library/parts"))
-    }
-
     @Test func roundTripsM3UAndPLS() {
         let originals = ["/tmp/x/a.mp3", "/tmp/x/Björk/01 Hunter.mp3", "/elsewhere/with space/c.flac"]
         let tracks = originals.map { fileTrack($0, title: "t", duration: 3) }

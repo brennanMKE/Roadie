@@ -68,7 +68,7 @@ struct LibrarySettingsView: View {
             } header: {
                 Text("Music Folder")
             } footer: {
-                Text("Organize it as Artist/Album/Track, like a Plex library. Singles can sit directly in the artist's folder; discs as \"Disc 1\", \"Disc 2\" subfolders.")
+                Text("Organize it as Artist/Album/Track. Singles can sit directly in the artist's folder; discs as \"Disc 1\", \"Disc 2\" subfolders.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -28,7 +28,7 @@ final class ProgressiveRig {
         wavURL = wav.url
         source = TrickleByteSource(data: wav.data, available: 0)
         source.advance(to: Int64(Double(wav.data.count) * available))
-        track = TrickleResolver.plexTrack(for: source)
+        track = TrickleResolver.progressiveTrack(for: source)
         player = Player(resolver: TrickleResolver(source: source, wholeFile: wav.url))
         player.recordsDiagnostics = true
         var policy = ProgressiveReadPolicy()
@@ -317,7 +317,7 @@ final class SeekLog {
         defer { try? FileManager.default.removeItem(at: dir) }
         let source = TrickleByteSource(data: ProgressiveFixtures.randomData(8192), available: 8192)
         let player = Player(resolver: TrickleResolver(source: source, wholeFile: dir.appending(path: "none.wav")))
-        player.enqueue([TrickleResolver.plexTrack(for: source)])
+        player.enqueue([TrickleResolver.progressiveTrack(for: source)])
         player.play()
         #expect(await waitUntil { player.state == .stopped && player.errorMessage != nil })
         #expect(player._graph == nil)

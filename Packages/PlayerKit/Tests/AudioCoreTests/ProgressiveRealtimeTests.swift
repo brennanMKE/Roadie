@@ -17,7 +17,7 @@ import Testing
         let player = Player(resolver: TrickleResolver(source: source, wholeFile: first.url))
         player.recordsDiagnostics = true
         let secondTrack = try Track.file(at: second.url)
-        player.enqueue([TrickleResolver.plexTrack(for: source), secondTrack])
+        player.enqueue([TrickleResolver.progressiveTrack(for: source), secondTrack])
         player.volume = 0   // silent
         player.play()
         #expect(await MixedFormatSupport.waitUntil(timeout: 500) { player.state == .playing })

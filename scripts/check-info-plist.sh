@@ -24,8 +24,8 @@ absent NSAppTransportSecurity.NSExceptionDomains
 absent NSBonjourServices
 desc="$(get NSLocalNetworkUsageDescription || true)"
 print -r -- "NSLocalNetworkUsageDescription = ${desc:-<absent>}"
-[[ "$desc" == *"Music Assistant"* && "$desc" == *Plex* ]] || {
-  print -u2 "!! NSLocalNetworkUsageDescription is missing or does not mention Music Assistant and Plex"; exit 1; }
+[[ "$desc" == *"Music Assistant"* && "$desc" != *Plex* ]] || {
+  print -u2 "!! NSLocalNetworkUsageDescription is missing, does not mention Music Assistant, or still mentions Plex"; exit 1; }
 # #0075: the Wi-Fi name needs Location access; both descriptions must say why.
 for key in NSLocationUsageDescription NSLocationWhenInUseUsageDescription; do
   loc="$(get $key || true)"

@@ -1,5 +1,7 @@
 # Playing Music from Plex on joe
 
+**Historical (2026-10-19, #0074).** Direct Plex support was removed; SkinAmp reaches a Plex library through Music Assistant's Plex provider (`docs/music-assistant-integration.md`). This describes the M2 client (PlexKit, TrackCache, PlexBackendKit) as it was; the code is in `git log` up to the commit that resolved #0074.
+
 How the player can reach the Plex Media Server on joe, browse its Music library, and play
 tracks. It also proposes a Settings screen where the user enters their own server's hostname
 or IP.

@@ -41,7 +41,6 @@ public struct TrackInfo: Equatable, Sendable {
     public init(track: Track, format: PlaybackFormat?) {
         let fileFormat: String? = switch track.source {
         case .file(let url): url.pathExtension.isEmpty ? nil : url.pathExtension.uppercased()
-        case .plex: nil
         }
         self.init(
             title: track.title, artist: track.artist, album: track.album, duration: track.duration, format: fileFormat,

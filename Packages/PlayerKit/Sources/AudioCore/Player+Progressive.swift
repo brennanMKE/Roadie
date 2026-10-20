@@ -59,7 +59,7 @@ extension Player {
         }
     }
 
-    /// Joins the download already in flight (for Plex, a waiter on the same transfer), then lets the source go
+    /// Joins the download already in flight (a source whose download is shared joins it), then lets the source go
     /// and opens the finished file. The join comes first: closing the source first could abandon the
     /// download and restart it.
     private func fallBackToFile(

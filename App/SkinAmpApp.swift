@@ -1,16 +1,9 @@
 import MusicAssistantKit
-import PlexKit
 import SwiftUI
-import TrackCache
 
 @main
 struct SkinAmpApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var plexSettings = PlexSettingsModel(
-        tokenStore: KeychainPlexTokenStore(),
-        connectionTest: PlexConnectionTest(clientIdentifier: PlexClientIdentifier.stored()),
-        account: PlexAccountClient(clientIdentifier: PlexClientIdentifier.stored()),
-        openURL: { NSWorkspace.shared.open($0) })
 
     var body: some Scene {
         Window("Library", id: "library") {
@@ -29,10 +22,8 @@ struct SkinAmpApp: App {
 
         Settings {
             SettingsView()
-                .environment(plexSettings)
                 .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.musicAssistantSelection)
-                .environment(appDelegate.model.cacheSettings)
                 .environment(appDelegate.model.folderSettings)
                 .environment(appDelegate.model.sources)
                 .environment(appDelegate.model.fallback)

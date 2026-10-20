@@ -141,8 +141,8 @@ permission approvals build up, nothing lingers from an earlier run, and every bu
   code. The only share is a read-only directory that holds this run's export.
 - **The corpus share is read-only and never enters git or the export.** `--corpus DIR` (#0038) adds a second named virtio-fs share (`--dir=corpus:DIR:ro`, mounted at `/Volumes/My Shared Files/corpus`); the guest copies it to `~/corpus` when the disk has the corpus size plus 2 GiB free (else it reads in place and `env.json` says so) before anything is timed. Steps `corpus-run` (`scripts/run-skin-corpus.sh`: release build of `skintool`, `skintool corpus --resume` restarted after a crash, hang or memory abort) and `corpus-report` (`skintool corpus-report`, prints `corpus:` and `gate:` lines and fails the step when the gate fails) follow the normal steps; `results.jsonl`, `report.md`, `summary.json`, `env.json`, `corpus-stderr.log` and `crashes/` come back in `build/vm-tests/<run-id>/corpus/`. The full ~103k-skin set is roughly 10-20 minutes of parsing plus the copy and the release build, and holds the VM lease the whole time.
 - **Results come back through `tart exec … tar`**, not through the share.
-- **No secrets in the guest.** Tests do not use the Plex token, and they never reach `joe`. PlexKit's opt-in integration test skips itself when `PLEX_URL`/`PLEX_TOKEN` are unset, which is always the case in the guest. The plex.tv sign-in tests use hand-written fixtures with a fake PIN code and token; nothing is recorded from the account, and the opener that would launch a browser is a closure. TrackCache's tests download from the `URLProtocol` stub or an in-process stub downloader, and its integration test skips itself the same way.
-- **No Keychain in the guest.** Unit tests use `InMemoryPlexTokenStore`; the real `KeychainPlexTokenStore` has an opt-in test (`PLEX_KEYCHAIN_TEST=1`) that only runs on the host by hand. A keychain dialog in the headless guest would hang the run.
+- **No secrets in the guest.** Tests don't use any server token. `MusicAssistantIntegrationTests` is opt-in (`MA_URL`/`MA_TOKEN`) and skips itself in the guest, where those are never set.
+- **No Keychain in the guest.** Unit tests use `InMemoryMusicAssistantTokenStore`; `KeychainMusicAssistantTokenStore` is never exercised in the guest. A keychain dialog in the headless guest would hang the run.
 - **Never hardcode the image name.** It comes from `tart-golden require`.
 
 ## No audio
@@ -268,9 +268,9 @@ The `SkinAmp` scheme's Test action holds unit tests only. UI tests go in a separ
 
 Test design for a headless, silent guest:
 
-- **No Plex.** The guest is on Tart's NAT network and *can* reach the LAN, so isolation has to come
-  from the app. Launch with an argument such as `-UITestStubPlex YES` that swaps in the
-  `URLProtocol` stub and recorded JSON fixtures from PlexKit's unit tests. No token is passed in.
+- **No Music Assistant server.** The guest is on Tart's NAT network and *can* reach the LAN, so isolation has to
+  come from the app. Launch with an argument such as `-UITestStubMusicAssistant YES` (when UI tests exist) that
+  swaps in `MusicAssistantKitStub`'s scripted transports and #0060's fixtures. No token is passed in.
 - **No user skins or music.** `Skins/`, `*.wsz` and `*.mp3` are gitignored, and third-party skins
   are never committed. Commit a small skin made for the project (or generate one at test time) plus
   a few seconds of generated audio, and pass their paths in through launch arguments.

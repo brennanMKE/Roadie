@@ -1,6 +1,8 @@
-# Plan: Skinned player for a Plex music library
+# Plan: Skinned player for a Music Assistant library
 
 ## Context
+
+**2026-10-19 (#0074):** direct Plex support was removed. Music Assistant is the default source and reaches a Plex library through its own Plex provider; a local folder is the fallback. M2, the Plex parts of M3 and the progressive download in M7 are history; AudioCore's progressive player path stays as a generic seam.
 
 The stub app (`App/`, `Packages/SkinKit`) loads classic `.wsz` skins and draws part of the
 main window, but it plays nothing. The goal is to play music from the Plex server on joe
@@ -23,8 +25,12 @@ App/                      SwiftUI app; AppKit hosting for skinned windows
 Packages/SkinKit/         (exists) skin parsing, sprites, skintool
 Packages/PlayerKit/       new package
   AudioCore/              AVAudioEngine graph, EQ, analyzer, queue model
-  TrackCache/             download-to-disk cache with LRU eviction
-  PlexKit/                Plex HTTP client, models, sign-in, connection test
+  MusicBackendKit/        source-neutral backend protocol and models
+  LocalPlayback/          the "This Mac" output and LocalPlaybackStack
+  FolderBackendKit/       a local folder as a backend (the fallback)
+  MusicAssistantKit/      Music Assistant client and backend (the default source)
+  LibraryBrowser/         browser view models and source switching
+  MusicLibraryKit/        artwork cache
 ```
 
 PlexKit and AudioCore have no UI code, and AudioCore does not know about Plex. They meet in
@@ -44,7 +50,7 @@ plays it.
   drawn at 30–60 Hz.
 - Media keys and Control Center through `MPRemoteCommandCenter` and `MPNowPlayingInfoCenter`.
 
-### Track cache (TrackCache)
+### Track cache (TrackCache) (removed by #0074)
 - **Location:** `~/Library/Caches/<bundle id>/Tracks/`. macOS may purge it when disk space
   runs low, which is acceptable.
 - **Cache key:** server `machineIdentifier` + part id + the part's `updatedAt`. If the file
@@ -72,7 +78,7 @@ plays it.
 - **Tests:** eviction order, pinning, size accounting and index rebuild, using temp
   directories and a stub downloader.
 
-### Plex (PlexKit)
+### Plex (PlexKit) (removed by #0074)
 Follows `docs/plex-music-library.md`:
 - `PlexAddress.normalize(_:)`: add `http://` and `:32400` when missing; `https` passes through.
 - `PlexClient`: async `URLSession`, `Accept: application/json`, `X-Plex-Token` header,
@@ -106,8 +112,8 @@ Follows `docs/plex-music-library.md`:
 - **Plex browser:** a normal SwiftUI window (unskinned, as the brief allows). It has
   sidebar, artists, albums and tracks, plus search. Double-click plays. "Add to playlist"
   adds to the queue.
-- **Settings** (SwiftUI `Settings` scene): a Plex section as specified in the doc, a Cache
-  section (size limit, current usage, Clear cache), and a Skins section (skins folder, scale).
+- **Settings** (SwiftUI `Settings` scene): Library, Music Assistant, Skins (the Plex and Cache
+  sections were removed by #0074).
 - **Info.plist:** `NSAppTransportSecurity.NSAllowsLocalNetworking = YES`,
   `NSLocalNetworkUsageDescription`, set through `project.yml`.
 
@@ -122,7 +128,7 @@ Follows `docs/plex-music-library.md`:
 5. Local files: open or drop audio files into the queue.
 6. Now Playing info and media keys.
 
-**M2: Plex connection**
+**M2: Plex connection** (removed by #0074)
 1. PlexKit client, JSON models and paging, tested with a `URLProtocol` stub.
 2. Address normalization and the connection test with its error messages.
 3. Keychain token store; Settings › Plex with a paste-token field and a library picker.
@@ -131,7 +137,7 @@ Follows `docs/plex-music-library.md`:
    Settings › Cache.
 6. PIN sign-in through plex.tv, and `plex.direct` HTTPS URIs from `/resources`.
 
-**M3: Plex browser**
+**M3: Plex browser** (Plex items removed by #0074)
 1. SwiftUI browser of artists, albums and tracks, with search and paging.
 2. Artist-name de-duplication, and album art with a placeholder.
 3. Play and enqueue from the browser; map Plex tracks to `Track`.
@@ -161,11 +167,10 @@ Follows `docs/plex-music-library.md`:
 - Cursors (`.cur`), performance across the full corpus, corpus run of 1,000 skins.
 
 ## Verification
-- `swift test` for SkinKit and PlayerKit: TrackCache LRU eviction, pinning and index rebuild, Plex JSON decoding against
-  recorded fixtures, address normalization, and the connection-test error paths.
-- Opt-in integration tests: `PLEX_URL=http://joe:32400 PLEX_TOKEN=$(ssh joe 'defaults read
-  com.plexapp.plexmediaserver PlexOnlineToken') swift test` lists sections and fetches one
-  track's metadata. Skipped when the variables are unset. The token is never written to disk.
+- `swift test` for SkinKit and PlayerKit: the folder index, queue save and restore, Music Assistant decoding against
+  recorded fixtures, and the connection-test error paths.
+- Opt-in integration tests: `MA_URL` + `MA_TOKEN` (`MusicAssistantIntegrationTests`). Skipped when the variables are
+  unset. The token is never written to disk.
 - Manual check in the app:
   1. Connect to `joe` in Settings.
   2. Browse to an album and play it.
