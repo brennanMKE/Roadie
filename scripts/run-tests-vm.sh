@@ -431,7 +431,7 @@ if (( build_failed )); then
   for name in skinkit-build playerkit-build app-build spike-pkg-build spike-build; do
     [[ -n "${step_rc[$name]:-}" && "${step_rc[$name]}" != 0 && "${step_rc[$name]}" != skip && -f "$RESULTS_DIR/$name.log" ]] && failed_logs+=("$RESULTS_DIR/$name.log")
   done
-  errs=$(cat "${failed_logs[@]}" 2>/dev/null | sed $'s/\e\\[[0-9;]*m//g' \
+  errs=$(cat "${failed_logs[@]}" 2>/dev/null | perl -pe 's/\e\]8;;.*?\e\\//g; s/\e\[[0-9;]*m//g' \
     | grep -E '^/.*:[0-9]+:[0-9]+: error: ' | sed "s|^$GUEST_SRC/||" | awk '!seen[$0]++' || true)
   if [[ -n "$errs" ]]; then
     log "ERRORS  $(print -r -- "$errs" | wc -l | tr -d ' ') compiler error(s) (first 30; full logs: ${(j:, :)${failed_logs:t}})"

@@ -42,7 +42,8 @@ while (( $# )); do
   esac
 done
 
-strip() { sed $'s/\e\\[[0-9;]*m//g'; }
+# Colour codes and the OSC 8 hyperlinks swiftc wraps diagnostic group names in.
+strip() { perl -pe 's/\e\]8;;.*?\e\\//g; s/\e\[[0-9;]*m//g'; }
 
 run_once() {
   OUT=$(mktemp "$REPO/build/verify-out.XXXXXX")
@@ -107,7 +108,7 @@ report=$(
          /^==> ERRORS  no file:line:col/ {e=0; next}
          /^==> ERRORS/ {print; e=1; next}
          /^==> / {e=0}
-         e && /^    / && !/Build complete!|BUILD SUCCEEDED/ {print}' "$SUMMARY"
+         e && /^    / && !/Build complete!|BUILD SUCCEEDED/ {print}' "$SUMMARY" | strip
   else
     # Usage error or preflight failure: no summary was written; the tail of the output says why.
     strip <"$OUT" | grep -v '^[[:space:]]*$' | tail -15
