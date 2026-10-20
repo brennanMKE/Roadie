@@ -131,6 +131,7 @@ final class FakeCommandTarget: NowPlayingCommandTarget {
             case .stateChanged(let s): events.append("state:\(s)")
             case .seeked: events.append("seeked")
             case .failed: events.append("failed")
+            case .streamStarted, .streamEnded, .streamPreempted: events.append("stream")
             }
         }
         try renderSilently(player)

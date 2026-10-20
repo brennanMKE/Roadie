@@ -102,7 +102,7 @@ import Testing
             switch event {
             case .trackChanged(let t): events.append("track:\(t?.title ?? "nil")@\(p.currentTime)")
             case .stateChanged(let s): events.append("state:\(s)")
-            case .seeked, .failed: break
+            case .seeked, .failed, .streamStarted, .streamEnded, .streamPreempted: break
             }
         }
         p.play(at: 0)

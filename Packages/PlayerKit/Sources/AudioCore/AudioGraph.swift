@@ -68,13 +68,19 @@ final class AudioGraph {
     /// Only safe while the engine is stopped: reconnecting an initialized `AVAudioUnitEQ`
     /// at a different rate or channel count throws -10868 (an uncaught Objective-C exception).
     private func connectIfNeeded() {
-        var rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
-        if rate <= 0 { rate = 44_100 }
+        let rate = outputSampleRate()
         if let current = processingFormat, current.sampleRate == rate { return }
         guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2) else { return }
         engine.connect(playerNode, to: eq, format: format)
         engine.connect(eq, to: engine.mainMixerNode, format: format)
         processingFormat = format
+    }
+
+    /// The output node's rate without starting the engine (what `connectIfNeeded` connects at); 44 100 when
+    /// it reports none.
+    func outputSampleRate() -> Double {
+        let rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
+        return rate > 0 ? rate : 44_100
     }
 
     /// Binds the output unit to `outputDevice` before the rate is read. Only called while stopped.

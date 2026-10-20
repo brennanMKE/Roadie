@@ -4,6 +4,7 @@ public enum AudioCoreError: Error, LocalizedError {
     case engineStart(underlying: any Error)
     case unresolvableSource(Track.Source)
     case outputDevice(underlying: any Error)
+    case unsupportedStreamFormat
 
     public var errorDescription: String? {
         switch self {
@@ -13,6 +14,8 @@ public enum AudioCoreError: Error, LocalizedError {
             "This track is not available as a local file."
         case .outputDevice(let underlying):
             "Could not switch the audio output device: \(underlying.localizedDescription)"
+        case .unsupportedStreamFormat:
+            "The stream's audio format is not supported."
         }
     }
 }
@@ -27,7 +30,7 @@ public protocol SourceScopedError: Error {
 extension AudioCoreError: SourceScopedError {
     public var affectsWholeSource: Bool {
         switch self {
-        case .engineStart, .outputDevice: true
+        case .engineStart, .outputDevice, .unsupportedStreamFormat: true
         case .unresolvableSource: false
         }
     }

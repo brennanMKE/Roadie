@@ -133,12 +133,18 @@ public final class Player: NowPlayingCommandTarget {
     /// Test hooks: how the progressive reader waits and fetches, and the size of the buffers it schedules.
     @ObservationIgnored var progressivePolicy = ProgressiveReadPolicy()
     @ObservationIgnored var progressiveBufferFrames: AVAudioFrameCount?
+    /// The server-timed PCM stream holding the node (#0106), or nil in file playback.
+    var stream: StreamSession?
+    /// Maps render times to local µs for the stream; tests in offline rendering swap in a sample clock.
+    @ObservationIgnored var streamRenderClock: any StreamRenderClock = HostStreamRenderClock()
+    /// Output latency the stream adds to render times, read when the stream begins and after output changes.
+    @ObservationIgnored var streamLatencySeconds: Double = 0
     @ObservationIgnored private var preloadTask: Task<Void, Never>?
     @ObservationIgnored var loadTask: Task<Void, Never>?
     /// What the in-flight (or last) load should do when the file opens: play, or park paused.
     /// Play, pause and toggle flip it while `state == .loading`.
     @ObservationIgnored private(set) var autoplayAfterLoad = true
-    @ObservationIgnored private var timeTask: Task<Void, Never>?
+    @ObservationIgnored var timeTask: Task<Void, Never>?
     @ObservationIgnored private var configTask: Task<Void, Never>?
     @ObservationIgnored private var outputTask: Task<Void, Never>?
     @ObservationIgnored let outputDevices: any OutputDeviceProvider
@@ -176,7 +182,7 @@ public final class Player: NowPlayingCommandTarget {
         let removingCurrent = queue.currentIndex == index
         if removingCurrent { currentTime = 0 }   // before the queue change publishes the new track
         queue.remove(at: index)
-        if removingCurrent && state != .stopped {
+        if removingCurrent && state != .stopped && stream == nil {
             // Keep the transport intent: a paused player parks on the new current track at 0:00,
             // and a load in flight keeps whatever play/pause intent it has accumulated.
             let autoplay = state == .loading ? autoplayAfterLoad : state == .playing
@@ -195,7 +201,7 @@ public final class Player: NowPlayingCommandTarget {
         let removingCurrent = queue.currentIndex.map { valid.contains($0) } ?? false
         if removingCurrent { currentTime = 0 }   // before the queue change publishes the new track
         queue.remove(at: valid)
-        if removingCurrent && state != .stopped {
+        if removingCurrent && state != .stopped && stream == nil {
             let autoplay = state == .loading ? autoplayAfterLoad : state == .playing
             if queue.current != nil { startCurrentTrack(autoplay: autoplay) } else { stop() }
         } else {
@@ -240,13 +246,14 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func clearQueue() {
-        stop()
+        if stream == nil { stop() }   // a server stream keeps playing; only the local list empties
         queue.removeAll()
     }
 
     // MARK: Transport
 
     public func play() {
+        preemptStreamIfNeeded()
         switch state {
         case .playing:
             return
@@ -279,6 +286,8 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func pause() {
+        // A server-timed stream cannot be paused locally.
+        if preemptStreamIfNeeded() { return }
         switch state {
         case .playing:
             updateCurrentTime()
@@ -304,6 +313,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func stop() {
+        if stream != nil { endStream() }
         consecutiveFailures = 0
         loadTask?.cancel()
         timeTask?.cancel()
@@ -317,6 +327,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func next() {
+        preemptStreamIfNeeded()
         currentTime = 0   // before the queue change publishes the new track
         if queue.next() != nil {
             startCurrentTrack()
@@ -326,6 +337,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func previous() {
+        preemptStreamIfNeeded()
         currentTime = 0   // before the queue change publishes the new track
         if queue.previous() != nil {
             startCurrentTrack()
@@ -335,6 +347,7 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     public func seek(to seconds: TimeInterval) {
+        preemptStreamIfNeeded()
         if let progressive {
             seekProgressive(progressive, to: seconds)
             return
@@ -364,6 +377,7 @@ public final class Player: NowPlayingCommandTarget {
 
     /// `autoplay: false` loads the track and parks it paused at 0:00 instead of starting it.
     func startCurrentTrack(autoplay: Bool = true) {
+        preemptStreamIfNeeded()
         guard let track = queue.current else {
             stop()
             return
@@ -549,6 +563,10 @@ public final class Player: NowPlayingCommandTarget {
     // MARK: Time
 
     func updateCurrentTime() {
+        if stream != nil {
+            updateStreamTime()
+            return
+        }
         guard file != nil || progressive != nil, let node = _graph?.playerNode,
               let renderTime = node.lastRenderTime,
               // Invalid before the first render (offline mode, or just after a restart); passing it
@@ -657,6 +675,15 @@ public final class Player: NowPlayingCommandTarget {
         // Read the position while the node still has a render time (the listener path leaves the engine running).
         if state == .playing { updateCurrentTime() }
         graph.stopEngine()   // also when the engine stopped itself already (no-op)
+        if stream != nil {
+            do {
+                try graph.start()
+                restartStreamAfterOutputChange(graph)   // the next chunk re-anchors at the new rate and latency
+            } catch {
+                fail(error)
+            }
+            return
+        }
         // Stopped, or loading a complete file: nothing is scheduled; the next start() (play / begin) binds
         // and connects. A progressive track waiting for its preroll is the exception: its feeder is already
         // scheduling, and its first buffer would start a node whose engine has stopped.
@@ -724,6 +751,12 @@ public enum PlayerEvent: Sendable {
     case stateChanged(PlaybackState)
     case seeked(TimeInterval)
     case failed(PlaybackFailure)
+    /// A server-timed stream took the node (`beginStream`).
+    case streamStarted
+    /// The stream stopped (`endStream`, or local transport preempting it).
+    case streamEnded
+    /// Local transport ended the stream; the bridge should tell the server to stop sending.
+    case streamPreempted
 }
 
 /// One track that could not be resolved or opened, or an engine failure. `skipped` says the player moved on

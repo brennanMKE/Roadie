@@ -27,12 +27,17 @@ public struct OutputDeviceDescription: Sendable, Equatable {
     /// `kAudioDevicePropertyTransportType` as text ("AirPlay", "Built-in", ...).
     public let transport: String
     public let nominalSampleRate: Double
+    /// Output latency plus safety offset (output scope), in seconds; 0 when unknown.
+    public let latencySeconds: Double
 
-    public init(id: AudioDeviceID, name: String, transport: String, nominalSampleRate: Double) {
+    public init(
+        id: AudioDeviceID, name: String, transport: String, nominalSampleRate: Double, latencySeconds: Double = 0
+    ) {
         self.id = id
         self.name = name
         self.transport = transport
         self.nominalSampleRate = nominalSampleRate
+        self.latencySeconds = latencySeconds
     }
 }
 
@@ -152,9 +157,18 @@ public struct SystemOutputDeviceProvider: OutputDeviceProvider {
         size = UInt32(MemoryLayout<Float64>.size)
         _ = AudioObjectGetPropertyData(object, &rateAddress, 0, nil, &size, &rate)
 
+        var latencyFrames: UInt32 = 0
+        for selector in [kAudioDevicePropertyLatency, kAudioDevicePropertySafetyOffset] {
+            var address = AudioObjectPropertyAddress(
+                mSelector: selector, mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+            var frames: UInt32 = 0
+            size = UInt32(MemoryLayout<UInt32>.size)
+            if AudioObjectGetPropertyData(object, &address, 0, nil, &size, &frames) == noErr { latencyFrames += frames }
+        }
+
         return OutputDeviceDescription(
             id: device, name: name.takeRetainedValue() as String, transport: Self.transportName(transport),
-            nominalSampleRate: rate)
+            nominalSampleRate: rate, latencySeconds: rate > 0 ? Double(latencyFrames) / rate : 0)
     }
 
     static func transportName(_ type: UInt32) -> String {
