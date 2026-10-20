@@ -614,7 +614,7 @@ extension SettingsModelTests {
         defer { rig.cleanUp() }
         try rig.tokens(for: a).save(testToken)
         let moved = URL(string: "http://homeassistant.local:8095")!
-        rig.model.adoptDiscoveredAddress(moved, for: a.id)
+        rig.model.adoptDiscoveredAddress(moved, for: a.id, serverID: "id-a")
         let stored = rig.store.load()
         #expect(stored.count == 2)
         #expect(stored[0].id == a.id)
@@ -626,5 +626,17 @@ extension SettingsModelTests {
         #expect(rig.tokens(for: a).token == testToken)
         #expect(rig.tokens(for: a).deletes == 0)
         #expect(rig.hookCalls == 1)
+    }
+
+    @Test func adoptDiscoveredAddressIgnoresAServerIDMismatch() throws {
+        let a = makeServer("http://10.0.0.5:8095", id: "id-a", name: "A")
+        let b = makeServer("http://192.168.1.20:8095", id: nil, name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        let moved = URL(string: "http://homeassistant.local:8095")!
+        rig.model.adoptDiscoveredAddress(moved, for: a.id, serverID: "id-other")
+        rig.model.adoptDiscoveredAddress(moved, for: b.id, serverID: "id-b")
+        #expect(rig.store.load() == [a, b])
+        #expect(rig.hookCalls == 0)
     }
 }

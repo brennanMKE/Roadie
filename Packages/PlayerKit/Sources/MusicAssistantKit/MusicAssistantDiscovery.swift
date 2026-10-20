@@ -113,7 +113,7 @@ public final class MusicAssistantDiscoveryModel: CustomStringConvertible, Custom
     public private(set) var hasSearched = false
 
     /// A configured server answered at another address and its stored address did not answer as it.
-    @ObservationIgnored public var onConfiguredServerMoved: (@MainActor (_ id: UUID, _ url: URL) -> Void)?
+    @ObservationIgnored public var onConfiguredServerMoved: (@MainActor (_ id: UUID, _ serverID: String, _ url: URL) -> Void)?
 
     /// No I/O here.
     public init(
@@ -135,6 +135,21 @@ public final class MusicAssistantDiscoveryModel: CustomStringConvertible, Custom
     public func start() {
         users += 1
         guard users == 1 else { return }
+        beginSearch()
+    }
+
+    /// Starts a fresh search for whoever already called `start()`; does nothing when no one has, or while a search is
+    /// running.
+    public func searchAgain() {
+        guard users > 0, !isSearching else { return }
+        browseTask?.cancel()
+        browseTask = nil
+        for task in probeTasks.values { task.cancel() }
+        probeTasks = [:]
+        beginSearch()
+    }
+
+    private func beginSearch() {
         generation += 1
         probed = []
         found = []
@@ -214,7 +229,7 @@ public final class MusicAssistantDiscoveryModel: CustomStringConvertible, Custom
         case .storedCheck(let id, let serverID, let newURL):
             guard info?.serverID != serverID else { return }
             moved += 1
-            onConfiguredServerMoved?(id, newURL)
+            onConfiguredServerMoved?(id, serverID, newURL)
         case .discovered(let order):
             guard let info else { return }
             answered += 1

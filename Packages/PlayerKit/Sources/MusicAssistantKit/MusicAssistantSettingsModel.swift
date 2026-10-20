@@ -204,11 +204,14 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
     }
 
     /// The same server answered at `url` and its stored address did not: move the row there, keeping its id, token,
-    /// name and networks. The selection re-checks through `onServersChanged`.
-    public func adoptDiscoveredAddress(_ url: URL, for id: UUID) {
+    /// name and networks. Changes nothing unless the row's stored `server_id` equals `serverID`. The selection re-checks
+    /// through `onServersChanged`.
+    public func adoptDiscoveredAddress(_ url: URL, for id: UUID, serverID: String) {
         commitEdits()
         servers = store.load()
-        guard let index = servers.firstIndex(where: { $0.id == id }), servers[index].address.baseURL != url else { return }
+        guard let index = servers.firstIndex(where: { $0.id == id }), servers[index].address.serverID == serverID,
+            servers[index].address.baseURL != url
+        else { return }
         servers[index].address.baseURL = url
         persist()
         if id == selection { loadDraft() }

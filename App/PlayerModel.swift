@@ -377,8 +377,8 @@ final class PlayerModel {
         }
         skinLibrary.passFinished = { [weak self] in self?.skinBrowser.indexDidChange() }
         musicAssistantSettings.onServersChanged = { [weak selection] in selection?.serversEdited() }
-        musicAssistantDiscovery.onConfiguredServerMoved = { [weak settings = musicAssistantSettings] id, url in
-            settings?.adoptDiscoveredAddress(url, for: id)
+        musicAssistantDiscovery.onConfiguredServerMoved = { [weak settings = musicAssistantSettings] id, serverID, url in
+            settings?.adoptDiscoveredAddress(url, for: id, serverID: serverID)
         }
         selection.onChange = { [weak self] old, new in
             self?.sendspinController.serverChanged()

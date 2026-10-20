@@ -79,7 +79,7 @@ final class DiscoveryRig {
     let browser = StubServiceBrowser()
     let clock = ManualClock()
     let model: MusicAssistantDiscoveryModel
-    var moves: [(UUID, URL)] = []
+    var moves: [(UUID, String, URL)] = []
 
     static let wellKnown = URL(string: "http://homeassistant.local:8095")!
 
@@ -88,7 +88,7 @@ final class DiscoveryRig {
         store = MusicAssistantServerStore(defaults: defaults)
         store.save(servers)
         model = MusicAssistantDiscoveryModel(store: store, browser: browser, fetch: fake.fetcher, clock: clock)
-        model.onConfiguredServerMoved = { [unowned self] in moves.append(($0, $1)) }
+        model.onConfiguredServerMoved = { [unowned self] in moves.append(($0, $1, $2)) }
     }
 
     func cleanUp() { defaults.removePersistentDomain(forName: suite) }
@@ -102,6 +102,43 @@ final class DiscoveryRig {
 
 @MainActor
 struct DiscoveryModelTests {
+    @Test func searchAgainProbesAfreshAfterAnEmptySearch() async throws {
+        let rig = DiscoveryRig()
+        defer { rig.cleanUp() }
+        rig.fake.set("http://homeassistant.local:8095", .fail)
+        rig.model.start()
+        await rig.settle(calls: 1)
+        #expect(rig.model.hasSearched)
+        #expect(!rig.model.isSearching)
+        #expect(rig.model.offers.isEmpty)
+        rig.fake.set("http://homeassistant.local:8095", .answer("id-x"))
+        rig.model.searchAgain()
+        await rig.settle(calls: 2)
+        #expect(rig.fake.calls.count == 2)
+        #expect(rig.model.offers.count == 1)
+        #expect(rig.model.offers.first?.id == "id-x")
+        #expect(rig.browser.started == 2)
+        #expect(await pollUntil { rig.browser.terminated == 1 })
+        rig.model.stop()
+        #expect(await pollUntil { rig.browser.terminated == 2 })
+    }
+
+    @Test func searchAgainDoesNothingWithoutStartOrWhileSearching() async throws {
+        let rig = DiscoveryRig()
+        defer { rig.cleanUp() }
+        rig.model.searchAgain()
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(rig.fake.calls.isEmpty)
+        #expect(rig.browser.started == 0)
+        rig.fake.set("http://homeassistant.local:8095", .hang)
+        rig.model.start()
+        #expect(await pollUntil { rig.fake.calls.count == 1 })
+        rig.model.searchAgain()
+        #expect(rig.browser.started == 1)
+        #expect(rig.fake.cancelled.isEmpty)
+        rig.model.stop()
+    }
+
     @Test func initAndNoStartDoNoIO() async throws {
         let rig = DiscoveryRig()
         defer { rig.cleanUp() }
@@ -196,7 +233,8 @@ struct DiscoveryModelTests {
         await rig.settle(calls: 2)
         #expect(rig.moves.count == 1)
         #expect(rig.moves.first?.0 == server.id)
-        #expect(rig.moves.first?.1 == DiscoveryRig.wellKnown)
+        #expect(rig.moves.first?.1 == "id-x")
+        #expect(rig.moves.first?.2 == DiscoveryRig.wellKnown)
         #expect(rig.model.offers.isEmpty)
         rig.model.stop()
     }

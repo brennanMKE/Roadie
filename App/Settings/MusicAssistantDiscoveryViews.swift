@@ -44,11 +44,14 @@ struct LibraryDiscoveryBanner: View {
                 Spacer()
                 if started && discovery.isSearching { ProgressView().controlSize(.small) }
                 Button("Find Servers on This Network") {
-                    guard !started else { return }
-                    started = true
-                    discovery.start()
+                    if started {
+                        discovery.searchAgain()
+                    } else {
+                        started = true
+                        discovery.start()
+                    }
                 }
-                .disabled(started)
+                .disabled(started && (discovery.isSearching || !discovery.hasSearched))
                 .accessibilityIdentifier("library.findServers")
             }
             if started {
