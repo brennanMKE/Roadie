@@ -215,4 +215,39 @@ final class StreamRig {
         #expect(panned.left > 0.03)
         #expect(panned.right < full.right * 0.05)
     }
+
+    @Test func underrunReanchorsTheNextChunkAtItsPresentationTime() async throws {
+        let rig = try StreamRig()
+        try rig.player.beginStream(rig.format)
+        rig.append(5, hz: 441, amplitude: 0.5)   // 100 ms
+        try await rig.render(blocks: 20)          // runs dry at ~4 410 frames
+        let now = rig.nowMicros
+        let nowFrame = Int((Double(now) / 1e6 * StreamRig.rate).rounded())
+        rig.append(15, from: 100_000, hz: 441, amplitude: 0.5, firstIndex: 5)
+        #expect(rig.player.stream?.underruns == 1)
+        try await rig.render(blocks: Int(0.4 * StreamRig.rate) / 512 + 4 - 20)
+        let last = try #require(rig.left.lastIndex { abs($0) > 1e-3 })   // past the filters' decaying tail
+        #expect(abs(last - Int(0.4 * StreamRig.rate)) <= 512)
+        let resumed = try #require(rig.left[10_240...].firstIndex { abs($0) > 1e-3 })
+        #expect(abs(resumed - nowFrame) <= 512)
+        rig.player.endStream()
+    }
+
+    @Test func longGapIsReanchoredWithoutASilenceBuffer() async throws {
+        let rig = try StreamRig()
+        try rig.player.beginStream(rig.format)
+        rig.append(5, hz: 441, amplitude: 0.5)
+        rig.append(5, from: 2_000_000, hz: 441, amplitude: 0.5, firstIndex: 5)
+        let session = try #require(rig.player.stream)
+        #expect(session.pendingBuffers == 10)
+        #expect(abs(session.scheduledNodeFrames - Int64((2.1 * StreamRig.rate).rounded())) <= 2)
+        try await rig.render(blocks: Int(2.1 * StreamRig.rate) / 512 + 4)
+        let firstEnd = try #require(rig.left[..<20_000].lastIndex { abs($0) > 1e-3 })
+        #expect(abs(firstEnd - 4_410) <= 512)
+        #expect(rig.left[5_000..<87_000].allSatisfy { abs($0) < 1e-4 })
+        let onset = try #require(rig.left[5_000...].firstIndex { abs($0) > 1e-3 })
+        #expect(abs(onset - 88_200) <= 512)
+        #expect(rig.player.stream?.underruns == 0)
+        rig.player.endStream()
+    }
 }

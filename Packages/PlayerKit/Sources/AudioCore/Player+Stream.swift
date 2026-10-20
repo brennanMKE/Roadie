@@ -23,6 +23,8 @@ final class StreamSession {
     var pendingCorrections: [(frame: Int64, skew: Double)] = []
     /// The last measured sync error (µs), for logs and tests.
     var lastErrorMicros: Int64?
+    /// Underruns seen (the node played everything scheduled before the next chunk). Cumulative; diagnostic.
+    var underruns = 0
 
     init(format: StreamFormat, decoder: PCMStreamDecoder) {
         self.format = format
@@ -90,19 +92,37 @@ extension Player {
         guard frames > 0 else { return }
         let rate = session.format.sampleRate
         let now = streamRenderClock.nowMicros() + Int64((streamLatencySeconds * 1e6).rounded())
+        // Underrun (#0112): the node played past everything scheduled, so its sample clock no longer maps to
+        // stream time. Re-anchor so this chunk plays at its presentation time.
+        if session.timeline.anchorMicros != nil, session.scheduledNodeFrames > 0,
+           let played = streamPlayerSample(graph), played.sample >= session.scheduledNodeFrames {
+            session.underruns += 1
+            log.notice("stream underrun at node frame \(played.sample, privacy: .public): re-anchoring")
+            session.timeline.reset()
+        }
         switch session.timeline.place(chunk.presentationMicros, frames: frames, nowMicros: now, rate: rate) {
         case .late:
             log.debug("stream chunk late, dropped (\(session.timeline.lateChunks, privacy: .public) so far)")
         case .start(let at, let drop):
             startStream(session, graph: graph, pcm: chunk.pcm, at: at, dropLeading: drop, nodeRate: nodeRate)
         case .gap(_, let silenceMicros):
-            log.info("stream gap of \(silenceMicros, privacy: .public) µs, filled with silence")
-            let silenceFrames = AVAudioFrameCount(max(0, Double(silenceMicros) * nodeRate / 1e6).rounded())
-            if silenceFrames > 0, let silence = AVAudioPCMBuffer(pcmFormat: session.decoder.outputFormat, frameCapacity: silenceFrames) {
-                silence.frameLength = silenceFrames   // zero-filled
-                scheduleStreamBuffer(silence, session: session, graph: graph)
+            if silenceMicros <= session.timeline.policy.snapMicros {
+                log.info("stream gap of \(silenceMicros, privacy: .public) µs, filled with silence")
+                let silenceFrames = AVAudioFrameCount(max(0, Double(silenceMicros) * nodeRate / 1e6).rounded())
+                if silenceFrames > 0, let silence = AVAudioPCMBuffer(pcmFormat: session.decoder.outputFormat, frameCapacity: silenceFrames) {
+                    silence.frameLength = silenceFrames   // zero-filled
+                    scheduleStreamBuffer(silence, session: session, graph: graph)
+                }
+                if let buffer = session.decoder.decode(chunk.pcm) { scheduleStreamBuffer(buffer, session: session, graph: graph) }
+            } else {
+                // Long gap (#0112): no silence buffer; schedule the chunk at its own node sample.
+                let startFrame = session.scheduledNodeFrames + Int64((Double(silenceMicros) * nodeRate / 1e6).rounded())
+                log.notice("stream gap of \(silenceMicros, privacy: .public) µs: re-anchored at node frame \(startFrame, privacy: .public)")
+                if let buffer = session.decoder.decode(chunk.pcm) {
+                    scheduleStreamBuffer(buffer, session: session, graph: graph,
+                                         at: AVAudioTime(sampleTime: startFrame, atRate: nodeRate), startFrame: startFrame)
+                }
             }
-            if let buffer = session.decoder.decode(chunk.pcm) { scheduleStreamBuffer(buffer, session: session, graph: graph) }
         case .overlap(let drop):
             if let buffer = session.decoder.decode(chunk.pcm, dropLeading: drop) {
                 scheduleStreamBuffer(buffer, session: session, graph: graph)
@@ -184,11 +204,14 @@ extension Player {
         startTimeUpdates()
     }
 
-    private func scheduleStreamBuffer(_ buffer: AVAudioPCMBuffer, session: StreamSession, graph: AudioGraph) {
+    private func scheduleStreamBuffer(
+        _ buffer: AVAudioPCMBuffer, session: StreamSession, graph: AudioGraph,
+        at time: AVAudioTime? = nil, startFrame: Int64? = nil
+    ) {
         let generation = session.generation
         session.pendingBuffers += 1
-        session.scheduledNodeFrames += Int64(buffer.frameLength)
-        graph.playerNode.scheduleBuffer(buffer, at: nil, options: [], completionCallbackType: .dataPlayedBack) { [weak self] _ in
+        session.scheduledNodeFrames = (startFrame ?? session.scheduledNodeFrames) + Int64(buffer.frameLength)
+        graph.playerNode.scheduleBuffer(buffer, at: time, options: [], completionCallbackType: .dataPlayedBack) { [weak self] _ in
             Task { @MainActor in self?.streamBufferFinished(generation) }
         }
     }
