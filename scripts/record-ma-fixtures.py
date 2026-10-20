@@ -139,7 +139,7 @@ class Closed(Exception):
 
 
 class WS:
-    def __init__(self, base, transcript, token):
+    def __init__(self, base, transcript, token, path="/ws"):
         self.transcript = transcript
         self.token = token
         self.pings = 0
@@ -154,8 +154,8 @@ class WS:
             sock = TLS.wrap_socket(sock, server_hostname=u.hostname)
         self.sock = sock
         key = base64.b64encode(os.urandom(16)).decode()
-        req = ("GET %s/ws HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-               "Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n" % (u.path.rstrip("/"), u.netloc, key))
+        req = ("GET %s%s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+               "Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n" % (u.path.rstrip("/"), path, u.netloc, key))
         sock.sendall(req.encode())
         head = b""
         deadline = time.time() + 10

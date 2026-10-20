@@ -1,0 +1,348 @@
+{
+  "client": {
+    "client_id": "skinamp-probe",
+    "name": "SkinAmp probe"
+  },
+  "clock": {
+    "offset_spread_us": 262,
+    "rtt_us": [
+      922,
+      1112,
+      1187,
+      1213,
+      2011
+    ],
+    "samples": 5
+  },
+  "direct_8927_tcp": true,
+  "frames": [
+    {
+      "dir": "out",
+      "frame": {
+        "client_id": "skinamp-probe",
+        "token": "<redacted>",
+        "type": "auth"
+      },
+      "t": 0.0
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "type": "auth_ok"
+      },
+      "t": 0.004
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_id": "skinamp-probe",
+          "device_info": {
+            "manufacturer": "SkinAmp",
+            "product_name": "SkinAmp",
+            "software_version": "probe"
+          },
+          "name": "SkinAmp probe",
+          "player@v1_support": {
+            "buffer_capacity": 1048576,
+            "supported_commands": [
+              "volume",
+              "mute"
+            ],
+            "supported_formats": [
+              {
+                "bit_depth": 16,
+                "channels": 2,
+                "codec": "pcm",
+                "sample_rate": 48000
+              }
+            ]
+          },
+          "supported_roles": [
+            "player@v1"
+          ],
+          "version": 1
+        },
+        "type": "client/hello"
+      },
+      "t": 0.004
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "active_roles": [
+            "player@v1"
+          ],
+          "connection_reason": "discovery",
+          "name": "Music Assistant",
+          "server_id": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "version": 1
+        },
+        "type": "server/hello"
+      },
+      "t": 0.007
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 159628
+        },
+        "type": "client/time"
+      },
+      "t": 0.007
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 159628,
+          "server_received": 2187807000949,
+          "server_transmitted": 2187807001065
+        },
+        "type": "server/time"
+      },
+      "t": 0.008
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 160959
+        },
+        "type": "client/time"
+      },
+      "t": 0.008
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 160959,
+          "server_received": 2187807002228,
+          "server_transmitted": 2187807002290
+        },
+        "type": "server/time"
+      },
+      "t": 0.009
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 162134
+        },
+        "type": "client/time"
+      },
+      "t": 0.009
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 162134,
+          "server_received": 2187807003428,
+          "server_transmitted": 2187807003485
+        },
+        "type": "server/time"
+      },
+      "t": 0.011
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 163379
+        },
+        "type": "client/time"
+      },
+      "t": 0.011
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 163379,
+          "server_received": 2187807004523,
+          "server_transmitted": 2187807004562
+        },
+        "type": "server/time"
+      },
+      "t": 0.012
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "client_transmitted": 164341
+        },
+        "type": "client/time"
+      },
+      "t": 0.012
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "client_transmitted": 164341,
+          "server_received": 2187807006292,
+          "server_transmitted": 2187807006441
+        },
+        "type": "server/time"
+      },
+      "t": 0.014
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "available": true,
+          "player": {
+            "min_buffer_ms": 200,
+            "muted": false,
+            "required_lead_time_ms": 500,
+            "static_delay_ms": 0,
+            "supported_commands": [],
+            "volume": 50
+          }
+        },
+        "type": "client/state"
+      },
+      "t": 0.014
+    },
+    {
+      "dir": "in",
+      "frame": {
+        "payload": {
+          "group_id": "ef74e639-9323-41f2-aab1-e2752d8eac22",
+          "playback_state": "stopped"
+        },
+        "type": "group/update"
+      },
+      "t": 0.017
+    },
+    {
+      "dir": "out",
+      "frame": {
+        "payload": {
+          "reason": "user_request"
+        },
+        "type": "client/goodbye"
+      },
+      "t": 6.022
+    }
+  ],
+  "info": {
+    "schema_version": 65,
+    "server_version": "2.10.6"
+  },
+  "player_after": {
+    "available": false,
+    "listed": true
+  },
+  "player_during": {
+    "active_group": null,
+    "active_output_protocol": null,
+    "active_sound_mode": null,
+    "active_source": "up7ffe1fc2",
+    "active_source_audio": null,
+    "available": true,
+    "can_group_with": [
+      "ap223aed81fe30",
+      "ap0a3090605b50",
+      "up417d3c77",
+      "ap720a998fd71d",
+      "upd9b597ac",
+      "ap82fe09484ac9",
+      "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    ],
+    "current_media": null,
+    "device_info": {
+      "identifiers": {},
+      "ip_address": null,
+      "mac_address": null,
+      "manufacturer": "SkinAmp",
+      "manufacturer_id": null,
+      "model": "SkinAmp",
+      "model_id": null,
+      "software_version": null
+    },
+    "display_name": "user",
+    "elapsed_time": null,
+    "elapsed_time_last_updated": null,
+    "enabled": true,
+    "expose_to_ha": true,
+    "extra_attributes": {},
+    "extra_data": {},
+    "group_childs": [],
+    "group_members": [],
+    "group_volume": 50,
+    "group_volume_muted": false,
+    "has_setup_flow": false,
+    "hide_in_ui": false,
+    "hide_player_in_ui": [
+      "when_unavailable",
+      "when_synced",
+      "when_group_active"
+    ],
+    "icon": "speaker",
+    "mute_control": "skinamp-probe",
+    "name": "SkinAmp probe",
+    "needs_setup": false,
+    "options": [],
+    "output_protocols": [
+      {
+        "available": true,
+        "derived_from": null,
+        "is_native": false,
+        "name": "Sendspin",
+        "output_protocol_id": "skinamp-probe",
+        "priority": 40,
+        "protocol_domain": "sendspin"
+      }
+    ],
+    "playback_state": "idle",
+    "player_id": "up7ffe1fc2",
+    "power_control": "none",
+    "powered": true,
+    "private": false,
+    "provider": "universal_player",
+    "setup_reason": null,
+    "sleep_timer_expires_at": null,
+    "sound_mode_list": [],
+    "source_list": [
+      {
+        "account_id": null,
+        "can_next_previous": false,
+        "can_play_pause": false,
+        "can_repeat": false,
+        "can_seek": false,
+        "can_shuffle": false,
+        "id": "up7ffe1fc2",
+        "name": "Music Assistant Queue",
+        "passive": false,
+        "repeat_mode": null,
+        "shuffle_enabled": null
+      }
+    ],
+    "state": "idle",
+    "static_group_members": [],
+    "supported_features": [
+      "volume_mute",
+      "volume_set",
+      "set_members"
+    ],
+    "synced_to": null,
+    "type": "player",
+    "volume_control": "skinamp-probe",
+    "volume_level": 50,
+    "volume_muted": false
+  },
+  "players_before": {
+    "count": 12,
+    "probe_listed": true
+  },
+  "proxy_auth_ok": true,
+  "stream_started": false
+}
