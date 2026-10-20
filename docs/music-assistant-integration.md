@@ -121,7 +121,7 @@ Recorded in the notes: `players/all`, the `players/cmd/*` transport commands, `m
 - Artwork: items carry `metadata.images[].proxy_id`; fetch `/imageproxy/<proxy_id>?size=<0|80|160|256|512|1024>` with no credentials (recorded in the notes).
 
 ### Discovery
-- The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060); there is no discovery; Settings › Music Assistant takes a manual address (#0063).
+- The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060). SkinAmp finds servers by browsing `_home-assistant._tcp` and `_sendspin-server._tcp` (and `_music-assistant._tcp`), plus `homeassistant.local`, and probing `http://<host>:8095/info` (#0104, below). A manual address still works (#0063).
 - Address rules (#0063): App Transport Security stays at the local-network exemption, so plain `http`/`ws` works for `.local` names, unqualified names and IP addresses (Tailscale `100.x` included). Any other address, a public DNS name or a Tailscale MagicDNS `*.ts.net` name, must be `https` (reached as `wss`), for example through `tailscale serve`. A bare non-local host defaults to `https`.
 
 ### Reference implementations worth reading
@@ -190,6 +190,14 @@ Acceptance for milestone 1 (steps 1 to 5): with the Mac on the home LAN, the app
 - **When.** Never at launch. The first resolution happens when the Library connects or #0067 probes Music Assistant. After that: a network path change (`NWPathMonitor`, debounced 2 s), a Settings edit, the Mac waking, a client that failed or kept reconnecting for more than 10 s, or a browse failure. The same winner causes no reload; a new winner disconnects and reloads the Library (or lets #0067 restore Music Assistant). Playback on This Mac is never touched. None reachable: #0067 falls back to the local folder. Renaming a server only relabels the winner and the reason, with no re-check, and the Library subtitle leaves out the reason until the first check (#0092).
 - **Wi-Fi name.** macOS returns it only with Location access. SkinAmp asks only when the user presses "Use Current Network" (the app has the `com.apple.security.personal-information.location` entitlement, needed under the hardened runtime). Without access, the order is the list order and the probe decides.
 - **Privacy.** The "why" text ("Home — on network X", "Studio — via Tailscale", "No Music Assistant server reachable") is UI only. Logs carry decision kinds and counts, never a name, address, network name, server id or token.
+
+### Discovery (#0104)
+
+- **When.** Only while Settings › Music Assistant is on screen, or after **Find Servers on This Network** in the Library's "no server reachable" state. Never at launch, so the Local Network prompt follows a user action.
+- **Where.** `homeassistant.local`, plus Bonjour browses for `_home-assistant._tcp` (host from the TXT `internal_url`/`base_url`, else the resolved address), `_sendspin-server._tcp` (Music Assistant's own Sendspin server; finds standalone installs) and `_music-assistant._tcp` (its advertised port). Each host local to ATS becomes `http://<host>:8095` and gets one unauthenticated `/info` probe (3 s). No token is ever sent.
+- **Offers.** A `server_id` that matches no stored server and a URL that matches no stored row is offered; **Add** creates an untested row (no `server_id`), and the user pastes the token and presses Test Connection as before.
+- **Moved servers.** A configured server answering at another address is not offered. If it is the only row with that id, its address is plain `http` and not Tailscale, and its stored address no longer answers as it, the row's address is replaced by the discovered one (id, token, name and networks kept) and the selection re-checks.
+- **Privacy.** Logs carry counts only (`probed`, `answered`, `offered`, `moved`), never a host, address, name, TXT value or server id. `NSBonjourServices` lists the three types.
 
 ## Sources
 - HA integration: https://www.home-assistant.io/integrations/music_assistant/

@@ -49,8 +49,21 @@ struct LibraryWindowView: View {
         return base
     }
 
-    @ViewBuilder
+    /// #0104: no Music Assistant server in use while it is the preferred source (none configured or none reachable).
+    private var showsDiscovery: Bool {
+        player.sources.preferredID == player.musicAssistant.sourceID && player.musicAssistantSelection.current == nil
+            && !(player.sources.selectedID == player.musicAssistant.sourceID && player.library.connection == .connected)
+    }
+
     private func contentColumn(_ library: LibraryBrowserModel) -> some View {
+        contentList(library)
+            .safeAreaInset(edge: .bottom) {
+                if showsDiscovery { LibraryDiscoveryBanner() }
+            }
+    }
+
+    @ViewBuilder
+    private func contentList(_ library: LibraryBrowserModel) -> some View {
         if library.connection != .connected {
             LibraryStatusView(library: library)
         } else if library.isSearching {

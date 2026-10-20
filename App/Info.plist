@@ -38,6 +38,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_home-assistant._tcp</string>
+		<string>_music-assistant._tcp</string>
+		<string>_sendspin-server._tcp</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>SkinAmp connects to your Music Assistant server on your local network to browse and play your music.</string>
 	<key>NSLocationUsageDescription</key>

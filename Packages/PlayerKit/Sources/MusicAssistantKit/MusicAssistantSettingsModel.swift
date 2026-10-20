@@ -184,6 +184,37 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
         log.info("server added: \(self.servers.count) now")
     }
 
+    // MARK: Discovery (#0104)
+
+    /// Adds a server found on the network as an untested row (no `serverID`: Test Connection learns it) and selects
+    /// it. A row with the same address or id is selected instead. Works when Settings never appeared.
+    public func addDiscoveredServer(_ found: MusicAssistantDiscoveredServer) {
+        commitEdits()
+        servers = store.load()
+        if let existing = servers.first(where: { $0.address.baseURL == found.url || $0.address.serverID == found.id }) {
+            select(existing.id)
+            return
+        }
+        let name = found.name.flatMap { $0.isEmpty ? nil : $0 } ?? MusicAssistantServerConfiguration.defaultName
+        let server = MusicAssistantServerConfiguration(name: name, address: MusicAssistantServerAddress(baseURL: found.url))
+        servers.append(server)
+        persist()
+        select(server.id)
+        log.info("discovered server added: \(self.servers.count) now")
+    }
+
+    /// The same server answered at `url` and its stored address did not: move the row there, keeping its id, token,
+    /// name and networks. The selection re-checks through `onServersChanged`.
+    public func adoptDiscoveredAddress(_ url: URL, for id: UUID) {
+        commitEdits()
+        servers = store.load()
+        guard let index = servers.firstIndex(where: { $0.id == id }), servers[index].address.baseURL != url else { return }
+        servers[index].address.baseURL = url
+        persist()
+        if id == selection { loadDraft() }
+        log.info("server address updated from discovery")
+    }
+
     public func removeServer(_ id: UUID) {
         guard let index = servers.firstIndex(where: { $0.id == id }) else { return }
         let wasSelected = id == selection

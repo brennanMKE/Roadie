@@ -1,5 +1,5 @@
 #!/bin/zsh
-# check-info-plist.sh — assert the app's Info.plist carries the networking keys (#0012, #0063), the location descriptions (#0075)
+# check-info-plist.sh — assert the app's Info.plist carries the networking keys (#0012, #0063), the location descriptions (#0075), NSBonjourServices (#0104)
 # and still carries the .wsz type (#0047) and claims it as a document type (#0043). Reads only; runs on the host against the
 # regenerated App/Info.plist and in the guest against the built SkinAmp.app.
 # Usage: scripts/check-info-plist.sh <path/to/Info.plist>
@@ -21,7 +21,11 @@ absent NSAppTransportSecurity.NSAllowsArbitraryLoads
 absent NSAppTransportSecurity.NSAllowsArbitraryLoadsInWebContent
 absent NSAppTransportSecurity.NSAllowsArbitraryLoadsForMedia
 absent NSAppTransportSecurity.NSExceptionDomains
-absent NSBonjourServices
+# #0104: discovery browses exactly these three types.
+expect NSBonjourServices.0 _home-assistant._tcp
+expect NSBonjourServices.1 _music-assistant._tcp
+expect NSBonjourServices.2 _sendspin-server._tcp
+absent NSBonjourServices.3
 desc="$(get NSLocalNetworkUsageDescription || true)"
 print -r -- "NSLocalNetworkUsageDescription = ${desc:-<absent>}"
 [[ "$desc" == *"Music Assistant"* && "$desc" != *Plex* ]] || {

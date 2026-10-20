@@ -6,6 +6,7 @@ import SwiftUI
 struct MusicAssistantSettingsView: View {
     @Environment(MusicAssistantSettingsModel.self) private var model
     @Environment(MusicAssistantSelectionController.self) private var selection
+    @Environment(MusicAssistantDiscoveryModel.self) private var discovery
     @State private var networkDraft = ""
 
     var body: some View {
@@ -52,6 +53,8 @@ struct MusicAssistantSettingsView: View {
                     }
                 }
             }
+
+            DiscoveredServersSection()
 
             if model.selected != nil {
                 Section {
@@ -103,6 +106,9 @@ struct MusicAssistantSettingsView: View {
         .formStyle(.grouped)
         .task { model.appeared() }
         .onDisappear { model.disappeared() }
+        // #0104: discovery runs only while this tab is on screen.
+        .task { discovery.start() }
+        .onDisappear { discovery.stop() }
     }
 
     /// The selected server's Wi-Fi network names (#0075).

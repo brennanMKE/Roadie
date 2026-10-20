@@ -10,6 +10,8 @@ struct SkinAmpApp: App {
             LibraryWindowView()
                 .environment(appDelegate.model)
                 .environment(appDelegate.model.fallback)
+                .environment(appDelegate.model.musicAssistantSettings)
+                .environment(appDelegate.model.musicAssistantDiscovery)
         }
         .keyboardShortcut("l")
         .defaultSize(width: 960, height: 600)
@@ -24,6 +26,7 @@ struct SkinAmpApp: App {
             SettingsView()
                 .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.musicAssistantSelection)
+                .environment(appDelegate.model.musicAssistantDiscovery)
                 .environment(appDelegate.model.folderSettings)
                 .environment(appDelegate.model.sources)
                 .environment(appDelegate.model.fallback)

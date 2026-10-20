@@ -571,3 +571,60 @@ struct SettingsModelTests {
         #expect(Mirror(reflecting: rig.model).children.isEmpty)
     }
 }
+
+// MARK: Discovery (#0104)
+
+extension SettingsModelTests {
+    @Test func addDiscoveredServerAddsAnUntestedRowAndSelectsIt() throws {
+        let a = makeServer("http://a.local:8095", name: "A")
+        let b = makeServer("http://b.local:8095", name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        let offer = MusicAssistantDiscoveredServer(id: "id-new", url: URL(string: "http://192.168.1.20:8095")!, name: "Den")
+        rig.model.addDiscoveredServer(offer)
+        let stored = rig.store.load()
+        #expect(stored.count == 3)
+        #expect(Array(stored.prefix(2)) == [a, b])
+        let added = try #require(stored.last)
+        #expect(added.address.serverID == nil)
+        #expect(added.address.baseURL == offer.url)
+        #expect(added.name == "Den")
+        #expect(rig.model.selectedID == added.id)
+        #expect(rig.hookCalls >= 1)
+        #expect(rig.tokens(for: added).saves == 0)
+        #expect(rig.tokens(for: a).saves == 0)
+    }
+
+    @Test func addDiscoveredServerSelectsTheExistingRowForTheSameAddress() throws {
+        let a = makeServer("http://a.local:8095", name: "A")
+        let b = makeServer("http://192.168.1.20:8095", id: nil, name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        rig.model.addDiscoveredServer(
+            MusicAssistantDiscoveredServer(id: "id-new", url: URL(string: "http://192.168.1.20:8095")!, name: "Den"))
+        #expect(rig.store.load() == [a, b])
+        #expect(rig.model.selectedID == b.id)
+        #expect(rig.hookCalls == 0)
+    }
+
+    @Test func adoptDiscoveredAddressMovesOnlyTheMatchingServer() throws {
+        let a = makeServer("http://10.0.0.5:8095", id: "id-a", name: "A", networks: ["Home"])
+        let b = makeServer("http://b.local:8095", id: "id-b", name: "B")
+        let rig = try SettingsRig(servers: [a, b])
+        defer { rig.cleanUp() }
+        try rig.tokens(for: a).save(testToken)
+        let moved = URL(string: "http://homeassistant.local:8095")!
+        rig.model.adoptDiscoveredAddress(moved, for: a.id)
+        let stored = rig.store.load()
+        #expect(stored.count == 2)
+        #expect(stored[0].id == a.id)
+        #expect(stored[0].address.baseURL == moved)
+        #expect(stored[0].address.serverID == "id-a")
+        #expect(stored[0].networks == ["Home"])
+        #expect(stored[0].name == "A")
+        #expect(stored[1] == b)
+        #expect(rig.tokens(for: a).token == testToken)
+        #expect(rig.tokens(for: a).deletes == 0)
+        #expect(rig.hookCalls == 1)
+    }
+}

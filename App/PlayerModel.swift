@@ -57,6 +57,8 @@ final class PlayerModel {
     let musicAssistantSettings: MusicAssistantSettingsModel
     /// Picks the reachable server automatically (#0075).
     let musicAssistantSelection: MusicAssistantSelectionController
+    /// #0104: finds servers on the current network; runs only while Settings › Music Assistant or the Library asks.
+    let musicAssistantDiscovery: MusicAssistantDiscoveryModel
     @ObservationIgnored private var maDropTask: Task<Void, Never>?
     /// Still public for the skinned window's time and spectrum bindings and for local files.
     let player: Player
@@ -280,6 +282,9 @@ final class PlayerModel {
         musicAssistantSettings = MusicAssistantSettingsModel(
             store: maStore, tokenStore: { KeychainMusicAssistantTokenStore(account: $0) }, test: MusicAssistantConnectionTest(),
             active: maActive, wifi: wifi)
+        musicAssistantDiscovery = MusicAssistantDiscoveryModel(
+            store: maStore, browser: SystemServiceBrowser(), fetch: MusicAssistantServerSelector.urlSessionFetcher,
+            clock: ContinuousClock())
         sources = LibrarySourceController(
             sources: [
                 LibrarySource(
@@ -349,6 +354,9 @@ final class PlayerModel {
         }
         skinLibrary.passFinished = { [weak self] in self?.skinBrowser.indexDidChange() }
         musicAssistantSettings.onServersChanged = { [weak selection] in selection?.serversEdited() }
+        musicAssistantDiscovery.onConfiguredServerMoved = { [weak settings = musicAssistantSettings] id, url in
+            settings?.adoptDiscoveredAddress(url, for: id)
+        }
         selection.onChange = { [weak self] old, new in self?.musicAssistantServerChanged(from: old, to: new) }
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()

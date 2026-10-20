@@ -50,6 +50,11 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: SkinAmp connects to your Music Assistant server on your local network to browse and play your music.
+        # #0104: Music Assistant discovery browses these (macOS lists them for Local Network access).
+        NSBonjourServices:
+          - _home-assistant._tcp
+          - _music-assistant._tcp
+          - _sendspin-server._tcp
         # #0075: macOS returns the Wi-Fi name only with Location access, requested only by "Use Current Network".
         NSLocationUsageDescription: SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.
         NSLocationWhenInUseUsageDescription: SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.
