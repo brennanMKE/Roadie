@@ -177,3 +177,4 @@ schemes:
         - package: PlayerKit/MusicLibraryKitTests
         - package: PlayerKit/MusicAssistantKitTests
         - package: PlayerKit/SendspinKitTests
+        - package: PlayerKit/SendspinPlaybackTests

@@ -1,4 +1,5 @@
 import AudioCore
+import SendspinPlayback
 import Testing
 @testable import LocalPlayback
 
@@ -11,5 +12,7 @@ import Testing
         #expect(stack.player.queue.tracks.isEmpty)
         #expect(stack.output.snapshot().state == .stopped)
         #expect(stack.output.subscriberCount == 0)
+        #expect(stack.sendspin.player === stack.player)
+        #expect(stack.sendspin.status == .off)
     }
 }

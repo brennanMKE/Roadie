@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "MusicAssistantKit", targets: ["MusicAssistantKit"]),
         .library(name: "MusicAssistantKitStub", targets: ["MusicAssistantKitStub"]),
         .library(name: "SendspinKit", targets: ["SendspinKit"]),
+        .library(name: "SendspinPlayback", targets: ["SendspinPlayback"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).
@@ -25,8 +26,8 @@ let package = Package(
         .target(name: "MusicBackendKit"),
         .testTarget(name: "MusicBackendKitTests", dependencies: ["MusicBackendKit"]),
         // The "This Mac" output and the stack that builds it. Shared by the folder backend and, with #0066, Music Assistant's local playback.
-        .target(name: "LocalPlayback", dependencies: ["MusicBackendKit", "AudioCore"]),
-        .testTarget(name: "LocalPlaybackTests", dependencies: ["LocalPlayback", "MusicBackendKit", "AudioCore"]),
+        .target(name: "LocalPlayback", dependencies: ["MusicBackendKit", "AudioCore", "SendspinPlayback"]),
+        .testTarget(name: "LocalPlaybackTests", dependencies: ["LocalPlayback", "MusicBackendKit", "AudioCore", "SendspinPlayback"]),
         // A local folder behind MusicBackend. Indexes Artist/Album/<tracks> with LocalTrackLoader; plays through LocalPlayback.
         .target(name: "FolderBackendKit", dependencies: ["MusicBackendKit", "LocalPlayback", "AudioCore"]),
         .testTarget(name: "FolderBackendKitTests", dependencies: ["FolderBackendKit", "MusicBackendKit", "LocalPlayback", "AudioCore"]),
@@ -48,5 +49,8 @@ let package = Package(
         // URL come in through `SendspinConnectionConfiguration`.
         .target(name: "SendspinKit"),
         .testTarget(name: "SendspinKitTests", dependencies: ["SendspinKit"], resources: [.copy("Fixtures")]),
+        // The bridge from a Sendspin session to AudioCore's stream input (#0108). Built by LocalPlaybackStack.
+        .target(name: "SendspinPlayback", dependencies: ["SendspinKit", "AudioCore"]),
+        .testTarget(name: "SendspinPlaybackTests", dependencies: ["SendspinPlayback", "SendspinKit", "AudioCore"]),
     ]
 )
