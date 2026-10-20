@@ -93,6 +93,7 @@ if (( RC == 0 )); then
   print "==> VERIFY  PASS (exit 0) ${RESULTS:t}: $(grep -c '^==> PASS' "$SUMMARY" 2>/dev/null) steps passed${total:+, $total}"
   grep -E '^==> (TIER|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null
   [[ -n "$expect_report" ]] && print -r -- "$expect_report"
+  [[ -f "$RESULTS/release/SkinAmp.app.zip" ]] && print "==> RELEASE  $RESULTS/release/SkinAmp.app.zip (scripts/make-dmg.sh packages it)"
   print "==> Results: $RESULTS"
   exit 0
 fi

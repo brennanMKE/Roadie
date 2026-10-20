@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike]
+# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike] [--dmg]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --build-only  stop after the build stage (both packages with their tests, the app; with --spike the spike too):
 #                 a quick compile check before a full run, never verification
@@ -27,6 +27,8 @@
 #   --corpus-sample N  with --corpus: only a seeded sample of N unique skins (the fast loop; 1000 is the acceptance sample)
 #   --spike  also build, test and smoke-launch the AirPlay routing spike harness (#0050): steps spike-pkg-build, spike-build, spike-tests, spike-smoke;
 #            the smoke launch constructs every engine and never plays
+#   --dmg    also build the app in the Release configuration (step app-release) and bring it back, zipped, as
+#            build/vm-tests/<run-id>/release/SkinAmp.app.zip; scripts/make-dmg.sh signs it on the host and makes the DMG
 #
 # In the guest, in order:
 #   Build stage (a failure here skips everything below and prints the compiler errors):
@@ -62,6 +64,7 @@ STRESS_FILTER=""
 STRESS_PACKAGE=""
 LOAD=0
 SPIKE=0
+DMG=0
 SKINS_DIR=""
 REFS_DIR=""
 CORPUS_DIR=""
@@ -79,6 +82,7 @@ while (( $#args )); do
     --stress-package) STRESS_PACKAGE=${args[1]:-}; shift args 2>/dev/null; [[ "$STRESS_PACKAGE" == (SkinKit|PlayerKit) ]] || { print -r -- "--stress-package needs SkinKit or PlayerKit" >&2; exit 2 } ;;
     --load) LOAD=1 ;;
     --spike) SPIKE=1 ;;
+    --dmg) DMG=1 ;;
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
     --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
     --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
@@ -386,6 +390,11 @@ elif [[ -n "$CORPUS_DIR" ]]; then
   run_step corpus-report "BIN=\$(swift build -c release --package-path Packages/SkinKit --show-bin-path)/skintool; \$BIN corpus-report $GUEST_RESULTS/corpus/results.jsonl --markdown $GUEST_RESULTS/corpus/report.md --json $GUEST_RESULTS/corpus/summary.json --env $GUEST_RESULTS/corpus/env.json --crashes $GUEST_RESULTS/corpus/crashes --sample $report_sample --seed 1"
 fi
 fi  # ! BUILD_ONLY
+
+if (( DMG )); then
+  # Release build for scripts/make-dmg.sh. Zipped with ditto so the bundle's symlinks and signature survive the tar back.
+  run_step app-release "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Release -derivedDataPath build/DerivedData-release build && mkdir -p $GUEST_RESULTS/release && ditto -c -k --keepParent build/DerivedData-release/Build/Products/Release/SkinAmp.app $GUEST_RESULTS/release/SkinAmp.app.zip"
+fi
 
 # --- Results back ----------------------------------------------------------
 
