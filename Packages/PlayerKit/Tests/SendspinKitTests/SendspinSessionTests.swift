@@ -178,4 +178,21 @@ struct SendspinSessionTests {
         #expect(abs(local - (server - transport.server.offset)) < 100)
         await session.stop(reason: .shutdown)
     }
+
+    @Test func longConnectionKeepsTrackedTasksBounded() async throws {
+        let sleeper = TestSleeper(releasedBursts: 50)
+        let (session, transport, _, _) = try await startSynchronized(sleeper: sleeper)
+        #expect(await waitFor { sleeper.sleeps.filter { $0 >= .seconds(10) }.count > 50 })
+        #expect(await session.trackedTaskCount <= 5)
+        let times = transport.sentTypes.filter { $0 == "client/time" }.count
+        #expect(times > 40 * SendspinClockBurst.defaultSize)
+        await session.stop(reason: .shutdown)
+    }
+
+    @Test func disconnectCancelsEveryTrackedTask() async throws {
+        let (session, _, _, _) = try await startSynchronized()
+        #expect(await session.trackedTaskCount > 0)
+        await session.stop(reason: .shutdown)
+        #expect(await waitFor { await session.trackedTaskCount == 0 })
+    }
 }

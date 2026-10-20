@@ -83,6 +83,12 @@ final class TestSleeper: Clock, @unchecked Sendable {
     }
 
     private let recorded = OSAllocatedUnfairLock<[Duration]>(initialState: [])
+    private let released: OSAllocatedUnfairLock<Int>
+
+    /// The first `releasedBursts` sleeps of 10 s or longer return at once; later ones block.
+    init(releasedBursts: Int = 0) {
+        released = OSAllocatedUnfairLock(initialState: releasedBursts)
+    }
     var sleeps: [Duration] { recorded.withLock { $0 } }
 
     var now: Instant { Instant(offset: .zero) }
@@ -92,6 +98,12 @@ final class TestSleeper: Clock, @unchecked Sendable {
         let duration = deadline.offset
         recorded.withLock { $0.append(duration) }
         if duration >= .seconds(10) {
+            let release = released.withLock { remaining -> Bool in
+                guard remaining > 0 else { return false }
+                remaining -= 1
+                return true
+            }
+            if release { return try Task.checkCancellation() }
             try await Task.sleep(for: .seconds(3_600))
         }
         try Task.checkCancellation()

@@ -182,20 +182,28 @@ public actor SendspinSession: SendspinSessionDriving {
     private var attempts = 0
     private var pendingT1: Int64?
     private var input: AsyncStream<Input>.Continuation?
-    private var connectionTasks: [Task<Void, Never>] = []
+    private enum TimerSlot: Hashable { case handshake, stateDeadline, timeReply, burst }
+    private var receiveTask: Task<Void, Never>?
+    /// One task per purpose: storing a new timer cancels the one it replaces, so the count stays bounded.
+    private var timers: [TimerSlot: Task<Void, Never>] = [:]
 
-    private func after(_ duration: Duration, _ value: Input) {
+    /// Tasks this connection currently holds (bounded by 5). Read by tests.
+    var trackedTaskCount: Int { timers.count + (receiveTask == nil ? 0 : 1) }
+
+    private func after(_ slot: TimerSlot, _ duration: Duration, _ value: Input) {
         guard let input else { return }
-        connectionTasks.append(Task {
+        timers[slot]?.cancel()
+        timers[slot] = (Task {
             guard (try? await Task.sleep(for: duration)) != nil else { return }
             input.yield(value)
         })
     }
 
-    private func afterSleeper(_ duration: Duration, _ value: Input) {
+    private func afterSleeper(_ slot: TimerSlot, _ duration: Duration, _ value: Input) {
         guard let input else { return }
         let sleeper = self.sleeper
-        connectionTasks.append(Task {
+        timers[slot]?.cancel()
+        timers[slot] = (Task {
             guard (try? await Self.sleep(sleeper, for: duration)) != nil else { return }
             input.yield(value)
         })
@@ -211,7 +219,7 @@ public actor SendspinSession: SendspinSessionDriving {
         pendingT1 = t1
         attempts += 1
         try await send(SendspinOutgoing.encode(SendspinClientTime(clientTransmitted: t1)))
-        after(Self.timeReplyTimeout, .timeTimeout(t1))
+        after(.timeReply, Self.timeReplyTimeout, .timeTimeout(t1))
     }
 
     private func startBurst() async throws {
@@ -222,6 +230,8 @@ public actor SendspinSession: SendspinSessionDriving {
 
     private func exchangeDone() async throws {
         pendingT1 = nil
+        timers[.timeReply]?.cancel()
+        timers[.timeReply] = nil
         if attempts < burst.size { return try await sendTime() }
         clockState.finish(burst)
         if !clockState.isConverged {
@@ -234,7 +244,7 @@ public actor SendspinSession: SendspinSessionDriving {
             try await sendState()
             eventContinuation.yield(.synchronized)
         }
-        afterSleeper(Self.burstInterval, .burstTick)
+        afterSleeper(.burst, Self.burstInterval, .burstTick)
     }
 
     /// One connection, from the upgrade to the close. Returns the error and whether it got as far as `running`.
@@ -246,14 +256,16 @@ public actor SendspinSession: SendspinSessionDriving {
         attempts = 0
         pendingT1 = nil
         defer {
-            for task in connectionTasks { task.cancel() }
-            connectionTasks = []
+            receiveTask?.cancel()
+            receiveTask = nil
+            for task in timers.values { task.cancel() }
+            timers = [:]
             input.finish()
             self.input = nil
         }
         do {
             try await transport.connect()
-            connectionTasks.append(Task {
+            receiveTask = (Task {
                 while !Task.isCancelled {
                     do {
                         let frame = try await transport.receive()
@@ -266,7 +278,7 @@ public actor SendspinSession: SendspinSessionDriving {
                 }
             })
             try await send(SendspinOutgoing.authFrame(token: configuration.token, clientID: configuration.clientID))
-            after(Self.handshakeTimeout, .deadline(.auth))
+            after(.handshake, Self.handshakeTimeout, .deadline(.auth))
 
             for await item in inbox {
                 if let outcome = try await handle(item) { return outcome }
@@ -308,7 +320,7 @@ public actor SendspinSession: SendspinSessionDriving {
                 guard Self.isAuthOK(text) else { return (.handshake("unexpected auth reply"), false) }
                 phase = .hello
                 try await send(SendspinOutgoing.encode(configuration.hello))
-                after(Self.handshakeTimeout, .deadline(.hello))
+                after(.handshake, Self.handshakeTimeout, .deadline(.hello))
                 return nil
             }
             let message: SendspinIncoming
@@ -324,7 +336,7 @@ public actor SendspinSession: SendspinSessionDriving {
                 guard hello.activeRoles.contains("player@v1") else { return (.roleRejected, false) }
                 eventContinuation.yield(.connected(hello))
                 phase = .syncing
-                after(Self.unavailableStateAfter, .stateDeadline)
+                after(.stateDeadline, Self.unavailableStateAfter, .stateDeadline)
                 try await startBurst()
             case .serverTime(let reply):
                 guard let t1 = pendingT1, reply.clientTransmitted == t1 else { return nil }
