@@ -70,9 +70,12 @@ public enum QueueEditPlan {
         removal(of: selected, in: snapshot)
     }
 
-    /// Crop: every unselected row. Nothing when nothing is selected.
+    /// Crop: every unselected row. Nothing when nothing is selected. An unselected current row simply stays, without
+    /// the notice (it wasn't asked for).
     public static func crop(selected: Set<Int>, in snapshot: RemoteQueueSnapshot) -> Removal {
-        removal(of: Set(QueueRows.indicesToRemove(cropping: selected, count: snapshot.items.count)), in: snapshot)
+        var removal = removal(of: Set(QueueRows.indicesToRemove(cropping: selected, count: snapshot.items.count)), in: snapshot)
+        removal.skippedCurrent = false
+        return removal
     }
 
     /// A drag of the selection by `offset` rows, clamped to the queue.
