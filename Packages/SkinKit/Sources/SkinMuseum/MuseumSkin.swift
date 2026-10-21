@@ -1,7 +1,7 @@
 import Foundation
 
 /// One classic skin row from the Winamp Skin Museum. `id` is the Museum's md5.
-public struct MuseumSkin: Identifiable, Hashable, Sendable, Decodable {
+public struct MuseumSkin: Identifiable, Hashable, Sendable, Codable {
     public var md5: String
     public var filename: String
     public var screenshotURL: URL
@@ -48,7 +48,7 @@ public struct MuseumSkin: Identifiable, Hashable, Sendable, Decodable {
 }
 
 /// One page of results. `total` is known for browse only.
-public struct MuseumPage: Sendable, Hashable {
+public struct MuseumPage: Sendable, Hashable, Codable {
     public var skins: [MuseumSkin]
     public var total: Int?
     public var hasMore: Bool

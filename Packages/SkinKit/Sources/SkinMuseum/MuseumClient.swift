@@ -8,11 +8,14 @@ public actor MuseumClient {
     private let userAgent: String
     private let endpoint: URL
     private let sleep: @Sendable (Duration) async throws -> Void
+    private let resultCache: MuseumResultCache?
 
     public init(
         transport: any MuseumTransport, userAgent: String, endpoint: URL = MuseumClient.defaultEndpoint,
+        resultCache: MuseumResultCache? = nil,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
+        self.resultCache = resultCache
         self.transport = transport
         self.userAgent = userAgent
         self.endpoint = endpoint
@@ -21,7 +24,14 @@ public actor MuseumClient {
 
     public func page(_ query: MuseumQuery) async throws -> MuseumPage {
         let data = try await post(query.request())
-        return try Self.decodePage(data, for: query)
+        let page = try Self.decodePage(data, for: query)
+        await resultCache?.store(page, for: query.cacheKey)
+        return page
+    }
+
+    /// The last successful page for `query`, if cached; `isStale` once past the cache's TTL.
+    public func cachedPage(_ query: MuseumQuery) async -> (page: MuseumPage, isStale: Bool)? {
+        await resultCache?.page(for: query.cacheKey)
     }
 
     private func makeRequest(_ body: GraphQLRequest) throws -> URLRequest {
