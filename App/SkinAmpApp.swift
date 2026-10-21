@@ -13,7 +13,6 @@ struct SkinAmpApp: App {
                 .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.musicAssistantDiscovery)
         }
-        .keyboardShortcut("l")
         .defaultSize(width: 960, height: 600)
 
         Window("Skins", id: "skins") {
@@ -49,6 +48,8 @@ struct SkinAmpApp: App {
             SkinsCommands(model: appDelegate.model)
             PlaybackCommands(model: appDelegate.model)
             CommandGroup(after: .windowArrangement) {
+                OpenLibraryWindowButton()
+                Divider()
                 Button("Player") { appDelegate.player.show() }
                     .keyboardShortcut("1")
                 Button("Windowshade") { appDelegate.model.toggleMainWindowShade() }
@@ -71,5 +72,16 @@ struct SkinAmpApp: App {
                         get: { appDelegate.model.isDoubleSize }, set: { _ in appDelegate.model.toggleDoubleSize() }))
             }
         }
+    }
+}
+
+/// Window › Library (⌘L, #0115). SwiftUI's automatic Window-menu entry for the scene doesn't appear in this app, so the
+/// item is explicit.
+private struct OpenLibraryWindowButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Library") { openWindow(id: "library") }
+            .keyboardShortcut("l")
     }
 }
