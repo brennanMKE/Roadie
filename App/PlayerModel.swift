@@ -417,6 +417,38 @@ final class PlayerModel {
     }
 
     /// Moves the feed of This Mac by the `ThisMacFeed.after` rule (#0114).
+    @ObservationIgnored private var outputMoveTask: Task<Void, Never>?
+
+    /// The Output menu's choice (#0117): moves what plays to `target` (Music Assistant's queue transfer), else only
+    /// selects it. Fallback reassignments set `selectedOutput` directly and never transfer.
+    func selectOutput(_ target: OutputDevice.ID) {
+        let source = selectedOutput
+        guard target != source else { return }
+        let state = nowPlaying.output == source ? nowPlaying.state : .stopped
+        let move = OutputMove.decide(from: source, to: target, sourceState: state, thisMacFeed: thisMacFeed)
+        // Moving onto This Mac: Music Assistant feeds it from now on, so the windows follow its stream (#0109/#0114).
+        if case .transfer = move, target == OutputDevice.thisMacID { applyFeed(.musicAssistantPlayRequested) }
+        selectedOutput = target
+        switch move {
+        case .select: break
+        case .keepLocal: post(StatusNotice(text: OutputMove.localStaysText))
+        case .transfer(let autoPlay):
+            let remote = router.remote
+            let previous = outputMoveTask
+            outputMoveTask = Task { [weak self] in
+                await previous?.value  // quick re-picks transfer in order
+                do { try await remote.transfer(from: source, to: target, autoPlay: autoPlay) } catch {
+                    guard let self else { return }
+                    if target == OutputDevice.thisMacID {
+                        self.applyFeed(
+                            .musicAssistantPlayFailed(isStreaming: self.sendspinController.sendspin.isStreaming))
+                    }
+                    self.showBackendFailure(error)
+                }
+            }
+        }
+    }
+
     private func applyFeed(_ event: ThisMacFeedEvent) { setThisMacFeed(thisMacFeed.after(event)) }
 
     /// Switches what feeds This Mac and follows the new owner's now-playing stream.

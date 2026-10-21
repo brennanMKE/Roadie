@@ -11,7 +11,7 @@ func controlScript(_ change: (inout FixtureScript) throws -> Void = { _ in }) th
     for command in [
         "players/cmd/play", "players/cmd/pause", "players/cmd/play_pause", "players/cmd/stop", "players/cmd/next",
         "players/cmd/previous", "players/cmd/seek", "players/cmd/volume_set", "players/cmd/shuffle",
-        "players/cmd/repeat", "player_queues/play_media",
+        "players/cmd/repeat", "player_queues/play_media", "player_queues/transfer",
     ] {
         script.override(command, result: .null)
     }
@@ -180,5 +180,79 @@ struct BackendTransportTests {
             }
         }
         await rig.backend.disconnect()
+    }
+
+    // MARK: Transfer (#0117)
+
+    /// A recorded output other than `player`.
+    private func otherOutput(_ rig: BackendRig) async throws -> OutputDevice.ID {
+        let outputs = try await rig.backend.outputs()
+        return try #require(outputs.first { $0.id != player && $0.id != OutputDevice.thisMacID }).id
+    }
+
+    @Test func transferBetweenSpeakersSendsSourceAndTargetQueues() async throws {
+        let rig = try await connectedBackend(script: controlScript {
+            $0.override("player_queues/get_active_queue", result: try SyntheticPlayback.queue())
+        })
+        let target = try await otherOutput(rig)
+        let queueID = try SyntheticPlayback.queue().decode(as: MAPlayerQueue.self).queueID
+        try await rig.backend.transfer(from: player, to: target, autoPlay: true)
+        let request = try #require(sent(rig, "player_queues/transfer").first)
+        #expect(request.args["source_queue_id"] == .string(queueID))
+        #expect(request.args["target_queue_id"] == .string(target.rawValue))
+        #expect(request.args["auto_play"] == .bool(true))
+        await rig.backend.disconnect()
+    }
+
+    @Test func transferUsesThePlayersOwnQueueWhenNoneIsActive() async throws {
+        let rig = try await connectedBackend(script: controlScript {
+            $0.override("player_queues/get_active_queue", result: .null)
+        })
+        let target = try await otherOutput(rig)
+        try await rig.backend.transfer(from: player, to: target, autoPlay: true)
+        let request = try #require(sent(rig, "player_queues/transfer").first)
+        #expect(request.args["source_queue_id"] == .string(SyntheticPlayback.playerID))
+        #expect(request.args["target_queue_id"] == .string(target.rawValue))
+        await rig.backend.disconnect()
+    }
+
+    @Test func transferPassesAutoPlayFalseWhenPaused() async throws {
+        let rig = try await connectedBackend(script: controlScript {
+            $0.override("player_queues/get_active_queue", result: .null)
+        })
+        let target = try await otherOutput(rig)
+        try await rig.backend.transfer(from: player, to: target, autoPlay: false)
+        let request = try #require(sent(rig, "player_queues/transfer").first)
+        #expect(request.args["auto_play"] == .bool(false))
+        await rig.backend.disconnect()
+    }
+
+    @Test func transferToUnknownOutputThrowsUnknownOutput() async throws {
+        let rig = try await connectedBackend(script: controlScript {
+            $0.override("player_queues/get_active_queue", result: .null)
+        })
+        let unknown = OutputDevice.ID(rawValue: "nope")
+        await #expect(throws: MusicBackendError.unknownOutput(unknown)) {
+            try await rig.backend.transfer(from: player, to: unknown, autoPlay: true)
+        }
+        #expect(sent(rig, "player_queues/transfer").isEmpty)
+        await rig.backend.disconnect()
+    }
+
+    @Test func transferToSameOutputSendsNothing() async throws {
+        let rig = try await connectedBackend(script: controlScript())
+        let before = rig.transport.sentRequests.count
+        try await rig.backend.transfer(from: player, to: player, autoPlay: true)
+        #expect(rig.transport.sentRequests.count == before)
+        await rig.backend.disconnect()
+    }
+
+    @Test func transferWhenDisconnectedThrowsNotConnected() async throws {
+        let rig = try makeBackend()
+        let backend = rig.backend
+        let player = player
+        await #expect(throws: MusicBackendError.notConnected) {
+            try await backend.transfer(from: player, to: OutputDevice.ID(rawValue: "other"), autoPlay: true)
+        }
     }
 }

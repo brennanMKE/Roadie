@@ -390,13 +390,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         guard !items.isEmpty else { return }
         try await guarded {
             let client = try requireClient()
-            let queueID: String
-            if output == OutputDevice.thisMacID {
-                queueID = try await resolveLocalPlayer().playerID
-            } else {
-                try await requireOutput(output)
-                queueID = output.rawValue
-            }
+            let queueID = try await playerID(for: output)
             let media = items.map(\.rawValue)
             let request: MARequest
             switch mode {
@@ -419,10 +413,10 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
                 case .setVolume, .setBalance:
                     // The app applies these to the local player, which reports volume through Sendspin (#0108).
                     throw MusicBackendError.unsupported(.localOutput)
-                default: player = try await resolveLocalPlayer()
+                default: player = try await self.player(for: output)
                 }
             } else {
-                player = try await requireOutput(output)
+                player = try await self.player(for: output)
             }
             let id = player.playerID
             let request: MARequest
@@ -449,6 +443,39 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             }
             _ = try await client.call(request)
         }
+    }
+
+    /// Moves what plays on `source` to `target` (`player_queues/transfer`); MA stops the source itself, so no extra
+    /// `stop` is sent (it could hit the target when both sit in one group).
+    public func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws {
+        guard source != target else { return }
+        try await guarded {
+            let client = try requireClient()
+            let sourceQueue = try await queueID(for: source, client: client)
+            let targetQueue = try await playerID(for: target)
+            guard sourceQueue != targetQueue else { return }
+            _ = try await client.call(
+                .transferQueue(sourceQueueID: sourceQueue, targetQueueID: targetQueue, autoPlay: autoPlay))
+        }
+    }
+
+    /// The queue that plays on `output` now: its active queue (a speaker synced into a group plays the group's),
+    /// else its own.
+    private func queueID(for output: OutputDevice.ID, client: MusicAssistantClient) async throws -> String {
+        let playerID = try await playerID(for: output)
+        let json = try await client.call(.activeQueue(playerID: playerID))
+        if !json.isNull, let queue = try? json.decode(as: MAPlayerQueue.self) { return queue.queueID }
+        return playerID
+    }
+
+    /// This Mac → the player MA wraps this client in; any other id → that recorded player (else `unknownOutput`).
+    private func player(for output: OutputDevice.ID) async throws -> MAPlayer {
+        output == OutputDevice.thisMacID ? try await resolveLocalPlayer() : try await requireOutput(output)
+    }
+
+    /// The Music Assistant player id behind `output`; `play`, `transport` and `transfer` share it.
+    func playerID(for output: OutputDevice.ID) async throws -> String {
+        try await player(for: output).playerID
     }
 
     /// The current snapshot at once, then one per change: events applied when they decode, refetches and polls as

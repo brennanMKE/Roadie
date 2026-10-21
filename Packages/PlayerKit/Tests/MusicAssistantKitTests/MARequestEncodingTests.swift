@@ -90,12 +90,22 @@ struct MARequestEncodingTests {
         #expect(String(describing: MARequest.time()) == "time")
     }
 
+    @Test func transferQueueUsesTheDocumentedArgNames() {
+        let request = MARequest.transferQueue(sourceQueueID: "src", targetQueueID: "dst", autoPlay: false)
+        #expect(request.command == "player_queues/transfer")
+        #expect(request.args["source_queue_id"] == .string("src"))
+        #expect(request.args["target_queue_id"] == .string("dst"))
+        #expect(request.args["auto_play"] == .bool(false))
+        #expect(request.args.count == 3)
+    }
+
     @Test func kwargsIsNeverSent() {
         let requests: [MARequest] = [
             .libraryItems(.album, limit: 1, offset: 0), .count(.track), .albumTracks(itemID: "1", provider: "library"),
             .search(query: "x", mediaTypes: [.track], limit: 1), .playersAll(), .queuesAll(),
             .playerCommand(.play, playerID: "p"), .playMedia(queueID: "q", media: [], option: .play),
             .auth(token: testToken),
+            .transferQueue(sourceQueueID: "a", targetQueueID: "b", autoPlay: true),
         ]
         for request in requests { #expect(request.args["kwargs"] == nil) }
     }

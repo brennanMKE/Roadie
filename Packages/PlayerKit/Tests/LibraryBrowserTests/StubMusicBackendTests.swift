@@ -33,6 +33,18 @@ struct StubMusicBackendTests {
         }
     }
 
+    @Test func transferIsRecordedAndCanFail() async throws {
+        let backend = StubMusicBackend()
+        let kitchen = OutputDevice.ID(rawValue: "kitchen")
+        try await backend.transfer(from: OutputDevice.thisMacID, to: kitchen, autoPlay: true)
+        #expect(await backend.calls(.transfer) == [.transfer(OutputDevice.thisMacID, kitchen, autoPlay: true)])
+        await backend.setError(.unknownOutput(kitchen), for: .transfer)
+        await #expect(throws: MusicBackendError.unknownOutput(kitchen)) {
+            try await backend.transfer(from: OutputDevice.thisMacID, to: kitchen, autoPlay: false)
+        }
+        #expect(await backend.count(.transfer) == 2)
+    }
+
     @Test func errorsAreStickyUntilCleared() async throws {
         let backend = StubMusicBackend()
         await backend.setError(.unreachable("down"), for: .artists)

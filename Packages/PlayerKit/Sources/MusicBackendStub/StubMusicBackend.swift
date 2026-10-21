@@ -5,7 +5,7 @@ import MusicBackendKit
 /// on demand, and can hold a method's calls in flight (a gate) so a test can observe a loading state.
 public actor StubMusicBackend: MusicBackend {
     public enum Method: Hashable, Sendable, CaseIterable {
-        case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport
+        case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport, transfer
     }
 
     public enum Call: Hashable, Sendable {
@@ -14,6 +14,7 @@ public actor StubMusicBackend: MusicBackend {
         case playlistTracks(MediaID)
         case search(String, Int), artwork(ArtworkRef, Int), outputs
         case play([MediaID], OutputDevice.ID, PlayMode), transport(TransportCommand, OutputDevice.ID)
+        case transfer(OutputDevice.ID, OutputDevice.ID, autoPlay: Bool)
 
         /// The method a call belongs to; `disconnect` has none.
         public var method: Method? {
@@ -30,6 +31,7 @@ public actor StubMusicBackend: MusicBackend {
             case .outputs: .outputs
             case .play: .play
             case .transport: .transport
+            case .transfer: .transfer
             }
         }
     }
@@ -211,6 +213,10 @@ public actor StubMusicBackend: MusicBackend {
 
     public func transport(_ command: TransportCommand, on output: OutputDevice.ID) async throws {
         try await enter(.transport(command, output))
+    }
+
+    public func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws {
+        try await enter(.transfer(source, target, autoPlay: autoPlay))
     }
 
     public func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying> {

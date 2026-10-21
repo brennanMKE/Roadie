@@ -128,6 +128,16 @@ extension MARequest {
             args: ["queue_id": .string(id), "limit": .number(Double(limit)), "offset": .number(Double(offset))])
     }
 
+    /// Moves a queue, position included, to another player; MA stops the source.
+    public static func transferQueue(sourceQueueID: String, targetQueueID: String, autoPlay: Bool) -> MARequest {
+        MARequest(
+            command: "player_queues/transfer",
+            args: [
+                "source_queue_id": .string(sourceQueueID), "target_queue_id": .string(targetQueueID),
+                "auto_play": .bool(autoPlay),
+            ])
+    }
+
     public static func playerCommand(_ command: MAPlayerCommand, playerID: String) -> MARequest {
         MARequest(command: "players/cmd/\(command.rawValue)", args: ["player_id": .string(playerID)])
     }

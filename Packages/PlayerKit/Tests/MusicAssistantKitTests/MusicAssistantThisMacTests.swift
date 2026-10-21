@@ -62,6 +62,36 @@ struct MusicAssistantThisMacTests {
         await rig.backend.disconnect()
     }
 
+    @Test func transferFromThisMacUsesTheWrappingPlayersQueue() async throws {
+        let rig = try await rig { $0.override("player_queues/get_active_queue", result: .null) }
+        let speaker = OutputDevice.ID(rawValue: SyntheticPlayback.playerID)
+        try await rig.backend.transfer(from: OutputDevice.thisMacID, to: speaker, autoPlay: true)
+        let request = try #require(sent(rig, "player_queues/transfer").first)
+        #expect(request.args["source_queue_id"] == .string(Self.wrapperID))
+        #expect(request.args["target_queue_id"] == .string(SyntheticPlayback.playerID))
+        await rig.backend.disconnect()
+    }
+
+    @Test func transferToThisMacTargetsTheWrappingPlayer() async throws {
+        let rig = try await rig { $0.override("player_queues/get_active_queue", result: .null) }
+        let speaker = OutputDevice.ID(rawValue: SyntheticPlayback.playerID)
+        try await rig.backend.transfer(from: speaker, to: OutputDevice.thisMacID, autoPlay: true)
+        let request = try #require(sent(rig, "player_queues/transfer").first)
+        #expect(request.args["source_queue_id"] == .string(SyntheticPlayback.playerID))
+        #expect(request.args["target_queue_id"] == .string(Self.wrapperID))
+        await rig.backend.disconnect()
+    }
+
+    @Test func transferToThisMacWithoutClientIDExplains() async throws {
+        let rig = try await rig(clientID: nil) { $0.override("player_queues/get_active_queue", result: .null) }
+        let speaker = OutputDevice.ID(rawValue: SyntheticPlayback.playerID)
+        await #expect(throws: MusicBackendError.backend(MusicAssistantBackend.thisMacNotRegisteredText)) {
+            try await rig.backend.transfer(from: speaker, to: OutputDevice.thisMacID, autoPlay: true)
+        }
+        #expect(sent(rig, "player_queues/transfer").isEmpty)
+        await rig.backend.disconnect()
+    }
+
     @Test func playOnThisMacWithoutClientIDExplains() async throws {
         let rig = try await rig(clientID: nil)
         await #expect(throws: MusicBackendError.backend(MusicAssistantBackend.thisMacNotRegisteredText)) {

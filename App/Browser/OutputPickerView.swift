@@ -36,7 +36,7 @@ struct OutputPickerView: View {
 
     private func entry(_ device: OutputDevice) -> some View {
         Button {
-            player.selectedOutput = device.id
+            player.selectOutput(device.id)
         } label: {
             if device.id == player.selectedOutput {
                 Label(device.name, systemImage: "checkmark")

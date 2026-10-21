@@ -64,6 +64,16 @@ public protocol MusicBackend: AnyObject, Sendable {
     /// Album and playlist ids expand to their tracks, in order.
     func play(_ items: [MediaID], on output: OutputDevice.ID, mode: PlayMode) async throws
     func transport(_ command: TransportCommand, on output: OutputDevice.ID) async throws
+    /// Moves the source output's queue, position included, to the target and stops the source.
+    /// `autoPlay == false` leaves it paused on the target.
+    func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws
     /// Yields the current snapshot at once, then one per change. Ends when the subscriber cancels.
     func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying>
+}
+
+extension MusicBackend {
+    /// Backends without remote outputs can't move a queue.
+    public func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws {
+        throw MusicBackendError.unsupported(.remoteOutputs)
+    }
 }
