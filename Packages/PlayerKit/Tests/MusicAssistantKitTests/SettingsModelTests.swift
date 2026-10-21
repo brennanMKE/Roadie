@@ -258,7 +258,7 @@ struct SettingsModelTests {
         try rig.tokens(for: server).save(testToken)
         rig.model.appeared()
         await rig.runTest()
-        #expect(rig.model.selectedStatus == .connected(name: "Music Assistant", version: "2.10.6"))
+        #expect(rig.model.selectedStatus == .connected(name: "Home", version: "2.10.6"))
         #expect(rig.tokens(for: server).loads == 1)
         #expect(rig.tokens(for: server).saves == 1)  // the seeding save only
         #expect(rig.tokens(for: server).deletes == 0)
@@ -661,6 +661,32 @@ extension SettingsModelTests {
         rig.model.tokenText = testToken.rawValue
         await rig.runTest()
         #expect(rig.model.servers[0].name == "Living Room")
+    }
+
+    @Test func testConnectedMessageOmitsAGenericName() async throws {
+        let server = makeServer(id: nil, name: MusicAssistantServerConfiguration.defaultName)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Music Assistant (abc123)")
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        let message = try #require(rig.model.statusMessage)
+        #expect(message.hasPrefix("Connected"))
+        #expect(!message.contains("abc123"))
+        #expect(!message.contains("Music Assistant ("))
+    }
+
+    @Test func testResetsAStoredGenericNameWithTheIDWhenTheServerStaysGeneric() async throws {
+        let server = makeServer(id: nil, name: "Music Assistant (abc123)")
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Music Assistant (abc123)")
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        #expect(rig.model.servers[0].name == MusicAssistantServerConfiguration.defaultName)
+        #expect(rig.store.load()[0].name == MusicAssistantServerConfiguration.defaultName)
     }
 
     @Test func addDiscoveredServerDropsAGenericAdvertisedName() throws {

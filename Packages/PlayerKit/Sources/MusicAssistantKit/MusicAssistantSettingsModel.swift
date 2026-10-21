@@ -454,13 +454,20 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
             log.info("test failed")
         case .connected(let info):
             servers[index].address.serverID = info.serverID
-            if MusicAssistantServerConfiguration.isGenericName(servers[index].name),
-               let found = info.name, !MusicAssistantServerConfiguration.isGenericName(found) {
-                servers[index].name = found
+            if MusicAssistantServerConfiguration.isGenericName(servers[index].name) {
+                if let found = info.name, !MusicAssistantServerConfiguration.isGenericName(found) {
+                    servers[index].name = found
+                } else if servers[index].name != MusicAssistantServerConfiguration.defaultName {
+                    // A legacy row holding the generic label with the server id: never show the id in the Name field.
+                    servers[index].name = MusicAssistantServerConfiguration.defaultName
+                }
             }
             persist()
             let saved = typedToken == nil || id != selection || commitToken()
-            status[id] = saved ? .connected(name: info.name, version: info.serverVersion) : .failed(.keychain(tokenStoreError ?? ""))
+            // displayName, not info.name: the advertised generic label carries the server id (#0119).
+            status[id] = saved
+                ? .connected(name: servers[index].displayName, version: info.serverVersion)
+                : .failed(.keychain(tokenStoreError ?? ""))
             log.info("test connected")
         }
     }
