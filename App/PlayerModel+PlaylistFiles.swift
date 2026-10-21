@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 extension PlayerModel {
     /// Single playlist file; replaces the queue and plays, like File › Open.
     func loadPlaylistFile() {
-        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: outputSelection) {
             post(StatusNotice(text: text))
             return
         }

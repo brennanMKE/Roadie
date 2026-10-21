@@ -483,11 +483,18 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             let all = try await client.call(.playersAll(), as: [MAPlayer].self)
             players = Dictionary(all.map { ($0.playerID, $0) }, uniquingKeysWith: { _, last in last })
             let local = localClientID
+            let hostingIDs = Set(local.map { id in all.filter { $0.hosts(sendspinClientID: id) }.map(\.playerID) } ?? [])
             return all.filter { player in
                 guard player.enabled != false, player.hideInUI != true else { return false }
                 if let local, player.hosts(sendspinClientID: local) { return false }
                 return true
-            }.map(OutputDevice.init(ma:))
+            }.map { player in
+                // This Mac's wrapper shows up as This Mac, so a speaker knows whether it can join it (#0118).
+                let groupable = player.canGroupWith.map { ids in
+                    Set(ids.map { hostingIDs.contains($0) ? OutputDevice.thisMacID : OutputDevice.ID(rawValue: $0) })
+                }
+                return OutputDevice(ma: player, groupable: groupable)
+            }
         }
     }
 
@@ -568,6 +575,25 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             guard sourceQueue != targetQueue else { return }
             _ = try await client.call(
                 .transferQueue(sourceQueueID: sourceQueue, targetQueueID: targetQueue, autoPlay: autoPlay))
+        }
+    }
+
+    /// Syncs `adding` to `leader` and unsyncs `removing` (`players/cmd/set_members`, #0118). This Mac stands for its
+    /// Music Assistant wrapper, so with Sendspin off it throws `thisMacNotRegisteredText`.
+    public func setGroupMembers(
+        of leader: OutputDevice.ID, adding: [OutputDevice.ID], removing: [OutputDevice.ID]
+    ) async throws {
+        guard !adding.isEmpty || !removing.isEmpty else { return }
+        try await guarded {
+            let client = try requireClient()
+            let target = try await playerID(for: leader)
+            var add: [String] = []
+            for id in adding { add.append(try await playerID(for: id)) }
+            var remove: [String] = []
+            for id in removing { remove.append(try await playerID(for: id)) }
+            _ = try await client.call(.setMembers(target: target, add: add, remove: remove))
+            // Their sync state changed: the next lookup refetches.
+            for id in [target] + add + remove { players[id] = nil }
         }
     }
 

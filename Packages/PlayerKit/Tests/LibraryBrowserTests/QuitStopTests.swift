@@ -14,6 +14,17 @@ struct QuitStopTests {
         #expect(QuitStop.targets(enabled: true, isConnected: true, selected: mac, thisMacFeed: .local).isEmpty)
     }
 
+    @Test func quitStopsGroupMembersToo() {
+        let bedroom = OutputDevice.ID(rawValue: "bedroom")
+        #expect(
+            QuitStop.targets(
+                enabled: true, isConnected: true, selected: mac, members: [homePod, bedroom], thisMacFeed: .musicAssistant)
+                == [homePod, bedroom, mac])
+        #expect(
+            QuitStop.targets(enabled: true, isConnected: true, selected: homePod, members: [mac], thisMacFeed: .musicAssistant)
+                == [homePod, mac])
+    }
+
     @Test func quitTargetsThisMacWhenMusicAssistantFeedsIt() {
         #expect(QuitStop.targets(enabled: true, isConnected: true, selected: mac, thisMacFeed: .musicAssistant) == [mac])
         #expect(

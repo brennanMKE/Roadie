@@ -65,7 +65,9 @@ extension PlayerModel {
     /// needs stopping; otherwise the task sending the stops, which a play can await first.
     @discardableResult
     func stopOthers(startingOn target: OutputDevice.ID) -> Task<Void, Never>? {
-        let sounding = player.state == .playing || sendspinController.sendspin.isStreaming
+        // This Mac synced into the selection (#0118) is part of the one place that plays, not another one.
+        let thisMacIsMember = outputSelection.members.contains(OutputDevice.thisMacID)
+        let sounding = !thisMacIsMember && (player.state == .playing || sendspinController.sendspin.isStreaming)
         let stops = PlaybackOwnership.stops(
             startingOn: target, previous: previousTarget, thisMacFeed: thisMacFeed, thisMacSounding: sounding,
             activity: activity)
@@ -88,7 +90,10 @@ extension PlayerModel {
         applyFeed(.streamStarted)
         let requested = ownStreamRequested
         ownStreamRequested = false
-        guard !requested, selectedOutput != OutputDevice.thisMacID else { return }
+        // A stream to This Mac as a synced member (#0118) is the group playing, not someone else's.
+        guard !requested, selectedOutput != OutputDevice.thisMacID,
+            !outputSelection.members.contains(OutputDevice.thisMacID)
+        else { return }
         adopt(OutputDevice.thisMacID)
         stopOthers(startingOn: OutputDevice.thisMacID)
     }
@@ -99,7 +104,7 @@ extension PlayerModel {
         let enabled = UserDefaults.standard.object(forKey: QuitStop.defaultsKey) as? Bool ?? true
         let targets = QuitStop.targets(
             enabled: enabled, isConnected: musicAssistantIsConnected, selected: selectedOutput,
-            thisMacFeed: thisMacFeed)
+            members: outputSelection.members, thisMacFeed: thisMacFeed)
         guard !targets.isEmpty else { return nil }
         let ma = musicAssistant
         return Task {

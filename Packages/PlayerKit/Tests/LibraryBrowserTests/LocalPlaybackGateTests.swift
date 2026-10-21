@@ -19,6 +19,13 @@ import Testing
         #expect(LocalPlaybackGate.refusal(forLocalFilesOn: group.id) == LocalPlaybackGate.switchToThisMac)
     }
 
+    @Test func localFilesAreRefusedWhileThisMacIsGrouped() {
+        #expect(LocalPlaybackGate.refusal(forLocalFilesOn: OutputSelection.thisMac) == nil)
+        let grouped = OutputSelection(leader: OutputDevice.thisMacID, members: [speaker])
+        #expect(LocalPlaybackGate.refusal(forLocalFilesOn: grouped) == LocalPlaybackGate.switchToThisMac)
+        #expect(LocalPlaybackGate.refusal(forLocalFilesOn: OutputSelection(leader: speaker)) == LocalPlaybackGate.switchToThisMac)
+    }
+
     @Test func localSourceIsRefusedOnASpeaker() {
         #expect(LocalPlaybackGate.refusal(source: [.search, .playlists], output: speaker)
             == LocalPlaybackGate.switchToThisMac)

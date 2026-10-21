@@ -68,11 +68,13 @@ extension LibraryPlaylist {
 }
 
 extension OutputDevice {
-    init(ma player: MAPlayer) {
+    init(ma player: MAPlayer, groupable: Set<ID>? = nil) {
         let name = player.displayName.flatMap { $0.isEmpty ? nil : $0 } ?? player.name
-        // Groups are unrecorded on the reference server: `type == "group"` or members listed. A `stereo_pair` is one speaker.
-        let isGroup = player.type == "group" || !(player.groupMembers ?? []).isEmpty
+        // Groups are unrecorded on the reference server: `type == "group"`, or members listed on a typeless player.
+        // A `player` with members is a sync leader (#0118), and a `stereo_pair` is one speaker.
+        let isGroup = player.type == "group" || (player.type == nil && !(player.groupMembers ?? []).isEmpty)
         self.init(
-            id: ID(rawValue: player.playerID), name: name, kind: .remote, isAvailable: player.available, isGroup: isGroup)
+            id: ID(rawValue: player.playerID), name: name, kind: .remote, isAvailable: player.available, isGroup: isGroup,
+            groupableWith: groupable)
     }
 }

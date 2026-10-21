@@ -14,13 +14,19 @@ public struct OutputDevice: Identifiable, Hashable, Sendable {
     public var isAvailable: Bool
     /// A group of speakers (a Music Assistant group player); the output picker lists these separately.
     public var isGroup: Bool
+    /// The outputs this one can sync with (#0118); nil when unknown, which allows any.
+    public var groupableWith: Set<ID>?
 
-    public init(id: ID, name: String, kind: Kind, isAvailable: Bool = true, isGroup: Bool = false) {
+    public init(
+        id: ID, name: String, kind: Kind, isAvailable: Bool = true, isGroup: Bool = false,
+        groupableWith: Set<ID>? = nil
+    ) {
         self.id = id
         self.name = name
         self.kind = kind
         self.isAvailable = isAvailable
         self.isGroup = isGroup
+        self.groupableWith = groupableWith
     }
 
     public static let thisMacID = ID(rawValue: "this-mac")

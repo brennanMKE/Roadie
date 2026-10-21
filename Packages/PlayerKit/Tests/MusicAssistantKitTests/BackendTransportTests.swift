@@ -11,7 +11,7 @@ func controlScript(_ change: (inout FixtureScript) throws -> Void = { _ in }) th
     for command in [
         "players/cmd/play", "players/cmd/pause", "players/cmd/play_pause", "players/cmd/stop", "players/cmd/next",
         "players/cmd/previous", "players/cmd/seek", "players/cmd/volume_set", "players/cmd/shuffle",
-        "players/cmd/repeat", "player_queues/play_media", "player_queues/transfer",
+        "players/cmd/repeat", "player_queues/play_media", "player_queues/transfer", "players/cmd/set_members",
     ] {
         script.override(command, result: .null)
     }
@@ -24,6 +24,37 @@ struct BackendTransportTests {
 
     private func sent(_ rig: BackendRig, _ command: String) -> [SentRequest] {
         rig.transport.sentRequests.filter { $0.command == command }
+    }
+
+    @Test func setGroupMembersSendsSetMembers() async throws {
+        let rig = try await connectedBackend(script: controlScript())
+        _ = try await rig.backend.outputs()
+        let kitchen = OutputDevice.ID(rawValue: "ap82fe09484ac9")
+        let bedroom = OutputDevice.ID(rawValue: "ap720a998fd71d")
+        try await rig.backend.setGroupMembers(of: player, adding: [kitchen], removing: [bedroom])
+        let request = try #require(sent(rig, "players/cmd/set_members").first)
+        #expect(request.args["target_player"] == .string(SyntheticPlayback.playerID))
+        #expect(request.args["player_ids_to_add"] == ["ap82fe09484ac9"])
+        #expect(request.args["player_ids_to_remove"] == ["ap720a998fd71d"])
+        await rig.backend.disconnect()
+    }
+
+    @Test func setGroupMembersOmitsAnEmptyList() async throws {
+        let rig = try await connectedBackend(script: controlScript())
+        _ = try await rig.backend.outputs()
+        try await rig.backend.setGroupMembers(
+            of: player, adding: [], removing: [OutputDevice.ID(rawValue: "ap82fe09484ac9")])
+        let request = try #require(sent(rig, "players/cmd/set_members").first)
+        #expect(request.args["player_ids_to_add"] == nil)
+        #expect(request.args["player_ids_to_remove"] == ["ap82fe09484ac9"])
+        await rig.backend.disconnect()
+    }
+
+    @Test func setGroupMembersWithNothingToChangeSendsNothing() async throws {
+        let rig = try await connectedBackend(script: controlScript())
+        try await rig.backend.setGroupMembers(of: player, adding: [], removing: [])
+        #expect(sent(rig, "players/cmd/set_members").isEmpty)
+        await rig.backend.disconnect()
     }
 
     @Test func playAlbumSendsPlayMediaReplace() async throws {

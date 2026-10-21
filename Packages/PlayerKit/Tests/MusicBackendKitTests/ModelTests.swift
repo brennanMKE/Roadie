@@ -3,6 +3,11 @@ import Testing
 @testable import MusicBackendKit
 
 struct NowPlayingTests {
+    @Test func outputDeviceGroupableWithDefaultsToUnknown() {
+        #expect(OutputDevice.thisMac.groupableWith == nil)
+        #expect(OutputDevice(id: OutputDevice.ID(rawValue: "kitchen"), name: "Kitchen", kind: .remote).groupableWith == nil)
+    }
+
     @Test func elapsedExtrapolatesOnlyWhilePlaying() {
         let t = Date(timeIntervalSince1970: 1_800_000_000)
         var snapshot = NowPlaying(output: OutputDevice.thisMacID, state: .playing, duration: 100, elapsed: 10, updatedAt: t)

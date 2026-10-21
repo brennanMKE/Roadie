@@ -60,6 +60,8 @@ public struct MAPlayer: Codable, Hashable, Sendable {
     /// Unrecorded on the reference server; a non-empty list marks the player as a group (`OutputDevice.isGroup`).
     public var groupMembers: [String]?
     public var syncedTo: String?
+    /// The players this one can sync with (`players/cmd/set_members`, #0118).
+    public var canGroupWith: [String]?
     public var activeGroup: String?
     public var supportedFeatures: [String]?
     public var currentMedia: MAPlayerMedia?
@@ -83,6 +85,7 @@ public struct MAPlayer: Codable, Hashable, Sendable {
         case volumeMuted = "volume_muted"
         case groupMembers = "group_members"
         case syncedTo = "synced_to"
+        case canGroupWith = "can_group_with"
         case activeGroup = "active_group"
         case supportedFeatures = "supported_features"
         case currentMedia = "current_media"

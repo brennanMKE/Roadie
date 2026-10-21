@@ -67,6 +67,8 @@ public protocol MusicBackend: AnyObject, Sendable {
     /// Moves the source output's queue, position included, to the target and stops the source.
     /// `autoPlay == false` leaves it paused on the target.
     func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws
+    /// Syncs `adding` to `leader` and unsyncs `removing` (#0118). Default: `.unsupported(.remoteOutputs)`.
+    func setGroupMembers(of leader: OutputDevice.ID, adding: [OutputDevice.ID], removing: [OutputDevice.ID]) async throws
     /// Yields the current snapshot at once, then one per change. Ends when the subscriber cancels.
     func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying>
 }
@@ -74,6 +76,13 @@ public protocol MusicBackend: AnyObject, Sendable {
 extension MusicBackend {
     /// Backends without remote outputs can't move a queue.
     public func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws {
+        throw MusicBackendError.unsupported(.remoteOutputs)
+    }
+
+    /// Backends without remote outputs can't group players.
+    public func setGroupMembers(
+        of leader: OutputDevice.ID, adding: [OutputDevice.ID], removing: [OutputDevice.ID]
+    ) async throws {
         throw MusicBackendError.unsupported(.remoteOutputs)
     }
 }

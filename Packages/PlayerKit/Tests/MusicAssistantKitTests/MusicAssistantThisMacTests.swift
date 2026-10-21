@@ -51,6 +51,51 @@ struct MusicAssistantThisMacTests {
         await without.backend.disconnect()
     }
 
+    @Test func outputsCarryGroupableWithAndMapThisMac() async throws {
+        let rig = try await rig {
+            $0.override(
+                "players/all",
+                result: [
+                    ["player_id": .string(Self.wrapperID), "type": "player", "name": "SkinAmp", "available": true,
+                     "output_protocols": [["output_protocol_id": .string(Self.clientID), "protocol_domain": "sendspin"]]],
+                    ["player_id": "kitchen", "type": "player", "name": "Kitchen", "available": true,
+                     "can_group_with": [.string(Self.wrapperID), "bedroom"]],
+                    ["player_id": "bedroom", "type": "player", "name": "Bedroom", "available": true],
+                ])
+        }
+        let outputs = try await rig.backend.outputs()
+        let kitchen = try #require(outputs.first { $0.id.rawValue == "kitchen" })
+        #expect(kitchen.groupableWith == [OutputDevice.thisMacID, OutputDevice.ID(rawValue: "bedroom")])
+        #expect(outputs.first { $0.id.rawValue == "bedroom" }?.groupableWith == nil)
+        await rig.backend.disconnect()
+    }
+
+    @Test func setGroupMembersMapsThisMacToItsPlayerID() async throws {
+        let rig = try await rig { $0.override("players/cmd/set_members", result: .null) }
+        let speaker = OutputDevice.ID(rawValue: "ap82fe09484ac9")
+        _ = try await rig.backend.outputs()
+        try await rig.backend.setGroupMembers(of: OutputDevice.thisMacID, adding: [speaker], removing: [])
+        _ = try await rig.backend.outputs()
+        try await rig.backend.setGroupMembers(of: speaker, adding: [OutputDevice.thisMacID], removing: [])
+        let requests = sent(rig, "players/cmd/set_members")
+        #expect(requests.count == 2)
+        #expect(requests.first?.args["target_player"] == .string(Self.wrapperID))
+        #expect(requests.first?.args["player_ids_to_add"] == ["ap82fe09484ac9"])
+        #expect(requests.last?.args["target_player"] == "ap82fe09484ac9")
+        #expect(requests.last?.args["player_ids_to_add"] == .array([.string(Self.wrapperID)]))
+        await rig.backend.disconnect()
+    }
+
+    @Test func setGroupMembersOnThisMacWithoutSendspinExplains() async throws {
+        let rig = try await rig(clientID: nil) { $0.override("players/cmd/set_members", result: .null) }
+        await #expect(throws: MusicBackendError.backend(MusicAssistantBackend.thisMacNotRegisteredText)) {
+            try await rig.backend.setGroupMembers(
+                of: OutputDevice.thisMacID, adding: [OutputDevice.ID(rawValue: "ap82fe09484ac9")], removing: [])
+        }
+        #expect(sent(rig, "players/cmd/set_members").isEmpty)
+        await rig.backend.disconnect()
+    }
+
     @Test func playOnThisMacTargetsTheWrappingPlayer() async throws {
         let rig = try await rig()
         let tracks = (1...3).map { MediaID(.track, "library://track/\($0)") }

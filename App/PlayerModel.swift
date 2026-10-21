@@ -86,10 +86,15 @@ final class PlayerModel {
     var selectedOutput: OutputDevice.ID = OutputDevice.thisMacID {
         didSet {
             guard selectedOutput != oldValue else { return }
+            // Any other write (adoption, fallback, a plain pick) leaves the leader alone in the selection (#0118).
+            if outputSelection.leader != selectedOutput { outputSelection = OutputSelection(leader: selectedOutput) }
             previousTarget = oldValue
             observeNowPlaying()
         }
     }
+    /// The Output popover's checked outputs (#0118). Its leader is always `selectedOutput`.
+    var outputSelection = OutputSelection.thisMac
+    @ObservationIgnored private var outputSelectionTask: Task<Void, Never>?
     /// The output targeted before the current one: what an exclusive start stops (#0121).
     @ObservationIgnored var previousTarget: OutputDevice.ID?
     /// Every Music Assistant player's playback, from `playbackActivity()` (#0121); `[]` while disconnected.
@@ -477,6 +482,48 @@ final class PlayerModel {
         }
     }
 
+    /// The popover's checkbox (#0118): adds `id` to the synced outputs, or drops it.
+    func toggleOutput(_ id: OutputDevice.ID) {
+        let (next, steps) = outputSelection.toggling(id, devices: outputPicker.devices)
+        applyOutputSelection(next, steps: steps)
+    }
+
+    /// The popover's "Only" (and a group row): ungroups, then moves to `id`.
+    func selectOnlyOutput(_ id: OutputDevice.ID) {
+        let (next, steps) = outputSelection.selectingOnly(id)
+        applyOutputSelection(next, steps: steps)
+    }
+
+    /// Shows `next` at once, then runs `steps` in order after any earlier ones. A failure puts the selection back.
+    private func applyOutputSelection(_ next: OutputSelection, steps: [OutputSelection.Step]) {
+        guard !steps.isEmpty else { return }
+        let previous = outputSelection
+        outputSelection = next
+        let ma = musicAssistant
+        let earlier = outputSelectionTask
+        outputSelectionTask = Task { [weak self] in
+            await earlier?.value
+            var moved = false
+            do {
+                for step in steps {
+                    switch step {
+                    case .setMembers(let leader, let add, let remove):
+                        try await ma.setGroupMembers(of: leader, adding: add, removing: remove)
+                    case .move(let target):
+                        guard let self else { return }
+                        moved = true
+                        self.selectOutput(target)
+                        await self.outputMoveTask?.value
+                    }
+                }
+            } catch {
+                guard let self else { return }
+                self.outputSelection = moved ? OutputSelection(leader: self.selectedOutput) : previous
+                self.showBackendFailure(error)
+            }
+        }
+    }
+
     /// Moves the feed of This Mac by the `ThisMacFeed.after` rule (#0114).
     func applyFeed(_ event: ThisMacFeedEvent) { setThisMacFeed(thisMacFeed.after(event)) }
 
@@ -527,7 +574,8 @@ final class PlayerModel {
                 switch state {
                 case .connected:
                     self.musicAssistantIsConnected = true
-                    self.activityAfterConnect = true
+                    // A snapshot that beat `.connected` already counted as the connect one (#0121 review).
+                    if self.activity.isEmpty { self.activityAfterConnect = true }
                 case .disconnected, .failed:
                     self.musicAssistantIsConnected = false
                 default: break
@@ -558,9 +606,11 @@ final class PlayerModel {
         let ma = musicAssistant
         let sources = sources
         // The old server's players are gone with it.
-        if selectedOutput != OutputDevice.thisMacID {
+        if outputSelection != .thisMac {
+            let wasThisMac = selectedOutput == OutputDevice.thisMacID
+            outputSelection = .thisMac
             selectedOutput = OutputDevice.thisMacID
-            post(StatusNotice(text: "Output switched to This Mac"))
+            if !wasThisMac { post(StatusNotice(text: "Output switched to This Mac")) }
         }
         let picker = outputPicker
         Task {
@@ -571,14 +621,18 @@ final class PlayerModel {
     }
 
     /// Lists the outputs again (the Library connected, the Output menu opened). A selected speaker that is no longer
-    /// listed falls back to This Mac; a failed or unconnected listing leaves the selection alone.
+    /// listed falls back to the next checked one, else This Mac (#0118); a failed or unconnected listing leaves the
+    /// selection alone.
     func refreshOutputs() async {
         await outputPicker.refresh()
         guard outputPicker.hint == nil else { return }
-        let reconciled = outputPicker.reconcile(selected: selectedOutput)
-        if reconciled != selectedOutput {
-            selectedOutput = reconciled
-            post(StatusNotice(text: "Output switched to This Mac"))
+        let reconciled = outputSelection.reconciled(with: outputPicker.devices)
+        guard reconciled != outputSelection else { return }
+        outputSelection = reconciled
+        if reconciled.leader != selectedOutput {
+            selectedOutput = reconciled.leader
+            let name = outputPicker.devices.first { $0.id == reconciled.leader }?.name ?? OutputDevice.thisMac.name
+            post(StatusNotice(text: "Output switched to " + Self.truncated(name, to: 31 - "Output switched to ".utf16.count)))
         }
     }
 
@@ -844,7 +898,10 @@ final class PlayerModel {
         let sourceID = backend.sourceID
         let output = selectedOutput
         // Local files play only on This Mac. Not a source failure, so the fallback is not told.
-        if let text = LocalPlaybackGate.refusal(source: backend.capabilities, output: output) {
+        if let text = LocalPlaybackGate.refusal(source: backend.capabilities, output: output)
+            ?? (outputSelection.members.isEmpty || backend.capabilities.contains(.remoteOutputs)
+                ? nil : LocalPlaybackGate.switchToThisMac)
+        {
             post(StatusNotice(text: text))
             return
         }
@@ -889,7 +946,7 @@ final class PlayerModel {
 
     /// The playlist's ADD › Add Dir: folders only, appended.
     func openFolder() {
-        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: outputSelection) {
             post(StatusNotice(text: text))
             return
         }
@@ -937,13 +994,13 @@ final class PlayerModel {
     /// notice while a speaker is selected, checked again after the load in case the output changed (#0084).
     func importLocalFiles(_ urls: [URL], replace: Bool) {
         guard !urls.isEmpty else { return }
-        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+        if let text = LocalPlaybackGate.refusal(forLocalFilesOn: outputSelection) {
             post(StatusNotice(text: text))
             return
         }
         Task {
             let result = await LocalTrackLoader.load(urls)
-            if let text = LocalPlaybackGate.refusal(forLocalFilesOn: selectedOutput) {
+            if let text = LocalPlaybackGate.refusal(forLocalFilesOn: outputSelection) {
                 post(StatusNotice(text: text))
                 return
             }

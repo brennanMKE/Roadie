@@ -5,7 +5,7 @@ import MusicBackendKit
 /// on demand, and can hold a method's calls in flight (a gate) so a test can observe a loading state.
 public actor StubMusicBackend: MusicBackend {
     public enum Method: Hashable, Sendable, CaseIterable {
-        case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport, transfer
+        case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport, transfer, setGroupMembers
     }
 
     public enum Call: Hashable, Sendable {
@@ -15,6 +15,7 @@ public actor StubMusicBackend: MusicBackend {
         case search(String, Int), artwork(ArtworkRef, Int), outputs
         case play([MediaID], OutputDevice.ID, PlayMode), transport(TransportCommand, OutputDevice.ID)
         case transfer(OutputDevice.ID, OutputDevice.ID, autoPlay: Bool)
+        case setGroupMembers(OutputDevice.ID, [OutputDevice.ID], [OutputDevice.ID])
 
         /// The method a call belongs to; `disconnect` has none.
         public var method: Method? {
@@ -32,6 +33,7 @@ public actor StubMusicBackend: MusicBackend {
             case .play: .play
             case .transport: .transport
             case .transfer: .transfer
+            case .setGroupMembers: .setGroupMembers
             }
         }
     }
@@ -217,6 +219,12 @@ public actor StubMusicBackend: MusicBackend {
 
     public func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws {
         try await enter(.transfer(source, target, autoPlay: autoPlay))
+    }
+
+    public func setGroupMembers(
+        of leader: OutputDevice.ID, adding: [OutputDevice.ID], removing: [OutputDevice.ID]
+    ) async throws {
+        try await enter(.setGroupMembers(leader, adding, removing))
     }
 
     public func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying> {

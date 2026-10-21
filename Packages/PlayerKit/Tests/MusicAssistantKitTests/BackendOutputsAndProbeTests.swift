@@ -39,11 +39,12 @@ struct BackendOutputsAndProbeTests {
                  "group_members": ["p1", "p2"]],
                 ["player_id": "p3", "type": "stereo_pair", "name": "Den", "available": true, "group_members": []],
                 ["player_id": "p4", "type": "player", "name": "Office", "available": false],
+                ["player_id": "g2", "name": "Upstairs", "available": true, "group_members": ["p5", "p6"]],
             ])
         let rig = try await connectedBackend(script: script)
         let outputs = try await rig.backend.outputs()
         #expect(Dictionary(uniqueKeysWithValues: outputs.map { ($0.id.rawValue, $0.isGroup) })
-            == ["g1": true, "p1": true, "p3": false, "p4": false])
+            == ["g1": true, "p1": false, "p3": false, "p4": false, "g2": true])
         #expect(outputs.first { $0.id.rawValue == "p4" }?.isAvailable == false)
         await rig.backend.disconnect()
     }

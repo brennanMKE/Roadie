@@ -37,7 +37,9 @@ public enum PlaybackOwnership {
         thisMacSounding: Bool, activity: [OutputActivity]
     ) -> [Stop] {
         var result: [Stop] = []
-        if target != OutputDevice.thisMacID, thisMacSounding {
+        // This Mac synced to `target` (#0118) plays with it; stopping it would reach the leader through the redirect.
+        let thisMacFollowsTarget = activity.first { $0.output == OutputDevice.thisMacID }?.leader == target
+        if target != OutputDevice.thisMacID, thisMacSounding, !thisMacFollowsTarget {
             result.append(thisMacFeed == .musicAssistant ? .musicAssistant(OutputDevice.thisMacID) : .thisMacLocal)
         }
         if let previous, previous != target, previous != OutputDevice.thisMacID,
@@ -55,13 +57,15 @@ public enum QuitStop {
     public static let defaultsKey = "musicAssistant.stopOnQuit"
     public static let timeout: Duration = .milliseconds(1500)
 
-    /// The Music Assistant outputs to stop on quit; empty when turned off or not connected.
+    /// The Music Assistant outputs to stop on quit; empty when turned off or not connected. `members` are the
+    /// speakers synced to `selected` (#0118); they are stopped too.
     public static func targets(
-        enabled: Bool, isConnected: Bool, selected: OutputDevice.ID, thisMacFeed: ThisMacFeed
+        enabled: Bool, isConnected: Bool, selected: OutputDevice.ID, members: [OutputDevice.ID] = [],
+        thisMacFeed: ThisMacFeed
     ) -> [OutputDevice.ID] {
         guard enabled, isConnected else { return [] }
         var ids: [OutputDevice.ID] = []
-        if selected != OutputDevice.thisMacID { ids.append(selected) }
+        for id in [selected] + members where id != OutputDevice.thisMacID && !ids.contains(id) { ids.append(id) }
         if thisMacFeed == .musicAssistant { ids.append(OutputDevice.thisMacID) }
         return ids
     }

@@ -96,6 +96,13 @@ struct PlaybackOwnershipTests {
         #expect(stops == [.musicAssistant(mac)])
     }
 
+    @Test func startingOnSpeakerSkipsThisMacSyncedToIt() {
+        let stops = PlaybackOwnership.stops(
+            startingOn: homePod, previous: mac, thisMacFeed: .musicAssistant, thisMacSounding: true,
+            activity: [activity(mac, .playing, leader: homePod), activity(homePod, .playing)])
+        #expect(stops.isEmpty)
+    }
+
     @Test func startingOnThisMacStopsThePreviousSpeaker() {
         let stops = PlaybackOwnership.stops(
             startingOn: mac, previous: homePod, thisMacFeed: .local, thisMacSounding: false,

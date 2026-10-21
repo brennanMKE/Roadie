@@ -81,6 +81,11 @@ public enum LocalPlaybackGate {
         output == OutputDevice.thisMacID ? nil : switchToThisMac
     }
 
+    /// Local files play only through AudioCore, so never while This Mac is grouped with speakers (#0118).
+    public static func refusal(forLocalFilesOn selection: OutputSelection) -> String? {
+        selection == .thisMac ? nil : switchToThisMac
+    }
+
     /// `playFromLibrary`'s rule: a source without `.remoteOutputs` can only play on This Mac.
     public static func refusal(source: BackendCapabilities, output: OutputDevice.ID) -> String? {
         output == OutputDevice.thisMacID || source.contains(.remoteOutputs) ? nil : switchToThisMac

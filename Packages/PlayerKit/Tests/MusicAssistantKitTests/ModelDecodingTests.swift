@@ -122,6 +122,12 @@ struct ModelDecodingTests {
         #expect(MAPlaybackState("something-new") == .unknown)
     }
 
+    @Test func playerDecodesCanGroupWith() throws {
+        let players = try recordedResult(.playersAll).decode(as: [MAPlayer].self)
+        let player = try #require(players.first { $0.playerID == "ap223aed81fe30" })
+        #expect(player.canGroupWith?.contains("ap82fe09484ac9") == true)
+    }
+
     @Test func queuesDecodeItemsAsACount() throws {
         let queues = try recordedResult(.playerQueuesAll).decode(as: [MAPlayerQueue].self)
         #expect(queues.count == 9)

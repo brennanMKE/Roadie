@@ -138,6 +138,14 @@ extension MARequest {
             ])
     }
 
+    /// `players/cmd/set_members` (#0118); an empty list is left out.
+    public static func setMembers(target: String, add: [String], remove: [String]) -> MARequest {
+        var args: [String: MAJSON] = ["target_player": .string(target)]
+        if !add.isEmpty { args["player_ids_to_add"] = .array(add.map(MAJSON.string)) }
+        if !remove.isEmpty { args["player_ids_to_remove"] = .array(remove.map(MAJSON.string)) }
+        return MARequest(command: "players/cmd/set_members", args: args)
+    }
+
     public static func playerCommand(_ command: MAPlayerCommand, playerID: String) -> MARequest {
         MARequest(command: "players/cmd/\(command.rawValue)", args: ["player_id": .string(playerID)])
     }
