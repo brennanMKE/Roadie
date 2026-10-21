@@ -8,7 +8,7 @@
 #   --identity NAME          codesign identity (default: the first "Developer ID Application" in the keychain)
 #   --notary-profile PROFILE notarize and staple with this `xcrun notarytool store-credentials` profile;
 #                            without it the DMG is signed but not notarized, and Gatekeeper asks once on first open
-# Output: build/dist/SkinAmp-<version>-<commit>.dmg (the commit comes from the run's commit.txt when present)
+# Output: build/dist/SkinAmp-<version>-<build>-<commit>.dmg (the commit comes from the run's commit.txt when present)
 
 set -euo pipefail
 
@@ -56,7 +56,8 @@ codesign --verify --deep --strict "$APP"
 
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
 COMMIT=$(cat "${ZIP:h:h}/commit.txt" 2>/dev/null || true)
-NAME="SkinAmp-$VERSION${COMMIT:+-$COMMIT}"
+BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")
+NAME="SkinAmp-$VERSION-$BUILD${COMMIT:+-$COMMIT}"
 mkdir -p "$REPO/build/dist"
 DMG="$REPO/build/dist/$NAME.dmg"
 
@@ -70,5 +71,6 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
 fi
 
 print "==> DMG  $DMG"
+print "==> Version $VERSION ($BUILD)${COMMIT:+, commit $COMMIT}"
 print "==> Signed by $IDENTITY$([[ -n "$NOTARY_PROFILE" ]] && print ', notarized and stapled' || print ', not notarized')"
 spctl --assess --type open --context context:primary-signature -v "$DMG" 2>&1 | sed 's/^/    /' || true

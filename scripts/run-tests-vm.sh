@@ -393,7 +393,10 @@ fi  # ! BUILD_ONLY
 
 if (( DMG )); then
   # Release build for scripts/make-dmg.sh. Zipped with ditto so the bundle's symlinks and signature survive the tar back.
-  run_step app-release "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Release -derivedDataPath build/DerivedData-release build && mkdir -p $GUEST_RESULTS/release && ditto -c -k --keepParent build/DerivedData-release/Build/Products/Release/SkinAmp.app $GUEST_RESULTS/release/SkinAmp.app.zip"
+  # The build number (CFBundleVersion) is a UTC date and time, computed once on the host (#0127); the command-line
+  # override reaches every target, so the app and its Quick Look extensions share it. Debug builds keep project.yml's 1.
+  BUILD_NUMBER=$(date -u +%Y%m%d.%H%M)
+  run_step app-release "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Release -derivedDataPath build/DerivedData-release CURRENT_PROJECT_VERSION=$BUILD_NUMBER build && mkdir -p $GUEST_RESULTS/release && print -r -- $BUILD_NUMBER > $GUEST_RESULTS/release/build.txt && ditto -c -k --keepParent build/DerivedData-release/Build/Products/Release/SkinAmp.app $GUEST_RESULTS/release/SkinAmp.app.zip"
 fi
 
 # --- Results back ----------------------------------------------------------
