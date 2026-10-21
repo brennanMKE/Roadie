@@ -98,6 +98,31 @@ final class WindowDockingCoordinator {
         layoutDidChange()
     }
 
+    // MARK: Showing
+
+    /// The top-left (AppKit space) for `controller`'s window as it is shown under `reference`: its current spot when it
+    /// has one that covers no visible skinned window, else directly under `reference` (`LayoutRules.showPosition`).
+    func showPosition(for controller: SkinWindowController, below reference: NSWindow) -> NSPoint {
+        let kind = controller.kind.windowKind
+        let frame = controller.window.frame
+        let current = desktop.box(frame)
+        let saved = controller.isPositioned ? Offset(x: current.x, y: current.y) : nil
+        let position = LayoutRules.showPosition(
+            size: frame.size, saved: saved, below: desktop.box(reference.frame),
+            visible: dockedWindows().filter { $0.kind != kind }, titleBarHeight: controller.dragStripHeight,
+            screens: screenBoxes, primary: primaryBox)
+        let box = Box(x: position.x, y: position.y, width: frame.width, height: frame.height)
+        let rect = desktop.rect(box)
+        return NSPoint(x: rect.minX, y: rect.maxY)
+    }
+
+    /// Moves `controller`'s window to `showPosition(for:below:)`, marks it positioned and saves the layout.
+    func place(_ controller: SkinWindowController, below reference: NSWindow) {
+        controller.window.setFrameTopLeftPoint(showPosition(for: controller, below: reference))
+        controller.isPositioned = true
+        layoutDidChange()
+    }
+
     // MARK: Z-order
 
     /// Brings the visible skinned windows forward together, directly beneath `controller`'s window and in their current

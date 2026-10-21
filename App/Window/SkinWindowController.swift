@@ -185,20 +185,24 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         NSMenu.popUpContextMenu(mainMenu(), with: event, for: hosting)
     }
 
-    /// Brings the window forward. The first time, a window with no restored position sits directly under `reference`
-    /// (Webamp's default layout), or centres when there is no reference.
+    /// Brings the window forward. Each time it comes back from hidden, it keeps its saved spot unless that spot covers
+    /// another visible skinned window, else it sits directly under `reference` (Webamp's default layout, #0120); with no
+    /// reference an unpositioned window centres.
     func show(below reference: NSWindow? = nil) {
-        if !hasBeenShown {
-            hasBeenShown = true
-            if !isPositioned {
-                if let reference {
-                    window.setFrameTopLeftPoint(NSPoint(x: reference.frame.minX, y: reference.frame.minY))
-                } else {
-                    window.center()
-                }
+        if !window.isVisible || !hasBeenShown {
+            if let reference, let coordinator {
+                coordinator.place(self, below: reference)
+            } else if let reference, !isPositioned {
+                window.setFrameTopLeftPoint(NSPoint(x: reference.frame.minX, y: reference.frame.minY))
+                isPositioned = true
+            } else if !isPositioned {
+                window.center()
                 isPositioned = true
                 coordinator?.layoutDidChange()
             }
+        }
+        if !hasBeenShown {
+            hasBeenShown = true
             applyLayout()
         }
         if window.isMiniaturized { window.deminiaturize(nil) }

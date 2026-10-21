@@ -127,4 +127,26 @@ public enum LayoutRules {
         for window in moving where window.box.top < topmost.box.top { topmost = window }
         return gripShift(for: strip(topmost), on: chosen)
     }
+
+    /// Where a window of `size` goes when it is shown: its `saved` top-left when that spot overlaps none of the
+    /// `visible` windows (shared edges are fine, docked windows share them) and its title strip is grabbable on a
+    /// screen; otherwise directly under `reference`. The reference is never moved, and the result may hang off the
+    /// bottom of the screen (as in Winamp).
+    public static func showPosition(
+        size: CGSize, saved: Offset?, below reference: Box, visible: [DockedWindow], titleBarHeight: CGFloat,
+        screens: [Box], primary: Box
+    ) -> Offset {
+        let screenList = screens.isEmpty ? [primary] : screens
+        if let saved {
+            let box = Box(x: saved.x, y: saved.y, width: size.width, height: size.height)
+            let overlaps = visible.contains { overlap(box, $0.box) }
+            if !overlaps && isGrabbable(box, titleBarHeight: titleBarHeight, on: screenList) { return saved }
+        }
+        return Offset(x: reference.x, y: reference.bottom)
+    }
+
+    /// Strict overlap: boxes that only touch along an edge do not overlap.
+    static func overlap(_ a: Box, _ b: Box) -> Bool {
+        a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+    }
 }

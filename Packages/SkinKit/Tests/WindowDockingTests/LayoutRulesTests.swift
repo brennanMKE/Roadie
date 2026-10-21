@@ -54,4 +54,60 @@ struct LayoutRulesTests {
         let tall = [w(.main, -10, 0, 550, 232), w(.playlist, -10, 232, 550, 900)]
         #expect(LayoutRules.recovery(windows: tall, screens: [screenA], primary: screenA) == .reset)
     }
+
+    // MARK: showPosition (#0120)
+
+    private let eqSize = CGSize(width: 550, height: 232)
+    private let mainBox = Box(x: 100, y: 100, width: 550, height: 232)
+
+    private func show(saved: Offset?, below reference: Box? = nil, visible: [DockedWindow]? = nil,
+                      size: CGSize? = nil, screens: [Box]? = nil) -> Offset {
+        LayoutRules.showPosition(
+            size: size ?? eqSize, saved: saved, below: reference ?? mainBox,
+            visible: visible ?? [DockedWindow(kind: .main, box: mainBox)], titleBarHeight: 28,
+            screens: screens ?? [screenA], primary: screenA)
+    }
+
+    @Test func showPositionKeepsAClearSavedSpot() {
+        #expect(show(saved: Offset(x: 700, y: 400)) == Offset(x: 700, y: 400))
+    }
+
+    @Test func showPositionDocksUnderReferenceWhenSavedSpotCoversMain() {
+        #expect(show(saved: Offset(x: 100, y: 100)) == Offset(x: 100, y: 332))
+    }
+
+    @Test func showPositionDocksUnderReferenceWhenSavedSpotPartlyOverlaps() {
+        #expect(show(saved: Offset(x: 300, y: 250)) == Offset(x: 100, y: 332))
+    }
+
+    @Test func showPositionAllowsSharedEdges() {
+        #expect(show(saved: Offset(x: 100, y: 332)) == Offset(x: 100, y: 332))
+        #expect(show(saved: Offset(x: 650, y: 100)) == Offset(x: 650, y: 100))
+    }
+
+    @Test func showPositionDocksUnderReferenceWhenUnpositioned() {
+        #expect(show(saved: nil) == Offset(x: 100, y: 332))
+    }
+
+    @Test func showPositionDocksPlaylistUnderEqualizer() {
+        let eqBox = Box(x: 100, y: 332, width: 550, height: 232)
+        let visible = [DockedWindow(kind: .main, box: mainBox), DockedWindow(kind: .equalizer, box: eqBox)]
+        let result = show(saved: Offset(x: 100, y: 332), below: eqBox, visible: visible,
+                          size: CGSize(width: 550, height: 464))
+        #expect(result == Offset(x: 100, y: 564))
+    }
+
+    @Test func showPositionIgnoresSavedSpotOffEveryScreen() {
+        #expect(show(saved: Offset(x: 5000, y: 5000)) == Offset(x: 100, y: 332))
+    }
+
+    @Test func showPositionNeverMovesTheReference() {
+        let laptop = Box(x: 0, y: 25, width: 1280, height: 775)
+        let lowMain = Box(x: 300, y: 650, width: 550, height: 232)
+        let result = show(saved: Offset(x: 300, y: 650), below: lowMain,
+                          visible: [DockedWindow(kind: .main, box: lowMain)], screens: [laptop])
+        #expect(result == Offset(x: 300, y: 882))
+        let box = Box(x: result.x, y: result.y, width: eqSize.width, height: eqSize.height)
+        #expect(!LayoutRules.overlap(box, lowMain))
+    }
 }
