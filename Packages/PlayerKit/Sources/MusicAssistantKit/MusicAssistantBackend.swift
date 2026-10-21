@@ -83,6 +83,10 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     var serverCommands = MAServerCommands.empty
     var commandProbe: Task<Void, Never>?
     var probedCommands: [String: MAServerCommands] = [:]
+    /// `libraryChanges()` subscribers (#0139) and the task following the installed client's events.
+    /// Internal for `MALibraryChanges.swift`.
+    var libraryChangeContinuations: [UUID: AsyncStream<LibraryChange>.Continuation] = [:]
+    var libraryChangeTask: Task<Void, Never>?
 
     /// One fixed address, trust on first use when it has no `serverID`. For tests: the app must use `init(server:token:...)`,
     /// which refuses to connect to a server whose identity has not been learned and verified.
@@ -176,6 +180,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             stopForwardingStates()
             stopWatchers()
             stopActivity()
+            stopLibraryChanges()
             await old.disconnect()
             client = nil
             connectedBaseURL = nil
@@ -205,6 +210,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         forwardStates(of: fresh)
         restartWatchers()
         restartActivity()
+        restartLibraryChanges()
         let info = await fresh.serverInfo
         startCommandProbe(
             base: address.baseURL,
@@ -232,6 +238,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         localPlayerID = nil
         stopWatchers()
         stopActivity()
+        stopLibraryChanges()
         commandProbe?.cancel()
         commandProbe = nil
         serverCommands = .empty

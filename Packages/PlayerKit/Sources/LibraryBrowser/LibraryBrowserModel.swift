@@ -128,6 +128,11 @@ public final class LibraryBrowserModel {
     @ObservationIgnored private var trackLoader: (@Sendable () async throws -> [LibraryTrack])?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var searchGeneration = 0
+    /// Follows `backend.libraryChanges()` while connected and shown (#0139).
+    @ObservationIgnored private var changesTask: Task<Void, Never>?
+    /// Every library change after the model's own handling: the seam for `PlaylistsModel`, `PlaylistEditor`,
+    /// and `FavoritesModel.apply(_:)` until they are owned here (#0139).
+    @ObservationIgnored public var onLibraryChange: (@MainActor (LibraryChange) -> Void)?
     private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LibraryBrowser")
 
     public init(
@@ -166,7 +171,9 @@ public final class LibraryBrowserModel {
     /// Connects unless already connected or connecting, then loads the current section if it is still idle.
     public func appeared() {
         switch connection {
-        case .connected: resumeSelection()
+        case .connected:
+            startChanges()
+            resumeSelection()
         case .connecting: break
         case .idle, .failed: startConnect()
         }
@@ -178,6 +185,7 @@ public final class LibraryBrowserModel {
         connectTask?.cancel()
         connectTask = nil
         if connection == .connecting { connection = .idle }
+        stopChanges()
         artists.cancel()
         allAlbums.cancel()
         playlists.cancel()
@@ -253,6 +261,42 @@ public final class LibraryBrowserModel {
         selectedPlaylist = playlist
     }
 
+    // MARK: Library changes (#0139)
+
+    private func startChanges() {
+        guard changesTask == nil else { return }
+        let backend = backend
+        changesTask = Task { [weak self] in
+            for await change in await backend.libraryChanges() {
+                guard !Task.isCancelled else { return }
+                self?.apply(change)
+            }
+        }
+    }
+
+    private func stopChanges() {
+        changesTask?.cancel()
+        changesTask = nil
+    }
+
+    /// Every change is a refetch hint (design §3.4). Favorites and Discover go to `onLibraryChange` only.
+    public func apply(_ change: LibraryChange) {
+        switch change {
+        case .playlistAdded, .playlistDeleted:
+            if case .playlistDeleted(let id) = change, selectedPlaylist?.id == id { selectedPlaylist = nil }
+            if playlists.phase != .idle { playlists.reload() }
+        case .playlistUpdated(let id):
+            // Stand-in for `PlaylistEditor.reloadIfOpen(id)` until it lands.
+            if selectedPlaylist?.id == id { retryTracks() }
+            if playlists.phase != .idle { playlists.reload() }
+        case .played:
+            discover?.scheduleRefresh()
+        case .favoriteChanged:
+            break
+        }
+        onLibraryChange?(change)
+    }
+
     // MARK: Connection
 
     private func startConnect() {
@@ -283,6 +327,7 @@ public final class LibraryBrowserModel {
         switch result {
         case .connected:
             Self.log.info("connected")
+            startChanges()
             resumeSelection()
             if isSearching { scheduleSearch(immediate: true) }
         case .failed(_, let needsSettings):

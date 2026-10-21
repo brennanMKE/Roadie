@@ -1,5 +1,17 @@
 import Foundation
 
+/// A library change made elsewhere (another app, Music Assistant's web UI) or confirming an own write (#0139).
+/// Every change is a hint to refetch, never the data itself: the event envelopes are unverified (#0076).
+public enum LibraryChange: Hashable, Sendable {
+    case playlistAdded(MediaID)
+    case playlistUpdated(MediaID)
+    case playlistDeleted(MediaID)
+    /// `nil` when the event didn't say which way.
+    case favoriteChanged(MediaID, Bool?)
+    /// Something was played: a refresh hint for Discover rows.
+    case played
+}
+
 public enum MediaKind: String, Hashable, Sendable, Codable, CaseIterable {
     case artist, album, track, playlist, radio
 }

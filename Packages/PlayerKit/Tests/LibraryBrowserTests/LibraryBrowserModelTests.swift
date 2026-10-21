@@ -424,4 +424,23 @@ struct LibraryBrowserModelTests {
         #expect(await waitFor { failures.entries.count == 3 })
         #expect(failures.entries == ["unreachable(\"a\")|browse", "backend(\"t\")|browse", "unreachable(\"s\")|browse"])
     }
+
+    // MARK: Library changes (#0139)
+
+    @Test func playlistAddedElsewhereReloadsTheList() async {
+        let (backend, model) = await connected(
+            library: .sample(playlistCount: 2), capabilities: [.search, .playlists])
+        model.section = .playlists
+        #expect(await waitFor { model.playlists.phase == .loaded && model.playlists.items.count == 2 })
+        #expect(await waitFor { await backend.changeSubscriberCount == 1 })
+        var forwarded: [LibraryChange] = []
+        model.onLibraryChange = { forwarded.append($0) }
+        await backend.setLibrary(.sample(playlistCount: 3))
+        let added = LibraryChange.playlistAdded(MediaID(.playlist, "elsewhere"))
+        await backend.pushChange(added)
+        #expect(await waitFor { model.playlists.phase == .loaded && model.playlists.items.count == 3 })
+        #expect(forwarded == [added])
+        model.disappeared()
+        #expect(await waitFor { await backend.changeSubscriberCount == 0 })
+    }
 }

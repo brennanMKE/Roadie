@@ -251,4 +251,28 @@ public actor StubMusicBackend: MusicBackend {
     }
 
     private func removeStream(_ id: UUID) { streams[id] = nil }
+
+    // MARK: Library changes (#0139)
+
+    private var changeStreams: [UUID: AsyncStream<LibraryChange>.Continuation] = [:]
+
+    /// Live `libraryChanges()` subscribers.
+    public var changeSubscriberCount: Int { changeStreams.count }
+
+    /// Feeds every live `libraryChanges()` stream, as a change made elsewhere would.
+    public func pushChange(_ change: LibraryChange) {
+        for continuation in changeStreams.values { continuation.yield(change) }
+    }
+
+    public func libraryChanges() async -> AsyncStream<LibraryChange> {
+        let (stream, continuation) = AsyncStream<LibraryChange>.makeStream(bufferingPolicy: .bufferingNewest(64))
+        let id = UUID()
+        changeStreams[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeChangeStream(id) }
+        }
+        return stream
+    }
+
+    private func removeChangeStream(_ id: UUID) { changeStreams[id] = nil }
 }

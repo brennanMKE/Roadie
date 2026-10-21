@@ -89,6 +89,8 @@ public protocol MusicBackend: AnyObject, Sendable {
     func setFavorite(_ id: MediaID, _ on: Bool) async throws
     /// Favorites what `output` plays now (#0141). Default: `.unsupported(.favorites)`.
     func favoriteCurrentTrack(on output: OutputDevice.ID) async throws
+    /// Library changes made elsewhere (#0139), as refetch hints. Default: a stream that finishes at once.
+    func libraryChanges() async -> AsyncStream<LibraryChange>
 }
 
 extension MusicBackend {
@@ -104,6 +106,11 @@ extension MusicBackend {
 }
 
 extension MusicBackend {
+    /// Backends without change events have nothing to follow.
+    public func libraryChanges() async -> AsyncStream<LibraryChange> {
+        AsyncStream { $0.finish() }
+    }
+
     /// Backends without remote outputs can't move a queue.
     public func transfer(from source: OutputDevice.ID, to target: OutputDevice.ID, autoPlay: Bool) async throws {
         throw MusicBackendError.unsupported(.remoteOutputs)
