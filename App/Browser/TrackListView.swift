@@ -63,6 +63,17 @@ struct TrackListView: View {
                             Text(LibraryFormat.trackSummary(count: tracks.count, duration: tracks.reduce(0) { $0 + ($1.duration ?? 0) }))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if library.selectedAlbum == nil, let playlist = library.selectedPlaylist {
+                                HStack(spacing: 4) {
+                                    if !playlist.isEditable {
+                                        Image(systemName: "lock.fill").accessibilityHidden(true)
+                                    }
+                                    Text(PlaylistGrouping.detailLine(playlist))
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("library.playlist.detail")
+                            }
                         }
                         .padding([.horizontal, .top])
                         .padding(.bottom, 8)

@@ -434,7 +434,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     public func playlists(page: PageRequest) async throws -> Page<LibraryPlaylist> {
         try await guarded {
             let (items, total) = try await listing(.playlist, as: MAPlaylist.self, page: page, albumArtistsOnly: false)
-            return Page.make(items: items.map(LibraryPlaylist.init(ma:)), request: page, total: total)
+            return Page.make(items: items.map { LibraryPlaylist(ma: $0) }, request: page, total: total)
         }
     }
 

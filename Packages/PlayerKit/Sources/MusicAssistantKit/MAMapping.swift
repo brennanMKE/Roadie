@@ -16,6 +16,34 @@ enum MAMapping {
         guard let artists, !artists.isEmpty else { return nil }
         return artists.map { ArtistName.display($0.name) }.joined(separator: ", ")
     }
+
+    /// The provider that owns a playlist's first mapping, else the item's own provider.
+    static func playlistDomain(_ playlist: MAPlaylist) -> String? {
+        playlist.providerMappings?.first?.providerDomain ?? playlist.provider
+    }
+
+    /// The builtin provider's own playlists (`random_tracks`, `all_favorite_tracks`, ...) are `.builtIn`: they are owned
+    /// by "Music Assistant" or are read-only (2.10.6 records them with `owner: "user"`, `is_editable: false`). An editable
+    /// builtin playlist is the user's M3U-backed one. Anything else belongs to its provider.
+    static func playlistSource(_ playlist: MAPlaylist) -> PlaylistSource {
+        let domain = playlistDomain(playlist)
+        switch domain {
+        case "builtin":
+            return playlist.owner == "Music Assistant" || playlist.isEditable != true ? .builtIn : .user
+        case nil, "library":
+            return .user
+        case let domain?:
+            return .provider(name: providerDisplayName(domain))
+        }
+    }
+
+    /// `spotify` → "Spotify", `apple_music` → "Apple Music". A display name from `providers` could replace this later.
+    static func providerDisplayName(_ domain: String) -> String {
+        let known = ["ytmusic": "YouTube Music", "tidal": "Tidal", "qobuz": "Qobuz", "plex": "Plex", "deezer": "Deezer",
+                     "soundcloud": "SoundCloud", "filesystem_local": "Local Files", "filesystem_smb": "SMB Share"]
+        if let name = known[domain] { return name }
+        return domain.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
 }
 
 extension LibraryArtist {
@@ -23,6 +51,7 @@ extension LibraryArtist {
         self.init(
             id: MediaID(.artist, artist.uri), name: ArtistName.display(artist.name), sortName: artist.sortName,
             artwork: MAMapping.artwork(artist.metadata))
+        isFavorite = artist.favorite
     }
 }
 
@@ -41,6 +70,7 @@ extension LibraryAlbum {
             artistID: album.artists?.first.map { MediaID(.artist, $0.uri) },
             artistName: MAMapping.artistNames(album.artists), year: album.year, trackCount: nil,
             artwork: MAMapping.artwork(album.metadata))
+        isFavorite = album.favorite
     }
 }
 
@@ -56,14 +86,28 @@ extension LibraryTrack {
             trackNumber: track.trackNumber, discNumber: track.discNumber, duration: track.duration,
             bitrate: bitRate, sampleRate: format?.sampleRate.map(Double.init), channels: format?.channels,
             artwork: MAMapping.artwork(track.metadata) ?? track.album?.image?.proxyID.map { ArtworkRef($0) })
+        isFavorite = track.favorite
+        playlistPosition = track.position
     }
 }
 
 extension LibraryPlaylist {
-    init(ma playlist: MAPlaylist) {
+    /// `canReorder`: the server has `music/playlists/move_playlist_track` (absent on 2.10.6; detected in a later item).
+    init(ma playlist: MAPlaylist, canReorder: Bool = false) {
+        let isEditable = playlist.isEditable ?? false
+        let isDynamic = playlist.isDynamic ?? false
+        let source = MAMapping.playlistSource(playlist)
+        var editing: PlaylistEditing = []
+        if isEditable && !isDynamic {
+            editing.insert(.addRemove)
+            if canReorder { editing.insert(.reorder) }
+        }
+        if source != .builtIn { editing.formUnion([.rename, .delete]) }
         self.init(
             id: MediaID(.playlist, playlist.uri), name: playlist.name, trackCount: nil,
-            artwork: MAMapping.artwork(playlist.metadata))
+            artwork: MAMapping.artwork(playlist.metadata), isEditable: isEditable, isDynamic: isDynamic,
+            owner: playlist.owner, source: source, editing: editing, isFavorite: playlist.favorite,
+            libraryID: playlist.provider == "library" ? playlist.itemID : nil)
     }
 }
 

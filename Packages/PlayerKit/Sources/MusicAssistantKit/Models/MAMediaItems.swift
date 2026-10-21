@@ -146,6 +146,8 @@ public struct MATrack: Codable, Hashable, Sendable {
     public var album: MAItemMapping?
     public var discNumber: Int?
     public var trackNumber: Int?
+    /// 1-based position, present on `music/playlists/playlist_tracks` rows.
+    public var position: Int?
 
     enum CodingKeys: String, CodingKey {
         case itemID = "item_id"
@@ -153,7 +155,7 @@ public struct MATrack: Codable, Hashable, Sendable {
         case mediaType = "media_type"
         case sortName = "sort_name"
         case providerMappings = "provider_mappings"
-        case metadata, favorite, available, duration, artists, album
+        case metadata, favorite, available, duration, artists, album, position
         case discNumber = "disc_number"
         case trackNumber = "track_number"
     }
@@ -173,6 +175,8 @@ public struct MAPlaylist: Codable, Hashable, Sendable {
     public var owner: String?
     public var isEditable: Bool?
     public var isDynamic: Bool?
+    /// Media types the playlist can hold; the server's default is `["track"]`.
+    public var supportedMediatypes: [String]?
 
     enum CodingKeys: String, CodingKey {
         case itemID = "item_id"
@@ -183,6 +187,7 @@ public struct MAPlaylist: Codable, Hashable, Sendable {
         case metadata, favorite, available, owner
         case isEditable = "is_editable"
         case isDynamic = "is_dynamic"
+        case supportedMediatypes = "supported_mediatypes"
     }
 }
 

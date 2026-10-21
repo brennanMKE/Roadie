@@ -26,15 +26,39 @@ struct PlaylistListView: View {
 
     var body: some View {
         PagedListView(
-            list: library.playlists, rows: library.playlists.items, pagingID: \.id, emptyText: "No playlists",
-            selectedID: library.selectedPlaylist?.id, onSelect: { library.select($0) }
-        ) { playlist in
-            HStack {
-                Text(playlist.name).lineLimit(1)
-                Spacer()
-                if let count = playlist.trackCount {
-                    Text("\(count)").foregroundStyle(.secondary).monospacedDigit()
+            list: library.playlists, rows: PlaylistGrouping.rows(library.playlists.items),
+            pagingID: { row in
+                switch row {
+                case .playlist(let playlist): playlist.id
+                // A header's paging id is its group's last playlist, which is in `playlists.items`.
+                case .header(let group): group.playlists[group.playlists.count - 1].id
                 }
+            },
+            emptyText: "No playlists",
+            selectedID: library.selectedPlaylist.map { PlaylistGrouping.Row.playlist($0).id },
+            onSelect: { row in
+                if case .playlist(let playlist) = row { library.select(playlist) }
+            }
+        ) { row in
+            switch row {
+            case .header(let group):
+                HStack(spacing: 4) {
+                    Text(group.title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    if group.isReadOnly {
+                        Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.secondary)
+                            .accessibilityLabel("Read-only")
+                    }
+                }
+                .selectionDisabled()
+            case .playlist(let playlist):
+                HStack {
+                    Text(playlist.name).lineLimit(1)
+                    Spacer()
+                    if let count = PlaylistGrouping.countText(playlist) {
+                        Text(count).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                }
+                .padding(.leading, 8)
             }
         }
         .accessibilityIdentifier("library.playlists")

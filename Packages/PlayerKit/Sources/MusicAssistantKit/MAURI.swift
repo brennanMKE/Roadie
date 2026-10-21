@@ -2,7 +2,7 @@ import Foundation
 import MusicBackendKit
 
 public enum MAMediaKind: String, Hashable, Sendable, CaseIterable {
-    case artist, album, track, playlist
+    case artist, album, track, playlist, radio
 
     /// The command namespace: `music/<plural>/...`.
     var plural: String { rawValue + "s" }
@@ -13,6 +13,7 @@ public enum MAMediaKind: String, Hashable, Sendable, CaseIterable {
         case .album: .album
         case .track: .track
         case .playlist: .playlist
+        case .radio: .radio
         }
     }
 
@@ -22,6 +23,7 @@ public enum MAMediaKind: String, Hashable, Sendable, CaseIterable {
         case .album: self = .album
         case .track: self = .track
         case .playlist: self = .playlist
+        case .radio: self = .radio
         }
     }
 }

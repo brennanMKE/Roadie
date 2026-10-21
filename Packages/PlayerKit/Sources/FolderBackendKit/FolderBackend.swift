@@ -370,7 +370,7 @@ public actor FolderBackend: MusicBackend {
             case .artist:
                 guard let albums = lookup.albumsByArtist[item] else { throw MusicBackendError.notFound(item) }
                 for album in albums { positions.append(contentsOf: lookup.tracksByAlbum[index.albums[album].id] ?? []) }
-            case .playlist:
+            case .playlist, .radio:
                 throw MusicBackendError.unsupported(.playlists)
             }
         }
