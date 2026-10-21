@@ -157,6 +157,13 @@ actor StubSkinIndex: SkinIndexReading {
         calls.append(.random(statuses))
         return records.filter { statuses.contains($0.status) }.min(by: Self.order)
     }
+
+    func skins(md5s: [String]) async throws -> [String: SkinRecord] {
+        let wanted = Set(md5s)
+        var result: [String: SkinRecord] = [:]
+        for record in records { if let md5 = record.md5, wanted.contains(md5) { result[md5] = record } }
+        return result
+    }
 }
 
 @MainActor

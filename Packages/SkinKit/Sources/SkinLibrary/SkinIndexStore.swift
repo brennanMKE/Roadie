@@ -4,12 +4,19 @@ import Foundation
 enum IngestOutcome: Sendable {
     case parsed(
         stamp: FileStamp, hash: String, name: String, readme: String?, status: SkinStatus, warnings: [String],
-        parserVersion: Int)
-    case linked(stamp: FileStamp, hash: String)
+        parserVersion: Int, md5: String? = nil)
+    case linked(stamp: FileStamp, hash: String, md5: String? = nil)
 
     var stamp: FileStamp {
         switch self {
-        case .parsed(let stamp, _, _, _, _, _, _), .linked(let stamp, _): stamp
+        case .parsed(let stamp, _, _, _, _, _, _, _), .linked(let stamp, _, _): stamp
+        }
+    }
+
+    /// The file's MD5; `""` when it could not be read (so the backfill does not retry it), nil when not computed.
+    var md5: String? {
+        switch self {
+        case .parsed(_, _, _, _, _, _, _, let md5), .linked(_, _, let md5): md5
         }
     }
 }
@@ -26,7 +33,7 @@ struct AppliedCounts: Sendable, Equatable {
 /// The SQLite index: skins, the files that hold them, and an FTS5 table over name and readme.
 /// One connection, owned by this actor; every reader and writer goes through it.
 public actor SkinIndexStore {
-    public static let schemaVersion: Int32 = 1
+    public static let schemaVersion: Int32 = 2
 
     /// `~/Library/Application Support/com.brennanmke.SkinAmp/SkinLibrary/index.sqlite`; not Caches, because
     /// an index of 100k skins is minutes of work and must not be purged by the system.
@@ -55,7 +62,7 @@ public actor SkinIndexStore {
 
     // MARK: Schema
 
-    private static let schemaV1: [String] = [
+    static let schemaV1: [String] = [
         """
         CREATE TABLE skins (
           id INTEGER PRIMARY KEY,
@@ -101,7 +108,13 @@ public actor SkinIndexStore {
     ]
 
     /// Version N is applied by running `migrations[N]`; a database above `schemaVersion` is refused.
-    private static let migrations: [Int32: [String]] = [1: schemaV1]
+    /// v2 (#0126): the MD5 the Skin Museum keys skins by. Nullable: v1 rows are backfilled by `SkinIndexer`.
+    static let schemaV2: [String] = [
+        "ALTER TABLE skins ADD COLUMN md5 TEXT",
+        "CREATE INDEX skins_md5 ON skins(md5)",
+    ]
+
+    private static let migrations: [Int32: [String]] = [1: schemaV1, 2: schemaV2]
 
     private static func migrate(_ db: SQLiteDatabase) throws {
         let found = db.userVersion
@@ -169,13 +182,15 @@ public actor SkinIndexStore {
                 "UPDATE skins SET status = ?, warnings = ?, readme = ?, parser_version = ? WHERE id = ?")
             let putFile = try db.statement(
                 "INSERT OR REPLACE INTO files(path, size, mtime, skin_id) VALUES (?, ?, ?, ?)")
+            let putMD5 = try db.statement(
+                "UPDATE skins SET md5 = ? WHERE id = ? AND (md5 IS NULL OR (md5 = '' AND ? != ''))")
             defer { findSkin.reset(); findFile.reset() }
 
             for outcome in ordered {
                 let stamp = outcome.stamp
                 let hash: String
                 switch outcome {
-                case .parsed(_, let h, _, _, _, _, _), .linked(_, let h): hash = h
+                case .parsed(_, let h, _, _, _, _, _, _), .linked(_, let h, _): hash = h
                 }
                 try findFile.bind(stamp.path, at: 1)
                 let pathExisted = try findFile.step()
@@ -187,7 +202,7 @@ public actor SkinIndexStore {
                 var created = false
 
                 switch outcome {
-                case .parsed(_, _, let name, let readme, let status, let warnings, let version):
+                case .parsed(_, _, let name, let readme, let status, let warnings, let version, _):
                     if let id = skinID {
                         try updateSkin.bind(status.rawValue, at: 1)
                         try updateSkin.bind(warnings.joined(separator: "\n"), at: 2)
@@ -223,6 +238,13 @@ public actor SkinIndexStore {
                 try putFile.bind(id, at: 4)
                 try putFile.step()
                 putFile.reset()
+                if let md5 = outcome.md5 {
+                    try putMD5.bind(md5, at: 1)
+                    try putMD5.bind(id, at: 2)
+                    try putMD5.bind(md5, at: 3)
+                    try putMD5.step()
+                    putMD5.reset()
+                }
 
                 if pathExisted { counts.updated += 1 } else if created { counts.added += 1 } else { counts.linked += 1 }
             }
@@ -276,7 +298,7 @@ public actor SkinIndexStore {
     private static let select = """
         SELECT s.id, s.hash, s.name, s.readme, s.status, s.warnings, s.size, \
         (SELECT COUNT(*) FROM files WHERE skin_id = s.id), \
-        COALESCE((SELECT MIN(path) FROM files WHERE skin_id = s.id), '') \
+        COALESCE((SELECT MIN(path) FROM files WHERE skin_id = s.id), ''), s.md5 \
         FROM skins s
         """
 
@@ -286,7 +308,8 @@ public actor SkinIndexStore {
             id: st.int64(0), hash: st.string(1), name: st.string(2), readme: st.optionalString(3),
             status: SkinStatus(rawValue: st.string(4)) ?? .failed,
             warnings: warnings.isEmpty ? [] : warnings.components(separatedBy: "\n"),
-            size: st.int64(6), fileCount: Int(st.int64(7)), primaryPath: st.string(8))
+            size: st.int64(6), fileCount: Int(st.int64(7)), primaryPath: st.string(8),
+            md5: st.optionalString(9).flatMap { $0.isEmpty ? nil : $0 })
     }
 
     /// A page ordered by name (case-insensitive), then id.
@@ -340,6 +363,59 @@ public actor SkinIndexStore {
         try st.bind(hash, at: 1)
         return try st.step() ? record(st) : nil
     }
+
+    // MARK: MD5 (#0126)
+
+    /// The skins whose MD5 is one of `md5s`, keyed by MD5; a whole Museum result page in one call.
+    public func skins(md5s: [String]) throws -> [String: SkinRecord] {
+        let wanted = Array(Set(md5s.filter(SkinContentHash.isValidMD5)))
+        var result: [String: SkinRecord] = [:]
+        for start in stride(from: 0, to: wanted.count, by: 500) {
+            let chunk = Array(wanted[start..<min(start + 500, wanted.count)])
+            let marks = Array(repeating: "?", count: chunk.count).joined(separator: ",")
+            let st = try db.temporaryStatement(Self.select + " WHERE s.md5 IN (\(marks))")
+            for (index, md5) in chunk.enumerated() { try st.bind(md5, at: Int32(index + 1)) }
+            while try st.step() {
+                let row = record(st)
+                if let md5 = row.md5 { result[md5] = row }
+            }
+        }
+        return result
+    }
+
+    /// Skins with no MD5 yet, by id after `afterID`, each with its hash and smallest file path.
+    func skinsMissingMD5(after afterID: Int64 = 0, limit: Int) throws -> [(id: Int64, hash: String, path: String)] {
+        let st = try db.statement(
+            """
+            SELECT s.id, s.hash, (SELECT MIN(path) FROM files WHERE skin_id = s.id) FROM skins s \
+            WHERE s.md5 IS NULL AND s.id > ? ORDER BY s.id LIMIT ?
+            """)
+        defer { st.reset() }
+        try st.bind(afterID, at: 1)
+        try st.bind(Int64(limit), at: 2)
+        var rows: [(id: Int64, hash: String, path: String)] = []
+        while try st.step() {
+            guard let path = st.optionalString(2) else { continue }
+            rows.append((st.int64(0), st.string(1), path))
+        }
+        return rows
+    }
+
+    /// Sets the MD5 of many skins in one transaction; `""` marks a file that could not be read.
+    func setMD5s(_ values: [(id: Int64, md5: String)]) throws {
+        guard !values.isEmpty else { return }
+        try db.transaction {
+            let st = try db.statement("UPDATE skins SET md5 = ? WHERE id = ?")
+            for value in values {
+                try st.bind(value.md5, at: 1)
+                try st.bind(value.id, at: 2)
+                try st.step()
+                st.reset()
+            }
+        }
+    }
+
+    func setMD5(_ md5: String, forSkin id: Int64) throws { try setMD5s([(id, md5)]) }
 
     public func files(forSkin id: Int64) throws -> [FileStamp] {
         let st = try db.statement("SELECT path, size, mtime FROM files WHERE skin_id = ? ORDER BY path")

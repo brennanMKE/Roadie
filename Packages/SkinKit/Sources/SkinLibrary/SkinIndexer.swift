@@ -95,6 +95,11 @@ public actor SkinIndexer {
 
         emit(SkinIndexProgress(phase: .pruning, changed: changed.count, processed: state.processed, totalFiles: onDisk.count), force: true)
         try await store.pruneOrphans()
+        if !summary.cancelled {
+            summary.cancelled = try await backfillMD5 { processed in
+                emit(SkinIndexProgress(phase: .hashing, changed: changed.count, processed: processed, totalFiles: onDisk.count))
+            }
+        }
         let formatter = ISO8601DateFormatter()
         try await store.setMeta("last_scan", formatter.string(from: Date()))
         try await store.setMeta("folder", folder.path)
@@ -113,11 +118,75 @@ public actor SkinIndexer {
         return summary
     }
 
+    // MARK: Single-file add (#0126)
+
+    /// Indexes just these folder-relative paths (a skin the Museum downloaded) without walking the folder.
+    /// Throws `.passAlreadyRunning` while `run` is active; the caller queues a normal pass instead.
+    public func add(paths: [String]) async throws -> SkinIndexSummary {
+        guard !running else { throw SkinLibraryError.passAlreadyRunning }
+        running = true
+        defer { running = false }
+        let clock = ContinuousClock()
+        let started = clock.now
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
+        var stamps: [FileStamp] = []
+        for path in Set(paths) {
+            let values = try folder.appending(path: path).resourceValues(forKeys: keys)
+            guard values.isRegularFile == true else { throw SkinLibraryError.folderUnreadable("not a file: \(path)") }
+            stamps.append(
+                FileStamp(
+                    path: path, size: Int64(values.fileSize ?? 0),
+                    mtime: values.contentModificationDate?.timeIntervalSince1970 ?? 0))
+        }
+        stamps.sort { $0.path < $1.path }
+        var summary = SkinIndexSummary()
+        var start = 0
+        while start < stamps.count {
+            let batch = Array(stamps[start..<min(start + batchSize, stamps.count)])
+            let (counts, failed) = try await ingest(batch)
+            summary.added += counts.added
+            summary.updated += counts.updated
+            summary.linked += counts.linked
+            summary.failed += failed
+            start += batch.count
+        }
+        summary.totalFiles = try await store.counts().files
+        summary.totalSkins = try await store.counts().skins
+        summary.duration = started.duration(to: clock.now).seconds
+        log.info("added \(stamps.count, privacy: .public) files without a pass")
+        return summary
+    }
+
+    // MARK: MD5 backfill (#0126)
+
+    /// Computes the MD5 of skins indexed before schema v2 (hash only, no ZIP parse), in cancellable batches.
+    /// Returns whether it was cancelled. A file whose bytes no longer match the stored hash is left for the next pass.
+    private func backfillMD5(progress: (Int) -> Void) async throws -> Bool {
+        let folder = self.folder
+        let ingester = self.ingester
+        var after: Int64 = 0
+        var processed = 0
+        while true {
+            if cancelFlag.withLock({ $0 }) || Task.isCancelled { return true }
+            let rows = try await store.skinsMissingMD5(after: after, limit: batchSize)
+            guard let last = rows.last else { return false }
+            after = last.id
+            let results: [(id: Int64, md5: String)?] = await Self.boundedMap(rows, concurrency: concurrency) { row in
+                guard let digests = try? ingester.digests(folder.appending(path: row.path)) else { return (row.id, "") }
+                return digests.sha256 == row.hash ? (row.id, digests.md5) : nil
+            }
+            try await store.setMD5s(results.compactMap { $0 })
+            processed += rows.count
+            progress(processed)
+        }
+    }
+
     // MARK: One batch
 
     private struct Hashed: Sendable {
         var stamp: FileStamp
         var hash: String
+        var md5: String
         var failure: String?
     }
 
@@ -127,11 +196,12 @@ public actor SkinIndexer {
         let hashed: [Hashed] = await Self.boundedMap(batch, concurrency: concurrency) { stamp in
             let url = folder.appending(path: stamp.path)
             do {
-                return Hashed(stamp: stamp, hash: try ingester.hash(url), failure: nil)
+                let digests = try ingester.digests(url)
+                return Hashed(stamp: stamp, hash: digests.sha256, md5: digests.md5, failure: nil)
             } catch {
                 // A stable key that cannot collide with real content, so the row is not retried until the stamp changes.
                 let key = SkinContentHash.hex(of: Data("unreadable:\(stamp.path)".utf8))
-                return Hashed(stamp: stamp, hash: key, failure: "Unreadable file: \(error.localizedDescription)")
+                return Hashed(stamp: stamp, hash: key, md5: "", failure: "Unreadable file: \(error.localizedDescription)")
             }
         }
 
@@ -160,11 +230,12 @@ public actor SkinIndexer {
                     outcomes.append(
                         .parsed(
                             stamp: item.stamp, hash: item.hash, name: name, readme: inspection.readme,
-                            status: inspection.status, warnings: inspection.warnings, parserVersion: parserVersion))
+                            status: inspection.status, warnings: inspection.warnings, parserVersion: parserVersion,
+                            md5: item.md5))
                     continue
                 }
             }
-            outcomes.append(.linked(stamp: item.stamp, hash: item.hash))
+            outcomes.append(.linked(stamp: item.stamp, hash: item.hash, md5: item.md5))
         }
         return (try await store.apply(outcomes), failed)
     }

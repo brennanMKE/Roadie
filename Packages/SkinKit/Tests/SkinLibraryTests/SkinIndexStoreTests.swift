@@ -5,12 +5,12 @@ import Testing
 
 func parsedOutcome(
     _ path: String, hash: String, name: String? = nil, readme: String? = nil, status: SkinStatus = .ok,
-    warnings: [String] = [], version: Int = 1, size: Int64 = 10, mtime: Double = 1
+    warnings: [String] = [], version: Int = 1, size: Int64 = 10, mtime: Double = 1, md5: String? = nil
 ) -> IngestOutcome {
     .parsed(
         stamp: FileStamp(path: path, size: size, mtime: mtime), hash: hash,
         name: name ?? URL(filePath: path).deletingPathExtension().lastPathComponent, readme: readme, status: status,
-        warnings: warnings, parserVersion: version)
+        warnings: warnings, parserVersion: version, md5: md5)
 }
 
 func linkedOutcome(_ path: String, hash: String, size: Int64 = 10, mtime: Double = 1) -> IngestOutcome {
@@ -18,17 +18,17 @@ func linkedOutcome(_ path: String, hash: String, size: Int64 = 10, mtime: Double
 }
 
 @Suite struct SkinIndexStoreTests {
-    @Test func migrateCreatesSchemaAtVersion1AndIsIdempotent() async throws {
+    @Test func migrateCreatesSchemaAtCurrentVersionAndIsIdempotent() async throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
         let url = dir.appending("db/index.sqlite")
         let store = try await SkinIndexStore.open(at: url)
-        #expect(try await store.strings("PRAGMA user_version") == ["1"])
+        #expect(try await store.strings("PRAGMA user_version") == ["2"])
         let tables = try await store.strings("SELECT name FROM sqlite_master WHERE type = 'table'")
         for name in ["skins", "files", "meta", "skins_fts"] { #expect(tables.contains(name)) }
         _ = try await store.apply([parsedOutcome("a.wsz", hash: "h1")])
         let again = try await SkinIndexStore.open(at: url)
-        #expect(try await again.strings("PRAGMA user_version") == ["1"])
+        #expect(try await again.strings("PRAGMA user_version") == ["2"])
         #expect(try await again.counts().skins == 1)
     }
 
@@ -233,7 +233,7 @@ func linkedOutcome(_ path: String, hash: String, size: Int64 = 10, mtime: Double
         #expect(try await store.counts().files == 0)
         #expect(try await store.meta("folder") == nil)
         #expect(try await store.search("findme").isEmpty)
-        #expect(try await store.strings("PRAGMA user_version") == ["1"])
+        #expect(try await store.strings("PRAGMA user_version") == ["2"])
         _ = try await store.apply([parsedOutcome("a.wsz", hash: "h1", name: "findme")])
         #expect(try await store.search("findme").count == 1)
     }
@@ -246,5 +246,56 @@ func linkedOutcome(_ path: String, hash: String, size: Int64 = 10, mtime: Double
         try await store.setMeta("k", "v1")
         try await store.setMeta("k", "v2")
         #expect(try await store.meta("k") == "v2")
+    }
+
+    // MARK: Schema v2, MD5 (#0126)
+
+    @Test func migratesV1DatabaseToV2KeepingRows() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let url = dir.appending("index.sqlite")
+        do {
+            let db = try SQLiteDatabase(url: url)
+            for sql in SkinIndexStore.schemaV1 { try db.execute(sql) }
+            try db.execute(
+                """
+                INSERT INTO skins(id, hash, name, readme, status, warnings, size, parser_version, first_indexed) \
+                VALUES (1, 'h1', 'Old', 'old readme', 'ok', '', 10, 1, 0)
+                """)
+            try db.execute("INSERT INTO files(path, size, mtime, skin_id) VALUES ('Old.wsz', 10, 1, 1)")
+            db.userVersion = 1
+        }
+        let store = try await SkinIndexStore.open(at: url)
+        #expect(try await store.strings("PRAGMA user_version") == ["2"])
+        let record = try #require(try await store.skin(hash: "h1"))
+        #expect(record.name == "Old")
+        #expect(record.primaryPath == "Old.wsz")
+        #expect(record.md5 == nil)
+        #expect(try await store.search("old").map(\.name) == ["Old"])
+        #expect(try await store.strings("SELECT name FROM sqlite_master WHERE type = 'index'").contains("skins_md5"))
+        let missing = try await store.skinsMissingMD5(limit: 10)
+        #expect(missing.map(\.id) == [record.id])
+        #expect(missing.first?.path == "Old.wsz")
+    }
+
+    @Test func skinsByMD5ReturnsMatchingRecords() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let store = try await dir.makeStore()
+        let m1 = String(repeating: "a", count: 32), m2 = String(repeating: "b", count: 32)
+        _ = try await store.apply([
+            parsedOutcome("a.wsz", hash: "h1", md5: m1),
+            parsedOutcome("b.wsz", hash: "h2", md5: m2),
+            parsedOutcome("c.wsz", hash: "h3"),
+        ])
+        let found = try await store.skins(md5s: [m1, String(repeating: "c", count: 32), "../not-an-md5", m1])
+        #expect(Set(found.keys) == [m1])
+        #expect(found[m1]?.name == "a")
+        #expect(found[m1]?.md5 == m1)
+        #expect(try await store.skin(hash: "h3")?.md5 == nil)
+        #expect(try await store.skinsMissingMD5(limit: 10).map(\.hash) == ["h3"])
+        // Many at once go through in chunks.
+        let many = (0..<1200).map { String(format: "%032x", $0) } + [m2]
+        #expect(try await store.skins(md5s: many).keys.sorted() == [m2])
     }
 }

@@ -13,14 +13,14 @@ import Testing
         try FileManager.default.copyItem(at: a, to: b)
         let ingester = SkinIngester()
         let expected = SHA256.hash(data: try Data(contentsOf: a)).map { String(format: "%02x", $0) }.joined()
-        #expect(try ingester.hash(a) == expected)
+        #expect(try ingester.digests(a).sha256 == expected)
         #expect(expected.count == 64)
         #expect(SkinContentHash.isValid(expected))
-        #expect(try ingester.hash(b) == expected)
+        #expect(try ingester.digests(b).sha256 == expected)
         var bytes = try Data(contentsOf: b)
         bytes[bytes.count / 2] ^= 0xFF
         try bytes.write(to: b)
-        #expect(try ingester.hash(b) != expected)
+        #expect(try ingester.digests(b).sha256 != expected)
     }
 
     @Test func contentHashValidation() {
@@ -66,6 +66,6 @@ import Testing
     @Test func hashThrowsForAMissingFile() throws {
         let dir = try TempDir()
         defer { dir.cleanup() }
-        #expect(throws: (any Error).self) { try SkinIngester().hash(dir.appending("nope.wsz")) }
+        #expect(throws: (any Error).self) { try SkinIngester().digests(dir.appending("nope.wsz")) }
     }
 }

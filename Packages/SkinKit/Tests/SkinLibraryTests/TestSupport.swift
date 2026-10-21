@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 @testable import SkinKit
 import ZIPFoundation
@@ -127,12 +128,13 @@ final class StubIngester: SkinIngesting, @unchecked Sendable {
         if recordThread && Thread.isMainThread { lock.withLock { _mainThreadCalls += 1 } }
     }
 
-    func hash(_ url: URL) throws -> String {
+    func digests(_ url: URL) throws -> SkinDigests {
         lock.withLock { _hashes += 1 }
         note(url)
         // The stub keys by the file's path below the skins folder: the last two components are unique in tests.
         let key = relative(url)
-        return lock.withLock { overrides[key] } ?? "stub:" + key
+        let hash = lock.withLock { overrides[key] } ?? "stub:" + key
+        return SkinDigests(sha256: hash, md5: Insecure.MD5.hash(data: Data(hash.utf8)).map { String(format: "%02x", $0) }.joined())
     }
 
     func inspect(_ url: URL) -> SkinInspection {
@@ -155,9 +157,9 @@ final class CountingIngester: SkinIngesting, @unchecked Sendable {
     var hashes: Int { lock.withLock { _hashes } }
     var inspections: Int { lock.withLock { _inspections } }
 
-    func hash(_ url: URL) throws -> String {
+    func digests(_ url: URL) throws -> SkinDigests {
         lock.withLock { _hashes += 1 }
-        return try base.hash(url)
+        return try base.digests(url)
     }
 
     func inspect(_ url: URL) -> SkinInspection {

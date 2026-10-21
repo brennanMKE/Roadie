@@ -9,6 +9,8 @@ public protocol SkinIndexReading: Sendable {
     func neighbor(of id: Int64, direction: SkinNeighborDirection, statuses: Set<SkinStatus>) async throws -> SkinRecord?
     func skin(atPath path: String) async throws -> SkinRecord?
     func randomSkin(statuses: Set<SkinStatus>) async throws -> SkinRecord?
+    /// Skins by MD5, for badging a Skin Museum page (#0126).
+    func skins(md5s: [String]) async throws -> [String: SkinRecord]
 }
 
 extension SkinIndexStore: SkinIndexReading {}

@@ -19,10 +19,13 @@ public struct SkinRecord: Identifiable, Hashable, Sendable {
     public var fileCount: Int
     /// The smallest path of its files, relative to the folder.
     public var primaryPath: String
+    /// MD5 hex, 32 characters; the Skin Museum's key (#0126). Nil until computed (rows from schema v1) or when the
+    /// file could not be read.
+    public var md5: String?
 
     public init(
         id: Int64, hash: String, name: String, readme: String? = nil, status: SkinStatus, warnings: [String] = [],
-        size: Int64 = 0, fileCount: Int = 1, primaryPath: String = ""
+        size: Int64 = 0, fileCount: Int = 1, primaryPath: String = "", md5: String? = nil
     ) {
         self.id = id
         self.hash = hash
@@ -33,6 +36,7 @@ public struct SkinRecord: Identifiable, Hashable, Sendable {
         self.size = size
         self.fileCount = fileCount
         self.primaryPath = primaryPath
+        self.md5 = md5
     }
 }
 
@@ -52,7 +56,7 @@ public struct FileStamp: Hashable, Sendable {
 }
 
 public struct SkinIndexProgress: Hashable, Sendable {
-    public enum Phase: String, Sendable { case scanning, indexing, pruning, done }
+    public enum Phase: String, Sendable { case scanning, indexing, pruning, hashing, done }
     public var phase: Phase
     /// Files this pass has to ingest.
     public var changed: Int

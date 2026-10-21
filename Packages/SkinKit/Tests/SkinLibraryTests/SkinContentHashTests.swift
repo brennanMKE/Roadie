@@ -27,4 +27,18 @@ import Testing
         #expect(!SkinContentHash.isValid(String(hash.dropLast())))
         #expect(!SkinContentHash.isValid("../" + String(repeating: "a", count: 61)))
     }
+
+    @Test func digestsMatchKnownVectors() throws {
+        let digests = SkinContentHash.digests(of: Data("abc".utf8))
+        #expect(digests.md5 == "900150983cd24fb0d6963f7d28e17f72")
+        #expect(digests.sha256 == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        #expect(SkinContentHash.isValidMD5(digests.md5))
+        #expect(!SkinContentHash.isValidMD5(digests.sha256))
+        #expect(!SkinContentHash.isValidMD5(digests.md5.uppercased()))
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let file = dir.appending("abc.wsz")
+        try Data("abc".utf8).write(to: file)
+        #expect(try SkinContentHash.digests(of: file) == digests)
+    }
 }

@@ -69,6 +69,7 @@ final class SkinLibraryModel {
         case .scanning: return "Scanning the folder…"
         case .indexing: return "Indexing \(progress.processed) of \(progress.changed) changed files (\(progress.totalFiles) in the folder)"
         case .pruning: return "Cleaning up…"
+        case .hashing: return "Checksumming \(progress.processed) older skins…"
         case .done: return "Done"
         }
     }

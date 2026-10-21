@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 
@@ -277,7 +278,7 @@ import Testing
             folder: folder, store: store, ingester: StubIngester(), concurrency: 2, batchSize: 10, progressInterval: .zero)
         _ = try await indexer.run { recorder.add($0) }
         let all = recorder.all
-        let order: [SkinIndexProgress.Phase] = [.scanning, .indexing, .pruning, .done]
+        let order: [SkinIndexProgress.Phase] = [.scanning, .indexing, .pruning, .hashing, .done]
         let ranks = all.map { order.firstIndex(of: $0.phase)! }
         #expect(ranks == ranks.sorted())
         let processed = all.map(\.processed)
@@ -301,6 +302,112 @@ import Testing
         #expect(ingester.mainThreadCalls == 0)
         #expect(!onMain.all.isEmpty)
         #expect(!onMain.all.contains(true))
+    }
+
+    // MARK: MD5 and single-file add (#0126)
+
+    private func md5(of url: URL) throws -> String {
+        Insecure.MD5.hash(data: try Data(contentsOf: url)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    @Test func ingestStoresMD5() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let folder = try dir.skinsFolder()
+        try makeCorpus(in: folder)
+        let store = try await dir.makeStore()
+        _ = try await SkinIndexer(folder: folder, store: store).run()
+        let alpha = try md5(of: folder.appending(path: "alpha.wsz"))
+        let record = try #require(try await store.skin(atPath: "alpha.wsz"))
+        #expect(record.md5 == alpha)
+        #expect(try await store.skins(md5s: [alpha])[alpha]?.id == record.id)
+        #expect(try await store.skinsMissingMD5(limit: 10).isEmpty)
+    }
+
+    @Test func passBackfillsMissingMD5() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let folder = try dir.skinsFolder()
+        try makeCorpus(in: folder)
+        let store = try await dir.makeStore()
+        // Rows as a v1 index left them: current stamps and parser version, no MD5.
+        let stamps = try FolderScanner.list(folder: folder)
+        _ = try await store.apply(
+            try stamps.map { stamp in
+                parsedOutcome(
+                    stamp.path, hash: try SkinContentHash.hex(of: folder.appending(path: stamp.path)),
+                    version: SkinIngester.parserVersion, size: stamp.size, mtime: stamp.mtime)
+            })
+        #expect(try await store.skinsMissingMD5(limit: 10).count == 5)
+        let ingester = CountingIngester()
+        let recorder = Recorder<SkinIndexProgress>()
+        let indexer = SkinIndexer(folder: folder, store: store, ingester: ingester, batchSize: 2, progressInterval: .zero)
+        let summary = try await indexer.run { recorder.add($0) }
+        #expect(summary.unchanged == 5)
+        #expect(!summary.cancelled)
+        #expect(ingester.inspections == 0)
+        #expect(ingester.hashes == 5)
+        #expect(recorder.all.contains { $0.phase == .hashing })
+        #expect(try await store.skinsMissingMD5(limit: 10).isEmpty)
+        for stamp in stamps {
+            #expect(try await store.skin(atPath: stamp.path)?.md5 == md5(of: folder.appending(path: stamp.path)))
+        }
+        // It runs once: the next pass reads nothing.
+        _ = try await indexer.run()
+        #expect(ingester.hashes == 5)
+    }
+
+    @Test func addIndexesOneFileWithoutScanning() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let folder = try dir.skinsFolder()
+        try makeCorpus(in: folder)
+        let store = try await dir.makeStore()
+        let ingester = CountingIngester()
+        let indexer = SkinIndexer(folder: folder, store: store, ingester: ingester)
+        let summary = try await indexer.add(paths: ["sub/gamma.wsz"])
+        #expect(summary.added == 1)
+        #expect(summary.totalFiles == 1 && summary.totalSkins == 1)
+        #expect(ingester.hashes == 1 && ingester.inspections == 1)
+        let record = try #require(try await store.skin(atPath: "sub/gamma.wsz"))
+        #expect(record.name == "gamma")
+        #expect(record.status == .ok)
+        #expect(record.md5 == (try md5(of: folder.appending(path: "sub/gamma.wsz"))))
+        // A byte-identical copy links to the same skin.
+        try FileManager.default.createDirectory(at: folder.appending(path: "Museum"), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: folder.appending(path: "alpha.wsz"), to: folder.appending(path: "Museum/alpha.wsz"))
+        _ = try await indexer.add(paths: ["alpha.wsz"])
+        let linked = try await indexer.add(paths: ["Museum/alpha.wsz"])
+        #expect(linked.linked == 1)
+        #expect(try await store.counts().skins == 2)
+        // The next pass picks the stamps up as unchanged.
+        let pass = try await indexer.run()
+        #expect(pass.unchanged == 3)
+        #expect(pass.added == 3)
+    }
+
+    @Test func addDuringPassThrowsAlreadyRunning() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let folder = try dir.skinsFolder()
+        try makeStubFiles(count: 10, in: folder)
+        let store = try await dir.makeStore()
+        let indexer = SkinIndexer(folder: folder, store: store, ingester: StubIngester(), concurrency: 2, batchSize: 10)
+        let probe = LockedBox<Task<Error?, Never>?>(nil)
+        let summary = try await indexer.run { progress in
+            guard progress.phase == .scanning else { return }
+            probe.value = Task {
+                do { _ = try await indexer.add(paths: ["d000/00000.wsz"]) } catch { return error }
+                return nil
+            }
+        }
+        let error = await (try #require(probe.value)).value
+        guard case SkinLibraryError.passAlreadyRunning? = error as? SkinLibraryError else {
+            Issue.record("expected passAlreadyRunning, got \(String(describing: error))")
+            return
+        }
+        #expect(summary.added == 10)
+        #expect(await indexer.isRunning == false)
     }
 }
 

@@ -2,8 +2,8 @@ import Foundation
 import SkinKit
 
 public protocol SkinIngesting: Sendable {
-    /// Cheap: reads the file, returns its content hash. I/O errors throw.
-    func hash(_ url: URL) throws -> String
+    /// Cheap: reads the file once, returns its SHA-256 (the content hash) and MD5. I/O errors throw.
+    func digests(_ url: URL) throws -> SkinDigests
     /// Expensive: parses the archive. Never throws; a rejected skin is a `.failed` inspection.
     func inspect(_ url: URL) -> SkinInspection
 }
@@ -26,7 +26,7 @@ public struct SkinIngester: SkinIngesting {
 
     public init() {}
 
-    public func hash(_ url: URL) throws -> String { try SkinContentHash.hex(of: url) }
+    public func digests(_ url: URL) throws -> SkinDigests { try SkinContentHash.digests(of: url) }
 
     public func inspect(_ url: URL) -> SkinInspection {
         let archive: SkinArchive
