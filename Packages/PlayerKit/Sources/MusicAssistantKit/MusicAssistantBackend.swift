@@ -128,7 +128,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         }
         if mode == .server, configuration.address.serverID == nil {
             throw MusicBackendError.notConfigured(
-                "Test the connection to \(configuration.name) under Settings \u{203A} Music Assistant.")
+                "Test the connection to \(configuration.displayName) under Settings \u{203A} Music Assistant.")
         }
         return configuration
     }

@@ -51,6 +51,20 @@ struct BackendServerProviderTests {
         #expect(rig.http.requests.isEmpty)
     }
 
+    @Test func unverifiedMessageOmitsAGenericName() async throws {
+        let rig = try makeProviderBackend(makeServer(id: nil, name: "Music Assistant (abc123)"))
+        do {
+            try await rig.backend.connect()
+            Issue.record("connect should refuse an unverified configuration")
+        } catch let MusicBackendError.notConfigured(message) {
+            #expect(message.hasPrefix("Test the connection to "))
+            #expect(!message.contains("abc123"))
+            #expect(!message.contains("Music Assistant ("))
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+
     @Test func noConfigurationIsNotConfigured() async throws {
         let rig = try makeProviderBackend(nil)
         let expected = MusicBackendError.notConfigured("Add a Music Assistant server under Settings \u{203A} Music Assistant.")

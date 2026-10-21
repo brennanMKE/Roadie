@@ -77,14 +77,14 @@ public struct MusicAssistantConnectionTest: Sendable {
             return .failed(.schema(error.errorDescription ?? "This Music Assistant server is not supported."))
         }
         if let knownServerID, knownServerID != info.serverID {
-            return .failed(.serverMismatch(foundName: info.name))
+            return .failed(.serverMismatch(foundName: Self.friendlyName(info)))
         }
         let token: MusicAssistantToken
         if let typedToken {
             token = typedToken
         } else {
             do {
-                guard let stored = try loadStored() else { return .failed(.needsToken(foundName: info.name)) }
+                guard let stored = try loadStored() else { return .failed(.needsToken(foundName: Self.friendlyName(info))) }
                 token = stored
             } catch {
                 return .failed(.keychain(Self.text(error)))
@@ -99,10 +99,17 @@ public struct MusicAssistantConnectionTest: Sendable {
             return nil
         } catch {
             await client.disconnect()
-            return .failed(Self.failure(for: error, found: info.name))
+            return .failed(Self.failure(for: error, found: Self.friendlyName(info)))
         }
         await client.disconnect()
         return .connected(info)
+    }
+
+    /// The advertised name for a message, or nil when it is Music Assistant's generic label, which carries the
+    /// server id (#0119). The message then falls back to its nameless wording.
+    static func friendlyName(_ info: MAServerInfo) -> String? {
+        MusicAssistantServerConfiguration.isGenericName(info.name)
+            ? nil : info.name?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func failure(for error: any Error, found: String?) -> MusicAssistantConnectionFailure {

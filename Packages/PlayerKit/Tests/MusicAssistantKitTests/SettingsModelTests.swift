@@ -220,8 +220,9 @@ struct SettingsModelTests {
         defer { rig.cleanUp() }
         rig.model.appeared()
         await rig.runTest()
-        #expect(rig.model.selectedStatus == .failed(.needsToken(foundName: "Music Assistant")))
-        #expect(rig.model.statusMessage == "Found Music Assistant. Enter a token.")
+        // The fixture advertises the generic "Music Assistant", which the message leaves out (#0119).
+        #expect(rig.model.selectedStatus == .failed(.needsToken(foundName: nil)))
+        #expect(rig.model.statusMessage == "Found a Music Assistant server. Enter a token.")
         #expect(rig.factory.made == 0)
         #expect(rig.stub.requests.count == 1)
         #expect(rig.stub.requests[0].url.path == "/info")
@@ -272,7 +273,7 @@ struct SettingsModelTests {
         rig.model.appeared()
         rig.model.tokenText = testToken.rawValue
         await rig.runTest()
-        #expect(rig.model.selectedStatus == .failed(.serverMismatch(foundName: "Music Assistant")))
+        #expect(rig.model.selectedStatus == .failed(.serverMismatch(foundName: nil)))
         #expect(rig.tokens(for: server).loads == 0)
         #expect(rig.factory.made == 0)
         #expect(rig.model.servers[0].address.serverID == "other-server-id")
@@ -675,6 +676,44 @@ extension SettingsModelTests {
         #expect(message.hasPrefix("Connected"))
         #expect(!message.contains("abc123"))
         #expect(!message.contains("Music Assistant ("))
+    }
+
+    @Test func testNeedsTokenMessageOmitsAGenericName() async throws {
+        let server = makeServer(id: nil)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Music Assistant (abc123)")
+        rig.model.appeared()
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .failed(.needsToken(foundName: nil)))
+        let message = try #require(rig.model.statusMessage)
+        #expect(message == "Found a Music Assistant server. Enter a token.")
+        #expect(!message.contains("abc123"))
+    }
+
+    @Test func testNeedsTokenMessageKeepsAFriendlyName() async throws {
+        let server = makeServer(id: nil)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Living Room")
+        rig.model.appeared()
+        await rig.runTest()
+        #expect(rig.model.statusMessage == "Found Living Room. Enter a token.")
+    }
+
+    @Test func testMismatchMessageOmitsAGenericName() async throws {
+        let server = makeServer(id: "other-server-id")
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Music Assistant (abc123)")
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        #expect(rig.model.selectedStatus == .failed(.serverMismatch(foundName: nil)))
+        let message = try #require(rig.model.statusMessage)
+        #expect(message == "A different server answered. Its token was not sent.")
+        #expect(!message.contains("abc123"))
+        #expect(rig.factory.made == 0)
     }
 
     @Test func testResetsAStoredGenericNameWithTheIDWhenTheServerStaysGeneric() async throws {

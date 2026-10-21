@@ -181,7 +181,7 @@ struct MusicAssistantSettingsView: View {
 
     private var identityText: String {
         if case .connected(let name, _) = model.selectedStatus, let name { return "Verified: \(name)" }
-        return model.selected?.isVerified == true ? "Verified: \(model.selected?.name ?? "")" : "Not tested yet"
+        return model.selected?.isVerified == true ? "Verified: \(model.selected?.displayName ?? "")" : "Not tested yet"
     }
 
     @ViewBuilder
