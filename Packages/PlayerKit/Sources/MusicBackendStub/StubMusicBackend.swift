@@ -7,7 +7,7 @@ public actor StubMusicBackend: MusicBackend {
     public enum Method: Hashable, Sendable, CaseIterable {
         case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport, transfer, setGroupMembers
         case setFavorite, favoriteCurrentTrack
-        case createPlaylist, renamePlaylist, deletePlaylist
+        case createPlaylist, renamePlaylist, deletePlaylist, addToPlaylist
     }
 
     public enum Call: Hashable, Sendable {
@@ -20,6 +20,7 @@ public actor StubMusicBackend: MusicBackend {
         case setGroupMembers(OutputDevice.ID, [OutputDevice.ID], [OutputDevice.ID])
         case setFavorite(MediaID, Bool), favoriteCurrentTrack(OutputDevice.ID)
         case createPlaylist(String), renamePlaylist(MediaID, String), deletePlaylist(MediaID)
+        case addToPlaylist([MediaID], MediaID)
 
         /// The method a call belongs to; `disconnect` has none.
         public var method: Method? {
@@ -43,6 +44,7 @@ public actor StubMusicBackend: MusicBackend {
             case .createPlaylist: .createPlaylist
             case .renamePlaylist: .renamePlaylist
             case .deletePlaylist: .deletePlaylist
+            case .addToPlaylist: .addToPlaylist
             }
         }
     }
@@ -337,5 +339,13 @@ public actor StubMusicBackend: MusicBackend {
         guard let index = library.playlists.firstIndex(where: { $0.id == id }) else { throw MusicBackendError.notFound(id) }
         library.playlists.remove(at: index)
         library.playlistTracks[id] = nil
+    }
+
+    /// Tracks append; an album appends its tracks (#0136).
+    public func add(_ items: [MediaID], toPlaylist id: MediaID) async throws {
+        try await enter(.addToPlaylist(items, id))
+        guard library.playlists.contains(where: { $0.id == id }) else { throw MusicBackendError.notFound(id) }
+        let tracks = items.flatMap { item in item.kind == .album ? library.tracks(of: item).map(\.id) : [item] }
+        library.playlistTracks[id, default: []].append(contentsOf: tracks)
     }
 }

@@ -13,4 +13,8 @@ extension MusicBackend {
     public func deletePlaylist(_ id: MediaID) async throws {
         throw MusicBackendError.unsupported(.playlistEditing)
     }
+
+    public func add(_ items: [MediaID], toPlaylist id: MediaID) async throws {
+        throw MusicBackendError.unsupported(.playlistEditing)
+    }
 }

@@ -113,6 +113,8 @@ public protocol MusicBackend: AnyObject, Sendable {
     func createPlaylist(named name: String) async throws -> LibraryPlaylist
     func renamePlaylist(_ id: MediaID, to name: String) async throws
     func deletePlaylist(_ id: MediaID) async throws
+    /// Tracks and albums (albums expand server-side), appended in order (#0136).
+    func add(_ items: [MediaID], toPlaylist id: MediaID) async throws
 }
 
 extension MusicBackend {

@@ -81,4 +81,24 @@ struct PlaylistsModelTests {
         model.playlistsModel.askToDelete(builtIn)
         #expect(model.playlistsModel.pendingDelete == nil)
     }
+
+    @Test func addRecordsRecentTarget() async throws {
+        let (backend, model) = await connectedOnPlaylists()
+        let defaults = try #require(UserDefaults(suiteName: "PlaylistsModelTests.\(UUID().uuidString)"))
+        let editor = PlaylistsModel(backend: backend, list: model.playlists, defaults: defaults)
+        let first = model.playlists.items[0], second = model.playlists.items[2]
+        let track = try #require(await backend.library.tracks.first?.id)
+
+        #expect(await editor.add([track], to: second) == "Added 1 track to \(second.name)")
+        #expect(await editor.add([track], to: first) == "Added 1 track to \(first.name)")
+        #expect(editor.recentTargets == [first.id, second.id])
+        #expect(await backend.calls(.addToPlaylist) == [.addToPlaylist([track], second.id), .addToPlaylist([track], first.id)])
+        #expect(editor.addEntries(excluding: nil).prefix(2) == [.playlist(first), .playlist(second)])
+        // Kept across launches.
+        #expect(PlaylistsModel(backend: backend, list: model.playlists, defaults: defaults).recentTargets == [first.id, second.id])
+
+        await backend.setError(.forbidden("Read-only"), for: .addToPlaylist)
+        #expect(await editor.add([track], to: second) == "Read-only")
+        #expect(editor.recentTargets == [first.id, second.id])
+    }
 }

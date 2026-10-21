@@ -28,6 +28,7 @@ struct ArtistListView: View {
 
 struct PlaylistListView: View {
     let library: LibraryBrowserModel
+    @Environment(PlayerModel.self) private var player
 
     private var model: PlaylistsModel { library.playlistsModel }
 
@@ -87,6 +88,7 @@ struct PlaylistListView: View {
                     FavoriteMenuItem(items: [playlist.id: playlist.isFavorite])
                     playlistMenu(playlist)
                 }
+                .addsDroppedItems(to: playlist, model: player)
             }
         }
         .onDeleteCommand { if let playlist = library.selectedPlaylist { model.askToDelete(playlist) } }

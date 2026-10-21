@@ -26,7 +26,10 @@ struct LibraryWindowView: View {
         .onChange(of: library.connection == .connected) { _, connected in
             if connected { Task { await player.refreshOutputs() } }
         }
-        .modifier(PlaylistEditingModifier(model: library.playlistsModel))
+        .modifier(
+            PlaylistEditingModifier(model: library.playlistsModel) { name, items in
+                player.createPlaylist(named: name, adding: items)
+            })
         .toolbar {
             ToolbarItem {
                 OutputPickerView()

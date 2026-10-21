@@ -38,6 +38,19 @@ extension MusicAssistantBackend {
         _ = try await write(.removeLibraryItem(mediaType: .playlist, libraryItemID: libraryID))
     }
 
+    /// One `add_playlist_tracks` with the items' URIs as given (albums expand server-side); artists are left out.
+    /// A playlist whose tracks can't be edited is refused here.
+    public func add(_ items: [MediaID], toPlaylist id: MediaID) async throws {
+        let uris = items.filter { $0.kind == .track || $0.kind == .album }.map(\.rawValue)
+        guard !uris.isEmpty else { return }
+        let (_, _, playlist) = try await fetchPlaylist(id)
+        guard playlist.editing.contains(.addRemove) else {
+            throw MusicBackendError.forbidden("\u{201C}\(playlist.name)\u{201D} is read-only.")
+        }
+        guard let libraryID = playlist.libraryID else { throw MusicBackendError.notFound(id) }
+        _ = try await write(.addPlaylistTracks(playlistID: libraryID, uris: uris))
+    }
+
     // MARK: Helpers
 
     /// The playlist as the server has it now: its URI, the raw object (for `update`) and the mapped value.

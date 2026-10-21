@@ -44,6 +44,9 @@ struct TrackListView: View {
 
     private var albumArtist: String? { library.selectedAlbum?.artistName }
 
+    /// The playlist shown here, which drops add to (#0136).
+    private var openPlaylist: LibraryPlaylist? { library.selectedAlbum == nil ? library.selectedPlaylist : nil }
+
     var body: some View {
         Group {
             switch library.tracks {
@@ -85,8 +88,10 @@ struct TrackListView: View {
                         .padding(.bottom, 8)
                         List(tracks, selection: $selection) { track in
                             TrackRow(track: track, albumArtist: albumArtist)
+                                .draggable(MediaIDTransfer([track.id]))
                         }
                         .libraryTrackActions(rows: tracks, album: library.selectedAlbum?.id, model: player)
+                        .addsDroppedItems(to: openPlaylist, model: player)
                     }
                 }
             }

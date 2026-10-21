@@ -56,9 +56,54 @@ public final class PlaylistsModel {
     @ObservationIgnored weak var browser: LibraryBrowserModel?
     private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playlists")
 
-    public init(backend: any MusicBackend, list: PagedList<LibraryPlaylist>) {
+    /// Add to Playlist targets, most recent first (#0136); kept in `defaults`.
+    public private(set) var recentTargets: [MediaID] = []
+    @ObservationIgnored private let defaults: UserDefaults
+    public static let recentTargetsKey = "library.playlists.recentTargets"
+
+    public init(backend: any MusicBackend, list: PagedList<LibraryPlaylist>, defaults: UserDefaults = .standard) {
         self.backend = backend
         self.list = list
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.recentTargetsKey),
+           let ids = try? JSONDecoder().decode([MediaID].self, from: data) {
+            recentTargets = ids
+        }
+    }
+
+    // MARK: Add to Playlist (#0136)
+
+    /// The submenu's entries; `open` (the playlist being viewed) is left out.
+    public func addEntries(excluding open: MediaID?) -> [AddToPlaylistMenu.Entry] {
+        AddToPlaylistMenu.entries(playlists: list.items, recent: recentTargets, excluding: open)
+    }
+
+    /// Adds `items` (tracks and albums) to `playlist` and remembers it as a recent target. Returns the text for
+    /// the main window's marquee: what was added, or why it wasn't.
+    @discardableResult
+    public func add(_ items: [MediaID], to playlist: LibraryPlaylist) async -> String {
+        message = nil
+        do {
+            try await backend.add(items, toPlaylist: playlist.id)
+            recordRecent(playlist.id)
+            Self.log.info("added \(items.count, privacy: .public) item(s) to a playlist")
+            return AddToPlaylistMenu.notice(adding: items, to: playlist)
+        } catch {
+            fail(error, for: nil)
+            return userMessage(for: error)
+        }
+    }
+
+    /// "New Playlist…" from Add to Playlist: creates it, then adds `items`. The marquee text, nil when nothing was created.
+    public func create(named name: String, adding items: [MediaID]) async -> String? {
+        guard let created = await create(named: name) else { return message }
+        guard !items.isEmpty else { return nil }
+        return await add(items, to: created)
+    }
+
+    private func recordRecent(_ id: MediaID) {
+        recentTargets = AddToPlaylistMenu.recording(id, in: recentTargets)
+        if let data = try? JSONEncoder().encode(recentTargets) { defaults.set(data, forKey: Self.recentTargetsKey) }
     }
 
     public var canEdit: Bool { backend.capabilities.contains(.playlistEditing) }

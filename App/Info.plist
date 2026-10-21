@@ -55,6 +55,16 @@
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>SkinAmp Library Item</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.brennanmke.skinamp.media-id</string>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
 				<string>public.zip-archive</string>
 			</array>
 			<key>UTTypeDescription</key>

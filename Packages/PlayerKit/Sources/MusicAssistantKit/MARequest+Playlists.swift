@@ -23,4 +23,11 @@ extension MARequest {
             command: "music/library/remove_item",
             args: ["media_type": .string(mediaType.rawValue), "library_item_id": .string(libraryItemID)])
     }
+
+    /// `db_playlist_id` is the library id. Album and playlist URIs expand server-side; duplicates are skipped.
+    public static func addPlaylistTracks(playlistID: String, uris: [String]) -> MARequest {
+        MARequest(
+            command: "music/playlists/add_playlist_tracks",
+            args: ["db_playlist_id": .string(playlistID), "uris": .array(uris.map { .string($0) })])
+    }
 }

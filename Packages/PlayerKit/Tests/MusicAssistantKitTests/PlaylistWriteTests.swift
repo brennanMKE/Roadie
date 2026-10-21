@@ -111,4 +111,30 @@ extension BackendPlaylistTests {
         #expect(MusicBackendError.forbidden(details).errorDescription == details)
         await rig.backend.disconnect()
     }
+
+    @Test func addSendsAlbumAndTrackURIsUnchanged() async throws {
+        let rig = try await playlistBackend([
+            .result(command: "music/playlists/get", roadTrip),
+            .result(command: "music/playlists/add_playlist_tracks", ["id": "t1", "name": "add", "status": "pending"]),
+        ])
+        let items = [
+            MediaID(.album, "library://album/27"), MediaID(.track, "spotify://track/abc"),
+            MediaID(.artist, "library://artist/3"),
+        ]
+        try await rig.backend.add(items, toPlaylist: roadTripID)
+        let sent = try #require(rig.transport.sentRequests.first { $0.command == "music/playlists/add_playlist_tracks" })
+        #expect(sent.args == ["db_playlist_id": "12", "uris": ["library://album/27", "spotify://track/abc"]])
+        #expect(MARequest.addPlaylistTracks(playlistID: "12", uris: []).command == "music/playlists/add_playlist_tracks")
+        await rig.backend.disconnect()
+    }
+
+    @Test func addToReadOnlyPlaylistIsRefused() async throws {
+        let builtIn = try #require(try recordedResult(.playlistsPage)[0])
+        let rig = try await playlistBackend([.result(command: "music/playlists/get", builtIn)])
+        await #expect(throws: MusicBackendError.self) {
+            try await rig.backend.add([MediaID(.track, "library://track/1")], toPlaylist: MediaID(.playlist, "library://playlist/4"))
+        }
+        #expect(!rig.transport.sentRequests.contains { $0.command == "music/playlists/add_playlist_tracks" })
+        await rig.backend.disconnect()
+    }
 }

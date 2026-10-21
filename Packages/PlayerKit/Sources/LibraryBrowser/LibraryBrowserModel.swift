@@ -366,6 +366,15 @@ public final class LibraryBrowserModel {
         loadSectionIfNeeded()
         if selectedArtist != nil, artistAlbums.phase == .idle { artistAlbums.reload() }
         if tracks == .idle { retryTracks() }
+        // Add to Playlist (#0136) lists the playlists from any section.
+        if backend.capabilities.contains(.playlistEditing) { loadPlaylistsIfNeeded() }
+    }
+
+    /// Loads the Playlists list if it hasn't been (the Add to Playlist submenu needs it outside the section).
+    public func loadPlaylistsIfNeeded() {
+        guard connection == .connected, backend.capabilities.contains(.playlists), playlists.phase == .idle else { return }
+        let backend = backend
+        playlists.reload(with: { try await backend.playlists(page: $0) })
     }
 
     private func loadSectionIfNeeded() {

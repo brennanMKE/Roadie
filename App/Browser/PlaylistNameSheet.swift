@@ -42,20 +42,20 @@ struct PlaylistNameSheet: View {
 /// The name sheet, the delete confirmation and the failure bar for the Playlists list (#0135).
 struct PlaylistEditingModifier: ViewModifier {
     @Bindable var model: PlaylistsModel
-    /// After "New Playlist…" from Add to Playlist: the new playlist and the items to add to it (#0136).
-    var onCreated: (LibraryPlaylist, [MediaID]) -> Void = { _, _ in }
+    /// "New Playlist…" from Add to Playlist: the name and the items to add to the new playlist (#0136).
+    var onCreateAdding: (String, [MediaID]) -> Void = { _, _ in }
 
     func body(content: Content) -> some View {
         content
             .sheet(item: $model.nameSheet) { sheet in
                 PlaylistNameSheet(sheet: sheet) { name in
-                    Task {
-                        switch sheet {
-                        case .create(let items):
-                            if let created = await model.create(named: name), !items.isEmpty { onCreated(created, items) }
-                        case .rename(let playlist):
-                            await model.rename(playlist, to: name)
-                        }
+                    switch sheet {
+                    case .create(let items) where !items.isEmpty:
+                        onCreateAdding(name, items)
+                    case .create:
+                        Task { await model.create(named: name) }
+                    case .rename(let playlist):
+                        Task { await model.rename(playlist, to: name) }
                     }
                 }
             }

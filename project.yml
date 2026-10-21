@@ -70,6 +70,10 @@ targets:
             LSHandlerRank: Default
             LSItemContentTypes: [com.brennanmke.skinamp.wsz]
         UTExportedTypeDeclarations:
+          # #0136: library items dragged onto playlists (MediaIDTransfer).
+          - UTTypeIdentifier: com.brennanmke.skinamp.media-id
+            UTTypeDescription: SkinAmp Library Item
+            UTTypeConformsTo: [public.data]
           - UTTypeIdentifier: com.brennanmke.skinamp.wsz
             UTTypeDescription: Winamp Classic Skin
             UTTypeConformsTo: [public.zip-archive]
