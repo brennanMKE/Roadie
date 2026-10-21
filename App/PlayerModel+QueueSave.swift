@@ -1,3 +1,4 @@
+import AudioCore
 import Foundation
 import LibraryBrowser
 import MusicBackendKit
