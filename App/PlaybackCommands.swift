@@ -1,12 +1,14 @@
 import SkinKit
 import SwiftUI
 
-/// The Playback menu: the transport on ⌃⌘ + the Winamp key. The bare keys are handled by `SkinWindow`.
+/// The Playback menu: the Library window, then the transport on ⌃⌘ + the Winamp key. The bare keys are handled by `SkinWindow`.
 struct PlaybackCommands: Commands {
     let model: PlayerModel
 
     var body: some Commands {
         CommandMenu("Playback") {
+            OpenLibraryWindowButton()
+            Divider()
             PlaybackMenuItems(model: model)
         }
     }

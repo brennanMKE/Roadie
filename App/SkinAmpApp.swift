@@ -48,7 +48,7 @@ struct SkinAmpApp: App {
             SkinsCommands(model: appDelegate.model)
             PlaybackCommands(model: appDelegate.model)
             CommandGroup(after: .windowArrangement) {
-                OpenLibraryWindowButton()
+                OpenLibraryWindowButton(showsShortcut: false)
                 Divider()
                 Button("Player") { appDelegate.player.show() }
                     .keyboardShortcut("1")
@@ -75,13 +75,18 @@ struct SkinAmpApp: App {
     }
 }
 
-/// Window › Library (⌘L, #0115). SwiftUI's automatic Window-menu entry for the scene doesn't appear in this app, so the
-/// item is explicit.
-private struct OpenLibraryWindowButton: View {
+/// Opens (or brings forward) the Library window (#0115). It sits at the top of the Playback menu with ⌘L and in the
+/// Window menu without it; SwiftUI's automatic Window-menu entry for the scene doesn't appear in this app.
+struct OpenLibraryWindowButton: View {
+    var showsShortcut = true
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("Library") { openWindow(id: "library") }
-            .keyboardShortcut("l")
+        let button = Button("Library") { openWindow(id: "library") }
+        if showsShortcut {
+            button.keyboardShortcut("l")
+        } else {
+            button
+        }
     }
 }
