@@ -93,4 +93,8 @@ extension MusicBackend {
     public func edit(_ edit: QueueEdit, on output: OutputDevice.ID) async throws {
         throw MusicBackendError.unsupported(.queueEditing)
     }
+
+    public func saveQueueAsPlaylist(on output: OutputDevice.ID, named name: String) async throws {
+        throw MusicBackendError.unsupported(.queueEditing)
+    }
 }

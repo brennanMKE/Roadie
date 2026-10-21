@@ -85,6 +85,8 @@ public protocol MusicBackend: AnyObject, Sendable {
     func queue(on output: OutputDevice.ID) async -> AsyncStream<RemoteQueueSnapshot>
     /// Changes the queue playing on `output` (#0144). Default: `.unsupported(.queueEditing)`.
     func edit(_ edit: QueueEdit, on output: OutputDevice.ID) async throws
+    /// Saves the queue playing on `output` as a new playlist named `name` (#0140). Default: `.unsupported(.queueEditing)`.
+    func saveQueueAsPlaylist(on output: OutputDevice.ID, named name: String) async throws
     /// Favorites or unfavorites a track, album, artist or playlist (#0141). Default: `.unsupported(.favorites)`.
     func setFavorite(_ id: MediaID, _ on: Bool) async throws
     /// Favorites what `output` plays now (#0141). Default: `.unsupported(.favorites)`.

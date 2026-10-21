@@ -47,6 +47,25 @@ extension MusicAssistantBackend {
         }
     }
 
+    /// `player_queues/save_as_playlist` on the queue `output` plays (a synced speaker: its leader's) (#0140). An empty
+    /// queue is `.backend(emptyQueueText)`.
+    public func saveQueueAsPlaylist(on output: OutputDevice.ID, named name: String) async throws {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw MusicBackendError.backend(Self.playlistNameMissingText) }
+        try await guarded {
+            do {
+                let client = try requireClient()
+                let queueID = try await queueID(for: output, client: client)
+                _ = try await client.call(.queueSaveAsPlaylist(queueID: queueID, name: name))
+            } catch MusicAssistantError.server(_, let details) where details.lowercased().contains("queueempty") {
+                throw MusicBackendError.backend(Self.emptyQueueText)
+            }
+        }
+    }
+
+    public static let emptyQueueText = "The queue is empty: there is nothing to save."
+    public static let playlistNameMissingText = "The playlist needs a name."
+
     /// Music Assistant raises `IndexError` for a move or delete at or before the buffered index; it arrives as a server
     /// error whose details name it (or say "buffered").
     static func isBufferedRefusal(_ details: String) -> Bool {
@@ -109,6 +128,11 @@ extension MARequest {
         MARequest(
             command: "player_queues/move_item",
             args: ["queue_id": .string(queueID), "queue_item_id": .string(itemID), "pos_shift": .number(Double(shift))])
+    }
+
+    /// Saves the queue as a new playlist on the builtin provider (#0140). Returns a `BackgroundTask`.
+    public static func queueSaveAsPlaylist(queueID: String, name: String) -> MARequest {
+        MARequest(command: "player_queues/save_as_playlist", args: ["queue_id": .string(queueID), "name": .string(name)])
     }
 
     /// Empties the queue (#0145).
