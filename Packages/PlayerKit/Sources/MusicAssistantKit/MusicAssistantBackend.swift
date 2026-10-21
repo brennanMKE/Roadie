@@ -23,7 +23,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     public nonisolated let displayName = "Music Assistant"
     /// `.localOutput`: This Mac plays through the MA player wrapping SkinAmp's Sendspin client (#0107).
     public nonisolated let capabilities: BackendCapabilities = [
-        .search, .playlists, .artwork, .remoteOutputs, .localOutput, .recommendations,
+        .search, .playlists, .artwork, .remoteOutputs, .localOutput, .recommendations, .queueEditing,
     ]
 
     public static let thisMacNotRegisteredText =
@@ -40,7 +40,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     private let transports: any MAWebSocketTransportFactory
     /// Internal for the command probe in `MAServerCommands.swift`.
     let http: any MAHTTPTransport
-    private let clock: any Clock<Duration>
+    let clock: any Clock<Duration>
     private let policy: MANowPlayingPolicy
     private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantBackend")
 
@@ -66,6 +66,9 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     /// One per `nowPlaying(on:)` subscriber.
     private var watchers: [UUID: Watcher] = [:]
+    /// One per `queue(on:)` subscriber (#0144), in `MusicAssistantBackend+Queue.swift`.
+    var queueWatchers: [UUID: QueueWatcher] = [:]
+    var queuePolicy = MAQueuePolicy.standard
     /// `connectionStates()` subscribers, and the task forwarding the installed client's states to them (#0075).
     private var stateContinuations: [UUID: AsyncStream<MusicAssistantClient.ConnectionState>.Continuation] = [:]
     private var stateForward: Task<Void, Never>?
@@ -612,7 +615,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     /// The queue that plays on `output` now: its active queue (a speaker synced into a group plays the group's),
     /// else its own.
-    private func queueID(for output: OutputDevice.ID, client: MusicAssistantClient) async throws -> String {
+    func queueID(for output: OutputDevice.ID, client: MusicAssistantClient) async throws -> String {
         let playerID = try await playerID(for: output)
         let json = try await client.call(.activeQueue(playerID: playerID))
         if !json.isNull, let queue = try? json.decode(as: MAPlayerQueue.self) { return queue.queueID }
@@ -685,11 +688,13 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     }
 
     private func restartWatchers() {
+        restartQueueWatchers()
         for id in watchers.keys { startWatcher(id) }
     }
 
     /// Ends every watch and shows idle; the streams stay open for the next `connect()`.
     private func stopWatchers() {
+        stopQueueWatchers()
         for (id, var watcher) in watchers {
             watcher.task?.cancel()
             watcher.task = nil

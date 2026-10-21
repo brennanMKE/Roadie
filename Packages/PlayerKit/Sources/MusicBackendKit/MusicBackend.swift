@@ -79,6 +79,10 @@ public protocol MusicBackend: AnyObject, Sendable {
     func recommendationItems(_ row: RecommendationRow) async throws -> [RecommendationItem]
     /// A slim item (`.other`) as the full one when the backend can find it. Default: the item itself.
     func resolve(_ item: RecommendationItem) async throws -> RecommendationItem
+    /// The queue playing on `output` (#0144): a snapshot at once, then one per change. Default: one empty snapshot.
+    func queue(on output: OutputDevice.ID) async -> AsyncStream<RemoteQueueSnapshot>
+    /// Changes the queue playing on `output` (#0144). Default: `.unsupported(.queueEditing)`.
+    func edit(_ edit: QueueEdit, on output: OutputDevice.ID) async throws
 }
 
 extension MusicBackend {

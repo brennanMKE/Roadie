@@ -137,6 +137,8 @@ final class PlayerModel {
     @ObservationIgnored var ownStreamRequested = false
     private(set) var nowPlaying: NowPlaying = .idle(on: OutputDevice.thisMacID)
     private var nowPlayingTask: Task<Void, Never>?
+    /// Follows the remote queue the playlist window shows (#0144).
+    private var queueTask: Task<Void, Never>?
     var playbackState: NowPlaying.State { nowPlaying.state }
     var isLoading: Bool { nowPlaying.state == .loading }
     /// Skin points per skin pixel: `baseScale`, or twice that in double size.
@@ -410,6 +412,10 @@ final class PlayerModel {
             self?.applyFeed(.localPlayRequested)
             self?.stopOthers(startingOn: OutputDevice.thisMacID)
         }
+        playlist.onPlayRemote = { [weak self] index in self?.playRemoteQueueRow(index) }
+        playlist.onRemoteRefused = { [weak self] in
+            self?.post(StatusNotice(text: "Not for Music Assistant queues"))
+        }
         // Music Assistant started playing on this Mac (from SkinAmp, its own UI, Home Assistant or a phone).
         stack.sendspin.onStreamStarted = { [weak self] in self?.streamStarted() }
         // The server ended the stream, or the session dropped or was stopped: This Mac plays its local queue again.
@@ -677,6 +683,7 @@ final class PlayerModel {
     /// Follows the selected output's now-playing stream, from the backend that owns the output. Never connects: the
     /// stream for This Mac works without a server, and Music Assistant's is idle until the Library connects it.
     private func observeNowPlaying() {
+        observeQueue()
         nowPlayingTask?.cancel()
         externalArtworkTask?.cancel()
         externalArtwork = nil
@@ -695,6 +702,42 @@ final class PlayerModel {
                 self.nowPlaying = snapshot
                 if let volume = snapshot.volume, self.sliderFocus != .volume { self.volume = volume }
                 if isRemote { self.publishExternal(snapshot) }
+            }
+        }
+    }
+
+    /// Points the playlist window at the selected output's queue (#0144): the local queue, or the backend's
+    /// remote queue followed through `queue(on:)`.
+    private func observeQueue() {
+        queueTask?.cancel()
+        queueTask = nil
+        let output = selectedOutput
+        let backend = router.backend(for: output)
+        switch QueueRowsSelection.choose(output: output, feed: thisMacFeed, remoteCapabilities: backend.capabilities) {
+        case .local:
+            playlist.remote = nil
+        case .none:
+            playlist.remote = .empty(on: output)
+        case .remote(let target):
+            if playlist.remote?.output != target { playlist.remote = .empty(on: target) }
+            queueTask = Task { [weak self] in
+                for await snapshot in await backend.queue(on: target) {
+                    guard !Task.isCancelled, let self else { return }
+                    self.playlist.remote = snapshot
+                }
+            }
+        }
+    }
+
+    /// Double-click or Return on a remote queue row: `player_queues/play_index` (#0144).
+    private func playRemoteQueueRow(_ index: Int) {
+        let output = selectedOutput
+        let backend = router.backend(for: output)
+        Task { [weak self] in
+            do {
+                try await backend.edit(.play(index: index), on: output)
+            } catch {
+                self?.showBackendFailure(error)
             }
         }
     }

@@ -1,12 +1,14 @@
 import AudioCore
 import Foundation
+import LibraryBrowser
+import MusicBackendKit
 import Observation
 import SkinKit
 
 /// The playlist window's state: a view of the local player's queue plus selection, scroll position and size. Owned by
 /// `PlayerModel`. Edits go straight to `Player` (not through `TransportCommand`: that stream exists for transport
-/// ordering, and the queue is only reachable locally). `MusicBackend` has no queue read API, so with a speaker
-/// selected the list is empty. With This Mac selected it shows the local queue even while Music Assistant feeds it (#0114).
+/// ordering). With a speaker selected, or This Mac fed by Music Assistant, it shows that backend's queue instead
+/// (`remote`, set by `PlayerModel`, #0144): read-only apart from playing a row.
 @MainActor
 @Observable
 final class PlaylistModel {
@@ -32,6 +34,18 @@ final class PlaylistModel {
     @ObservationIgnored var isPlayingLocalQueue: @MainActor () -> Bool = { true }
     /// Called before a row plays, so This Mac takes its local queue back from Music Assistant (#0114).
     @ObservationIgnored var onPlayLocal: @MainActor () -> Void = {}
+    /// Plays the remote queue's row at this index (#0144). Set by `PlayerModel`.
+    @ObservationIgnored var onPlayRemote: @MainActor (Int) -> Void = { _ in }
+    /// An edit the remote queue can't take yet (#0145): shows the marquee notice. Set by `PlayerModel`.
+    @ObservationIgnored var onRemoteRefused: @MainActor () -> Void = {}
+
+    /// The remote queue the rows show; nil for the local queue. Set by `PlayerModel` (#0144).
+    var remote: RemoteQueueSnapshot? {
+        didSet { remoteTracks = remote.map(remoteTracks(for:)) ?? [] }
+    }
+    /// `remote`'s items as rows; ids stay the same per queue item so the selection survives refetches.
+    private var remoteTracks: [Track] = []
+    @ObservationIgnored private var remoteIDs: [String: UUID] = [:]
 
     var selection = PlaylistSelection()
     /// Webamp's 0...100 percent of the overflow.
@@ -63,8 +77,38 @@ final class PlaylistModel {
 
     // MARK: Queue
 
-    var tracks: [Track] { isLocal() ? player.queue.tracks : [] }
-    var currentIndex: Int? { isLocal() && isPlayingLocalQueue() ? player.queue.currentIndex : nil }
+    var tracks: [Track] {
+        if remote != nil { return remoteTracks }
+        return isLocal() ? player.queue.tracks : []
+    }
+
+    var currentIndex: Int? {
+        if let remote { return remote.currentIndex }
+        return isLocal() && isPlayingLocalQueue() ? player.queue.currentIndex : nil
+    }
+
+    /// Whether the rows are a remote queue, where only playing a row works (#0144); refuses with the notice.
+    private func refusesRemoteEdit() -> Bool {
+        guard remote != nil else { return false }
+        onRemoteRefused()
+        return true
+    }
+
+    /// A `Track` per remote item, for the row, selection, HTML and File Info code the local queue uses.
+    private func remoteTracks(for snapshot: RemoteQueueSnapshot) -> [Track] {
+        var ids: [String: UUID] = [:]
+        let tracks = snapshot.items.map { item in
+            let id = remoteIDs[item.id] ?? UUID()
+            ids[item.id] = id
+            return Track(
+                id: id, title: item.title, artist: item.artist ?? "",
+                album: item.album, duration: item.duration ?? 0,
+                source: .file(item.item.flatMap { URL(string: $0.rawValue) } ?? URL(string: "about:blank")!))
+        }
+        remoteIDs = ids
+        selection.prune(to: tracks)
+        return tracks
+    }
     var count: Int { tracks.count }
 
     var visibleRange: Range<Int> {
@@ -159,6 +203,10 @@ final class PlaylistModel {
     func invertSelection() { selection.invert(in: tracks) }
 
     func playRow(_ index: Int) {
+        if let remote {
+            if remote.items.indices.contains(index) { onPlayRemote(remote.items[index].index) }
+            return
+        }
         guard isLocal() else { return }
         onPlayLocal()
         player.play(at: index)
@@ -170,6 +218,7 @@ final class PlaylistModel {
     }
 
     func removeSelected() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         let indices = selectedIndices
         guard !indices.isEmpty else { return }
@@ -179,6 +228,7 @@ final class PlaylistModel {
 
     /// Keeps only the selected rows. With nothing selected it does nothing (Webamp would empty the list).
     func crop() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         let keep = selectedIndices
         guard !keep.isEmpty else { return }
@@ -189,6 +239,7 @@ final class PlaylistModel {
 
     /// Webamp's removeAllTracks: stops and empties.
     func removeAll() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         player.clearQueue()
         selection.selectNone()
@@ -197,7 +248,7 @@ final class PlaylistModel {
 
     /// Drags the selected rows `offset` rows (clamped at the ends by the queue).
     func dragSelected(by offset: Int) {
-        guard isLocal(), offset != 0 else { return }
+        guard offset != 0, !refusesRemoteEdit(), isLocal() else { return }
         player.moveTracks(selectedIndices, by: offset)
     }
 
@@ -205,27 +256,32 @@ final class PlaylistModel {
 
     /// Sorts by the row text, so the order matches what the list shows.
     func sortByTitle() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         player.sortQueue(by: Self.displayName)
     }
 
     func sortByFileName() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         player.sortQueue(by: PlaylistSortKey.fileName)
     }
 
     func sortByPath() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         player.sortQueue(by: PlaylistSortKey.path)
     }
 
     func reverse() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         player.reverseQueue()
     }
 
     /// Winamp's Randomize List: permutes the list itself (shuffle mode only changes play order).
     func randomize() {
+        if refusesRemoteEdit() { return }
         guard isLocal() else { return }
         player.randomizeQueue()
     }

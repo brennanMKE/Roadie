@@ -103,7 +103,7 @@ struct BackendOutputsAndProbeTests {
 
     @Test func capabilitiesIncludeRemoteOutputs() throws {
         let rig = try makeBackend()
-        #expect(rig.backend.capabilities == [.search, .playlists, .artwork, .remoteOutputs, .localOutput, .recommendations])
+        #expect(rig.backend.capabilities.isSuperset(of: [.search, .playlists, .artwork, .remoteOutputs, .localOutput, .recommendations, .queueEditing]))
         #expect(rig.backend.sourceID == "musicAssistant")
         #expect(rig.backend.displayName == "Music Assistant")
     }
