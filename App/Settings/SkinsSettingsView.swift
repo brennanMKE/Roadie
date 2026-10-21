@@ -4,6 +4,7 @@ import SwiftUI
 struct SkinsSettingsView: View {
     @Environment(SkinLibraryModel.self) private var model
     @State private var confirmingReset = false
+    @AppStorage(PlayerModel.museumShowsNSFWKey) private var museumShowsNSFW = false
 
     var body: some View {
         Form {
@@ -70,6 +71,19 @@ struct SkinsSettingsView: View {
                 Text("Index")
             } footer: {
                 Text("Skins are indexed in the background; only new or changed files are read again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Show NSFW skins from the Skin Museum", isOn: $museumShowsNSFW)
+                    .accessibilityIdentifier("skins.museum.nsfw")
+            } header: {
+                Text("Skin Museum")
+            } footer: {
+                Text(model.hasFolder
+                    ? "Downloads go to \(model.folderText)/Museum."
+                    : "Downloads go to the Museum folder inside the skins folder.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

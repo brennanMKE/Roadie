@@ -28,6 +28,8 @@ final class SkinLibraryModel {
     @ObservationIgnored private var indexer: SkinIndexer?
     @ObservationIgnored private var indexedPath: String?
     @ObservationIgnored private var scanTask: Task<Void, Never>?
+    /// A Museum download arrived while a pass ran: run an incremental pass after it (#0126).
+    @ObservationIgnored private var rescanAfterPass = false
     @ObservationIgnored private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "SkinLibrary")
 
     init(
@@ -165,13 +167,47 @@ final class SkinLibraryModel {
         if let text = try? await store.meta("last_scan") { lastScan = ISO8601DateFormatter().date(from: text) }
     }
 
+    /// Indexes one skin the Museum just downloaded into the skins folder, without walking the folder (#0126).
+    /// While a pass runs, an incremental pass is queued after it instead.
+    func addDownloaded(_ url: URL) async {
+        guard let path = folderPath else { return }
+        let root = URL(filePath: path, directoryHint: .isDirectory).standardizedFileURL.path
+        let file = url.standardizedFileURL.path
+        guard file.hasPrefix(root.hasSuffix("/") ? root : root + "/") else { return }
+        let relative = String(file.dropFirst(root.hasSuffix("/") ? root.count : root.count + 1))
+        if isIndexing {
+            rescanAfterPass = true
+            return
+        }
+        do {
+            guard let store = try await openStoreIfNeeded() else { return }
+            if indexer == nil || indexedPath != path {
+                indexer = SkinIndexer(folder: URL(filePath: path, directoryHint: .isDirectory), store: store)
+                indexedPath = path
+            }
+            guard let indexer else { return }
+            _ = try await indexer.add(paths: [relative])
+            await refreshCounts()
+        } catch SkinLibraryError.passAlreadyRunning {
+            if isIndexing { rescanAfterPass = true } else { scan() }
+        } catch {
+            Self.logger.error("adding a downloaded skin failed: \(error.localizedDescription, privacy: .public)")
+            scan()
+        }
+    }
+
     private func runPass(path: String, full: Bool) async {
         defer {
             isIndexing = false
             progress = nil
             passFinished?()
             // The folder changed while this pass ran (setFolder cancelled it, and its scan() was skipped): index the new one.
-            if let current = folderPath, current != path { scan() }
+            if let current = folderPath, current != path {
+                scan()
+            } else if rescanAfterPass {
+                rescanAfterPass = false
+                scan()
+            }
         }
         do {
             guard let store = try await openStoreIfNeeded() else { return }

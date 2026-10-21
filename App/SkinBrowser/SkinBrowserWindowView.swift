@@ -2,13 +2,38 @@ import SkinBrowser
 import SkinLibrary
 import SwiftUI
 
-/// The Skins window: a grid of thumbnails over the SQLite index, with search, a status filter and a random button.
+/// Which grid the Skins window shows (#0126).
+enum SkinsSource: String, CaseIterable, Identifiable {
+    case library, museum
+    var id: String { rawValue }
+    var title: String { self == .library ? "Library" : "Museum" }
+}
+
+/// The Skins window: the local Library (a grid over the SQLite index, with search, a status filter and a random
+/// button) or the Winamp Skin Museum. The Museum makes no request until its tab is shown.
 struct SkinBrowserWindowView: View {
     @Environment(PlayerModel.self) private var player
+    @SceneStorage("skins.source") private var source: SkinsSource = .library
 
     var body: some View {
+        switch source {
+        case .library: libraryBody
+        case .museum: MuseumModeView(sourcePicker: AnyView(sourcePicker))
+        }
+    }
+
+    private var sourcePicker: some View {
+        Picker("Source", selection: $source) {
+            ForEach(SkinsSource.allCases) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityIdentifier("skins.source")
+    }
+
+    private var libraryBody: some View {
         @Bindable var browser = player.skinBrowser
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             content(browser)
             Divider()
             statusBar(browser)
@@ -16,6 +41,7 @@ struct SkinBrowserWindowView: View {
         .searchable(text: $browser.searchText, placement: .toolbar, prompt: "Search skins by name or readme")
         .onSubmit(of: .search) { browser.searchNow() }
         .toolbar {
+            ToolbarItem(placement: .navigation) { sourcePicker }
             ToolbarItem {
                 Picker("Status", selection: $browser.filter) {
                     ForEach(SkinStatusFilter.allCases) { Text($0.title).tag($0) }

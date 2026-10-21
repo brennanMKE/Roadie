@@ -11,6 +11,7 @@ import Observation
 import SkinBrowser
 import SkinKit
 import SkinLibrary
+import SkinMuseum
 import os
 
 @MainActor
@@ -47,6 +48,35 @@ final class PlayerModel {
         folder: { [skinLibrary] in skinLibrary.folderURL },
         thumbnails: SkinThumbnailAdapter(cache: skinThumbnails),
         applySkin: { [weak self] in self?.loadSkin(from: $0) })
+    /// The Museum tab of the Skins window (#0126). Lazy, and it makes no request until the tab appears.
+    @ObservationIgnored private(set) lazy var museumBrowser: MuseumBrowserModel = {
+        self.museumBrowserCreated = true
+        let transport = URLSessionMuseumTransport()
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        let userAgent = MuseumUserAgent.make(version: version)
+        let caches = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory)
+            .appending(path: "com.brennanmke.SkinAmp/Museum", directoryHint: .isDirectory)
+        let results = MuseumResultCache(directory: caches.appending(path: "Results", directoryHint: .isDirectory))
+        return MuseumBrowserModel(
+            client: MuseumClient(transport: transport, userAgent: userAgent, resultCache: results),
+            downloader: MuseumDownloader(transport: transport, userAgent: userAgent),
+            screenshots: MuseumScreenshotCache(
+                directory: caches.appending(path: "Screenshots", directoryHint: .isDirectory),
+                transport: transport, userAgent: userAgent),
+            folder: { [skinLibrary] in skinLibrary.folderURL },
+            lookup: { [skinLibrary] in try await skinLibrary.openStoreIfNeeded() },
+            indexAdded: { [weak self] url in
+                guard let self else { return }
+                await skinLibrary.addDownloaded(url)
+                skinBrowser.indexDidChange()
+            },
+            applySkin: { [weak self] in self?.loadSkin(from: $0) },
+            showsNSFW: { UserDefaults.standard.bool(forKey: Self.museumShowsNSFWKey) },
+            setShowsNSFW: { UserDefaults.standard.set($0, forKey: Self.museumShowsNSFWKey) })
+    }()
+    @ObservationIgnored private var museumBrowserCreated = false
+    static let museumShowsNSFWKey = "museumShowsNSFW"
     @ObservationIgnored private var skinLoadGeneration = 0
     /// The local-folder source; Settings › Library chooses and indexes its folder. Owns the "This Mac" output (`LocalPlaybackStack`), which every local track plays through.
     let folderBackend: FolderBackend
@@ -401,7 +431,11 @@ final class PlayerModel {
         if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
         }
-        skinLibrary.passFinished = { [weak self] in self?.skinBrowser.indexDidChange() }
+        skinLibrary.passFinished = { [weak self] in
+            guard let self else { return }
+            skinBrowser.indexDidChange()
+            if museumBrowserCreated { museumBrowser.indexDidChange() }
+        }
         musicAssistantSettings.onServersChanged = { [weak selection] in selection?.serversEdited() }
         musicAssistantDiscovery.onConfiguredServerMoved = { [weak settings = musicAssistantSettings] id, serverID, url in
             settings?.adoptDiscoveredAddress(url, for: id, serverID: serverID)

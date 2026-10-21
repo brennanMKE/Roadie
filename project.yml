@@ -27,6 +27,8 @@ targets:
         product: SkinLibrary
       - package: SkinKit
         product: SkinBrowser
+      - package: SkinKit
+        product: SkinMuseum
       - package: PlayerKit
         product: AudioCore
       - package: PlayerKit
