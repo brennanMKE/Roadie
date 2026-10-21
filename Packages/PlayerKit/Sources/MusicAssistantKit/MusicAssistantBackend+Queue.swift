@@ -48,7 +48,8 @@ extension MusicAssistantBackend {
     }
 
     /// `player_queues/save_as_playlist` on the queue `output` plays (a synced speaker: its leader's) (#0140). An empty
-    /// queue is `.backend(emptyQueueText)`.
+    /// queue (`QueueEmpty`, error code 8) is `.backend(emptyQueueText)`; a queue with nothing a playlist can hold
+    /// (`InvalidDataError`, code 3, e.g. only radio stations) is `.backend(nothingToSaveText)`.
     public func saveQueueAsPlaylist(on output: OutputDevice.ID, named name: String) async throws {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw MusicBackendError.backend(Self.playlistNameMissingText) }
@@ -57,14 +58,29 @@ extension MusicAssistantBackend {
                 let client = try requireClient()
                 let queueID = try await queueID(for: output, client: client)
                 _ = try await client.call(.queueSaveAsPlaylist(queueID: queueID, name: name))
-            } catch MusicAssistantError.server(_, let details) where details.lowercased().contains("queueempty") {
+            } catch MusicAssistantError.server(let code, let details) where Self.isEmptyQueueRefusal(code: code, details) {
                 throw MusicBackendError.backend(Self.emptyQueueText)
+            } catch MusicAssistantError.server(code: Self.invalidDataErrorCode, _) {
+                throw MusicBackendError.backend(Self.nothingToSaveText)
             }
         }
     }
 
     public static let emptyQueueText = "The queue is empty: there is nothing to save."
+    public static let nothingToSaveText = "Nothing in this queue can go in a playlist."
     public static let playlistNameMissingText = "The playlist needs a name."
+
+    /// `music_assistant_models.errors`: `QueueEmpty.error_code` and `InvalidDataError.error_code`.
+    static let queueEmptyErrorCode = 8
+    static let invalidDataErrorCode = 3
+
+    /// `save_as_playlist` raises `QueueEmpty("Cannot save an empty queue as a playlist.")`; the server sends its code
+    /// (8) and message. The details check is a fallback for a server that sends another code.
+    static func isEmptyQueueRefusal(code: Int, _ details: String) -> Bool {
+        if code == queueEmptyErrorCode { return true }
+        let text = details.lowercased()
+        return text.contains("empty queue") || text.contains("queueempty")
+    }
 
     /// Music Assistant raises `IndexError` for a move or delete at or before the buffered index; it arrives as a server
     /// error whose details name it (or say "buffered").

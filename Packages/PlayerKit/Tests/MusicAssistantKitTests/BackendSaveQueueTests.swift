@@ -36,10 +36,21 @@ struct BackendSaveQueueTests {
 
     @Test func saveQueueOnAnEmptyQueueIsAClearError() async throws {
         let rig = try await rig(activeQueue: SyntheticPlayback.playerID, extra: [
-            .error(command: "player_queues/save_as_playlist", code: 999, details: "QueueEmpty: Queue is empty")
+            .error(command: "player_queues/save_as_playlist", code: 8, details: "Cannot save an empty queue as a playlist.")
         ])
         _ = try await rig.backend.outputs()
         await #expect(throws: MusicBackendError.backend(MusicAssistantBackend.emptyQueueText)) {
+            try await rig.backend.saveQueueAsPlaylist(on: output, named: "Road Trip")
+        }
+        await rig.backend.disconnect()
+    }
+
+    @Test func saveQueueWithNothingPlaylistableIsAClearError() async throws {
+        let rig = try await rig(activeQueue: SyntheticPlayback.playerID, extra: [
+            .error(command: "player_queues/save_as_playlist", code: 3, details: "No valid items in queue to save as playlist.")
+        ])
+        _ = try await rig.backend.outputs()
+        await #expect(throws: MusicBackendError.backend(MusicAssistantBackend.nothingToSaveText)) {
             try await rig.backend.saveQueueAsPlaylist(on: output, named: "Road Trip")
         }
         await rig.backend.disconnect()
