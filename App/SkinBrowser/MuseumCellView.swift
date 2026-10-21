@@ -27,19 +27,29 @@ struct MuseumCellView: View {
                         }
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                if museum.isDownloaded(skin) {
+                    Label("Downloaded", systemImage: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(.regularMaterial))
+                        .background(Capsule().fill(Color.green.opacity(0.35)))
+                        .padding(4)
+                        .accessibilityLabel("Downloaded")
+                        .accessibilityIdentifier("skins.museum.downloaded.\(skin.md5)")
+                }
+            }
             .contentShape(Rectangle())
             .onTapGesture(count: 2) { runPrimary(museum) }
             HStack(spacing: 4) {
                 Text(skin.displayName).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 0)
-                if museum.isDownloaded(skin) {
-                    Text("Downloaded")
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.green.opacity(0.25)))
-                }
                 actionButton(museum)
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .font(.caption)
         }
@@ -57,6 +67,7 @@ struct MuseumCellView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(skin.displayName)
+        .accessibilityValue(museum.isDownloaded(skin) ? "Downloaded" : "")
         .accessibilityIdentifier("skins.museum.cell.\(skin.md5)")
     }
 
