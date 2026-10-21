@@ -23,7 +23,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     public nonisolated let displayName = "Music Assistant"
     /// `.localOutput`: This Mac plays through the MA player wrapping SkinAmp's Sendspin client (#0107).
     public nonisolated let capabilities: BackendCapabilities = [
-        .search, .playlists, .artwork, .remoteOutputs, .localOutput,
+        .search, .playlists, .artwork, .remoteOutputs, .localOutput, .recommendations,
     ]
 
     public static let thisMacNotRegisteredText =
@@ -780,12 +780,12 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     // MARK: Helpers
 
-    private func requireClient() throws -> MusicAssistantClient {
+    func requireClient() throws -> MusicAssistantClient {
         guard let client else { throw MusicBackendError.notConnected }
         return client
     }
 
-    private func guarded<T>(_ body: () async throws -> T) async throws -> T {
+    func guarded<T>(_ body: () async throws -> T) async throws -> T {
         do {
             return try await body()
         } catch {

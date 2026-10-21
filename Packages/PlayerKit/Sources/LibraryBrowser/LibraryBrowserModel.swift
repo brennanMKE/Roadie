@@ -5,6 +5,8 @@ import os
 
 public enum LibrarySection: String, Hashable, Sendable, CaseIterable, Identifiable {
     case artists, albums, playlists
+    /// A Discover row (#0143); which one is `discover.selectedRowID`. Not in `sections`: the sidebar lists the rows.
+    case discover
     public var id: Self { self }
 }
 
@@ -46,6 +48,8 @@ public final class LibraryBrowserModel {
     public let artists: PagedList<LibraryArtist>
     public let allAlbums: PagedList<LibraryAlbum>
     public let playlists: PagedList<LibraryPlaylist>
+    /// Discover rows (#0143); nil without `.recommendations`.
+    public let discover: DiscoverModel?
     /// Albums of `selectedArtist`.
     public let artistAlbums: PagedList<LibraryAlbum>
     /// Of `selectedAlbum` or `selectedPlaylist`.
@@ -136,6 +140,7 @@ public final class LibraryBrowserModel {
         allAlbums = PagedList(pageSize: pageSize)
         playlists = PagedList(pageSize: pageSize)
         artistAlbums = PagedList(pageSize: pageSize)
+        discover = backend.capabilities.contains(.recommendations) ? DiscoverModel(backend: backend) : nil
         artists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         allAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         playlists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
@@ -173,6 +178,7 @@ public final class LibraryBrowserModel {
         allAlbums.cancel()
         playlists.cancel()
         artistAlbums.cancel()
+        discover?.cancel()
         tracksGeneration += 1
         tracksTask?.cancel()
         tracksTask = nil
@@ -191,6 +197,13 @@ public final class LibraryBrowserModel {
         loadSection(reloading: true)
         if selectedArtist != nil { artistAlbums.reload() }
         retryTracks()
+    }
+
+    /// Shows a Discover row's items and loads them if needed.
+    public func select(discoverRow id: RecommendationRow.ID) {
+        guard let discover else { return }
+        discover.selectedRowID = id
+        if section != .discover { section = .discover } else { loadSectionIfNeeded() }
     }
 
     public func retryTracks() {
@@ -279,6 +292,7 @@ public final class LibraryBrowserModel {
 
     /// Loads the current section if idle, and whatever the selection needs after a cancel.
     private func resumeSelection() {
+        discover?.loadRowsIfNeeded()
         loadSectionIfNeeded()
         if selectedArtist != nil, artistAlbums.phase == .idle { artistAlbums.reload() }
         if tracks == .idle { retryTracks() }
@@ -303,6 +317,12 @@ public final class LibraryBrowserModel {
         case .playlists:
             if reloading || playlists.phase == .idle {
                 playlists.reload(with: { try await backend.playlists(page: $0) })
+            }
+        case .discover:
+            guard let discover else { return }
+            discover.loadRowsIfNeeded()
+            if let id = discover.selectedRowID, let row = discover.row(id: id) {
+                if reloading { discover.refresh(row) } else { discover.loadItemsIfNeeded(row) }
             }
         }
     }

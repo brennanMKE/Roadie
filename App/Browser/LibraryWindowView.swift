@@ -74,6 +74,10 @@ struct LibraryWindowView: View {
             case .artists: ArtistListView(library: library)
             case .albums: AlbumListView(library: library, list: library.allAlbums, showsArtist: true)
             case .playlists: PlaylistListView(library: library)
+            case .discover:
+                if let discover = library.discover {
+                    DiscoverRowView(library: library, discover: discover)
+                }
             }
         }
     }
@@ -102,6 +106,11 @@ struct LibraryWindowView: View {
                 } else {
                     ContentUnavailableView("Select a playlist", systemImage: "music.note.list")
                 }
+            case .discover:
+                ContentUnavailableView(
+                    library.discover?.selectedRow?.name ?? "Discover",
+                    systemImage: MDIIcon.symbol(library.discover?.selectedRow?.icon),
+                    description: Text("Double-click an item to play it."))
             }
         }
     }

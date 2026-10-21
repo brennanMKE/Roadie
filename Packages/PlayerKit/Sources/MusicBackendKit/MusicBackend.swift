@@ -11,6 +11,8 @@ public struct BackendCapabilities: OptionSet, Hashable, Sendable {
     public static let localOutput = BackendCapabilities(rawValue: 1 << 3)
     /// Controls players other than this Mac.
     public static let remoteOutputs = BackendCapabilities(rawValue: 1 << 4)
+    /// Has the server's automatic rows (Discover, #0143).
+    public static let recommendations = BackendCapabilities(rawValue: 1 << 7)
 }
 
 /// No case carries a URL, a request, a header or a token; `errorDescription` is user-facing.
@@ -71,6 +73,24 @@ public protocol MusicBackend: AnyObject, Sendable {
     func setGroupMembers(of leader: OutputDevice.ID, adding: [OutputDevice.ID], removing: [OutputDevice.ID]) async throws
     /// Yields the current snapshot at once, then one per change. Ends when the subscriber cancels.
     func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying>
+
+    /// Discover rows (#0143), in the server's order. Default: `.unsupported(.recommendations)`.
+    func recommendationRows() async throws -> [RecommendationRow]
+    func recommendationItems(_ row: RecommendationRow) async throws -> [RecommendationItem]
+    /// A slim item (`.other`) as the full one when the backend can find it. Default: the item itself.
+    func resolve(_ item: RecommendationItem) async throws -> RecommendationItem
+}
+
+extension MusicBackend {
+    public func recommendationRows() async throws -> [RecommendationRow] {
+        throw MusicBackendError.unsupported(.recommendations)
+    }
+
+    public func recommendationItems(_ row: RecommendationRow) async throws -> [RecommendationItem] {
+        throw MusicBackendError.unsupported(.recommendations)
+    }
+
+    public func resolve(_ item: RecommendationItem) async throws -> RecommendationItem { item }
 }
 
 extension MusicBackend {
