@@ -262,6 +262,8 @@ public final class MuseumBrowserModel {
         do {
             guard let reader = try await lookup() else { return }
             let found = try await reader.skins(md5s: skins.map(\.md5))
+            // A skin that left the index (moved to the Trash, #0131) loses its badge.
+            for skin in skins where found[skin.md5] == nil { downloaded[skin.md5] = nil }
             for (md5, record) in found {
                 downloaded[md5] = SkinBrowserFormat.fileURL(folder: root, path: record.primaryPath)
             }

@@ -16,9 +16,19 @@ struct SkinBrowserWindowView: View {
     @SceneStorage("skins.source") private var source: SkinsSource = .library
 
     var body: some View {
-        switch source {
-        case .library: libraryBody
-        case .museum: MuseumModeView(sourcePicker: AnyView(sourcePicker))
+        @Bindable var browser = player.skinBrowser
+        Group {
+            switch source {
+            case .library: libraryBody
+            case .museum: MuseumModeView(sourcePicker: AnyView(sourcePicker))
+            }
+        }
+        .alert(
+            "Move to Trash", isPresented: Binding(get: { browser.trashError != nil }, set: { if !$0 { browser.trashError = nil } })
+        ) {
+            Button("OK", role: .cancel) { browser.trashError = nil }
+        } message: {
+            Text(browser.trashError ?? "")
         }
     }
 

@@ -156,6 +156,18 @@ public actor SkinThumbnailCache {
         negative.removeAll()
     }
 
+    /// Forgets one skin's thumbnail in memory and on disk (#0131: the skin was moved to the Trash).
+    public func remove(hash: String) {
+        guard SkinContentHash.isValid(hash) else { return }
+        if let old = entries.removeValue(forKey: hash) {
+            bytes -= old.byteCount
+            if let index = order.firstIndex(of: hash) { order.remove(at: index) }
+        }
+        negative.remove(hash)
+        try? FileManager.default.removeItem(at: store.url(for: hash))
+        try? FileManager.default.removeItem(at: store.markerURL(for: hash))
+    }
+
     /// Memory and disk (Settings, Reset).
     public func removeAll() throws {
         clear()

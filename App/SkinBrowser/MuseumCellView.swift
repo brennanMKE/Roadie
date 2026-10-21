@@ -58,6 +58,7 @@ struct MuseumCellView: View {
             Button("Open in Skin Museum") { NSWorkspace.shared.open(skin.museumURL) }
             if let url = museum.downloaded[skin.md5] {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                Button("Move to Trash") { player.trashDownloadedMuseumSkin(at: url) }
             }
         }
         .task(id: skin.md5) {

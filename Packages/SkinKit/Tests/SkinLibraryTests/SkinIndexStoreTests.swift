@@ -298,4 +298,27 @@ func linkedOutcome(_ path: String, hash: String, size: Int64 = 10, mtime: Double
         let many = (0..<1200).map { String(format: "%032x", $0) } + [m2]
         #expect(try await store.skins(md5s: many).keys.sorted() == [m2])
     }
+
+    @Test func removeFileDropsRowAndSkinOnlyWithTheLastFile() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let store = try await SkinIndexStore.open(at: dir.appending("index.sqlite"))
+        _ = try await store.apply([
+            parsedOutcome("a.wsz", hash: "h1", name: "alpha"), linkedOutcome("b.wsz", hash: "h1"),
+            parsedOutcome("c.wsz", hash: "h2", name: "gamma"),
+        ])
+        // A linked duplicate: only that file's row goes; the skin and its other file stay.
+        #expect(try await store.removeFile(atPath: "b.wsz") == nil)
+        let kept = try #require(try await store.skin(hash: "h1"))
+        #expect(try await store.files(forSkin: kept.id).map(\.path) == ["a.wsz"])
+        // The last file: the skin goes too (and out of search), its hash comes back for the thumbnail.
+        #expect(try await store.removeFile(atPath: "a.wsz") == "h1")
+        #expect(try await store.skin(hash: "h1") == nil)
+        #expect(try await store.search("alpha").isEmpty)
+        #expect(try await store.counts().skins == 1)
+        #expect(try await store.counts().files == 1)
+        // Unknown path: nothing happens.
+        #expect(try await store.removeFile(atPath: "missing.wsz") == nil)
+        #expect(try await store.counts().skins == 1)
+    }
 }

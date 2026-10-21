@@ -7,4 +7,10 @@ import SkinLibrary
 public protocol SkinThumbnailProviding: Sendable {
     /// nil when the skin cannot be rendered (show the placeholder). Called off the main actor.
     func thumbnail(for record: SkinRecord, at url: URL) async -> CGImage?
+    /// Forgets the thumbnail of a skin that left the index (#0131).
+    func remove(hash: String) async
+}
+
+extension SkinThumbnailProviding {
+    public func remove(hash: String) async {}
 }

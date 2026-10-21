@@ -12,4 +12,6 @@ struct SkinThumbnailAdapter: SkinThumbnailProviding {
         guard record.status != .failed else { return nil }
         return await cache.thumbnail(hash: record.hash, url: url)?.image
     }
+
+    func remove(hash: String) async { await cache.remove(hash: hash) }
 }

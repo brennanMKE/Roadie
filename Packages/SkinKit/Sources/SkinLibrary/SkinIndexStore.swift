@@ -267,6 +267,38 @@ public actor SkinIndexStore {
         }
     }
 
+    /// Drops one file's row right away, no rescan (#0131). When no other file holds that skin the skin row goes too
+    /// (the trigger keeps FTS in step) and its hash is returned so the caller can drop the thumbnail; nil when the path
+    /// is unknown or a linked duplicate still holds the skin.
+    @discardableResult
+    public func removeFile(atPath path: String) throws -> String? {
+        try db.transaction {
+            let find = try db.statement("SELECT s.id, s.hash FROM files f JOIN skins s ON s.id = f.skin_id WHERE f.path = ?")
+            try find.bind(path, at: 1)
+            guard try find.step() else {
+                find.reset()
+                return nil
+            }
+            let id = find.int64(0), hash = find.string(1)
+            find.reset()
+            let delete = try db.statement("DELETE FROM files WHERE path = ?")
+            try delete.bind(path, at: 1)
+            try delete.step()
+            delete.reset()
+            let remaining = try db.statement("SELECT COUNT(*) FROM files WHERE skin_id = ?")
+            try remaining.bind(id, at: 1)
+            _ = try remaining.step()
+            let left = remaining.int64(0)
+            remaining.reset()
+            guard left == 0 else { return nil }
+            let drop = try db.statement("DELETE FROM skins WHERE id = ?")
+            try drop.bind(id, at: 1)
+            try drop.step()
+            drop.reset()
+            return hash
+        }
+    }
+
     /// Deletes skins no file points at any more (the trigger keeps the FTS table in step).
     @discardableResult
     func pruneOrphans() throws -> Int {

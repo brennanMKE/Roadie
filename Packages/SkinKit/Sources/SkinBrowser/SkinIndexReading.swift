@@ -13,6 +13,8 @@ public protocol SkinIndexReading: Sendable {
     func skins(md5s: [String]) async throws -> [String: SkinRecord]
     /// The skin with this SHA-256, so a Museum download never writes a second copy (#0126).
     func skin(hash: String) async throws -> SkinRecord?
+    /// Drops a trashed file's row (#0131); returns the skin's hash when its last file went, so the thumbnail goes too.
+    func removeFile(atPath path: String) async throws -> String?
 }
 
 extension SkinIndexStore: SkinIndexReading {}

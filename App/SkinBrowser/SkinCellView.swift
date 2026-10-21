@@ -38,6 +38,10 @@ struct SkinCellView: View {
         .contentShape(Rectangle())
         .onTapGesture { browser.apply(record) }
         .allowsHitTesting(record.status != .failed)
+        .contextMenu {
+            Button("Move to Trash") { browser.moveToTrash(record) }
+                .accessibilityIdentifier("skins.cell.trash")
+        }
         .help(record.status == .ok ? "" : record.warnings.joined(separator: "\n"))
         .task(id: record.hash) {
             image = nil

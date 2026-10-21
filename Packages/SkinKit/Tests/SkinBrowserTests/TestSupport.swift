@@ -168,6 +168,32 @@ actor StubSkinIndex: SkinIndexReading {
     func skin(hash: String) async throws -> SkinRecord? {
         records.first { $0.hash == hash }
     }
+
+    private(set) var removedPaths: [String] = []
+
+    func removeFile(atPath path: String) async throws -> String? {
+        removedPaths.append(path)
+        if extraPaths.removeValue(forKey: path) != nil { return nil }
+        guard let index = records.firstIndex(where: { $0.primaryPath == path }) else { return nil }
+        return records.remove(at: index).hash
+    }
+}
+
+/// Records what Move to Trash would have trashed; never touches the real Trash (#0131).
+final class StubRemover: @unchecked Sendable {
+    private let lock = NSLock()
+    private var urls: [URL] = []
+    private var error: Error?
+    var trashed: [URL] { lock.withLock { urls } }
+    func fail(with error: Error?) { lock.withLock { self.error = error } }
+    var closure: SkinBrowserModel.FileRemover {
+        { [self] url in
+            try lock.withLock {
+                if let error { throw error }
+                urls.append(url)
+            }
+        }
+    }
 }
 
 @MainActor
@@ -184,6 +210,10 @@ final class StubThumbnails: SkinThumbnailProviding, @unchecked Sendable {
     private let lock = NSLock()
     private var urls: [URL] = []
     var requested: [URL] { lock.withLock { urls } }
+    private var removedHashes: [String] = []
+    var removed: [String] { lock.withLock { removedHashes } }
+
+    func remove(hash: String) async { lock.withLock { removedHashes.append(hash) } }
 
     func thumbnail(for record: SkinRecord, at url: URL) async -> CGImage? {
         lock.withLock { urls.append(url) }
@@ -200,14 +230,14 @@ let testFolder = URL(filePath: "/skins", directoryHint: .isDirectory)
 @MainActor
 func makeModel(
     _ records: [SkinRecord], folder: URL? = testFolder, pageSize: Int = 200, delay: Duration = .milliseconds(20),
-    noIndex: Bool = false
+    noIndex: Bool = false, remover: StubRemover = StubRemover()
 ) -> (StubSkinIndex, RecordingApplier, SkinBrowserModel, StubThumbnails) {
     let stub = StubSkinIndex(records)
     let applier = RecordingApplier()
     let thumbs = StubThumbnails()
     let model = SkinBrowserModel(
         index: { noIndex ? nil : stub }, folder: { folder }, thumbnails: thumbs,
-        applySkin: { applier.record($0) }, pageSize: pageSize, prefetchDistance: 40, searchDelay: delay)
+        applySkin: { applier.record($0) }, removeFile: remover.closure, pageSize: pageSize, prefetchDistance: 40, searchDelay: delay)
     return (stub, applier, model, thumbs)
 }
 

@@ -45,6 +45,9 @@ public enum SkinStatusFilter: String, CaseIterable, Sendable, Identifiable {
 @Observable
 public final class SkinBrowserModel {
     public typealias IndexProvider = @Sendable () async throws -> (any SkinIndexReading)?
+    /// Moves a file to the Trash (#0131). Injected so no test touches the real Trash.
+    public typealias FileRemover = @Sendable (URL) throws -> Void
+    public static let systemTrash: FileRemover = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
 
     public private(set) var phase: SkinBrowserPhase = .idle
     public private(set) var items: [SkinRecord] = []
@@ -55,6 +58,10 @@ public final class SkinBrowserModel {
     public private(set) var lastQueryDuration: Duration?
     public private(set) var hasMore = false
     public private(set) var currentSkinID: Int64?
+    /// The last Move to Trash failure, for a short alert; nil when there is nothing to show (#0131).
+    public var trashError: String?
+    /// Called after a skin left the index through Move to Trash, so other views (the Museum badges) can refresh.
+    @ObservationIgnored public var onTrashed: (@MainActor () -> Void)?
 
     public var searchText = "" {
         didSet { if searchText != oldValue { scheduleSearch(delay: searchDelay) } }
@@ -78,6 +85,7 @@ public final class SkinBrowserModel {
     @ObservationIgnored private let folder: @MainActor () -> URL?
     @ObservationIgnored private let thumbnails: any SkinThumbnailProviding
     @ObservationIgnored private let applySkin: @MainActor (URL) -> Void
+    @ObservationIgnored private let removeFile: FileRemover
     @ObservationIgnored private let pageSize: Int
     @ObservationIgnored private let prefetchDistance: Int
     @ObservationIgnored private let searchDelay: Duration
@@ -97,12 +105,14 @@ public final class SkinBrowserModel {
         folder: @escaping @MainActor () -> URL?,
         thumbnails: any SkinThumbnailProviding,
         applySkin: @escaping @MainActor (URL) -> Void,
+        removeFile: @escaping FileRemover = SkinBrowserModel.systemTrash,
         pageSize: Int = 200, prefetchDistance: Int = 40, searchDelay: Duration = .milliseconds(150)
     ) {
         indexProvider = index
         self.folder = folder
         self.thumbnails = thumbnails
         self.applySkin = applySkin
+        self.removeFile = removeFile
         self.pageSize = pageSize
         self.prefetchDistance = prefetchDistance
         self.searchDelay = searchDelay
@@ -311,6 +321,44 @@ public final class SkinBrowserModel {
             // A newer apply since this load started owns `currentSkinID`.
             if serial == applySerial { currentSkinID = id }
         }
+    }
+
+    // MARK: Move to Trash
+
+    public func moveToTrash(_ record: SkinRecord) {
+        Task { await moveToTrash(path: record.primaryPath, name: record.name) }
+    }
+
+    /// Moves the file at the folder-relative `path` to the Trash (only that file: a linked duplicate stays) and drops
+    /// its row, and the skin's row and thumbnail when it was the last file, without a rescan. A file that is already
+    /// gone is just dropped from the index. A skin that is applied stays applied. Returns whether the row went.
+    @discardableResult
+    public func moveToTrash(path: String, name: String? = nil) async -> Bool {
+        let label = name ?? (path as NSString).lastPathComponent
+        guard let root = folder() else { return false }
+        let url = SkinBrowserFormat.fileURL(folder: root, path: path)
+        guard SkinBrowserFormat.relativePath(of: url, in: root) != nil else {
+            trashError = "“\(label)” is not in the skins folder."
+            return false
+        }
+        guard let reader = await resolveReader() else { return false }
+        do {
+            try removeFile(url)
+        } catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+            Self.logger.info("trash: file already gone, dropping it from the index")
+        } catch {
+            trashError = "Couldn’t move “\(label)” to the Trash. \(Self.message(error))"
+            return false
+        }
+        do {
+            if let hash = try await reader.removeFile(atPath: path) { await thumbnails.remove(hash: hash) }
+        } catch {
+            trashError = "“\(label)” was moved to the Trash, but the index could not be updated. \(Self.message(error))"
+        }
+        items.removeAll { $0.primaryPath == path }
+        indexDidChange()
+        onTrashed?()
+        return true
     }
 
     // MARK: Thumbnails

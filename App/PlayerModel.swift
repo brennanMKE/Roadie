@@ -436,6 +436,10 @@ final class PlayerModel {
             skinBrowser.indexDidChange()
             if museumBrowserCreated { museumBrowser.indexDidChange() }
         }
+        skinBrowser.onTrashed = { [weak self] in
+            guard let self, museumBrowserCreated else { return }
+            museumBrowser.indexDidChange()
+        }
         musicAssistantSettings.onServersChanged = { [weak selection] in selection?.serversEdited() }
         musicAssistantDiscovery.onConfiguredServerMoved = { [weak settings = musicAssistantSettings] id, serverID, url in
             settings?.adoptDiscoveredAddress(url, for: id, serverID: serverID)
@@ -729,6 +733,15 @@ final class PlayerModel {
 
     /// Writes the queue now; called on quit so the last second of changes is not lost.
     func flushQueue() { queueAutosaver.flush() }
+
+    /// Museum › Move to Trash for a downloaded skin (#0131): the same path as the Library's, keyed by the file.
+    func trashDownloadedMuseumSkin(at url: URL) {
+        guard let root = skinLibrary.folderURL, let path = SkinBrowserFormat.relativePath(of: url, in: root) else {
+            skinBrowser.trashError = "“\(url.lastPathComponent)” is not in the skins folder."
+            return
+        }
+        Task { await skinBrowser.moveToTrash(path: path) }
+    }
 
     func loadSkin(from url: URL) {
         // Two quick applies (holding the Next Skin shortcut) race; the newest request wins and the older parse is dropped.

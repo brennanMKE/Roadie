@@ -247,4 +247,15 @@ private func makeMuseum(
         #expect(applier.applied.isEmpty)
         #expect(model.downloaded[skin.md5] == nil)
     }
+
+    @Test func trashedSkinLosesItsBadge() async {
+        let had = SkinRecord(id: 1, hash: "h", name: "s3", status: .ok, primaryPath: "Old/s3.wsz", md5: md5(3))
+        let (model, _, _, _, _, index) = makeMuseum(records: [had])
+        await load(model)
+        #expect(await waitFor { model.isDownloaded(museumSkin(3)) })
+        _ = try? await index.removeFile(atPath: "Old/s3.wsz")
+        model.indexDidChange()
+        #expect(await waitFor { !model.isDownloaded(museumSkin(3)) })
+        #expect(model.downloaded[md5(3)] == nil)
+    }
 }

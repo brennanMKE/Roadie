@@ -409,4 +409,17 @@ import Testing
         let second = await cache.statistics
         #expect(second.renders == first.renders)
     }
+
+    @Test func removeForgetsMemoryAndDisk() async throws {
+        let dir = try TempDir()
+        defer { dir.cleanup() }
+        let renderer = CountingRenderer()
+        let cache = makeCache(dir, renderer: renderer)
+        let skin = try fakeSkin(in: dir, "a")
+        #expect(await cache.thumbnail(hash: skin.hash, url: skin.url) != nil)
+        #expect(FileManager.default.fileExists(atPath: cache.fileURL(hash: skin.hash).path))
+        await cache.remove(hash: skin.hash)
+        #expect(await cache.cached(hash: skin.hash) == nil)
+        #expect(!FileManager.default.fileExists(atPath: cache.fileURL(hash: skin.hash).path))
+    }
 }
