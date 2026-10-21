@@ -7,6 +7,8 @@ public enum LibrarySection: String, Hashable, Sendable, CaseIterable, Identifiab
     case artists, albums, playlists
     /// A Discover row (#0143); which one is `discover.selectedRowID`. Not in `sections`: the sidebar lists the rows.
     case discover
+    /// Favorited tracks, albums, artists and playlists (#0142); only with `.favorites`.
+    case favorites
     public var id: Self { self }
 }
 
@@ -142,13 +144,16 @@ public final class LibraryBrowserModel {
         self.backend = backend
         self.searchDelay = searchDelay
         self.searchLimit = searchLimit
-        sections = backend.capabilities.contains(.playlists) ? [.artists, .albums, .playlists] : [.artists, .albums]
+        var sections: [LibrarySection] = [.artists, .albums]
+        if backend.capabilities.contains(.playlists) { sections.append(.playlists) }
+        if backend.capabilities.contains(.favorites) { sections.append(.favorites) }
+        self.sections = sections
         artists = PagedList(pageSize: pageSize)
         allAlbums = PagedList(pageSize: pageSize)
         playlists = PagedList(pageSize: pageSize)
         artistAlbums = PagedList(pageSize: pageSize)
         discover = backend.capabilities.contains(.recommendations) ? DiscoverModel(backend: backend) : nil
-        favorites = FavoritesModel(backend: backend)
+        favorites = FavoritesModel(backend: backend, pageSize: pageSize)
         artists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         allAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         playlists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
@@ -191,6 +196,7 @@ public final class LibraryBrowserModel {
         playlists.cancel()
         artistAlbums.cancel()
         discover?.cancel()
+        favorites.cancelLists()
         tracksGeneration += 1
         tracksTask?.cancel()
         tracksTask = nil
@@ -257,7 +263,7 @@ public final class LibraryBrowserModel {
     }
 
     public func select(_ playlist: LibraryPlaylist) {
-        if section != .playlists { section = .playlists }
+        if section != .playlists && section != .favorites { section = .playlists }
         selectedPlaylist = playlist
     }
 
@@ -373,6 +379,8 @@ public final class LibraryBrowserModel {
             if let id = discover.selectedRowID, let row = discover.row(id: id) {
                 if reloading { discover.refresh(row) } else { discover.loadItemsIfNeeded(row) }
             }
+        case .favorites:
+            favorites.sectionAppeared(reloading: reloading)
         }
     }
 

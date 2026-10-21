@@ -49,6 +49,7 @@ struct LibrarySidebarView: View {
         case .albums: Label("Albums", systemImage: "square.stack")
         case .playlists: Label("Playlists", systemImage: "music.note.list")
         case .discover: Label("Discover", systemImage: MDIIcon.fallback)
+        case .favorites: Label("Favorites", systemImage: "heart")
         }
     }
 }

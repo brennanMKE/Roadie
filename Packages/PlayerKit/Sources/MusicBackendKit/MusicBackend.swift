@@ -91,6 +91,13 @@ public protocol MusicBackend: AnyObject, Sendable {
     func favoriteCurrentTrack(on output: OutputDevice.ID) async throws
     /// Library changes made elsewhere (#0139), as refetch hints. Default: a stream that finishes at once.
     func libraryChanges() async -> AsyncStream<LibraryChange>
+    /// How many items of `kind` are favorited (#0142); nil when unknown. Default: `.unsupported(.favorites)`.
+    func favoriteCount(_ kind: MediaKind) async throws -> Int?
+    /// Favorited items, paged (#0142). Defaults: `.unsupported(.favorites)`.
+    func favoriteTracks(page: PageRequest) async throws -> Page<LibraryTrack>
+    func favoriteAlbums(page: PageRequest) async throws -> Page<LibraryAlbum>
+    func favoriteArtists(page: PageRequest) async throws -> Page<LibraryArtist>
+    func favoritePlaylists(page: PageRequest) async throws -> Page<LibraryPlaylist>
 }
 
 extension MusicBackend {

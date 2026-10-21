@@ -127,6 +127,13 @@ struct LibraryBrowserModelTests {
         #expect(withPlaylists.sections == [.artists, .albums, .playlists])
     }
 
+    @Test func favoritesSectionNeedsTheCapability() {
+        let (_, plain) = makeModel(capabilities: [.search, .playlists])
+        #expect(!plain.sections.contains(.favorites))
+        let (_, withFavorites) = makeModel(capabilities: [.search, .playlists, .favorites])
+        #expect(withFavorites.sections == [.artists, .albums, .playlists, .favorites])
+    }
+
     @Test func switchingSectionsLoadsEachListOnce() async {
         let (backend, model) = await connected()
         model.section = .albums

@@ -78,6 +78,7 @@ struct LibraryWindowView: View {
                 if let discover = library.discover {
                     DiscoverRowView(library: library, discover: discover)
                 }
+            case .favorites: FavoriteKindsView(favorites: library.favorites)
             }
         }
     }
@@ -111,6 +112,8 @@ struct LibraryWindowView: View {
                     library.discover?.selectedRow?.name ?? "Discover",
                     systemImage: MDIIcon.symbol(library.discover?.selectedRow?.icon),
                     description: Text("Double-click an item to play it."))
+            case .favorites:
+                FavoritesDetailView(library: library, favorites: library.favorites)
             }
         }
     }

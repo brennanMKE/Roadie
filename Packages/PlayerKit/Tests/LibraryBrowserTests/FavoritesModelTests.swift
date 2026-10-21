@@ -63,8 +63,39 @@ struct FavoritesModelTests {
         #expect(!model.favorites.isFavorite(first.id, stored: true))
     }
 
+    @Test func countsLoadPerKind() async {
+        var library = StubLibrary.sample(playlistCount: 3)
+        for i in 0..<3 { library.tracks[i].isFavorite = true }
+        library.albums[0].isFavorite = true
+        library.playlists[1].isFavorite = true
+        let (_, model) = makeModel(library: library, capabilities: [.search, .playlists, .favorites])
+        await model.favorites.loadCounts()
+        #expect(model.favorites.counts == [.tracks: 3, .albums: 1, .artists: 0, .playlists: 1])
+        // The section loads the selected kind; unfavoriting a row removes it after the refetch.
+        model.section = .favorites
+        model.appeared()
+        #expect(await waitFor { model.favorites.tracks.phase == .loaded })
+        #expect(model.favorites.tracks.items.count == 3)
+        let first = model.favorites.tracks.items[0].id
+        await StubFavoriteEdit.unfavorite(first, in: model)
+        #expect(await waitFor { model.favorites.tracks.items.count == 2 })
+        #expect(await waitFor { model.favorites.counts[.tracks] == 2 })
+    }
+
     @Test func severalRowsFavoriteUnlessAllAre() {
         #expect(FavoritesModel.target(for: [true, false]))
         #expect(!FavoritesModel.target(for: [true, true]))
+    }
+}
+
+/// Unfavorites in the stub's library too, so the refetch sees it.
+@MainActor
+enum StubFavoriteEdit {
+    static func unfavorite(_ id: MediaID, in model: LibraryBrowserModel) async {
+        guard let backend = model.backend as? StubMusicBackend else { return }
+        var library = await backend.library
+        if let index = library.tracks.firstIndex(where: { $0.id == id }) { library.tracks[index].isFavorite = false }
+        await backend.setLibrary(library)
+        #expect(await model.favorites.set(id, to: false) == nil)
     }
 }

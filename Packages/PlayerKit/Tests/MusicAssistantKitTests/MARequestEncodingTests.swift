@@ -45,6 +45,15 @@ struct MARequestEncodingTests {
         #expect(Set(request.args.keys) == Set(recorded.keys))
     }
 
+    @Test func favoriteListingsPassTheFilterToCountToo() {
+        let list = MARequest.favoriteLibraryItems(.track, limit: 100, offset: 200)
+        #expect(list.command == "music/tracks/library_items")
+        #expect(MAJSON.object(list.args) == ["limit": 100, "offset": 200, "order_by": "sort_name", "favorite": true])
+        let count = MARequest.favoriteCount(.album)
+        #expect(count.command == "music/albums/count")
+        #expect(MAJSON.object(count.args) == ["favorite_only": true])
+    }
+
     @Test func queueItemsUseTheDocumentedArgNames() {
         let request = MARequest.queueItems(id: "q", limit: 50, offset: 100)
         #expect(request.command == "player_queues/items")

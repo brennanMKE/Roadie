@@ -239,6 +239,38 @@ public actor StubMusicBackend: MusicBackend {
         try await enter(.favoriteCurrentTrack(output))
     }
 
+    /// Favorites listing (#0142): the library's items whose `isFavorite` is true. Not recorded as calls.
+    public func favoriteCount(_ kind: MediaKind) async throws -> Int? {
+        guard capabilities.contains(.favorites) else { throw MusicBackendError.unsupported(.favorites) }
+        switch kind {
+        case .track: return library.tracks.filter { $0.isFavorite == true }.count
+        case .album: return library.albums.filter { $0.isFavorite == true }.count
+        case .artist: return library.artists.filter { $0.isFavorite == true }.count
+        case .playlist: return library.playlists.filter { $0.isFavorite == true }.count
+        case .radio: return 0
+        }
+    }
+
+    public func favoriteTracks(page request: PageRequest) async throws -> Page<LibraryTrack> {
+        guard capabilities.contains(.favorites) else { throw MusicBackendError.unsupported(.favorites) }
+        return page(library.tracks.filter { $0.isFavorite == true }, request)
+    }
+
+    public func favoriteAlbums(page request: PageRequest) async throws -> Page<LibraryAlbum> {
+        guard capabilities.contains(.favorites) else { throw MusicBackendError.unsupported(.favorites) }
+        return page(library.albums.filter { $0.isFavorite == true }, request)
+    }
+
+    public func favoriteArtists(page request: PageRequest) async throws -> Page<LibraryArtist> {
+        guard capabilities.contains(.favorites) else { throw MusicBackendError.unsupported(.favorites) }
+        return page(library.artists.filter { $0.isFavorite == true }, request)
+    }
+
+    public func favoritePlaylists(page request: PageRequest) async throws -> Page<LibraryPlaylist> {
+        guard capabilities.contains(.favorites) else { throw MusicBackendError.unsupported(.favorites) }
+        return page(library.playlists.filter { $0.isFavorite == true }, request)
+    }
+
     public func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying> {
         let (stream, continuation) = AsyncStream<NowPlaying>.makeStream(bufferingPolicy: .bufferingNewest(1))
         let id = UUID()

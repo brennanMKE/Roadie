@@ -20,7 +20,57 @@ extension MARequest {
     }
 }
 
+extension MARequest {
+    /// `music/<kind>s/library_items {favorite: true}` (#0142): the Favorites lists.
+    public static func favoriteLibraryItems(_ kind: MAMediaKind, limit: Int, offset: Int) -> MARequest {
+        var request = libraryItems(kind, limit: limit, offset: offset)
+        request.args["favorite"] = .bool(true)
+        return request
+    }
+
+    /// `music/<kind>s/count {favorite_only: true}`: the same filter as the listing it counts.
+    public static func favoriteCount(_ kind: MAMediaKind) -> MARequest {
+        MARequest(command: "music/\(kind.plural)/count", args: ["favorite_only": .bool(true)])
+    }
+}
+
 extension MusicAssistantBackend {
+    public func favoriteCount(_ kind: MediaKind) async throws -> Int? {
+        try await guarded {
+            try await requireClient().call(.favoriteCount(MAMediaKind(kind)), as: Int.self)
+        }
+    }
+
+    public func favoriteTracks(page: PageRequest) async throws -> Page<LibraryTrack> {
+        try await favoriteListing(.track, as: MATrack.self, page: page, map: LibraryTrack.init(ma:))
+    }
+
+    public func favoriteAlbums(page: PageRequest) async throws -> Page<LibraryAlbum> {
+        try await favoriteListing(.album, as: MAAlbum.self, page: page, map: LibraryAlbum.init(ma:))
+    }
+
+    public func favoriteArtists(page: PageRequest) async throws -> Page<LibraryArtist> {
+        try await favoriteListing(.artist, as: MAArtist.self, page: page, map: LibraryArtist.init(ma:))
+    }
+
+    public func favoritePlaylists(page: PageRequest) async throws -> Page<LibraryPlaylist> {
+        try await favoriteListing(.playlist, as: MAPlaylist.self, page: page) { LibraryPlaylist(ma: $0) }
+    }
+
+    /// One page plus the favorite-only count (the total), fetched together.
+    private func favoriteListing<T: Decodable & Sendable, Item: Hashable & Sendable>(
+        _ kind: MAMediaKind, as type: T.Type, page: PageRequest, map: @Sendable (T) -> Item
+    ) async throws -> Page<Item> {
+        try await guarded {
+            let client = try requireClient()
+            async let items = client.call(
+                .favoriteLibraryItems(kind, limit: page.limit, offset: page.offset), as: [T].self)
+            async let total = try? client.call(.favoriteCount(kind), as: Int.self)
+            let loaded = try await items
+            return Page.make(items: loaded.map(map), request: page, total: await total)
+        }
+    }
+
     public static let unfavoriteNeedsLibraryText = "Only items in the Music Assistant library can be unfavorited."
 
     /// Favorite: the item's URI. Unfavorite: its `library://` id; anything else is refused before sending (#0141).
