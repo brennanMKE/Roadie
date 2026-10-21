@@ -55,6 +55,10 @@
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
+				<string>public.zip-archive</string>
+				<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
@@ -62,11 +66,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.brennanmke.skinamp.media-id</string>
 		</dict>
-		<dict>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.zip-archive</string>
-			</array>
+	</array>
 			<key>UTTypeDescription</key>
 			<string>Winamp Classic Skin</string>
 			<key>UTTypeIdentifier</key>

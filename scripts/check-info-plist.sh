@@ -39,5 +39,7 @@ done
 expect UTExportedTypeDeclarations.0.UTTypeIdentifier com.brennanmke.skinamp.wsz
 # #0047: the open panel filter relies on this conformance.
 expect UTExportedTypeDeclarations.0.UTTypeConformsTo.0 public.zip-archive
+expect UTExportedTypeDeclarations.1.UTTypeIdentifier com.brennanmke.skinamp.media-id
+expect UTExportedTypeDeclarations.1.UTTypeConformsTo.0 public.data
 expect CFBundleDocumentTypes.0.LSItemContentTypes.0 com.brennanmke.skinamp.wsz
 print -r -- "Info.plist OK: $P"
