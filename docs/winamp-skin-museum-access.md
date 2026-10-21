@@ -45,7 +45,8 @@ Option A is worth knowing about, but B gives us the metadata the library needs, 
 ### Other queries
 - `statistics { unique_classic_skins_count nsfw_skins_count approved_skins_count ... }`: sanity-check totals before a run.
 - `skins(filter: APPROVED|NSFW|REJECTED|TWEETED, first, offset)`: classic only, filterable. Useful if we ever want "curated only".
-- `search_classic_skins(query, first, offset)` / `search_skins(...)`: SQLite FTS search. Handy for a live "search the Museum" feature in the app later.
+- `search_classic_skins(query: String!, first, offset, nsfw: Boolean = null)`: SQLite FTS search over classic skins, with a server-side `nsfw` argument (pass `false` to exclude flagged skins). The app's Museum search uses it (#0126). `search_skins(...)` returns the `Skin` interface, modern skins included, so the app doesn't use it.
+- `skins(filter, first, offset, sort)` enums, confirmed in the source 2026-10-20: `SkinsFilterOption = APPROVED | NSFW | REJECTED | TWEETED`, `SkinsSortOption = MUSEUM`. `skins` has no "not NSFW" filter; the app browses `APPROVED` when NSFW is hidden.
 - `fetch_skin_by_md5(md5)`: look up one skin, e.g. to enrich a local file we already have.
 
 ## Step 1: Smoke test
