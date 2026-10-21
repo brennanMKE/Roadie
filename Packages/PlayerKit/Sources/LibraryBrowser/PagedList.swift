@@ -120,6 +120,15 @@ public final class PagedList<Item: Identifiable & Hashable & Sendable> where Ite
         loadMore()
     }
 
+    /// Patches the loaded item with `id` in place (a confirmed favorite, #0141); no-op when it isn't loaded.
+    public func update(id: Item.ID, _ change: (inout Item) -> Void) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        var item = items[index]
+        change(&item)
+        guard item.id == id else { return }
+        items[index] = item
+    }
+
     /// Cancels the in-flight request. Loaded items stay; a first page that never answered goes back to `.idle`.
     public func cancel() {
         task?.cancel()

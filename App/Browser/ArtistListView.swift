@@ -12,10 +12,15 @@ struct ArtistListView: View {
             pagingID: { $0.members[$0.members.count - 1].id }, emptyText: "No artists",
             selectedID: library.selectedArtistGroup?.id, onSelect: { library.select($0) }
         ) { group in
-            HStack(spacing: 8) {
-                AlbumArtView(ref: group.artwork, side: 28)
-                Text(group.name).lineLimit(1)
+            let artist = group.members[0]
+            FavoriteRow(id: artist.id, stored: artist.isFavorite) {
+                HStack(spacing: 8) {
+                    AlbumArtView(ref: group.artwork, side: 28)
+                    Text(group.name).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
             }
+            .contextMenu { FavoriteMenuItem(items: [artist.id: artist.isFavorite]) }
         }
         .accessibilityIdentifier("library.artists")
     }
@@ -51,14 +56,17 @@ struct PlaylistListView: View {
                 }
                 .selectionDisabled()
             case .playlist(let playlist):
-                HStack {
-                    Text(playlist.name).lineLimit(1)
-                    Spacer()
-                    if let count = PlaylistGrouping.countText(playlist) {
-                        Text(count).foregroundStyle(.secondary).monospacedDigit()
+                FavoriteRow(id: playlist.id, stored: playlist.isFavorite) {
+                    HStack {
+                        Text(playlist.name).lineLimit(1)
+                        Spacer()
+                        if let count = PlaylistGrouping.countText(playlist) {
+                            Text(count).foregroundStyle(.secondary).monospacedDigit()
+                        }
                     }
                 }
                 .padding(.leading, 8)
+                .contextMenu { FavoriteMenuItem(items: [playlist.id: playlist.isFavorite]) }
             }
         }
         .accessibilityIdentifier("library.playlists")

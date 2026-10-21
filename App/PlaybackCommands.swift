@@ -46,5 +46,9 @@ private struct PlaybackMenuItems: View {
             .keyboardShortcut("s", modifiers: [.command, .control])
         Toggle("Repeat", isOn: Binding(get: { model.isRepeating }, set: { _ in model.toggleRepeat() }))
             .keyboardShortcut("r", modifiers: [.command, .control])
+        Divider()
+        Button("Favorite Current Track") { model.favoriteCurrentTrack() }
+            .keyboardShortcut("l", modifiers: [.command, .control])
+            .disabled(!model.canFavoriteCurrentTrack)
     }
 }

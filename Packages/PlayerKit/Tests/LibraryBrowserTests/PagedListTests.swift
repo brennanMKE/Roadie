@@ -11,6 +11,20 @@ struct PagedListTests {
         PagedList(pageSize: pageSize, prefetchDistance: prefetch, loader: loader.loader)
     }
 
+    @Test func updatePatchesAnItemInPlace() async {
+        let albums = (0..<3).map { LibraryAlbum(id: MediaID(.album, "a\($0)"), title: "A\($0)") }
+        let list = PagedList<LibraryAlbum>(pageSize: 10) { request in
+            Page.make(items: albums, request: request, total: albums.count)
+        }
+        list.reload()
+        #expect(await waitFor { list.phase == .loaded })
+        list.update(id: albums[1].id) { $0.isFavorite = true }
+        #expect(list.items.map(\.isFavorite) == [nil, true, nil])
+        list.update(id: MediaID(.album, "missing")) { $0.isFavorite = true }
+        list.update(id: albums[0].id) { $0.id = MediaID(.album, "renamed") }
+        #expect(list.items.map(\.id) == albums.map(\.id))
+    }
+
     @Test func reloadLoadsTheFirstPageAndReportsTheTotal() async {
         let loader = GatedLoader()
         let list = makeList(loader)

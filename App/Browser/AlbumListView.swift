@@ -7,6 +7,12 @@ struct AlbumRow: View {
     var showsArtist = true
 
     var body: some View {
+        FavoriteRow(id: album.id, stored: album.isFavorite) {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: 10) {
             AlbumArtView(ref: album.artwork, side: 40)
             VStack(alignment: .leading, spacing: 2) {
@@ -22,6 +28,7 @@ struct AlbumRow: View {
                 .font(.caption)
                 .lineLimit(1)
             }
+            Spacer(minLength: 0)
         }
     }
 }
@@ -39,7 +46,7 @@ struct AlbumListView: View {
             selectedID: library.selectedAlbum?.id, onSelect: { library.select($0) }
         ) { album in
             AlbumRow(album: album, showsArtist: showsArtist)
-                .libraryAlbumActions(album.id, model: player)
+                .libraryAlbumActions(album.id, favorite: album.isFavorite, model: player)
         }
         .accessibilityIdentifier(showsArtist ? "library.albums" : "library.artistAlbums")
     }

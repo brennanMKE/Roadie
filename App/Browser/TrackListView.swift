@@ -7,6 +7,12 @@ struct TrackRow: View {
     var albumArtist: String?
 
     var body: some View {
+        FavoriteRow(id: track.id, stored: track.isFavorite) {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: 10) {
             Text(LibraryFormat.trackNumber(track))
                 .monospacedDigit()

@@ -52,6 +52,8 @@ public final class LibraryBrowserModel {
     public let discover: DiscoverModel?
     /// Albums of `selectedArtist`.
     public let artistAlbums: PagedList<LibraryAlbum>
+    /// Hearts and their optimistic state (#0141).
+    public let favorites: FavoritesModel
     /// Of `selectedAlbum` or `selectedPlaylist`.
     public private(set) var tracks: LoadState<[LibraryTrack]> = .idle
 
@@ -141,10 +143,12 @@ public final class LibraryBrowserModel {
         playlists = PagedList(pageSize: pageSize)
         artistAlbums = PagedList(pageSize: pageSize)
         discover = backend.capabilities.contains(.recommendations) ? DiscoverModel(backend: backend) : nil
+        favorites = FavoritesModel(backend: backend)
         artists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         allAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         playlists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         artistAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
+        favorites.onConfirmed = { [weak self] id, on in self?.patchFavorite(id, on) }
     }
 
     private func reportFailure(_ error: any Error, _ phase: FailurePhase) {

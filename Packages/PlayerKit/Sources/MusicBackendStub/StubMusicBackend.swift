@@ -6,6 +6,7 @@ import MusicBackendKit
 public actor StubMusicBackend: MusicBackend {
     public enum Method: Hashable, Sendable, CaseIterable {
         case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport, transfer, setGroupMembers
+        case setFavorite, favoriteCurrentTrack
     }
 
     public enum Call: Hashable, Sendable {
@@ -16,6 +17,7 @@ public actor StubMusicBackend: MusicBackend {
         case play([MediaID], OutputDevice.ID, PlayMode), transport(TransportCommand, OutputDevice.ID)
         case transfer(OutputDevice.ID, OutputDevice.ID, autoPlay: Bool)
         case setGroupMembers(OutputDevice.ID, [OutputDevice.ID], [OutputDevice.ID])
+        case setFavorite(MediaID, Bool), favoriteCurrentTrack(OutputDevice.ID)
 
         /// The method a call belongs to; `disconnect` has none.
         public var method: Method? {
@@ -34,6 +36,8 @@ public actor StubMusicBackend: MusicBackend {
             case .transport: .transport
             case .transfer: .transfer
             case .setGroupMembers: .setGroupMembers
+            case .setFavorite: .setFavorite
+            case .favoriteCurrentTrack: .favoriteCurrentTrack
             }
         }
     }
@@ -225,6 +229,14 @@ public actor StubMusicBackend: MusicBackend {
         of leader: OutputDevice.ID, adding: [OutputDevice.ID], removing: [OutputDevice.ID]
     ) async throws {
         try await enter(.setGroupMembers(leader, adding, removing))
+    }
+
+    public func setFavorite(_ id: MediaID, _ on: Bool) async throws {
+        try await enter(.setFavorite(id, on))
+    }
+
+    public func favoriteCurrentTrack(on output: OutputDevice.ID) async throws {
+        try await enter(.favoriteCurrentTrack(output))
     }
 
     public func nowPlaying(on output: OutputDevice.ID) async -> AsyncStream<NowPlaying> {

@@ -47,7 +47,7 @@ struct SearchResultsView: View {
                                         AlbumRow(album: album).frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
-                                    .libraryAlbumMenu(album.id, model: player)
+                                    .libraryAlbumMenu(album.id, favorite: album.isFavorite, model: player)
                                 }
                             }
                         }

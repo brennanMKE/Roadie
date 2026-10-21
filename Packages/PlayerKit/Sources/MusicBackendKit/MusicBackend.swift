@@ -13,6 +13,8 @@ public struct BackendCapabilities: OptionSet, Hashable, Sendable {
     public static let remoteOutputs = BackendCapabilities(rawValue: 1 << 4)
     /// Has the server's automatic rows (Discover, #0143).
     public static let recommendations = BackendCapabilities(rawValue: 1 << 7)
+    /// Favorites: `setFavorite` and `favoriteCurrentTrack` (#0141).
+    public static let favorites = BackendCapabilities(rawValue: 1 << 6)
 }
 
 /// No case carries a URL, a request, a header or a token; `errorDescription` is user-facing.
@@ -83,6 +85,10 @@ public protocol MusicBackend: AnyObject, Sendable {
     func queue(on output: OutputDevice.ID) async -> AsyncStream<RemoteQueueSnapshot>
     /// Changes the queue playing on `output` (#0144). Default: `.unsupported(.queueEditing)`.
     func edit(_ edit: QueueEdit, on output: OutputDevice.ID) async throws
+    /// Favorites or unfavorites a track, album, artist or playlist (#0141). Default: `.unsupported(.favorites)`.
+    func setFavorite(_ id: MediaID, _ on: Bool) async throws
+    /// Favorites what `output` plays now (#0141). Default: `.unsupported(.favorites)`.
+    func favoriteCurrentTrack(on output: OutputDevice.ID) async throws
 }
 
 extension MusicBackend {
@@ -108,5 +114,15 @@ extension MusicBackend {
         of leader: OutputDevice.ID, adding: [OutputDevice.ID], removing: [OutputDevice.ID]
     ) async throws {
         throw MusicBackendError.unsupported(.remoteOutputs)
+    }
+
+    /// Backends without favorites refuse.
+    public func setFavorite(_ id: MediaID, _ on: Bool) async throws {
+        throw MusicBackendError.unsupported(.favorites)
+    }
+
+    /// Backends without favorites refuse.
+    public func favoriteCurrentTrack(on output: OutputDevice.ID) async throws {
+        throw MusicBackendError.unsupported(.favorites)
     }
 }
