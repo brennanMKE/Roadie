@@ -155,6 +155,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
                 return true
             }
         }
+        window.collectionBehavior.insert(kind.windowKind.windowGroupRole.collectionBehavior)
         applyLayout()
         applyLevel()
         observe()
@@ -329,5 +330,15 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     func windowWillClose(_ notification: Notification) {
         onClose?()
+    }
+}
+
+extension WindowGroupRole {
+    /// Stage Manager keeps auxiliary windows on stage with the app's primary window instead of swapping it out (#0120).
+    var collectionBehavior: NSWindow.CollectionBehavior {
+        switch self {
+        case .primary: .primary
+        case .auxiliary: .auxiliary
+        }
     }
 }

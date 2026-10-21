@@ -52,6 +52,22 @@ public struct SnapResult: Equatable, Sendable {
 /// The three skinned windows that dock to each other.
 public enum WindowKind: String, Codable, CaseIterable, Sendable {
     case main, equalizer, playlist
+
+    /// How the window manager should group the window (Stage Manager, #0120). With "Show windows from an application:
+    /// One at a time", every top-level window counts as its own set, so making the equalizer or playlist key swaps the
+    /// main window out to the strip. The main window is the app's primary window; the equalizer and playlist are
+    /// auxiliary, so they stay on stage with it. The app maps this to `NSWindow.CollectionBehavior.primary`/`.auxiliary`.
+    public var windowGroupRole: WindowGroupRole {
+        switch self {
+        case .main: .primary
+        case .equalizer, .playlist: .auxiliary
+        }
+    }
+}
+
+/// A skinned window's role in the window manager's grouping: see `WindowKind.windowGroupRole`.
+public enum WindowGroupRole: Equatable, Sendable {
+    case primary, auxiliary
 }
 
 public struct DockedWindow: Equatable, Sendable {
