@@ -2,7 +2,7 @@ import Foundation
 import MusicAssistantKit
 import os
 
-/// Answers `GET /info` and the image proxy from recorded values; records every request so tests can assert
+/// Answers `GET /info`, `GET /api-docs/commands.json` (#0137) and the image proxy from recorded values; records every request so tests can assert
 /// the exact path and that no credentials were sent.
 public final class StubHTTPTransport: MAHTTPTransport, @unchecked Sendable {
     public struct Request: Sendable, Hashable {
@@ -52,6 +52,9 @@ public final class StubHTTPTransport: MAHTTPTransport, @unchecked Sendable {
         if url.path == "/info" {
             return MAHTTPResponse(status: 200, contentType: "application/json", body: try MAFixture.infoHTTP.data)
         }
+        if url.path.hasSuffix("/api-docs/commands.json") {
+            return MAHTTPResponse(status: 200, contentType: "application/json", body: try Self.commandNames())
+        }
         if url.path.hasPrefix("/imageproxy/") {
             let size = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "size" }?.value
             if size == "200" {
@@ -61,5 +64,13 @@ public final class StubHTTPTransport: MAHTTPTransport, @unchecked Sendable {
             return MAHTTPResponse(status: 200, contentType: "image/jpeg", body: Self.imageBytes)
         }
         return MAHTTPResponse(status: 404, contentType: "text/plain", body: Data())
+    }
+
+    /// `commands-names.json`: the recorded server's `commands.json` trimmed to the `command` field.
+    public static func commandNames() throws -> Data {
+        guard let url = Bundle.module.url(forResource: "commands-names", withExtension: "json", subdirectory: "Fixtures") else {
+            throw MAFixture.Missing(name: "commands-names")
+        }
+        return try Data(contentsOf: url)
     }
 }

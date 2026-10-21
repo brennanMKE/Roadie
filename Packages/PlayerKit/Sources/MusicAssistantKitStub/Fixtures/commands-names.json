@@ -1,0 +1,932 @@
+[
+ {
+  "command": "ambient_sounds/add_sound"
+ },
+ {
+  "command": "ambient_sounds/remove_sound"
+ },
+ {
+  "command": "audio_analysis/coverage"
+ },
+ {
+  "command": "audio_analysis/failures"
+ },
+ {
+  "command": "audio_analysis/failures/clear"
+ },
+ {
+  "command": "audio_analysis/wave_form"
+ },
+ {
+  "command": "auth/authorization_url"
+ },
+ {
+  "command": "auth/join_code/exchange"
+ },
+ {
+  "command": "auth/join_code/revoke"
+ },
+ {
+  "command": "auth/join_codes"
+ },
+ {
+  "command": "auth/login"
+ },
+ {
+  "command": "auth/logout"
+ },
+ {
+  "command": "auth/me"
+ },
+ {
+  "command": "auth/providers"
+ },
+ {
+  "command": "auth/scopes"
+ },
+ {
+  "command": "auth/token/create"
+ },
+ {
+  "command": "auth/token/revoke"
+ },
+ {
+  "command": "auth/tokens"
+ },
+ {
+  "command": "auth/user"
+ },
+ {
+  "command": "auth/user/create"
+ },
+ {
+  "command": "auth/user/delete"
+ },
+ {
+  "command": "auth/user/disable"
+ },
+ {
+  "command": "auth/user/enable"
+ },
+ {
+  "command": "auth/user/providers"
+ },
+ {
+  "command": "auth/user/unlink_provider"
+ },
+ {
+  "command": "auth/user/update"
+ },
+ {
+  "command": "auth/users"
+ },
+ {
+  "command": "builtin/add_radio"
+ },
+ {
+  "command": "builtin/add_track"
+ },
+ {
+  "command": "config/core"
+ },
+ {
+  "command": "config/core/get"
+ },
+ {
+  "command": "config/core/get_entries"
+ },
+ {
+  "command": "config/core/get_value"
+ },
+ {
+  "command": "config/core/invoke_action"
+ },
+ {
+  "command": "config/core/save"
+ },
+ {
+  "command": "config/dsp_irs/list"
+ },
+ {
+  "command": "config/dsp_irs/remove"
+ },
+ {
+  "command": "config/dsp_irs/upload"
+ },
+ {
+  "command": "config/dsp_presets/get"
+ },
+ {
+  "command": "config/dsp_presets/remove"
+ },
+ {
+  "command": "config/dsp_presets/save"
+ },
+ {
+  "command": "config/flows/abort"
+ },
+ {
+  "command": "config/flows/get"
+ },
+ {
+  "command": "config/flows/submit"
+ },
+ {
+  "command": "config/player_queues"
+ },
+ {
+  "command": "config/player_queues/get"
+ },
+ {
+  "command": "config/player_queues/get_entries"
+ },
+ {
+  "command": "config/player_queues/get_value"
+ },
+ {
+  "command": "config/player_queues/save"
+ },
+ {
+  "command": "config/players"
+ },
+ {
+  "command": "config/players/dsp/apply_preset"
+ },
+ {
+  "command": "config/players/dsp/get"
+ },
+ {
+  "command": "config/players/dsp/save"
+ },
+ {
+  "command": "config/players/get"
+ },
+ {
+  "command": "config/players/get_entries"
+ },
+ {
+  "command": "config/players/get_value"
+ },
+ {
+  "command": "config/players/invoke_action"
+ },
+ {
+  "command": "config/players/remove"
+ },
+ {
+  "command": "config/players/save"
+ },
+ {
+  "command": "config/players/setup"
+ },
+ {
+  "command": "config/providers"
+ },
+ {
+  "command": "config/providers/get"
+ },
+ {
+  "command": "config/providers/get_entries"
+ },
+ {
+  "command": "config/providers/get_value"
+ },
+ {
+  "command": "config/providers/invoke_action"
+ },
+ {
+  "command": "config/providers/reconfigure"
+ },
+ {
+  "command": "config/providers/reload"
+ },
+ {
+  "command": "config/providers/remove"
+ },
+ {
+  "command": "config/providers/save"
+ },
+ {
+  "command": "config/providers/setup"
+ },
+ {
+  "command": "dashboard/dashboards"
+ },
+ {
+  "command": "dashboard/get_url"
+ },
+ {
+  "command": "dashboard/hide"
+ },
+ {
+  "command": "dashboard/register"
+ },
+ {
+  "command": "dashboard/sessions"
+ },
+ {
+  "command": "dashboard/show"
+ },
+ {
+  "command": "dashboard/unregister"
+ },
+ {
+  "command": "diagnostics/get"
+ },
+ {
+  "command": "hass/search_control_entities"
+ },
+ {
+  "command": "info"
+ },
+ {
+  "command": "logging/get"
+ },
+ {
+  "command": "metadata/get_image_palette"
+ },
+ {
+  "command": "metadata/get_track_lyrics"
+ },
+ {
+  "command": "metadata/set_default_preferred_language"
+ },
+ {
+  "command": "metadata/set_preferred_language"
+ },
+ {
+  "command": "metadata/update_metadata"
+ },
+ {
+  "command": "music/add_provider_mapping"
+ },
+ {
+  "command": "music/albums/album_tracks"
+ },
+ {
+  "command": "music/albums/album_versions"
+ },
+ {
+  "command": "music/albums/count"
+ },
+ {
+  "command": "music/albums/get"
+ },
+ {
+  "command": "music/albums/get_by_external_id"
+ },
+ {
+  "command": "music/albums/get_collection"
+ },
+ {
+  "command": "music/albums/library_items"
+ },
+ {
+  "command": "music/albums/remove"
+ },
+ {
+  "command": "music/albums/update"
+ },
+ {
+  "command": "music/artists/artist_albums"
+ },
+ {
+  "command": "music/artists/artist_audiobooks"
+ },
+ {
+  "command": "music/artists/artist_tracks"
+ },
+ {
+  "command": "music/artists/count"
+ },
+ {
+  "command": "music/artists/get"
+ },
+ {
+  "command": "music/artists/get_by_external_id"
+ },
+ {
+  "command": "music/artists/get_collection"
+ },
+ {
+  "command": "music/artists/library_artist_types"
+ },
+ {
+  "command": "music/artists/library_items"
+ },
+ {
+  "command": "music/artists/remove"
+ },
+ {
+  "command": "music/artists/similar_artists"
+ },
+ {
+  "command": "music/artists/top_albums"
+ },
+ {
+  "command": "music/artists/top_tracks"
+ },
+ {
+  "command": "music/artists/update"
+ },
+ {
+  "command": "music/audiobooks/audiobook_versions"
+ },
+ {
+  "command": "music/audiobooks/count"
+ },
+ {
+  "command": "music/audiobooks/get"
+ },
+ {
+  "command": "music/audiobooks/get_by_external_id"
+ },
+ {
+  "command": "music/audiobooks/get_collection"
+ },
+ {
+  "command": "music/audiobooks/library_items"
+ },
+ {
+  "command": "music/audiobooks/remove"
+ },
+ {
+  "command": "music/audiobooks/update"
+ },
+ {
+  "command": "music/browse"
+ },
+ {
+  "command": "music/favorites/add_item"
+ },
+ {
+  "command": "music/favorites/remove_item"
+ },
+ {
+  "command": "music/genres/add"
+ },
+ {
+  "command": "music/genres/add_alias"
+ },
+ {
+  "command": "music/genres/add_media_mapping"
+ },
+ {
+  "command": "music/genres/albums"
+ },
+ {
+  "command": "music/genres/count"
+ },
+ {
+  "command": "music/genres/exclude_genre_from_media_item"
+ },
+ {
+  "command": "music/genres/genre_exclusions_for_media_item"
+ },
+ {
+  "command": "music/genres/genres_for_media_item"
+ },
+ {
+  "command": "music/genres/get"
+ },
+ {
+  "command": "music/genres/get_by_external_id"
+ },
+ {
+  "command": "music/genres/get_collection"
+ },
+ {
+  "command": "music/genres/global_exclusions"
+ },
+ {
+  "command": "music/genres/library_items"
+ },
+ {
+  "command": "music/genres/media_counts"
+ },
+ {
+  "command": "music/genres/merge"
+ },
+ {
+  "command": "music/genres/overview"
+ },
+ {
+  "command": "music/genres/promote_alias"
+ },
+ {
+  "command": "music/genres/remove"
+ },
+ {
+  "command": "music/genres/remove_alias"
+ },
+ {
+  "command": "music/genres/remove_genre_exclusion"
+ },
+ {
+  "command": "music/genres/remove_global_exclusion"
+ },
+ {
+  "command": "music/genres/remove_media_mapping"
+ },
+ {
+  "command": "music/genres/restore_defaults"
+ },
+ {
+  "command": "music/genres/scan_mappings"
+ },
+ {
+  "command": "music/genres/scanner_status"
+ },
+ {
+  "command": "music/genres/tracks"
+ },
+ {
+  "command": "music/genres/update"
+ },
+ {
+  "command": "music/get_library_item"
+ },
+ {
+  "command": "music/in_progress_items"
+ },
+ {
+  "command": "music/item"
+ },
+ {
+  "command": "music/item_by_name"
+ },
+ {
+  "command": "music/item_by_uri"
+ },
+ {
+  "command": "music/library/add_item"
+ },
+ {
+  "command": "music/library/remove_item"
+ },
+ {
+  "command": "music/mark_played"
+ },
+ {
+  "command": "music/mark_unplayed"
+ },
+ {
+  "command": "music/match_providers"
+ },
+ {
+  "command": "music/playlists/add_playlist_tracks"
+ },
+ {
+  "command": "music/playlists/count"
+ },
+ {
+  "command": "music/playlists/create_playlist"
+ },
+ {
+  "command": "music/playlists/export_playlist"
+ },
+ {
+  "command": "music/playlists/get"
+ },
+ {
+  "command": "music/playlists/get_by_external_id"
+ },
+ {
+  "command": "music/playlists/get_collection"
+ },
+ {
+  "command": "music/playlists/import_playlist"
+ },
+ {
+  "command": "music/playlists/library_items"
+ },
+ {
+  "command": "music/playlists/playlist_tracks"
+ },
+ {
+  "command": "music/playlists/remove"
+ },
+ {
+  "command": "music/playlists/remove_playlist_tracks"
+ },
+ {
+  "command": "music/playlists/update"
+ },
+ {
+  "command": "music/podcasts/count"
+ },
+ {
+  "command": "music/podcasts/get"
+ },
+ {
+  "command": "music/podcasts/get_by_external_id"
+ },
+ {
+  "command": "music/podcasts/get_collection"
+ },
+ {
+  "command": "music/podcasts/library_items"
+ },
+ {
+  "command": "music/podcasts/podcast_episode"
+ },
+ {
+  "command": "music/podcasts/podcast_episodes"
+ },
+ {
+  "command": "music/podcasts/podcast_versions"
+ },
+ {
+  "command": "music/podcasts/remove"
+ },
+ {
+  "command": "music/podcasts/update"
+ },
+ {
+  "command": "music/radios/count"
+ },
+ {
+  "command": "music/radios/export_radios"
+ },
+ {
+  "command": "music/radios/get"
+ },
+ {
+  "command": "music/radios/get_by_external_id"
+ },
+ {
+  "command": "music/radios/get_collection"
+ },
+ {
+  "command": "music/radios/import_radios"
+ },
+ {
+  "command": "music/radios/library_items"
+ },
+ {
+  "command": "music/radios/radio_tracks"
+ },
+ {
+  "command": "music/radios/radio_versions"
+ },
+ {
+  "command": "music/radios/remove"
+ },
+ {
+  "command": "music/radios/update"
+ },
+ {
+  "command": "music/recently_added_tracks"
+ },
+ {
+  "command": "music/recently_played_items"
+ },
+ {
+  "command": "music/recommendations"
+ },
+ {
+  "command": "music/recommendations/items"
+ },
+ {
+  "command": "music/refresh_item"
+ },
+ {
+  "command": "music/remove_provider_mapping"
+ },
+ {
+  "command": "music/search"
+ },
+ {
+  "command": "music/sound_effects"
+ },
+ {
+  "command": "music/sync"
+ },
+ {
+  "command": "music/track_by_name"
+ },
+ {
+  "command": "music/tracks/count"
+ },
+ {
+  "command": "music/tracks/get"
+ },
+ {
+  "command": "music/tracks/get_by_external_id"
+ },
+ {
+  "command": "music/tracks/get_collection"
+ },
+ {
+  "command": "music/tracks/library_items"
+ },
+ {
+  "command": "music/tracks/preview"
+ },
+ {
+  "command": "music/tracks/remove"
+ },
+ {
+  "command": "music/tracks/similar_tracks"
+ },
+ {
+  "command": "music/tracks/track_albums"
+ },
+ {
+  "command": "music/tracks/track_versions"
+ },
+ {
+  "command": "music/tracks/update"
+ },
+ {
+  "command": "music/verify_item_uri"
+ },
+ {
+  "command": "party/add_to_queue"
+ },
+ {
+  "command": "party/boost_queue_item"
+ },
+ {
+  "command": "party/can_listen_in"
+ },
+ {
+  "command": "party/config"
+ },
+ {
+  "command": "party/listen_in"
+ },
+ {
+  "command": "party/player"
+ },
+ {
+  "command": "party/skip"
+ },
+ {
+  "command": "party/stop_listen_in"
+ },
+ {
+  "command": "party/url"
+ },
+ {
+  "command": "player_queues/all"
+ },
+ {
+  "command": "player_queues/autoplay"
+ },
+ {
+  "command": "player_queues/clear"
+ },
+ {
+  "command": "player_queues/crossfade"
+ },
+ {
+  "command": "player_queues/delete_item"
+ },
+ {
+  "command": "player_queues/get"
+ },
+ {
+  "command": "player_queues/get_active_queue"
+ },
+ {
+  "command": "player_queues/items"
+ },
+ {
+  "command": "player_queues/move_item"
+ },
+ {
+  "command": "player_queues/move_item_end"
+ },
+ {
+  "command": "player_queues/next"
+ },
+ {
+  "command": "player_queues/overlay"
+ },
+ {
+  "command": "player_queues/pause"
+ },
+ {
+  "command": "player_queues/play"
+ },
+ {
+  "command": "player_queues/play_index"
+ },
+ {
+  "command": "player_queues/play_media"
+ },
+ {
+  "command": "player_queues/play_pause"
+ },
+ {
+  "command": "player_queues/previous"
+ },
+ {
+  "command": "player_queues/repeat"
+ },
+ {
+  "command": "player_queues/resume"
+ },
+ {
+  "command": "player_queues/save_as_playlist"
+ },
+ {
+  "command": "player_queues/seek"
+ },
+ {
+  "command": "player_queues/set_playback_speed"
+ },
+ {
+  "command": "player_queues/shuffle"
+ },
+ {
+  "command": "player_queues/skip"
+ },
+ {
+  "command": "player_queues/stop"
+ },
+ {
+  "command": "player_queues/transfer"
+ },
+ {
+  "command": "players/add_currently_playing_to_favorites"
+ },
+ {
+  "command": "players/all"
+ },
+ {
+  "command": "players/cmd/group"
+ },
+ {
+  "command": "players/cmd/group_many"
+ },
+ {
+  "command": "players/cmd/group_volume"
+ },
+ {
+  "command": "players/cmd/group_volume_down"
+ },
+ {
+  "command": "players/cmd/group_volume_mute"
+ },
+ {
+  "command": "players/cmd/group_volume_up"
+ },
+ {
+  "command": "players/cmd/next"
+ },
+ {
+  "command": "players/cmd/pause"
+ },
+ {
+  "command": "players/cmd/play"
+ },
+ {
+  "command": "players/cmd/play_announcement"
+ },
+ {
+  "command": "players/cmd/play_pause"
+ },
+ {
+  "command": "players/cmd/power"
+ },
+ {
+  "command": "players/cmd/previous"
+ },
+ {
+  "command": "players/cmd/repeat"
+ },
+ {
+  "command": "players/cmd/resume"
+ },
+ {
+  "command": "players/cmd/seek"
+ },
+ {
+  "command": "players/cmd/select_sound_mode"
+ },
+ {
+  "command": "players/cmd/select_source"
+ },
+ {
+  "command": "players/cmd/set_members"
+ },
+ {
+  "command": "players/cmd/set_option"
+ },
+ {
+  "command": "players/cmd/shuffle"
+ },
+ {
+  "command": "players/cmd/stop"
+ },
+ {
+  "command": "players/cmd/ungroup"
+ },
+ {
+  "command": "players/cmd/ungroup_many"
+ },
+ {
+  "command": "players/cmd/volume_down"
+ },
+ {
+  "command": "players/cmd/volume_mute"
+ },
+ {
+  "command": "players/cmd/volume_set"
+ },
+ {
+  "command": "players/cmd/volume_up"
+ },
+ {
+  "command": "players/create_group_player"
+ },
+ {
+  "command": "players/get"
+ },
+ {
+  "command": "players/get_by_name"
+ },
+ {
+  "command": "players/player_control"
+ },
+ {
+  "command": "players/player_controls"
+ },
+ {
+  "command": "players/remove"
+ },
+ {
+  "command": "players/remove_group_player"
+ },
+ {
+  "command": "players/sleep_timer/clear"
+ },
+ {
+  "command": "players/sleep_timer/get"
+ },
+ {
+  "command": "players/sleep_timer/set"
+ },
+ {
+  "command": "players/tts_engines"
+ },
+ {
+  "command": "providers"
+ },
+ {
+  "command": "providers/icon"
+ },
+ {
+  "command": "providers/manifests"
+ },
+ {
+  "command": "providers/manifests/get"
+ },
+ {
+  "command": "remote_access/configure"
+ },
+ {
+  "command": "remote_access/info"
+ },
+ {
+  "command": "sendspin/pair_web_player"
+ },
+ {
+  "command": "tasks/cancel"
+ },
+ {
+  "command": "tasks/clear_finished"
+ },
+ {
+  "command": "tasks/get"
+ },
+ {
+  "command": "tasks/list"
+ },
+ {
+  "command": "tasks/log"
+ },
+ {
+  "command": "tasks/remove"
+ },
+ {
+  "command": "tasks/retry"
+ },
+ {
+  "command": "tasks/run"
+ },
+ {
+  "command": "tasks/set_enabled"
+ },
+ {
+  "command": "tasks/update_schedule"
+ },
+ {
+  "command": "time"
+ },
+ {
+  "command": "translations/locales"
+ }
+]

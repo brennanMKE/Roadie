@@ -38,7 +38,8 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     private let hasVerifiedServer: @Sendable () -> Bool
     private let tokenProvider: ServerTokenProvider
     private let transports: any MAWebSocketTransportFactory
-    private let http: any MAHTTPTransport
+    /// Internal for the command probe in `MAServerCommands.swift`.
+    let http: any MAHTTPTransport
     private let clock: any Clock<Duration>
     private let policy: MANowPlayingPolicy
     private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantBackend")
@@ -73,6 +74,11 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     private var lastActivity: [OutputActivity] = []
     private var activityTask: Task<Void, Never>?
     private var activityRefetch: Task<Void, Never>?
+    /// The server's commands (#0137): filled by `commandProbe` after connect, cached per server identity, and
+    /// trimmed when a command answers error 12. Internal for `MAServerCommands.swift`.
+    var serverCommands = MAServerCommands.empty
+    var commandProbe: Task<Void, Never>?
+    var probedCommands: [String: MAServerCommands] = [:]
 
     /// One fixed address, trust on first use when it has no `serverID`. For tests: the app must use `init(server:token:...)`,
     /// which refuses to connect to a server whose identity has not been learned and verified.
@@ -195,6 +201,10 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         forwardStates(of: fresh)
         restartWatchers()
         restartActivity()
+        let info = await fresh.serverInfo
+        startCommandProbe(
+            base: address.baseURL,
+            identity: "\(info?.serverID ?? address.baseURL.absoluteString)|\(info?.serverVersion ?? "")")
         if let raced, raced !== fresh { await raced.disconnect() }
     }
 
@@ -218,6 +228,9 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         localPlayerID = nil
         stopWatchers()
         stopActivity()
+        commandProbe?.cancel()
+        commandProbe = nil
+        serverCommands = .empty
         await old?.disconnect()
     }
 
