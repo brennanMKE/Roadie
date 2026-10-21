@@ -68,6 +68,11 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// `connectionStates()` subscribers, and the task forwarding the installed client's states to them (#0075).
     private var stateContinuations: [UUID: AsyncStream<MusicAssistantClient.ConnectionState>.Continuation] = [:]
     private var stateForward: Task<Void, Never>?
+    /// `playbackActivity()` subscribers (#0121), the last snapshot, and the task following the installed client.
+    private var activityContinuations: [UUID: AsyncStream<[OutputActivity]>.Continuation] = [:]
+    private var lastActivity: [OutputActivity] = []
+    private var activityTask: Task<Void, Never>?
+    private var activityRefetch: Task<Void, Never>?
 
     /// One fixed address, trust on first use when it has no `serverID`. For tests: the app must use `init(server:token:...)`,
     /// which refuses to connect to a server whose identity has not been learned and verified.
@@ -160,6 +165,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         if let old = client {
             stopForwardingStates()
             stopWatchers()
+            stopActivity()
             await old.disconnect()
             client = nil
             connectedBaseURL = nil
@@ -188,6 +194,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         log.info("connected")
         forwardStates(of: fresh)
         restartWatchers()
+        restartActivity()
         if let raced, raced !== fresh { await raced.disconnect() }
     }
 
@@ -210,7 +217,107 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         players = [:]
         localPlayerID = nil
         stopWatchers()
+        stopActivity()
         await old?.disconnect()
+    }
+
+    // MARK: Playback activity (#0121)
+
+    /// Every visible player's playback: one snapshot per (re)connect, then one per player or queue change (debounced).
+    /// `[]` while disconnected. Runs only while someone subscribes, so a backend nobody watches sends nothing extra.
+    public func playbackActivity() -> AsyncStream<[OutputActivity]> {
+        let (stream, continuation) = AsyncStream<[OutputActivity]>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let id = UUID()
+        activityContinuations[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeActivityContinuation(id) }
+        }
+        if client == nil {
+            continuation.yield([])
+        } else if activityTask == nil {
+            restartActivity()
+        } else {
+            continuation.yield(lastActivity)
+        }
+        return stream
+    }
+
+    private func removeActivityContinuation(_ id: UUID) {
+        activityContinuations[id] = nil
+        if activityContinuations.isEmpty { stopActivity(yieldEmpty: false) }
+    }
+
+    private func restartActivity() {
+        stopActivity(yieldEmpty: false)
+        guard let client, !activityContinuations.isEmpty else { return }
+        activityTask = Task { [weak self] in
+            let events = await client.events()
+            let states = await client.states()
+            await self?.snapshotActivity(from: client)
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for await event in events {
+                        guard let self else { return }
+                        await self.activityEvent(event, from: client)
+                    }
+                }
+                group.addTask {
+                    var lost = false
+                    for await state in states {
+                        switch state {
+                        case .reconnecting: lost = true
+                        case .connected where lost:
+                            lost = false
+                            await self?.snapshotActivity(from: client)
+                        default: break
+                        }
+                    }
+                }
+                await group.waitForAll()
+            }
+        }
+    }
+
+    private func stopActivity(yieldEmpty: Bool = true) {
+        activityTask?.cancel()
+        activityTask = nil
+        activityRefetch?.cancel()
+        activityRefetch = nil
+        guard yieldEmpty else { return }
+        lastActivity = []
+        for continuation in activityContinuations.values { continuation.yield([]) }
+    }
+
+    static let activityEvents: Set<String> = ["player_updated", "queue_updated", "player_added", "player_removed"]
+
+    private func activityEvent(_ event: MAServerEvent, from source: MusicAssistantClient) {
+        guard source === client, Self.activityEvents.contains(event.event), activityRefetch == nil else { return }
+        let clock = clock, delay = policy.refetchDebounce
+        activityRefetch = Task { [weak self] in
+            do { try await clock.sleep(for: delay) } catch { return }
+            await self?.debouncedActivity(from: source)
+        }
+    }
+
+    private func debouncedActivity(from source: MusicAssistantClient) async {
+        activityRefetch = nil
+        guard !Task.isCancelled else { return }
+        await snapshotActivity(from: source)
+    }
+
+    private func snapshotActivity(from source: MusicAssistantClient) async {
+        do {
+            async let players = source.call(.playersAll(), as: [MAPlayer].self)
+            async let queues = source.call(.queuesAll(), as: [MAPlayerQueue].self)
+            let (all, allQueues) = try await (players, queues)
+            guard source === client, !Task.isCancelled else { return }
+            for player in all { self.players[player.playerID] = player }
+            let snapshot = MAPlaybackActivity.map(players: all, queues: allQueues, localClientID: localClientID)
+            lastActivity = snapshot
+            for continuation in activityContinuations.values { continuation.yield(snapshot) }
+        } catch {
+            log.debug("activity snapshot failed: \(String(describing: type(of: error)), privacy: .public)")
+        }
     }
 
     /// The connection state of whichever client is installed: `.disconnected` first when none is, then every change,
@@ -418,7 +525,12 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             } else {
                 player = try await self.player(for: output)
             }
-            let id = player.playerID
+            // A synced member plays its leader's queue, so playback commands go to the leader (#0121); volume stays.
+            let id: String
+            switch command {
+            case .setVolume, .setBalance: id = player.playerID
+            default: id = player.activeGroup ?? player.syncedTo ?? player.playerID
+            }
             let request: MARequest
             switch command {
             case .play: request = .playerCommand(.play, playerID: id)
@@ -436,7 +548,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
                     throw MusicBackendError.unsupported(.remoteOutputs)
                 }
                 let level = volume.isFinite ? min(max(Int((volume * 100).rounded()), 0), 100) : 0
-                request = .volumeSet(playerID: id, level: level)
+                request = .volumeSet(playerID: player.playerID, level: level)
             case .setShuffle(let enabled): request = .shuffle(playerID: id, enabled: enabled)
             case .setRepeat(let on): request = .repeat(playerID: id, mode: on ? .all : .off)
             case .setBalance: throw MusicBackendError.unsupported(.remoteOutputs)

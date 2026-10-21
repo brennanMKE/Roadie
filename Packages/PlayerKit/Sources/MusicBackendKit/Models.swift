@@ -128,3 +128,25 @@ public struct SearchResults: Hashable, Sendable {
     public static let empty = SearchResults()
     public var isEmpty: Bool { artists.isEmpty && albums.isEmpty && tracks.isEmpty }
 }
+
+/// One Music Assistant player's playback as SkinAmp sees it (#0121). SkinAmp's own player is `OutputDevice.thisMacID`.
+public struct OutputActivity: Hashable, Sendable {
+    public var output: OutputDevice.ID
+    public var name: String
+    public var state: NowPlaying.State
+    /// The group or sync leader this player plays as a member of; nil when it plays its own queue.
+    public var leader: OutputDevice.ID?
+    /// Server time of the last state or position change; for "most recent" when several play.
+    public var updatedAt: Double?
+
+    public init(
+        output: OutputDevice.ID, name: String, state: NowPlaying.State, leader: OutputDevice.ID? = nil,
+        updatedAt: Double? = nil
+    ) {
+        self.output = output
+        self.name = name
+        self.state = state
+        self.leader = leader
+        self.updatedAt = updatedAt
+    }
+}

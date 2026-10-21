@@ -155,6 +155,32 @@ struct BackendTransportTests {
         await rig.backend.disconnect()
     }
 
+    /// A speaker synced to another player (#0121).
+    private func memberRig() async throws -> BackendRig {
+        try await connectedBackend(
+            script: controlScript {
+                guard case .object(var object) = try SyntheticPlayback.player() else { return }
+                object["synced_to"] = "leader1"
+                $0.override("players/get", result: .object(object))
+            })
+    }
+
+    @Test func stopOnASyncedMemberGoesToTheLeader() async throws {
+        let rig = try await memberRig()
+        try await rig.backend.transport(.stop, on: player)
+        let request = try #require(sent(rig, "players/cmd/stop").first)
+        #expect(request.args["player_id"] == "leader1")
+        await rig.backend.disconnect()
+    }
+
+    @Test func volumeOnASyncedMemberStaysOnTheMember() async throws {
+        let rig = try await memberRig()
+        try await rig.backend.transport(.setVolume(0.5), on: player)
+        let request = try #require(sent(rig, "players/cmd/volume_set").first)
+        #expect(request.args["player_id"] == .string(SyntheticPlayback.playerID))
+        await rig.backend.disconnect()
+    }
+
     @Test func commandsUseThePlayerCacheNotPlayersAll() async throws {
         let rig = try await connectedBackend(script: controlScript())
         for step in 0..<20 { try await rig.backend.transport(.setVolume(Float(step) / 20), on: player) }

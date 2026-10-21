@@ -7,7 +7,7 @@ import SendspinPlayback
 import os
 
 /// Starts and stops SkinAmp's Sendspin session, which makes This Mac a Music Assistant player (#0109). It connects
-/// only when the Music Assistant API does (the Library or a probe), never at launch: no Keychain read, no socket.
+/// only when the Music Assistant API does; since #0121 that is also at launch when a verified server exists.
 @MainActor
 @Observable
 final class SendspinController {

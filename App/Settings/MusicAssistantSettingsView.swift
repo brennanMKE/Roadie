@@ -1,10 +1,13 @@
 import AppKit
+import LibraryBrowser
 import MusicAssistantKit
 import SwiftUI
 
 /// Settings › Music Assistant: the list of servers and the editor for the selected one. All logic is in the model.
 struct MusicAssistantSettingsView: View {
     @Environment(MusicAssistantSettingsModel.self) private var model
+    /// #0121: stop the targeted Music Assistant player(s) on quit.
+    @AppStorage(QuitStop.defaultsKey) private var stopOnQuit = true
     @Environment(MusicAssistantSelectionController.self) private var selection
     @Environment(MusicAssistantDiscoveryModel.self) private var discovery
     @Environment(SendspinController.self) private var sendspin
@@ -124,10 +127,14 @@ struct MusicAssistantSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("ma.sendspin.status")
+            Toggle("Stop playback when SkinAmp quits", isOn: $stopOnQuit)
+                .accessibilityIdentifier("ma.stopOnQuit")
         } header: {
             Text("This Mac")
         } footer: {
-            Text("Music Assistant streams to SkinAmp over Sendspin. Group This Mac with other speakers in Music Assistant.")
+            Text(
+                "Music Assistant streams to SkinAmp over Sendspin. Group This Mac with other speakers in Music Assistant. "
+                    + "Speakers keep playing after quit when Stop playback is off.")
         }
     }
 

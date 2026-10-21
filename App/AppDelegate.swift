@@ -58,6 +58,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// A quit stop is in flight; a second ⌘Q terminates at once.
+    private var quitStopPending = false
+
+    /// #0121: stop the Music Assistant target before exiting (capped at `QuitStop.timeout`), then terminate.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !quitStopPending, let stopping = model.stopPlaybackForQuit() else { return .terminateNow }
+        quitStopPending = true
+        Task { @MainActor in
+            await stopping.value
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         docking.layoutDidChange()
         model.flushQueue()

@@ -30,7 +30,7 @@ final class PlayerModel {
     /// `sources.select(_:)` swaps them. The composition in `init` is the one place that names Music Assistant and the folder.
     let sources: LibrarySourceController
     var backend: any MusicBackend { sources.backend }
-    /// The Library window's state; connects when the window appears, never at launch.
+    /// The Library window's state. Music Assistant also connects at launch when a verified server exists (#0121).
     var library: LibraryBrowserModel { sources.library }
     /// The thumbnail cache for the active source (rebuilt on a switch: refs only mean something to their backend).
     var artwork: ArtworkCache { sources.artwork }
@@ -84,8 +84,22 @@ final class PlayerModel {
     @ObservationIgnored private var externalArtwork: (ref: ArtworkRef, data: Data?)?
     @ObservationIgnored private var externalArtworkTask: Task<Void, Never>?
     var selectedOutput: OutputDevice.ID = OutputDevice.thisMacID {
-        didSet { if selectedOutput != oldValue { observeNowPlaying() } }
+        didSet {
+            guard selectedOutput != oldValue else { return }
+            previousTarget = oldValue
+            observeNowPlaying()
+        }
     }
+    /// The output targeted before the current one: what an exclusive start stops (#0121).
+    @ObservationIgnored var previousTarget: OutputDevice.ID?
+    /// Every Music Assistant player's playback, from `playbackActivity()` (#0121); `[]` while disconnected.
+    @ObservationIgnored var activity: [OutputActivity] = []
+    @ObservationIgnored var activityTask: Task<Void, Never>?
+    /// The next activity snapshot follows a `.connected`, so it may adopt a paused player too.
+    @ObservationIgnored var activityAfterConnect = true
+    @ObservationIgnored var musicAssistantIsConnected = false
+    /// SkinAmp itself asked Music Assistant to play on This Mac; cleared when the stream starts.
+    @ObservationIgnored var ownStreamRequested = false
     private(set) var nowPlaying: NowPlaying = .idle(on: OutputDevice.thisMacID)
     private var nowPlayingTask: Task<Void, Never>?
     var playbackState: NowPlaying.State { nowPlaying.state }
@@ -357,9 +371,12 @@ final class PlayerModel {
         }
         playlist.isLocal = { [weak self] in self?.selectedOutput == OutputDevice.thisMacID }
         playlist.isPlayingLocalQueue = { [weak self] in self?.playsLocalQueue ?? false }
-        playlist.onPlayLocal = { [weak self] in self?.applyFeed(.localPlayRequested) }
+        playlist.onPlayLocal = { [weak self] in
+            self?.applyFeed(.localPlayRequested)
+            self?.stopOthers(startingOn: OutputDevice.thisMacID)
+        }
         // Music Assistant started playing on this Mac (from SkinAmp, its own UI, Home Assistant or a phone).
-        stack.sendspin.onStreamStarted = { [weak self] in self?.applyFeed(.streamStarted) }
+        stack.sendspin.onStreamStarted = { [weak self] in self?.streamStarted() }
         // The server ended the stream, or the session dropped or was stopped: This Mac plays its local queue again.
         stack.sendspin.onStreamStopped = { [weak self] in self?.applyFeed(.streamStopped) }
         // Local playback took the node: Music Assistant stops sending.
@@ -391,6 +408,15 @@ final class PlayerModel {
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()
         selection.start()
+        // #0121: connect at launch when a verified server exists, so SkinAmp follows what Music Assistant plays.
+        if MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) {
+            Task { [weak self] in
+                _ = await selection.resolveNow()
+                do { try await ma.connect() } catch { return }
+                await self?.refreshOutputs()
+            }
+        }
+        watchPlaybackActivity()
         // A browse failure on Music Assistant also re-picks the server; the fallback keeps its own handling.
         let fallbackFailure = sources.onBackendFailure
         sources.onBackendFailure = { [weak selection] id, error, phase in
@@ -416,7 +442,6 @@ final class PlayerModel {
         }
     }
 
-    /// Moves the feed of This Mac by the `ThisMacFeed.after` rule (#0114).
     @ObservationIgnored private var outputMoveTask: Task<Void, Never>?
 
     /// The Output menu's choice (#0117): moves what plays to `target` (Music Assistant's queue transfer), else only
@@ -427,7 +452,10 @@ final class PlayerModel {
         let state = nowPlaying.output == source ? nowPlaying.state : .stopped
         let move = OutputMove.decide(from: source, to: target, sourceState: state, thisMacFeed: thisMacFeed)
         // Moving onto This Mac: Music Assistant feeds it from now on, so the windows follow its stream (#0109/#0114).
-        if case .transfer = move, target == OutputDevice.thisMacID { applyFeed(.musicAssistantPlayRequested) }
+        if case .transfer = move, target == OutputDevice.thisMacID {
+            ownStreamRequested = true
+            applyFeed(.musicAssistantPlayRequested)
+        }
         selectedOutput = target
         switch move {
         case .select: break
@@ -449,7 +477,8 @@ final class PlayerModel {
         }
     }
 
-    private func applyFeed(_ event: ThisMacFeedEvent) { setThisMacFeed(thisMacFeed.after(event)) }
+    /// Moves the feed of This Mac by the `ThisMacFeed.after` rule (#0114).
+    func applyFeed(_ event: ThisMacFeedEvent) { setThisMacFeed(thisMacFeed.after(event)) }
 
     /// Switches what feeds This Mac and follows the new owner's now-playing stream.
     func setThisMacFeed(_ feed: ThisMacFeed) {
@@ -479,7 +508,7 @@ final class PlayerModel {
         }
     }
 
-    private static func truncated(_ text: String, to units: Int) -> String {
+    static func truncated(_ text: String, to units: Int) -> String {
         var result = ""
         for character in text {
             guard result.utf16.count + String(character).utf16.count <= units else { break }
@@ -495,6 +524,14 @@ final class PlayerModel {
             var reconnectTimer: Task<Void, Never>?
             for await state in await ma.connectionStates() {
                 guard let self else { return }
+                switch state {
+                case .connected:
+                    self.musicAssistantIsConnected = true
+                    self.activityAfterConnect = true
+                case .disconnected, .failed:
+                    self.musicAssistantIsConnected = false
+                default: break
+                }
                 switch state {
                 case .failed:
                     reconnectTimer?.cancel()
@@ -815,7 +852,10 @@ final class PlayerModel {
             applyFeed(sourceID == musicAssistant.sourceID ? .musicAssistantPlayRequested : .localPlayRequested)
         }
         let maOnThisMac = output == OutputDevice.thisMacID && sourceID == musicAssistant.sourceID
+        if maOnThisMac { ownStreamRequested = true }
+        let stopping = stopOthers(startingOn: output)
         Task {
+            await stopping?.value
             do { try await backend.play(request.items, on: output, mode: request.mode) } catch {
                 // A failed Music Assistant play hands This Mac back unless an earlier stream still runs (#0114).
                 if maOnThisMac { applyFeed(.musicAssistantPlayFailed(isStreaming: sendspinController.sendspin.isStreaming)) }
@@ -911,6 +951,7 @@ final class PlayerModel {
             guard !result.tracks.isEmpty else { return }
             // Local files take This Mac back from Music Assistant; AudioCore then preempts the stream.
             applyFeed(.localPlayRequested)
+            stopOthers(startingOn: OutputDevice.thisMacID)
             let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty
             if replace { player.clearQueue() }
             let start = player.queue.tracks.count
