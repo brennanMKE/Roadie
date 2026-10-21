@@ -73,7 +73,7 @@ The `/sendspin` path on 8095 is reserved for the built-in web player and rejects
    - In the Home app's home settings for AirPlay speaker & TV access, select **everyone on the same network**, not only people in this home, or HomePods play silence. (Wording per MA docs; exact Home app menu labels not verified.)
    - Output is 44.1 kHz/16-bit lossless (optionally ALAC). Stereo pairs configurable in player settings.
    - **MA cannot AirPlay to a Mac** (macOS dropped RAOP). The Mac must be a Sendspin player to play locally (see 5.2).
-4. **Create a long-lived token for the app:** Settings > Profile > Long-lived access tokens. Consider a dedicated non-admin MA user for the app (some commands, e.g. `music/sync`, need admin).
+4. **Create a long-lived token for the app** in Music Assistant's own web app (`http://<host>:8095`, not Home Assistant's sidebar; a Home Assistant token does not work): your user profile > Long-lived access tokens. Long-lived tokens expire after one year and do not renew (`auth/token/create` in `commands.json`). Consider a dedicated non-admin MA user for the app (some commands, e.g. `music/sync`, need admin).
 5. Wait for first library sync (spinner beside the source in Settings).
 6. Browse `http://<ma-ip>:8095/api-docs` and save the command list; it is generated from the running server and is the source of truth for section 4.
 
