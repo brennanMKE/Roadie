@@ -251,6 +251,26 @@ struct SelectionControllerTests {
         #expect(rig.fake.calls.count == 1)
     }
 
+    @Test func libraryNameFollowsTheWinner() async {
+        let rig = SelectionRig([a, b])
+        defer { rig.cleanUp() }
+        rig.fake.set("http://a.local:8095", .answer("id-a"))
+        await rig.controller.resolveNow()
+        #expect(rig.controller.libraryName == "A")
+        #expect(rig.controller.reasonText == "A \u{2014} first reachable")
+        rig.store.save([renamed(a, "Attic"), b])
+        rig.controller.serversEdited()
+        await rig.controller.waitForPending()
+        #expect(rig.controller.libraryName == "Attic")
+
+        let single = SelectionRig([a])
+        defer { single.cleanUp() }
+        single.fake.set("http://a.local:8095", .answer("id-a"))
+        await single.controller.resolveNow()
+        #expect(single.controller.current?.server.name == "A")
+        #expect(single.controller.libraryName == nil)
+    }
+
     @Test func renameBeforeFirstUseDoesNothing() async {
         let rig = SelectionRig([a])
         defer { rig.cleanUp() }

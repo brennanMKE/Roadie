@@ -30,6 +30,8 @@ public final class MusicAssistantSelectionController {
     public private(set) var current: MusicAssistantServerRanking.Candidate?
     /// "Home — on network X" etc. User data: UI only, never logged.
     public private(set) var reasonText: String = MusicAssistantServerRanking.notCheckedText
+    /// The Library subtitle's server name (#0124): a real name with several servers, else nil. UI only, never logged.
+    public private(set) var libraryName: String?
     /// The last probe round's outcomes, for the Settings status dots.
     public private(set) var lastOutcomes: [UUID: MusicAssistantServerRanking.Outcome] = [:]
     public var isResolving: Bool { resolving > 0 }
@@ -176,6 +178,7 @@ public final class MusicAssistantSelectionController {
         let candidate = MusicAssistantServerRanking.Candidate(server: updated, basis: current.basis)
         self.current = candidate
         reasonText = MusicAssistantServerRanking.reason(for: candidate)
+        libraryName = MusicAssistantServerRanking.libraryLabel(for: updated, serverCount: servers.count)
         active.set(updated)
     }
 
@@ -199,6 +202,8 @@ public final class MusicAssistantSelectionController {
         hasDecision = true
         lastOutcomes = result.outcomes
         reasonText = MusicAssistantServerRanking.reason(for: result.decision, hasCandidates: hasCandidates) ?? reasonText
+        libraryName = MusicAssistantServerRanking.libraryLabel(
+            for: winner?.server, serverCount: resolvedServers?.count ?? 0)
         isValid = true
         active.set(winner?.server)
         // A rename typed while the probe ran.

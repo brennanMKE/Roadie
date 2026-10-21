@@ -74,6 +74,13 @@ public struct MusicAssistantServerRanking: Hashable, Sendable {
         }
     }
 
+    /// The Library window's label for the chosen server (#0124): its real name, only when there is more than one
+    /// server to tell apart. Never the host or the selection reason. UI only, never logged.
+    public static func libraryLabel(for server: MusicAssistantServerConfiguration?, serverCount: Int) -> String? {
+        guard let server, serverCount > 1, !MusicAssistantServerConfiguration.isGenericName(server.name) else { return nil }
+        return server.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// The UI text for a decision; `.undecided` has none.
     public static func reason(for decision: Decision, hasCandidates: Bool) -> String? {
         switch decision {

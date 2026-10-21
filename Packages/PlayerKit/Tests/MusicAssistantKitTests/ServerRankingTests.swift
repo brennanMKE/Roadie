@@ -96,4 +96,15 @@ struct ServerRankingTests {
         #expect(!text.contains("("))
         #expect(!text.contains("Music Assistant"))
     }
+
+    @Test func libraryLabelShowsOnlyARealNameWithSeveralServers() {
+        let home = makeServer("http://a.local:8095", id: "a", name: "Home")
+        #expect(Ranking.libraryLabel(for: home, serverCount: 2) == "Home")
+        #expect(Ranking.libraryLabel(for: home, serverCount: 1) == nil)
+        for name in ["Music Assistant", "Music Assistant (abc123)", "", "  "] {
+            let generic = makeServer("http://a.local:8095", id: "a", name: name)
+            #expect(Ranking.libraryLabel(for: generic, serverCount: 2) == nil)
+        }
+        #expect(Ranking.libraryLabel(for: nil, serverCount: 2) == nil)
+    }
 }
