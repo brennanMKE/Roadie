@@ -557,6 +557,107 @@ def write_fixtures(fixtures, targets, fix_dir, summary):
     return written
 
 
+def answered(rc):
+    """True when a recorded call got a reply that is not an error frame. Session.call never raises on
+    an error frame or a timeout (it returns no frames), so cleanup steps check this."""
+    return bool(rc.get("frames")) and not is_error(rc)
+
+
+def failure_reason(rc):
+    return "error frame" if rc.get("frames") else "no reply before the timeout"
+
+
+def run_playlist_writes(s, tracks, name, fixtures, scrub=str, report=print, sleep=time.sleep):
+    """The writes run's steps and cleanup, separate from I/O setup so scripts/tests can drive it with a
+    fake Session. Returns a failure description or None. Cleanup always runs; any doubt about server
+    state is printed as CLEANUP FAILED; an interrupt (KeyboardInterrupt, SystemExit) during cleanup is
+    reported and then re-raised after the remaining cleanup steps."""
+    st = {"playlist_id": None, "create_sent": False, "fav_added": False, "fav_removed": False}
+    t0 = tracks[0]
+    track_name = t0.get("name") or t0.get("uri")
+    failed = None
+
+    def R(fname, command, a=None, timeout=15):
+        rc = s.call(command, a, timeout=timeout)
+        fixtures[fname] = rc
+        if is_error(rc) and fname != "error-unknown-command-move":
+            report("note: %s answered with an error frame" % fname)
+        return rc
+
+    try:
+        st["create_sent"] = True
+        pl = result_of(R("playlist-create", "music/playlists/create_playlist", {"name": name}))
+        if not isinstance(pl, dict) or pl.get("name") != name or not pl.get("item_id"):
+            raise RuntimeError("create_playlist did not return the new playlist")
+        st["playlist_id"] = playlist_id = pl["item_id"]
+        ref = {"item_id": playlist_id, "provider_instance_id_or_domain": "library"}
+        R("playlist-add-tracks", "music/playlists/add_playlist_tracks",
+          {"db_playlist_id": playlist_id, "uris": [t["uri"] for t in tracks[:2]]})
+        sleep(3)  # the add is a background task
+        R("playlist-tracks-after-add", "music/playlists/playlist_tracks", ref, timeout=30)
+        R("playlist-remove-tracks", "music/playlists/remove_playlist_tracks",
+          {"db_playlist_id": playlist_id, "positions_to_remove": [1]})
+        sleep(3)
+        R("playlist-tracks-after-remove", "music/playlists/playlist_tracks", ref, timeout=30)
+        cur = result_of(s.call("music/playlists/get", ref)) or pl
+        renamed = dict(cur, name=name + " renamed")
+        R("playlist-update", "music/playlists/update",
+          {"item_id": playlist_id, "update": renamed, "overwrite": True})
+        R("error-unknown-command-move", "music/playlists/move_playlist_track",
+          {"db_playlist_id": playlist_id, "from_position": 1, "to_position": 1})
+        if t0.get("favorite"):
+            report("note: the first track is already a favorite; favorite-add/remove skipped")
+        else:
+            st["fav_added"] = True  # until the server says otherwise: a timeout may still have added it
+            if is_error(R("favorite-add", "music/favorites/add_item", {"item": t0["uri"]})):
+                st["fav_added"] = False
+            else:
+                rc = R("favorite-remove", "music/favorites/remove_item",
+                       {"media_type": "track", "library_item_id": t0["item_id"]})
+                st["fav_removed"] = answered(rc)
+    except Exception as e:  # recorded; cleanup still runs
+        failed = type(e).__name__ + ": " + scrub(str(e))
+    finally:
+        cleanup_playlist_writes(s, R, st, name, track_name, t0, report)
+    return failed
+
+
+def cleanup_playlist_writes(s, R, st, name, track_name, t0, report=print):
+    interrupt = None
+    if st["fav_added"] and not st["fav_removed"]:
+        reason = None
+        try:
+            rc = s.call("music/favorites/remove_item",
+                        {"media_type": "track", "library_item_id": t0["item_id"]}, timeout=15)
+            if answered(rc):
+                st["fav_removed"] = True
+            else:
+                reason = failure_reason(rc)
+        except BaseException as e:
+            reason = type(e).__name__
+            if not isinstance(e, Exception):
+                interrupt = e
+        if reason:
+            report("CLEANUP FAILED (%s): un-favorite the track %r in the Music Assistant UI" % (reason, track_name))
+    if st["playlist_id"] is not None:
+        reason = None
+        try:
+            rc = R("playlist-delete", "music/library/remove_item",
+                   {"media_type": "playlist", "library_item_id": st["playlist_id"]})
+            if not answered(rc):
+                reason = failure_reason(rc)
+        except BaseException as e:
+            reason = type(e).__name__
+            if not isinstance(e, Exception):
+                interrupt = interrupt or e
+        if reason:
+            report("CLEANUP FAILED (%s): delete the playlist named %r in the Music Assistant UI" % (reason, name))
+    elif st["create_sent"]:
+        report("CLEANUP FAILED: the playlist named %r may exist; delete it in the Music Assistant UI" % name)
+    if interrupt is not None:
+        raise interrupt
+
+
 def record_playlist_writes(args):
     """#0133, playlists design §1.5 step 2. Opt-in, self-cleaning: every write targets a playlist this
     run creates and deletes in `finally`; a favorite is added and removed only when the track was not one."""
@@ -586,58 +687,16 @@ def record_playlist_writes(args):
     s.events = []
     fixtures = {}
 
-    def R(name, command, a=None, timeout=15):
-        rc = s.call(command, a, timeout=timeout)
-        fixtures[name] = rc
-        if is_error(rc) and name != "error-unknown-command-move":
-            print("note: %s answered with an error frame" % name)
-        return result_of(rc)
-
     tracks = result_of(s.call("music/tracks/library_items", {"limit": 2, "offset": 0, "order_by": "sort_name"})) or []
     tracks = [t for t in tracks if isinstance(t, dict) and t.get("uri")]
     if len(tracks) < 2:
         s.ws.close()
         die("the library needs at least two tracks")
     name = "SkinAmp fixture " + run_id
-    playlist_id = None
     failed = None
     try:
-        pl = R("playlist-create", "music/playlists/create_playlist", {"name": name})
-        if not isinstance(pl, dict) or pl.get("name") != name or not pl.get("item_id"):
-            raise RuntimeError("create_playlist did not return the new playlist")
-        playlist_id = pl["item_id"]
-        ref = {"item_id": playlist_id, "provider_instance_id_or_domain": "library"}
-        R("playlist-add-tracks", "music/playlists/add_playlist_tracks",
-          {"db_playlist_id": playlist_id, "uris": [t["uri"] for t in tracks[:2]]})
-        time.sleep(3)  # the add is a background task
-        R("playlist-tracks-after-add", "music/playlists/playlist_tracks", ref, timeout=30)
-        R("playlist-remove-tracks", "music/playlists/remove_playlist_tracks",
-          {"db_playlist_id": playlist_id, "positions_to_remove": [1]})
-        time.sleep(3)
-        R("playlist-tracks-after-remove", "music/playlists/playlist_tracks", ref, timeout=30)
-        cur = result_of(s.call("music/playlists/get", ref)) or pl
-        renamed = dict(cur, name=name + " renamed")
-        R("playlist-update", "music/playlists/update",
-          {"item_id": playlist_id, "update": renamed, "overwrite": True})
-        R("error-unknown-command-move", "music/playlists/move_playlist_track",
-          {"db_playlist_id": playlist_id, "from_position": 1, "to_position": 1})
-        t0 = tracks[0]
-        if t0.get("favorite"):
-            print("note: the first track is already a favorite; favorite-add/remove skipped")
-        else:
-            R("favorite-add", "music/favorites/add_item", {"item": t0["uri"]})
-            R("favorite-remove", "music/favorites/remove_item",
-              {"media_type": "track", "library_item_id": t0["item_id"]})
-    except Exception as e:  # recorded below; cleanup still runs
-        failed = type(e).__name__ + ": " + targets.scrub_str(str(e))
+        failed = run_playlist_writes(s, tracks, name, fixtures, scrub=targets.scrub_str)
     finally:
-        if playlist_id is not None:
-            try:
-                R("playlist-delete", "music/library/remove_item",
-                  {"media_type": "playlist", "library_item_id": playlist_id})
-            except Exception as e:
-                print("CLEANUP FAILED (%s): delete the playlist named %r in the Music Assistant UI"
-                      % (type(e).__name__, name))
         # Let the trailing media_item_* events arrive.
         end = time.time() + 5
         while time.time() < end:
@@ -667,7 +726,7 @@ def record_playlist_writes(args):
     print("secret gate: passed (%d files)" % len(written))
     print("run id: %s ; transcript: %s" % (run_id, os.path.relpath(tr_dir, ROOT)))
     if failed:
-        die("a step failed (%s); the fixture playlist was deleted" % failed)
+        die("a step failed (%s); see any CLEANUP FAILED line above" % failed)
 
 
 def record(args):
