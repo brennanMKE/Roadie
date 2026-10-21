@@ -36,8 +36,14 @@ final class PlaylistModel {
     @ObservationIgnored var onPlayLocal: @MainActor () -> Void = {}
     /// Plays the remote queue's row at this index (#0144). Set by `PlayerModel`.
     @ObservationIgnored var onPlayRemote: @MainActor (Int) -> Void = { _ in }
-    /// An edit the remote queue can't take yet (#0145): shows the marquee notice. Set by `PlayerModel`.
+    /// An edit the remote queue can't take (sorting, #0145): shows the marquee notice. Set by `PlayerModel`.
     @ObservationIgnored var onRemoteRefused: @MainActor () -> Void = {}
+    /// Sends a remove, move or clear to the remote queue (#0145). Set by `PlayerModel`.
+    @ObservationIgnored var onEditRemote: @MainActor (QueueEdit) async throws -> Void = { _ in }
+    /// A marquee notice about a remote edit: a refusal here, or the server's error (#0145). Set by `PlayerModel`.
+    @ObservationIgnored var onRemoteNotice: @MainActor (String) -> Void = { _ in }
+    /// Remote edits run one after another, in the order made (drag steps arrive quickly).
+    @ObservationIgnored private var remoteEditChain: Task<Void, Never>?
 
     /// The remote queue the rows show; nil for the local queue. Set by `PlayerModel` (#0144).
     var remote: RemoteQueueSnapshot? {
@@ -87,7 +93,7 @@ final class PlaylistModel {
         return isLocal() && isPlayingLocalQueue() ? player.queue.currentIndex : nil
     }
 
-    /// Whether the rows are a remote queue, where only playing a row works (#0144); refuses with the notice.
+    /// Whether the rows are a remote queue, which can't be sorted (#0144, #0145); refuses with the notice.
     private func refusesRemoteEdit() -> Bool {
         guard remote != nil else { return false }
         onRemoteRefused()
@@ -218,7 +224,10 @@ final class PlaylistModel {
     }
 
     func removeSelected() {
-        if refusesRemoteEdit() { return }
+        if let remote {
+            removeRemote(QueueEditPlan.remove(selected: Set(selectedIndices), in: remote))
+            return
+        }
         guard isLocal() else { return }
         let indices = selectedIndices
         guard !indices.isEmpty else { return }
@@ -228,7 +237,10 @@ final class PlaylistModel {
 
     /// Keeps only the selected rows. With nothing selected it does nothing (Webamp would empty the list).
     func crop() {
-        if refusesRemoteEdit() { return }
+        if let remote {
+            removeRemote(QueueEditPlan.crop(selected: Set(selectedIndices), in: remote))
+            return
+        }
         guard isLocal() else { return }
         let keep = selectedIndices
         guard !keep.isEmpty else { return }
@@ -239,7 +251,13 @@ final class PlaylistModel {
 
     /// Webamp's removeAllTracks: stops and empties.
     func removeAll() {
-        if refusesRemoteEdit() { return }
+        if let remote {
+            guard !remote.items.isEmpty else { return }
+            sendRemote(.clear)
+            selection.selectNone()
+            scrollPosition = 0
+            return
+        }
         guard isLocal() else { return }
         player.clearQueue()
         selection.selectNone()
@@ -248,8 +266,44 @@ final class PlaylistModel {
 
     /// Drags the selected rows `offset` rows (clamped at the ends by the queue).
     func dragSelected(by offset: Int) {
-        guard offset != 0, !refusesRemoteEdit(), isLocal() else { return }
+        guard offset != 0 else { return }
+        if let remote {
+            switch QueueEditPlan.move(selected: Set(selectedIndices), by: offset, in: remote) {
+            case .none: break
+            case .refusedMultiple: onRemoteNotice("Drag one track at a time")
+            case .move(let itemID, let shift): sendRemote(.move(itemID: itemID, shift: shift))
+            }
+            return
+        }
+        guard isLocal() else { return }
         player.moveTracks(selectedIndices, by: offset)
+    }
+
+    // MARK: Remote queue edits (#0145)
+
+    private func removeRemote(_ removal: QueueEditPlan.Removal) {
+        if removal.skippedCurrent { onRemoteNotice("Can't remove the playing track") }
+        guard !removal.items.isEmpty else { return }
+        sendRemote(.remove(items: removal.items))
+    }
+
+    /// Shows the edit at once and sends it after any earlier one; a refusal puts the rows back as they were. The
+    /// queue watcher's refetch then confirms the server's order.
+    private func sendRemote(_ edit: QueueEdit) {
+        guard let before = remote else { return }
+        remote = QueueEditPlan.apply(edit, to: before)
+        let previous = remoteEditChain
+        remoteEditChain = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            do {
+                try await self.onEditRemote(edit)
+            } catch is CancellationError {
+            } catch {
+                if self.remote?.output == before.output { self.remote = before }
+                self.onRemoteNotice((error as? LocalizedError)?.errorDescription ?? "Music Assistant refused")
+            }
+        }
     }
 
     // MARK: Sort List (MISC menu)

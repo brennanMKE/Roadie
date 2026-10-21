@@ -20,12 +20,14 @@ final class ActionMenuItem: NSMenuItem {
 @MainActor
 enum PlaylistContextMenus {
     /// `nil` titles are separators.
-    static func popUp(_ items: [(title: String, action: () -> Void)?]) {
+    static func popUp(_ items: [(title: String, action: () -> Void)?], enabled: Bool = true) {
         let menu = NSMenu()
         menu.autoenablesItems = false
         for item in items {
             if let item {
-                menu.addItem(ActionMenuItem(title: item.title, handler: item.action))
+                let entry = ActionMenuItem(title: item.title, handler: item.action)
+                entry.isEnabled = enabled
+                menu.addItem(entry)
             } else {
                 menu.addItem(.separator())
             }
@@ -36,7 +38,10 @@ enum PlaylistContextMenus {
         }
     }
 
+    /// Disabled on a Music Assistant queue, which can't be sorted (#0145); the marquee says so.
     static func sort(_ playlist: PlaylistModel) {
+        let enabled = playlist.remote == nil
+        if !enabled { playlist.onRemoteRefused() }
         popUp([
             ("Sort List by Title", { playlist.sortByTitle() }),
             ("Sort List by File Name", { playlist.sortByFileName() }),
@@ -44,7 +49,7 @@ enum PlaylistContextMenus {
             nil,
             ("Reverse List", { playlist.reverse() }),
             ("Randomize List", { playlist.randomize() }),
-        ])
+        ], enabled: enabled)
     }
 
     static func miscOptions(_ model: PlayerModel) {

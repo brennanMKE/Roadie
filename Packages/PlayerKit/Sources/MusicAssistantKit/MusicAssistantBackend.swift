@@ -832,7 +832,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// Client errors to backend errors. The address does not lead to the configured server for a mismatch or an
     /// unsupported schema, so those read as unreachable and the token was never sent.
     public static func map(_ error: any Error) -> any Error {
-        if error is CancellationError || error is MusicBackendError { return error }
+        if error is CancellationError || error is MusicBackendError || error is QueueEditError { return error }
         guard let failure = error as? MusicAssistantError else {
             return MusicBackendError.backend("The Music Assistant request failed.")
         }

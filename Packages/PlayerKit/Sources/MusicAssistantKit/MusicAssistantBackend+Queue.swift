@@ -25,13 +25,33 @@ extension MusicAssistantBackend {
 
     public func edit(_ edit: QueueEdit, on output: OutputDevice.ID) async throws {
         try await guarded {
-            let client = try requireClient()
-            let queueID = try await queueID(for: output, client: client)
-            switch edit {
-            case .play(let index):
-                _ = try await client.call(.queuePlayIndex(queueID: queueID, index: index))
+            do {
+                let client = try requireClient()
+                let queueID = try await queueID(for: output, client: client)
+                switch edit {
+                case .play(let index):
+                    _ = try await client.call(.queuePlayIndex(queueID: queueID, index: index))
+                case .remove(let items):
+                    for item in items.sorted(by: { $0.index > $1.index }) {
+                        _ = try await client.call(.queueDeleteItem(queueID: queueID, itemID: item.id))
+                    }
+                case .move(let itemID, let shift):
+                    guard shift != 0 else { return }
+                    _ = try await client.call(.queueMoveItem(queueID: queueID, itemID: itemID, shift: shift))
+                case .clear:
+                    _ = try await client.call(.queueClear(queueID: queueID))
+                }
+            } catch MusicAssistantError.server(_, let details) where Self.isBufferedRefusal(details) {
+                throw QueueEditError.buffered
             }
         }
+    }
+
+    /// Music Assistant raises `IndexError` for a move or delete at or before the buffered index; it arrives as a server
+    /// error whose details name it (or say "buffered").
+    static func isBufferedRefusal(_ details: String) -> Bool {
+        let text = details.lowercased()
+        return text.contains("indexerror") || text.contains("buffer")
     }
 
     /// For tests: smaller pages and caps. Applies to watches started afterwards.
@@ -73,5 +93,26 @@ extension MusicAssistantBackend {
             queueWatchers[id] = watcher
             watcher.continuation.yield(.empty(on: watcher.output))
         }
+    }
+}
+
+extension MARequest {
+    /// Removes one queue item by its `queue_item_id` (#0145).
+    public static func queueDeleteItem(queueID: String, itemID: String) -> MARequest {
+        MARequest(
+            command: "player_queues/delete_item",
+            args: ["queue_id": .string(queueID), "item_id_or_index": .string(itemID)])
+    }
+
+    /// Moves one queue item `shift` rows; positive moves it down (#0145).
+    public static func queueMoveItem(queueID: String, itemID: String, shift: Int) -> MARequest {
+        MARequest(
+            command: "player_queues/move_item",
+            args: ["queue_id": .string(queueID), "queue_item_id": .string(itemID), "pos_shift": .number(Double(shift))])
+    }
+
+    /// Empties the queue (#0145).
+    public static func queueClear(queueID: String) -> MARequest {
+        MARequest(command: "player_queues/clear", args: ["queue_id": .string(queueID)])
     }
 }

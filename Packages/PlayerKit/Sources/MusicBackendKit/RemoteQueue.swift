@@ -58,10 +58,28 @@ public struct RemoteQueueSnapshot: Hashable, Sendable {
     public static func empty(on output: OutputDevice.ID) -> RemoteQueueSnapshot { RemoteQueueSnapshot(output: output) }
 }
 
-/// A change to a remote queue. #0145 adds removes, moves and clear.
+/// A change to a remote queue (#0144, #0145).
 public enum QueueEdit: Hashable, Sendable {
     /// Plays the row at this 0-based index.
     case play(index: Int)
+    /// Removes these items, one request each, highest index first so the lower indices stay put.
+    case remove(items: [RemoteQueueItem])
+    /// Moves one item `shift` rows (positive: down, toward the end).
+    case move(itemID: String, shift: Int)
+    /// Empties the queue.
+    case clear
+}
+
+/// Why a remote queue refused an edit (#0145).
+public enum QueueEditError: Error, Hashable, Sendable, LocalizedError {
+    /// The server won't move or delete an item at or before its buffered index (Music Assistant's `IndexError`).
+    case buffered
+
+    public var errorDescription: String? {
+        switch self {
+        case .buffered: "Track already buffered"
+        }
+    }
 }
 
 extension MusicBackend {

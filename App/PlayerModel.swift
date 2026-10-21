@@ -416,6 +416,8 @@ final class PlayerModel {
         playlist.onRemoteRefused = { [weak self] in
             self?.post(StatusNotice(text: "Not for Music Assistant queues"))
         }
+        playlist.onEditRemote = { [weak self] edit in try await self?.editRemoteQueue(edit) }
+        playlist.onRemoteNotice = { [weak self] text in self?.post(StatusNotice(text: text)) }
         // Music Assistant started playing on this Mac (from SkinAmp, its own UI, Home Assistant or a phone).
         stack.sendspin.onStreamStarted = { [weak self] in self?.streamStarted() }
         // The server ended the stream, or the session dropped or was stopped: This Mac plays its local queue again.
@@ -740,6 +742,12 @@ final class PlayerModel {
                 self?.showBackendFailure(error)
             }
         }
+    }
+
+    /// A remove, move or clear from the playlist editor on a remote queue (#0145).
+    private func editRemoteQueue(_ edit: QueueEdit) async throws {
+        let output = selectedOutput
+        try await router.backend(for: output).edit(edit, on: output)
     }
 
     /// Control Center for a remote output: the snapshot now, its artwork once fetched (on a change of ref only).

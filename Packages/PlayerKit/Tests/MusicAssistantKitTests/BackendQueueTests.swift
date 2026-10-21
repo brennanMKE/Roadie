@@ -127,3 +127,61 @@ extension ModelDecodingTests {
         #expect(MAQueueWatch.item(radio, fallbackIndex: 7).index == 7)
     }
 }
+
+/// Removes, moves and clear on a Music Assistant queue (#0145). Queue items are synthetic, as above.
+extension BackendQueueTests {
+    private func editRig(_ extra: [FixtureScript.Route] = []) async throws -> BackendRig {
+        try await connectedBackend(
+            script: controlScript { script in
+                script.override("player_queues/get_active_queue", result: Self.queueJSON(items: 5, current: 0))
+                script.override("player_queues/get", result: Self.queueJSON(items: 5, current: 0))
+                for command in ["player_queues/delete_item", "player_queues/move_item", "player_queues/clear"] {
+                    script.routes.insert(.result(command: command, .null), at: 0)
+                }
+                for route in extra { script.routes.insert(route, at: 0) }
+            })
+    }
+
+    private func sent(_ rig: BackendRig, _ command: String) -> [SentRequest] {
+        rig.transport.sentRequests.filter { $0.command == command }
+    }
+
+    @Test func deleteSendsOnePerRowHighestFirst() async throws {
+        let rig = try await editRig()
+        let items = [1, 4, 2].map { RemoteQueueItem(id: "qi\($0)", index: $0, title: "Song \($0)") }
+        try await rig.backend.edit(.remove(items: items), on: output)
+        let deletes = sent(rig, "player_queues/delete_item")
+        #expect(deletes.compactMap { $0.args["item_id_or_index"]?.stringValue } == ["qi4", "qi2", "qi1"])
+        #expect(deletes.allSatisfy { $0.args["queue_id"]?.stringValue == Self.queueID })
+        await rig.backend.disconnect()
+    }
+
+    @Test func moveSendsPosShift() async throws {
+        let rig = try await editRig()
+        try await rig.backend.edit(.move(itemID: "qi3", shift: -2), on: output)
+        let move = try #require(sent(rig, "player_queues/move_item").first)
+        #expect(move.args["queue_item_id"]?.stringValue == "qi3")
+        #expect(move.args["pos_shift"]?.intValue == -2)
+        #expect(move.args["queue_id"]?.stringValue == Self.queueID)
+        await rig.backend.disconnect()
+    }
+
+    @Test func clearUsesQueueClear() async throws {
+        let rig = try await editRig()
+        try await rig.backend.edit(.clear, on: output)
+        #expect(sent(rig, "player_queues/clear").map { $0.args["queue_id"]?.stringValue } == [Self.queueID])
+        #expect(sent(rig, "player_queues/delete_item").isEmpty)
+        await rig.backend.disconnect()
+    }
+
+    @Test func bufferedRefusalIsAClearError() async throws {
+        let rig = try await editRig([
+            .error(command: "player_queues/move_item", code: 999, details: "IndexError: Item is already buffered")
+        ])
+        await #expect(throws: QueueEditError.buffered) {
+            try await rig.backend.edit(.move(itemID: "qi0", shift: 1), on: output)
+        }
+        #expect(QueueEditError.buffered.errorDescription == "Track already buffered")
+        await rig.backend.disconnect()
+    }
+}
