@@ -131,7 +131,7 @@ public final class LibraryBrowserModel {
     /// Follows `backend.libraryChanges()` while connected and shown (#0139).
     @ObservationIgnored private var changesTask: Task<Void, Never>?
     /// Every library change after the model's own handling: the seam for `PlaylistsModel`, `PlaylistEditor`,
-    /// and `FavoritesModel.apply(_:)` until they are owned here (#0139).
+    /// until they are owned here (#0139).
     @ObservationIgnored public var onLibraryChange: (@MainActor (LibraryChange) -> Void)?
     private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LibraryBrowser")
 
@@ -291,8 +291,8 @@ public final class LibraryBrowserModel {
             if playlists.phase != .idle { playlists.reload() }
         case .played:
             discover?.scheduleRefresh()
-        case .favoriteChanged:
-            break
+        case .favoriteChanged(let id, let on):
+            favorites.apply(favorite: on, for: id)
         }
         onLibraryChange?(change)
     }
