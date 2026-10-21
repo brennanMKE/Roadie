@@ -47,6 +47,51 @@ public enum MAFixture: String, CaseIterable, Sendable {
     case artworkProbe = "artwork-probe"
     case events
 
+    // #0133: playlist, favorites, recommendation and queue captures. Not recorded until the user runs
+    // the §1.5 recipe; `isRecorded` is false until then and tests skip or use synthetic routes.
+    case playlistGet = "playlist-get"
+    case playlistsFavoritesPage = "playlists-favorites-page"
+    case tracksFavoritesPage = "tracks-favorites-page"
+    case recommendations
+    case recentlyPlayedItems = "recently-played-items"
+    case recentlyAddedTracks = "recently-added-tracks"
+    case radiosCount = "radios-count"
+    case radiosPage = "radios-page"
+    case playlistExport = "playlist-export"
+    case playerQueueItemsLoaded = "player-queue-items-loaded"
+    // Opt-in `--record-playlist-writes` run.
+    case playlistCreate = "playlist-create"
+    case playlistAddTracks = "playlist-add-tracks"
+    case playlistTracksAfterAdd = "playlist-tracks-after-add"
+    case playlistRemoveTracks = "playlist-remove-tracks"
+    case playlistTracksAfterRemove = "playlist-tracks-after-remove"
+    case playlistUpdate = "playlist-update"
+    case favoriteAdd = "favorite-add"
+    case favoriteRemove = "favorite-remove"
+    case errorUnknownCommandMove = "error-unknown-command-move"
+    case playlistDelete = "playlist-delete"
+    case eventsPlaylists = "events-playlists"
+
+    /// The fixtures recorded before #0133; the original 42.
+    public static let baseline: [MAFixture] = Array(allCases.prefix(42))
+
+    /// The cases whose file is in the bundle. Pending #0133 captures are absent until the user records them.
+    public static var recorded: [MAFixture] { allCases.filter(\.isRecorded) }
+
+    public var isRecorded: Bool { Self.url(named: rawValue) != nil }
+
+    /// Per-row `recommendations-items-<item_id>` files, whose names depend on the server's rows.
+    public static func recommendationItems(row: String) throws -> MAJSON {
+        guard let url = url(named: "recommendations-items-" + row) else {
+            throw Missing(name: "recommendations-items-" + row)
+        }
+        return try MAJSON.parse(Data(contentsOf: url))
+    }
+
+    private static func url(named name: String) -> URL? {
+        Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures")
+    }
+
     public struct Missing: Error, CustomStringConvertible {
         public var name: String
         public var description: String { "Missing music assistant fixture \(name)" }
@@ -54,7 +99,7 @@ public enum MAFixture: String, CaseIterable, Sendable {
 
     public var data: Data {
         get throws {
-            guard let url = Bundle.module.url(forResource: rawValue, withExtension: "json", subdirectory: "Fixtures") else {
+            guard let url = Self.url(named: rawValue) else {
                 throw Missing(name: rawValue)
             }
             return try Data(contentsOf: url)
@@ -65,7 +110,7 @@ public enum MAFixture: String, CaseIterable, Sendable {
         get throws { try MAJSON.parse(data) }
     }
 
-    /// nil for the handshake, `info-http`, `artwork-probe` and `events`.
+    /// nil for the handshake, `info-http`, `artwork-probe`, `events` and `events-playlists`.
     public var command: String? { (try? json)?["command"]?.stringValue }
 
     public var args: MAJSON? { (try? json)?["args"] }

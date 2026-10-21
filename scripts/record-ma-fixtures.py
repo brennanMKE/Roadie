@@ -5,11 +5,15 @@ Run:   /usr/bin/python3 -I scripts/record-ma-fixtures.py [--out DIR] [--events-s
 Check: /usr/bin/python3 -I scripts/record-ma-fixtures.py --check
 Live:  /usr/bin/python3 -I scripts/record-ma-fixtures.py --check-live   (read-only drift check, #0061)
 Audio: /usr/bin/python3 -I scripts/record-ma-fixtures.py --probe-audio [--write] [--no-wait]   (per-track audio over HTTP, #0089)
+Writes: /usr/bin/python3 -I scripts/record-ma-fixtures.py --record-playlist-writes [--out DIR]   (opt-in, #0133)
 
 Reads MUSIC_ASSISTANT_URL and MUSIC_ASSISTANT_TOKEN from .env itself. The token lives in one
 variable, goes only into the `auth` frame and into Authorization headers of artwork probes, and is
 never put in argv, the environment, a URL, a log line or a file. Sends only the commands in ALLOWED:
 nothing that plays, pauses, seeks, changes volume, groups players, syncs or edits anything.
+The one exception is the opt-in --record-playlist-writes run (#0133): it may also send ALLOWED_WRITES,
+and only against a throwaway playlist it creates itself and deletes in a `finally`; a favorite it
+adds is removed again, and skipped entirely when the track already was a favorite.
 Python 3.9 compatible (Apple's /usr/bin/python3).
 """
 import base64
@@ -45,7 +49,27 @@ ALLOWED = frozenset([
     "music/artists/artist_albums", "music/albums/album_tracks", "music/albums/get",
     "music/playlists/playlist_tracks", "music/item_by_uri", "music/search",
     "music/tracks/preview",  # #0089: mints a preview URL; a read (library.read), plays nothing
+    # #0133 (playlists design §1.5): reads only.
+    "music/playlists/get", "music/recommendations", "music/recommendations/items",
+    "music/recently_played_items", "music/recently_added_tracks",
+    "music/radios/count", "music/radios/library_items", "music/playlists/export_playlist",
 ])
+# #0133: sent only by --record-playlist-writes, only on the throwaway playlist it creates.
+ALLOWED_WRITES = frozenset([
+    "music/playlists/create_playlist", "music/playlists/add_playlist_tracks",
+    "music/playlists/remove_playlist_tracks", "music/playlists/update",
+    "music/playlists/move_playlist_track",  # absent on 2.10.6: the error frame is the recording
+    "music/favorites/add_item", "music/favorites/remove_item", "music/library/remove_item",
+])
+# Fixtures only the writes run produces; the default run leaves them in place.
+WRITE_FIXTURES = frozenset([
+    "playlist-create", "playlist-add-tracks", "playlist-tracks-after-add", "playlist-remove-tracks",
+    "playlist-tracks-after-remove", "playlist-update", "favorite-add", "favorite-remove",
+    "error-unknown-command-move", "playlist-delete", "events-playlists",
+])
+# Items kept per result frame (the real counts go to original_item_counts).
+TRUNCATE = {"playlist-tracks": 5, "player-queue-items-loaded": 5,
+            "playlist-tracks-after-add": 5, "playlist-tracks-after-remove": 5}
 # Error-envelope probes. Harmless: an unknown command, never the real token on a failing path.
 PROBES = frozenset(["skinamp/no_such_command"])
 
@@ -280,17 +304,18 @@ class WS:
 class Session:
     """One authenticated or anonymous connection plus the id counter and pushed-event buffer."""
 
-    def __init__(self, base, transcript, token):
+    def __init__(self, base, transcript, token, allowed=ALLOWED):
         self.ws = WS(base, transcript, token)
         self.next_id = 1
         self.events = []
+        self.allowed = allowed
 
     def first_frame(self, timeout=10):
         t = self.ws.recv(timeout)
         return json.loads(t) if t else None
 
     def call(self, command, args=None, timeout=10, probe=False, _auth_token=None):
-        if command not in ALLOWED and not (probe and command in PROBES):
+        if command not in self.allowed and not (probe and command in PROBES):
             raise RuntimeError("command not on the read-only allowlist: " + command)
         mid = str(self.next_id)
         self.next_id += 1
@@ -510,6 +535,141 @@ def find_images(o, acc):
             find_images(v, acc)
 
 
+def write_fixtures(fixtures, targets, fix_dir, summary):
+    """Scrub, truncate and write call fixtures; returns the written paths."""
+    written = []
+    for name, obj in fixtures.items():
+        o = targets.scrub(obj, fixture=True)
+        keep = TRUNCATE.get(name, 3 if name.startswith("recommendations-items-") else None)
+        if keep is not None and isinstance(o, dict):
+            for fr in o.get("frames", []):
+                if isinstance(fr.get("result"), list) and len(fr["result"]) > keep:
+                    o.setdefault("original_item_counts", []).append(len(fr["result"]))
+                    fr["result"] = fr["result"][:keep]
+                    o["truncated_to_%d_items_per_frame" % keep] = True
+        p = os.path.join(fix_dir, name + ".json")
+        data = json.dumps(o, indent=2, ensure_ascii=False) + "\n"
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(data)
+        written.append(p)
+        n = len(o.get("frames", o.get("events", []))) if isinstance(o, dict) else 1
+        summary.append((name + ".json", n, len(data)))
+    return written
+
+
+def record_playlist_writes(args):
+    """#0133, playlists design §1.5 step 2. Opt-in, self-cleaning: every write targets a playlist this
+    run creates and deletes in `finally`; a favorite is added and removed only when the track was not one."""
+    base, token = read_env()
+    out_root = os.path.abspath(args["out"]) if args["out"] else None
+    run_id = time.strftime("%Y%m%d-%H%M%S")
+    fix_dir = os.path.join(out_root, "Fixtures") if out_root else os.path.join(ROOT, FIXTURE_REL)
+    tr_dir = os.path.join(out_root, "transcript") if out_root else os.path.join(ROOT, "build", "ma-recorder", run_id + "-writes")
+    os.makedirs(tr_dir, exist_ok=True)
+    os.makedirs(fix_dir, exist_ok=True)
+    transcript = open(os.path.join(tr_dir, "transcript.jsonl"), "w", encoding="utf-8")
+
+    st, _, body = http_get(base, "/info")
+    if st != 200:
+        die("GET /info returned %d" % st)
+    targets = Targets(base, token, json.loads(body))
+    s = Session(base, transcript, token, allowed=ALLOWED | ALLOWED_WRITES)
+    s.first_frame()
+    res = result_of(s.call("auth", {"token": token}))
+    if not (isinstance(res, dict) and res.get("authenticated")):
+        s.ws.close()
+        die("authentication did not succeed; stopping before sending anything else")
+    user = res.get("user") or {}
+    if isinstance(user.get("username"), str):
+        targets.username = user["username"]
+    start = time.time()
+    s.events = []
+    fixtures = {}
+
+    def R(name, command, a=None, timeout=15):
+        rc = s.call(command, a, timeout=timeout)
+        fixtures[name] = rc
+        if is_error(rc) and name != "error-unknown-command-move":
+            print("note: %s answered with an error frame" % name)
+        return result_of(rc)
+
+    tracks = result_of(s.call("music/tracks/library_items", {"limit": 2, "offset": 0, "order_by": "sort_name"})) or []
+    tracks = [t for t in tracks if isinstance(t, dict) and t.get("uri")]
+    if len(tracks) < 2:
+        s.ws.close()
+        die("the library needs at least two tracks")
+    name = "SkinAmp fixture " + run_id
+    playlist_id = None
+    failed = None
+    try:
+        pl = R("playlist-create", "music/playlists/create_playlist", {"name": name})
+        if not isinstance(pl, dict) or pl.get("name") != name or not pl.get("item_id"):
+            raise RuntimeError("create_playlist did not return the new playlist")
+        playlist_id = pl["item_id"]
+        ref = {"item_id": playlist_id, "provider_instance_id_or_domain": "library"}
+        R("playlist-add-tracks", "music/playlists/add_playlist_tracks",
+          {"db_playlist_id": playlist_id, "uris": [t["uri"] for t in tracks[:2]]})
+        time.sleep(3)  # the add is a background task
+        R("playlist-tracks-after-add", "music/playlists/playlist_tracks", ref, timeout=30)
+        R("playlist-remove-tracks", "music/playlists/remove_playlist_tracks",
+          {"db_playlist_id": playlist_id, "positions_to_remove": [1]})
+        time.sleep(3)
+        R("playlist-tracks-after-remove", "music/playlists/playlist_tracks", ref, timeout=30)
+        cur = result_of(s.call("music/playlists/get", ref)) or pl
+        renamed = dict(cur, name=name + " renamed")
+        R("playlist-update", "music/playlists/update",
+          {"item_id": playlist_id, "update": renamed, "overwrite": True})
+        R("error-unknown-command-move", "music/playlists/move_playlist_track",
+          {"db_playlist_id": playlist_id, "from_position": 1, "to_position": 1})
+        t0 = tracks[0]
+        if t0.get("favorite"):
+            print("note: the first track is already a favorite; favorite-add/remove skipped")
+        else:
+            R("favorite-add", "music/favorites/add_item", {"item": t0["uri"]})
+            R("favorite-remove", "music/favorites/remove_item",
+              {"media_type": "track", "library_item_id": t0["item_id"]})
+    except Exception as e:  # recorded below; cleanup still runs
+        failed = type(e).__name__ + ": " + targets.scrub_str(str(e))
+    finally:
+        if playlist_id is not None:
+            try:
+                R("playlist-delete", "music/library/remove_item",
+                  {"media_type": "playlist", "library_item_id": playlist_id})
+            except Exception as e:
+                print("CLEANUP FAILED (%s): delete the playlist named %r in the Music Assistant UI"
+                      % (type(e).__name__, name))
+        # Let the trailing media_item_* events arrive.
+        end = time.time() + 5
+        while time.time() < end:
+            try:
+                t = s.ws.recv(min(1.0, end - time.time()))
+            except Closed:
+                break
+            if t:
+                s.events.append((time.time(), json.loads(t)))
+        s.ws.close()
+        transcript.close()
+    events = [{"after_ms": int((t - start) * 1000), "frame": f} for t, f in s.events][:80]
+    fixtures["events-playlists"] = {"events": events, "capped": len(s.events) > 80,
+                                    "server_pings_seen": s.ws.pings, "closed_by_server": None}
+    summary = []
+    written = write_fixtures(fixtures, targets, fix_dir, summary)
+    for fname, frames, size in summary:
+        print("%-34s frames=%-3d bytes=%d" % (fname, frames, size))
+    problems = gate(written, targets, [fix_dir])
+    if problems:
+        for p in written:
+            os.remove(p)
+        print("SECRET GATE FAILED; written files deleted:")
+        for path, rule in problems:
+            print("  %s: %s" % (os.path.relpath(path, ROOT), rule))
+        sys.exit(2)
+    print("secret gate: passed (%d files)" % len(written))
+    print("run id: %s ; transcript: %s" % (run_id, os.path.relpath(tr_dir, ROOT)))
+    if failed:
+        die("a step failed (%s); the fixture playlist was deleted" % failed)
+
+
 def record(args):
     base, token = read_env()
     out_root = os.path.abspath(args["out"]) if args["out"] else None
@@ -634,6 +794,37 @@ def record(args):
         pl = first["playlists"]
         R("playlist-tracks", "music/playlists/playlist_tracks",
           {"item_id": pl["item_id"], "provider_instance_id_or_domain": "library"}, timeout=30)
+    # #0133 (playlists design §1.5): playlist, favorites, Discover, radio and queue reads.
+    if first.get("playlists"):
+        pl = first["playlists"]
+        R("playlist-get", "music/playlists/get",
+          {"item_id": pl["item_id"], "provider_instance_id_or_domain": "library"})
+    R("playlists-favorites-page", "music/playlists/library_items",
+      {"limit": 3, "offset": 0, "order_by": "sort_name", "favorite": True})
+    R("tracks-favorites-page", "music/tracks/library_items",
+      {"limit": 3, "offset": 0, "order_by": "sort_name", "favorite": True})
+    rows = R("recommendations", "music/recommendations", timeout=30) or []
+    for row in rows if isinstance(rows, list) else []:
+        rid = row.get("item_id") if isinstance(row, dict) else None
+        if not isinstance(rid, str) or not rid:
+            continue
+        safe = re.sub(r"[^A-Za-z0-9_-]+", "_", rid)[:60]
+        R("recommendations-items-" + safe, "music/recommendations/items",
+          {"provider": row.get("provider"), "item_id": rid}, timeout=30)
+    R("recently-played-items", "music/recently_played_items", {"limit": 5})
+    R("recently-added-tracks", "music/recently_added_tracks", {"limit": 3})
+    R("radios-count", "music/radios/count")
+    R("radios-page", "music/radios/library_items", {"limit": 3, "offset": 0, "order_by": "sort_name"})
+    # First editable playlist: an unsaved listing (one read), then the export of that one.
+    scan = result_of(s.call("music/playlists/library_items", {"limit": 50, "offset": 0, "order_by": "sort_name"})) or []
+    editable = next((p for p in scan if isinstance(p, dict) and p.get("is_editable")), None)
+    if editable:
+        R("playlist-export", "music/playlists/export_playlist", {"db_playlist_id": editable["item_id"]}, timeout=30)
+    loaded = next((q for q in queues if isinstance(q, dict) and isinstance(q.get("items"), int) and q["items"] > 0), None) \
+        if isinstance(queues, list) else None
+    if loaded:
+        R("player-queue-items-loaded", "player_queues/items", {"queue_id": loaded["queue_id"], "limit": 5, "offset": 0})
+
     trk = first.get("tracks")
     if trk and isinstance(trk.get("name"), str) and trk["name"].split():
         R("search", "music/search", {"search_query": trk["name"].split()[0],
@@ -708,25 +899,14 @@ def record(args):
         docs["dns-sd.txt"] += "\n$ dns-sd -L <instance> _music-assistant._tcp  (5 s)\n" + d3
 
     # 10. scrub, write, gate
-    written = []
-    shutil.rmtree(fix_dir, ignore_errors=True)
+    # The writes run's fixtures (#0133) survive a default run; everything else is rewritten.
+    if os.path.isdir(fix_dir):
+        for fn in os.listdir(fix_dir):
+            if fn.endswith(".json") and fn[:-5] not in WRITE_FIXTURES:
+                os.remove(os.path.join(fix_dir, fn))
     os.makedirs(fix_dir, exist_ok=True)
     os.makedirs(docs_dir, exist_ok=True)
-    for name, obj in fixtures.items():
-        o = targets.scrub(obj, fixture=True)
-        if name == "playlist-tracks":
-            for fr in o.get("frames", []):
-                if isinstance(fr.get("result"), list) and len(fr["result"]) > 5:
-                    o.setdefault("original_item_counts", []).append(len(fr["result"]))
-                    fr["result"] = fr["result"][:5]
-                    o["truncated_to_5_items_per_frame"] = True
-        p = os.path.join(fix_dir, name + ".json")
-        data = json.dumps(o, indent=2, ensure_ascii=False) + "\n"
-        with open(p, "w", encoding="utf-8") as f:
-            f.write(data)
-        written.append(p)
-        n = len(o.get("frames", o.get("events", []))) if isinstance(o, dict) else 1
-        summary.append((name + ".json", n, len(data)))
+    written = write_fixtures(fixtures, targets, fix_dir, summary)
     for name, obj in docs.items():
         p = os.path.join(docs_dir, name)
         if isinstance(obj, str):
@@ -758,6 +938,36 @@ def record(args):
     print("run id: %s ; transcript: %s" % (run_id, os.path.relpath(tr_dir, ROOT)))
 
 
+def shape_problems(root):
+    """#0133: each fixture parses; call fixtures have command+frames; the writes run touched only its playlist."""
+    problems = []
+    d = os.path.join(root, FIXTURE_REL)
+    if not os.path.isdir(d):
+        return problems
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".json"):
+            continue
+        path = os.path.join(d, fn)
+        try:
+            with open(path, encoding="utf-8") as f:
+                o = json.load(f)
+        except (OSError, ValueError):
+            problems.append((path, "not JSON"))
+            continue
+        stem = fn[:-5]
+        if stem in WRITE_FIXTURES and stem != "events-playlists":
+            if not (isinstance(o, dict) and o.get("command") in ALLOWED_WRITES | ALLOWED and "frames" in o):
+                problems.append((path, "writes fixture without an allowlisted command"))
+            elif o["command"] in ALLOWED_WRITES and o["command"] != "music/favorites/add_item" \
+                    and o["command"] != "music/favorites/remove_item" and o["command"] != "music/playlists/create_playlist":
+                pid = o["args"].get("db_playlist_id", o["args"].get("item_id", o["args"].get("library_item_id")))
+                if pid is None:
+                    problems.append((path, "writes fixture without a playlist id"))
+        if stem == "events-playlists" and not (isinstance(o, dict) and isinstance(o.get("events"), list)):
+            problems.append((path, "events fixture without events"))
+    return problems
+
+
 def check():
     base, token = read_env()
     st, _, body = http_get(base, "/info")
@@ -767,7 +977,7 @@ def check():
     files = owned_files(ROOT)
     if not files:
         die("nothing to check")
-    problems = gate(files, targets, [os.path.join(ROOT, FIXTURE_REL)])
+    problems = gate(files, targets, [os.path.join(ROOT, FIXTURE_REL)]) + shape_problems(ROOT)
     if problems:
         print("SECRET GATE FAILED:")
         for path, rule in problems:
@@ -1292,7 +1502,8 @@ def probe_audio(write, wait):
 
 
 def main(argv):
-    args = {"out": None, "events_seconds": 30, "check": False, "live": False, "probe": False, "write": False, "wait": True}
+    args = {"out": None, "events_seconds": 30, "check": False, "live": False, "probe": False, "write": False,
+            "wait": True, "playlist_writes": False}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -1304,6 +1515,11 @@ def main(argv):
             args["probe"] = True
         elif a == "--write":
             args["write"] = True
+        elif a == "--record-playlist-writes":
+            args["playlist_writes"] = True
+        elif a in ("-h", "--help"):
+            print(__doc__)
+            return
         elif a == "--no-wait":
             args["wait"] = False
         elif a == "--out":
@@ -1315,6 +1531,9 @@ def main(argv):
         else:
             die("unknown argument " + a)
         i += 1
+    if args["playlist_writes"]:
+        record_playlist_writes(args)
+        return
     if args["probe"]:
         probe_audio(args["write"], args["wait"])
         return

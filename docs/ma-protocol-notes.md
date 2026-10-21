@@ -140,3 +140,16 @@ Probed read-only from the host on 2026-10-19 with `scripts/record-ma-fixtures.py
 - **The stream server (8097)** has no `/info` route (404) and serves full tracks only on `/flow|single/{session}/{queue}/{item}/{player}`, to a registered player in a live queue session.
 
 Verdict: full audio on This Mac needs the Mac to be a player, which on 2.10.6 means Sendspin (#0066). The HTTP path is closed.
+
+## 14. Playlists, favorites, Discover and queue captures (#0133)
+
+Pending: the recorder supports these captures (playlists design `docs/design/playlists.md` §1.5), but no recording has landed yet. Until it does, `MAFixture.isRecorded` is false for the new cases and tests use synthetic routes.
+
+The user runs both on the host (needs `.env`; agents never contact the server):
+
+1. **Reads (default run, as before):** `/usr/bin/python3 -I scripts/record-ma-fixtures.py && /usr/bin/python3 -I scripts/record-ma-fixtures.py --check`
+   Adds `playlist-get`, `playlists-favorites-page`, `tracks-favorites-page`, `recommendations`, one `recommendations-items-<item_id>` per row (3 items kept, real counts in `original_item_counts`), `recently-played-items`, `recently-added-tracks`, `radios-count`, `radios-page`, `playlist-export` (first editable playlist; skipped when none), and `player-queue-items-loaded` (first queue with items, 5 kept; start something playing first to get it).
+2. **Writes (opt-in):** `/usr/bin/python3 -I scripts/record-ma-fixtures.py --record-playlist-writes && /usr/bin/python3 -I scripts/record-ma-fixtures.py --check`
+   Uses its own allowlist (`ALLOWED_WRITES`). Creates `SkinAmp fixture <run-id>`, adds the first two library tracks, lists, removes position 1, lists, renames with `overwrite: true`, probes `move_playlist_track` (expected `error-unknown-command-move` on 2.10.6), adds and removes the first track as a favorite (skipped if it already was one), and deletes the playlist in a `finally` even if a step failed. Writes `playlist-create`, `playlist-add-tracks`, `playlist-tracks-after-add`, `playlist-remove-tracks`, `playlist-tracks-after-remove`, `playlist-update`, `error-unknown-command-move`, `favorite-add`, `favorite-remove`, `playlist-delete` and the pushed frames in `events-playlists.json`. Nothing else is modified. If the script prints `CLEANUP FAILED`, delete the named playlist in the Music Assistant UI.
+
+A later default run keeps the writes run's files. `--check` also verifies that every fixture parses and that each writes fixture carries an allowlisted command and a playlist id.

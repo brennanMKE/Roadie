@@ -4,11 +4,13 @@ import Testing
 @testable import MusicAssistantKit
 
 struct MAFixtureTests {
-    private static let notCalls: Set<MAFixture> = [.serverInfo, .infoHTTP, .artworkProbe, .events]
+    private static let notCalls: Set<MAFixture> = [.serverInfo, .infoHTTP, .artworkProbe, .events, .eventsPlaylists]
 
     @Test func everyFixtureLoadsAndParses() throws {
-        #expect(MAFixture.allCases.count == 42)
-        for fixture in MAFixture.allCases {
+        #expect(MAFixture.baseline.count == 42)
+        #expect(MAFixture.baseline.allSatisfy(\.isRecorded))
+        #expect(MAFixture.baseline.last == .events)
+        for fixture in MAFixture.recorded {
             _ = try fixture.json
             if Self.notCalls.contains(fixture) { continue }
             #expect(fixture.command != nil, "\(fixture.rawValue) has no command")
@@ -28,7 +30,7 @@ struct MAFixtureTests {
             .playersAllSendspin, .playersAllSendspinUnavailable,
         ]
         var checked = 0
-        for fixture in MAFixture.allCases where !Self.notCalls.contains(fixture) && !skipped.contains(fixture) {
+        for fixture in MAFixture.baseline where !Self.notCalls.contains(fixture) && !skipped.contains(fixture) {
             let command = try #require(fixture.command)
             let args = try #require(fixture.args)
             let replies = script.replies(command: command, args: args, messageID: "99")
@@ -43,6 +45,14 @@ struct MAFixtureTests {
             checked += 1
         }
         #expect(checked == 32)
+    }
+
+    @Test func pendingCapturesAreSkippedUntilRecorded() throws {
+        // #0133: the playlist captures are optional until the user records them; each one present must parse.
+        for fixture in MAFixture.allCases where !MAFixture.baseline.contains(fixture) && fixture.isRecorded {
+            _ = try fixture.json
+        }
+        #expect(throws: MAFixture.Missing.self) { try MAFixture.recommendationItems(row: "skinamp-no-such-row") }
     }
 
     @Test func authAnswersByToken() throws {
