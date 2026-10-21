@@ -1,0 +1,170 @@
+import Foundation
+import MusicBackendKit
+import Observation
+import os
+
+/// List-level playlist edits (#0135): create, rename, delete. Each edit changes the Playlists list at once and
+/// puts it back when the backend refuses; the refusal's text goes to `message`.
+@MainActor @Observable
+public final class PlaylistsModel {
+    /// The name sheet the Library window shows.
+    public enum NameSheet: Hashable, Identifiable, Sendable {
+        /// `adding`: items to add to the new playlist once it exists (#0136).
+        case create(adding: [MediaID])
+        case rename(LibraryPlaylist)
+
+        public var id: String {
+            switch self {
+            case .create: "create"
+            case .rename(let playlist): "rename:" + playlist.id.rawValue
+            }
+        }
+
+        public var title: String {
+            switch self {
+            case .create: "New Playlist"
+            case .rename: "Rename Playlist"
+            }
+        }
+
+        public var initialName: String {
+            switch self {
+            case .create: "New Playlist"
+            case .rename(let playlist): playlist.name
+            }
+        }
+
+        public var confirmTitle: String {
+            switch self {
+            case .create: "Create"
+            case .rename: "Rename"
+            }
+        }
+    }
+
+    public let backend: any MusicBackend
+    public let list: PagedList<LibraryPlaylist>
+    public var nameSheet: NameSheet?
+    /// The playlist the delete confirmation asks about.
+    public var pendingDelete: LibraryPlaylist?
+    /// The last failure, for the bar under the list.
+    public private(set) var message: String?
+    /// Playlists the server refused to rename or delete for want of permission, with its message.
+    public private(set) var refusals: [MediaID: String] = [:]
+
+    /// The browser whose selection follows the edits.
+    @ObservationIgnored weak var browser: LibraryBrowserModel?
+    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playlists")
+
+    public init(backend: any MusicBackend, list: PagedList<LibraryPlaylist>) {
+        self.backend = backend
+        self.list = list
+    }
+
+    public var canEdit: Bool { backend.capabilities.contains(.playlistEditing) }
+
+    public func canRename(_ playlist: LibraryPlaylist) -> Bool {
+        canEdit && playlist.editing.contains(.rename) && refusals[playlist.id] == nil
+    }
+
+    public func canDelete(_ playlist: LibraryPlaylist) -> Bool {
+        canEdit && playlist.editing.contains(.delete) && refusals[playlist.id] == nil
+    }
+
+    /// Why Rename/Delete is off for `playlist`, for the help tag.
+    public func refusal(for playlist: LibraryPlaylist) -> String? {
+        if let refused = refusals[playlist.id] { return refused }
+        if playlist.source == .builtIn { return "Built-in playlists can't be renamed or deleted." }
+        return nil
+    }
+
+    public func dismissMessage() { message = nil }
+
+    public func askToCreate(adding items: [MediaID] = []) {
+        guard canEdit else { return }
+        nameSheet = .create(adding: items)
+    }
+
+    public func askToRename(_ playlist: LibraryPlaylist) {
+        guard canRename(playlist) else { return }
+        nameSheet = .rename(playlist)
+    }
+
+    public func askToDelete(_ playlist: LibraryPlaylist) {
+        guard canDelete(playlist) else { return }
+        pendingDelete = playlist
+    }
+
+    /// Creates the playlist, lists it first and selects it. nil on failure (`message` says why).
+    @discardableResult
+    public func create(named name: String) async -> LibraryPlaylist? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canEdit, !trimmed.isEmpty else { return nil }
+        message = nil
+        do {
+            let created = try await backend.createPlaylist(named: trimmed)
+            if list.phase == .loaded { list.insert(created, at: 0) }
+            browser?.select(created)
+            Self.log.info("created a playlist")
+            return created
+        } catch {
+            fail(error, for: nil)
+            return nil
+        }
+    }
+
+    /// Renames at once; puts the old name back when the backend refuses.
+    @discardableResult
+    public func rename(_ playlist: LibraryPlaylist, to name: String) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canRename(playlist), !trimmed.isEmpty else { return false }
+        guard trimmed != playlist.name else { return true }
+        message = nil
+        let original = list.items.first { $0.id == playlist.id } ?? playlist
+        var renamed = original
+        renamed.name = trimmed
+        apply(renamed)
+        do {
+            try await backend.renamePlaylist(playlist.id, to: trimmed)
+            return true
+        } catch {
+            apply(original)
+            fail(error, for: playlist.id)
+            return false
+        }
+    }
+
+    /// Removes at once (and the selection, when it was this playlist); puts it back when the backend refuses.
+    @discardableResult
+    public func delete(_ playlist: LibraryPlaylist) async -> Bool {
+        guard canDelete(playlist) else { return false }
+        message = nil
+        let wasSelected = browser?.selectedPlaylist?.id == playlist.id
+        let removed = list.remove(id: playlist.id)
+        if wasSelected { browser?.selectedPlaylist = nil }
+        do {
+            try await backend.deletePlaylist(playlist.id)
+            return true
+        } catch {
+            if let removed { list.insert(removed.item, at: removed.index) }
+            if wasSelected, let browser, browser.selectedPlaylist == nil, browser.section == .playlists {
+                browser.selectedPlaylist = removed?.item ?? playlist
+            }
+            fail(error, for: playlist.id)
+            return false
+        }
+    }
+
+    private func apply(_ playlist: LibraryPlaylist) {
+        list.replace(playlist)
+        if let browser, browser.selectedPlaylist?.id == playlist.id { browser.selectedPlaylist = playlist }
+    }
+
+    private func fail(_ error: any Error, for id: MediaID?) {
+        if let id, case .forbidden(let text)? = error as? MusicBackendError {
+            refusals[id] = text
+        }
+        message = userMessage(for: error)
+        Self.log.info("playlist edit failed")
+    }
+}

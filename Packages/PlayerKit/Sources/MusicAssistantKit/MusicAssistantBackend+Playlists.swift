@@ -1,0 +1,71 @@
+import Foundation
+import MusicBackendKit
+
+/// Playlist writes (#0135, #0136). Every command goes through `write(_:)`: a server error 12 removes the
+/// command for the session (`.unsupported`), a scope or permission refusal reads as `.forbidden`.
+extension MusicAssistantBackend {
+    public func createPlaylist(named name: String) async throws -> LibraryPlaylist {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw MusicBackendError.backend("A playlist needs a name.") }
+        let created = try await write(.createPlaylist(name: trimmed))
+        do {
+            return LibraryPlaylist(ma: try created.decode(as: MAPlaylist.self))
+        } catch {
+            throw MusicBackendError.backend("Music Assistant's answer could not be read.")
+        }
+    }
+
+    /// Sends the playlist as the server has it, with the new name and `overwrite: true`.
+    public func renamePlaylist(_ id: MediaID, to name: String) async throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw MusicBackendError.backend("A playlist needs a name.") }
+        let (uri, raw, playlist) = try await fetchPlaylist(id)
+        guard playlist.source != .builtIn else {
+            throw MusicBackendError.forbidden("Built-in playlists can't be renamed.")
+        }
+        guard var object = raw.objectValue else { throw MusicBackendError.notFound(id) }
+        object["name"] = .string(trimmed)
+        _ = try await write(.updatePlaylist(itemID: uri.itemID, playlist: .object(object), overwrite: true))
+    }
+
+    /// `music/library/remove_item`; built-in playlists are refused here (the server would hide them in its own UI).
+    public func deletePlaylist(_ id: MediaID) async throws {
+        let (_, _, playlist) = try await fetchPlaylist(id)
+        guard playlist.source != .builtIn else {
+            throw MusicBackendError.forbidden("Built-in playlists can't be deleted.")
+        }
+        guard let libraryID = playlist.libraryID else { throw MusicBackendError.notFound(id) }
+        _ = try await write(.removeLibraryItem(mediaType: .playlist, libraryItemID: libraryID))
+    }
+
+    // MARK: Helpers
+
+    /// The playlist as the server has it now: its URI, the raw object (for `update`) and the mapped value.
+    func fetchPlaylist(_ id: MediaID) async throws -> (MAURI, MAJSON, LibraryPlaylist) {
+        guard let uri = MAURI.parse(id.rawValue), uri.mediaType == .playlist else {
+            throw MusicBackendError.notFound(id)
+        }
+        let raw = try await write(.get(.playlist, itemID: uri.itemID, provider: uri.provider))
+        guard let decoded = try? raw.decode(as: MAPlaylist.self) else { throw MusicBackendError.notFound(id) }
+        return (uri, raw, LibraryPlaylist(ma: decoded))
+    }
+
+    /// `perform(_:)` plus the scope rule.
+    func write(_ request: MARequest) async throws -> MAJSON {
+        guard let client else { throw MusicBackendError.notConnected }
+        do {
+            return try await client.call(request)
+        } catch {
+            if case MusicAssistantError.server(let code, let details) = error,
+               code != MAServerCommands.unsupportedCommandCode, Self.isPermissionRefusal(details) {
+                throw MusicBackendError.forbidden(details)
+            }
+            throw noteUnsupported(error, command: request.command)
+        }
+    }
+
+    static func isPermissionRefusal(_ details: String) -> Bool {
+        let lowered = details.lowercased()
+        return lowered.contains("scope") || lowered.contains("permission")
+    }
+}

@@ -62,6 +62,8 @@ public final class LibraryBrowserModel {
     public let artistAlbums: PagedList<LibraryAlbum>
     /// Hearts and their optimistic state (#0141).
     public let favorites: FavoritesModel
+    /// Create, rename, delete and add-to edits on `playlists` (#0135, #0136).
+    public let playlistsModel: PlaylistsModel
     /// Of `selectedAlbum` or `selectedPlaylist`.
     public private(set) var tracks: LoadState<[LibraryTrack]> = .idle
 
@@ -99,7 +101,8 @@ public final class LibraryBrowserModel {
 
     public var selectedPlaylist: LibraryPlaylist? {
         didSet {
-            guard selectedPlaylist != oldValue else { return }
+            // A rename (#0135) changes the value, not the playlist: the tracks stay.
+            guard selectedPlaylist?.id != oldValue?.id else { return }
             if let playlist = selectedPlaylist {
                 let backend = backend
                 let id = playlist.id
@@ -162,6 +165,8 @@ public final class LibraryBrowserModel {
         artistAlbums = PagedList(pageSize: pageSize)
         discover = backend.capabilities.contains(.recommendations) ? DiscoverModel(backend: backend) : nil
         favorites = FavoritesModel(backend: backend, pageSize: pageSize)
+        playlistsModel = PlaylistsModel(backend: backend, list: playlists)
+        playlistsModel.browser = self
         artists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         allAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         playlists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }

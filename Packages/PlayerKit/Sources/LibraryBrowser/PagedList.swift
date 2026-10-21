@@ -153,6 +153,33 @@ public final class PagedList<Item: Identifiable & Hashable & Sendable> where Ite
         phase = .idle
     }
 
+    // MARK: Local edits (#0135): optimistic changes the owner applies before the server confirms.
+
+    /// Inserts `item` at `index` (clamped); no-op when its id is already listed.
+    public func insert(_ item: Item, at index: Int) {
+        guard seen.insert(item.id).inserted else { return }
+        items.insert(item, at: min(max(0, index), items.count))
+        if let total { self.total = total + 1 }
+    }
+
+    /// Replaces the listed item with the same id; false when it isn't listed.
+    @discardableResult
+    public func replace(_ item: Item) -> Bool {
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return false }
+        items[index] = item
+        return true
+    }
+
+    /// Removes the item with `id`; returns it and where it was, for a rollback.
+    @discardableResult
+    public func remove(id: Item.ID) -> (item: Item, index: Int)? {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return nil }
+        let item = items.remove(at: index)
+        seen.remove(id)
+        if let total { self.total = max(0, total - 1) }
+        return (item, index)
+    }
+
     private func finish(_ page: Page<Item>, generation: Int, isFirst: Bool) {
         guard generation == self.generation else { return }
         for item in page.items where seen.insert(item.id).inserted {

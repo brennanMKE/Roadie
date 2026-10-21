@@ -7,6 +7,7 @@ public actor StubMusicBackend: MusicBackend {
     public enum Method: Hashable, Sendable, CaseIterable {
         case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport, transfer, setGroupMembers
         case setFavorite, favoriteCurrentTrack
+        case createPlaylist, renamePlaylist, deletePlaylist
     }
 
     public enum Call: Hashable, Sendable {
@@ -18,6 +19,7 @@ public actor StubMusicBackend: MusicBackend {
         case transfer(OutputDevice.ID, OutputDevice.ID, autoPlay: Bool)
         case setGroupMembers(OutputDevice.ID, [OutputDevice.ID], [OutputDevice.ID])
         case setFavorite(MediaID, Bool), favoriteCurrentTrack(OutputDevice.ID)
+        case createPlaylist(String), renamePlaylist(MediaID, String), deletePlaylist(MediaID)
 
         /// The method a call belongs to; `disconnect` has none.
         public var method: Method? {
@@ -38,6 +40,9 @@ public actor StubMusicBackend: MusicBackend {
             case .setGroupMembers: .setGroupMembers
             case .setFavorite: .setFavorite
             case .favoriteCurrentTrack: .favoriteCurrentTrack
+            case .createPlaylist: .createPlaylist
+            case .renamePlaylist: .renamePlaylist
+            case .deletePlaylist: .deletePlaylist
             }
         }
     }
@@ -63,6 +68,7 @@ public actor StubMusicBackend: MusicBackend {
     private var waiting: [UUID: (method: Method, continuation: CheckedContinuation<Void, any Error>)] = [:]
     private var streams: [UUID: AsyncStream<NowPlaying>.Continuation] = [:]
     private var latest: NowPlaying?
+    private var createdPlaylists = 0
 
     public init(
         library: StubLibrary = .sample(),
@@ -307,4 +313,29 @@ public actor StubMusicBackend: MusicBackend {
     }
 
     private func removeChangeStream(_ id: UUID) { changeStreams[id] = nil }
+    // MARK: Playlist editing (#0135)
+
+    public func createPlaylist(named name: String) async throws -> LibraryPlaylist {
+        try await enter(.createPlaylist(name))
+        createdPlaylists += 1
+        let playlist = LibraryPlaylist(
+            id: MediaID(.playlist, "new\(createdPlaylists)"), name: name, isEditable: true, owner: "you",
+            source: .user, editing: [.addRemove, .rename, .delete], libraryID: "new\(createdPlaylists)")
+        library.playlists.append(playlist)
+        library.playlistTracks[playlist.id] = []
+        return playlist
+    }
+
+    public func renamePlaylist(_ id: MediaID, to name: String) async throws {
+        try await enter(.renamePlaylist(id, name))
+        guard let index = library.playlists.firstIndex(where: { $0.id == id }) else { throw MusicBackendError.notFound(id) }
+        library.playlists[index].name = name
+    }
+
+    public func deletePlaylist(_ id: MediaID) async throws {
+        try await enter(.deletePlaylist(id))
+        guard let index = library.playlists.firstIndex(where: { $0.id == id }) else { throw MusicBackendError.notFound(id) }
+        library.playlists.remove(at: index)
+        library.playlistTracks[id] = nil
+    }
 }

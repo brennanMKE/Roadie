@@ -15,6 +15,8 @@ public struct BackendCapabilities: OptionSet, Hashable, Sendable {
     public static let recommendations = BackendCapabilities(rawValue: 1 << 7)
     /// Favorites: `setFavorite` and `favoriteCurrentTrack` (#0141).
     public static let favorites = BackendCapabilities(rawValue: 1 << 6)
+    /// Create, rename and delete playlists and add tracks to them (#0135, #0136).
+    public static let playlistEditing = BackendCapabilities(rawValue: 1 << 5)
 }
 
 /// No case carries a URL, a request, a header or a token; `errorDescription` is user-facing.
@@ -31,10 +33,13 @@ public enum MusicBackendError: Error, Hashable, Sendable, LocalizedError {
     case unknownOutput(OutputDevice.ID)
     /// Anything else, its localized description.
     case backend(String)
+    /// The server refused for want of permission (a token scope); the server's message (#0135).
+    case forbidden(String)
 
     public var errorDescription: String? {
         switch self {
-        case .notConfigured(let message), .unreachable(let message), .backend(let message): message
+        case .notConfigured(let message), .unreachable(let message), .backend(let message), .forbidden(let message):
+            message
         case .notConnected: "Not connected to the music source."
         case .unauthorized: "The music source rejected the sign-in."
         case .notFound(let id): "Could not find \(id.kind.rawValue) \(id.rawValue)."
@@ -104,6 +109,10 @@ public protocol MusicBackend: AnyObject, Sendable {
     func radios(page: PageRequest) async throws -> Page<LibraryRadio>
     func addRadio(url: String, name: String) async throws -> LibraryRadio
     func favoriteRadios(page: PageRequest) async throws -> Page<LibraryRadio>
+    // Playlist editing (#0135, #0136); defaults in MusicBackend+Playlists.swift throw `.unsupported(.playlistEditing)`.
+    func createPlaylist(named name: String) async throws -> LibraryPlaylist
+    func renamePlaylist(_ id: MediaID, to name: String) async throws
+    func deletePlaylist(_ id: MediaID) async throws
 }
 
 extension MusicBackend {

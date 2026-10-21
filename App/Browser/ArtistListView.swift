@@ -29,6 +29,23 @@ struct ArtistListView: View {
 struct PlaylistListView: View {
     let library: LibraryBrowserModel
 
+    private var model: PlaylistsModel { library.playlistsModel }
+
+    @ViewBuilder
+    private func playlistMenu(_ playlist: LibraryPlaylist) -> some View {
+        if model.canEdit {
+            Button("New Playlist\u{2026}") { model.askToCreate() }
+            Divider()
+            Button("Rename\u{2026}") { model.askToRename(playlist) }
+                .disabled(!model.canRename(playlist))
+                .help(model.refusal(for: playlist) ?? "")
+                .accessibilityIdentifier("library.playlist.rename")
+            Button("Delete\u{2026}") { model.askToDelete(playlist) }
+                .disabled(!model.canDelete(playlist))
+                .help(model.refusal(for: playlist) ?? "")
+        }
+    }
+
     var body: some View {
         PagedListView(
             list: library.playlists, rows: PlaylistGrouping.rows(library.playlists.items),
@@ -66,9 +83,22 @@ struct PlaylistListView: View {
                     }
                 }
                 .padding(.leading, 8)
-                .contextMenu { FavoriteMenuItem(items: [playlist.id: playlist.isFavorite]) }
+                .contextMenu {
+                    FavoriteMenuItem(items: [playlist.id: playlist.isFavorite])
+                    playlistMenu(playlist)
+                }
             }
         }
+        .onDeleteCommand { if let playlist = library.selectedPlaylist { model.askToDelete(playlist) } }
+        .background {
+            // ⌘⌫ deletes the selected playlist (with the confirmation).
+            Button("Delete Playlist") { if let playlist = library.selectedPlaylist { model.askToDelete(playlist) } }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(library.selectedPlaylist.map { !model.canDelete($0) } ?? true)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { PlaylistMessageBar(model: model) }
         .accessibilityIdentifier("library.playlists")
     }
 }

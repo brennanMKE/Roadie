@@ -24,7 +24,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// `.localOutput`: This Mac plays through the MA player wrapping SkinAmp's Sendspin client (#0107).
     public nonisolated let capabilities: BackendCapabilities = [
         .search, .playlists, .artwork, .remoteOutputs, .localOutput, .recommendations, .queueEditing,
-        .favorites, .radio,
+        .favorites, .radio, .playlistEditing,
     ]
 
     public static let thisMacNotRegisteredText =

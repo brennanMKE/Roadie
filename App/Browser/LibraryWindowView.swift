@@ -26,9 +26,19 @@ struct LibraryWindowView: View {
         .onChange(of: library.connection == .connected) { _, connected in
             if connected { Task { await player.refreshOutputs() } }
         }
+        .modifier(PlaylistEditingModifier(model: library.playlistsModel))
         .toolbar {
             ToolbarItem {
                 OutputPickerView()
+            }
+            if library.playlistsModel.canEdit {
+                ToolbarItem {
+                    Button("New Playlist", systemImage: "plus") { library.playlistsModel.askToCreate() }
+                        .keyboardShortcut("n", modifiers: .command)
+                        .disabled(library.connection != .connected)
+                        .help("New Playlist")
+                        .accessibilityIdentifier("library.playlists.new")
+                }
             }
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { library.refresh() }
