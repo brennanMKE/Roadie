@@ -164,6 +164,10 @@ actor StubSkinIndex: SkinIndexReading {
         for record in records { if let md5 = record.md5, wanted.contains(md5) { result[md5] = record } }
         return result
     }
+
+    func skin(hash: String) async throws -> SkinRecord? {
+        records.first { $0.hash == hash }
+    }
 }
 
 @MainActor

@@ -11,6 +11,8 @@ public protocol SkinIndexReading: Sendable {
     func randomSkin(statuses: Set<SkinStatus>) async throws -> SkinRecord?
     /// Skins by MD5, for badging a Skin Museum page (#0126).
     func skins(md5s: [String]) async throws -> [String: SkinRecord]
+    /// The skin with this SHA-256, so a Museum download never writes a second copy (#0126).
+    func skin(hash: String) async throws -> SkinRecord?
 }
 
 extension SkinIndexStore: SkinIndexReading {}

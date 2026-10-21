@@ -23,8 +23,8 @@ let package = Package(
         // Folder index in SQLite (system libsqlite3). Depends on SkinKit only; no UI, no audio, no network.
         .target(name: "SkinLibrary", dependencies: ["SkinKit"], linkerSettings: [.linkedLibrary("sqlite3")]),
         // Skins window and Skins menu view models. Foundation + Observation + CoreGraphics; no UI, no audio.
-        .target(name: "SkinBrowser", dependencies: ["SkinLibrary", "SkinKit"]),
-        .testTarget(name: "SkinBrowserTests", dependencies: ["SkinBrowser", "SkinLibrary", "SkinKit"]),
+        .target(name: "SkinBrowser", dependencies: ["SkinLibrary", "SkinKit", "SkinMuseum"]),
+        .testTarget(name: "SkinBrowserTests", dependencies: ["SkinBrowser", "SkinLibrary", "SkinKit", "SkinMuseum"]),
         .executableTarget(name: "skintool", dependencies: ["SkinKit", "SkinLibrary"]),
         // ZIPFoundation here so tests can write synthetic .wsz archives (#0043).
         .testTarget(name: "SkinKitTests", dependencies: ["SkinKit", .product(name: "ZIPFoundation", package: "ZIPFoundation")]),
