@@ -102,6 +102,24 @@ struct LibraryBrowserModelTests {
 
     // MARK: Sections
 
+    @Test func sectionIdentityIsTheSectionItself() {
+        #expect(LibrarySection.allCases.map(\.id) == LibrarySection.allCases)
+    }
+
+    @Test func sectionSurvivesDisappearAndAppear() async {
+        let (backend, model) = await connected(capabilities: [.search, .playlists])
+        model.section = .playlists
+        #expect(await waitFor { model.playlists.phase == .loaded })
+        let artistCalls = await backend.count(.artists)
+        model.disappeared()
+        model.appeared()
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(model.section == .playlists)
+        #expect(model.playlists.phase == .loaded)
+        #expect(await backend.count(.playlists) == 1)
+        #expect(await backend.count(.artists) == artistCalls)
+    }
+
     @Test func sectionsHidePlaylistsWithoutTheCapability() {
         let (_, plain) = makeModel()
         #expect(plain.sections == [.artists, .albums])

@@ -9,14 +9,19 @@ struct LibrarySidebarView: View {
         let selection = Binding<LibrarySection?>(
             get: { library.section },
             set: { if let value = $0 { library.section = value } })
-        List(library.sections, selection: selection) { section in
-            switch section {
-            case .artists: Label("Artists", systemImage: "music.mic")
-            case .albums: Label("Albums", systemImage: "square.stack")
-            case .playlists: Label("Playlists", systemImage: "music.note.list")
-            }
+        List(library.sections, id: \.self, selection: selection) { section in
+            row(for: section).tag(section)
         }
         .accessibilityIdentifier("library.sections")
         .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 220)
+    }
+
+    @ViewBuilder
+    private func row(for section: LibrarySection) -> some View {
+        switch section {
+        case .artists: Label("Artists", systemImage: "music.mic")
+        case .albums: Label("Albums", systemImage: "square.stack")
+        case .playlists: Label("Playlists", systemImage: "music.note.list")
+        }
     }
 }

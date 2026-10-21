@@ -5,7 +5,7 @@ import os
 
 public enum LibrarySection: String, Hashable, Sendable, CaseIterable, Identifiable {
     case artists, albums, playlists
-    public var id: String { rawValue }
+    public var id: Self { self }
 }
 
 /// State behind the Library window. Talks only to `MusicBackend`; the views draw what it publishes.
