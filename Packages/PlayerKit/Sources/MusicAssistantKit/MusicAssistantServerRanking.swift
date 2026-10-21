@@ -66,11 +66,11 @@ public struct MusicAssistantServerRanking: Hashable, Sendable {
     /// For the UI only: it holds names and network names, so it is never logged.
     public static func reason(for candidate: Candidate) -> String {
         switch candidate.basis {
-        case .network(let ssid): return "\(candidate.server.name) \u{2014} on network \(ssid)"
+        case .network(let ssid): return "\(candidate.server.displayName) \u{2014} on network \(ssid)"
         case .listOrder:
             return isTailscale(candidate.server.address.baseURL)
-                ? "\(candidate.server.name) \u{2014} via Tailscale"
-                : "\(candidate.server.name) \u{2014} first reachable"
+                ? "\(candidate.server.displayName) \u{2014} via Tailscale"
+                : "\(candidate.server.displayName) \u{2014} first reachable"
         }
     }
 

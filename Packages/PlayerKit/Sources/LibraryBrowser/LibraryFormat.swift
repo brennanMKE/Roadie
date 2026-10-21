@@ -21,6 +21,16 @@ public enum LibraryFormat {
         return "\(number)"
     }
 
+    /// "1 track", "2 tracks", "0 tracks".
+    public static func count(_ n: Int, _ singular: String, plural: String? = nil) -> String {
+        "\(n) \(n == 1 ? singular : (plural ?? singular + "s"))"
+    }
+
+    /// "1 track, 3:41".
+    public static func trackSummary(count n: Int, duration: TimeInterval) -> String {
+        "\(count(n, "track")), \(self.duration(duration))"
+    }
+
     /// "23 of 242" when the total is known, else nil.
     public static func countLabel(loaded: Int, total: Int?) -> String? {
         guard let total else { return nil }

@@ -88,4 +88,12 @@ struct ServerRankingTests {
         #expect(!Ranking.isTailscale(URL(string: "http://100.128.0.1:8095")!))
         #expect(!Ranking.isTailscale(URL(string: "http://192.168.1.2:8095")!))
     }
+
+    @Test func reasonTextNamesTheHostWhenTheNameIsGeneric() {
+        let server = makeServer("http://a.local:8095", id: "a", name: "Music Assistant (abc123)")
+        let text = Ranking.reason(for: Ranking.Candidate(server: server, basis: .listOrder))
+        #expect(text == "a.local \u{2014} first reachable")
+        #expect(!text.contains("("))
+        #expect(!text.contains("Music Assistant"))
+    }
 }

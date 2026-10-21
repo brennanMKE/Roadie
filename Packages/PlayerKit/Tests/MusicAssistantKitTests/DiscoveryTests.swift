@@ -286,4 +286,11 @@ struct DiscoveryModelTests {
         #expect(await pollUntil { rig.browser.terminated == 1 && rig.fake.cancelled == [DiscoveryRig.wellKnown] })
         #expect(!rig.model.isSearching)
     }
+
+    @Test func discoveredServerDisplayNameFallsBackToTheHost() {
+        let url = URL(string: "http://a.local:8095")!
+        #expect(MusicAssistantDiscoveredServer(id: "abc123", url: url, name: "Den").displayName == "Den")
+        #expect(MusicAssistantDiscoveredServer(id: "abc123", url: url, name: "Music Assistant (abc123)").displayName == "a.local")
+        #expect(MusicAssistantDiscoveredServer(id: "abc123", url: url).displayName == "a.local")
+    }
 }

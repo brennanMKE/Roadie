@@ -81,7 +81,7 @@ private struct DiscoveredServerRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
-                Text(offer.name ?? "Music Assistant")
+                Text(offer.displayName)
                 Text(offer.url.host() ?? "").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()

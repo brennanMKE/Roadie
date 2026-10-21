@@ -639,4 +639,38 @@ extension SettingsModelTests {
         #expect(rig.store.load() == [a, b])
         #expect(rig.hookCalls == 0)
     }
+
+    @Test func testDoesNotAdoptAGenericAdvertisedName() async throws {
+        let server = makeServer(id: nil, name: MusicAssistantServerConfiguration.defaultName)
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Music Assistant (abc123)")
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        #expect(rig.model.servers[0].address.serverID == fixtureServerID)
+        #expect(rig.model.servers[0].name == MusicAssistantServerConfiguration.defaultName)
+    }
+
+    @Test func testReplacesAStoredGenericNameWithARealOne() async throws {
+        let server = makeServer(id: nil, name: "Music Assistant (abc123)")
+        let rig = try SettingsRig(servers: [server])
+        defer { rig.cleanUp() }
+        try rig.renameServerInfo(to: "Living Room")
+        rig.model.appeared()
+        rig.model.tokenText = testToken.rawValue
+        await rig.runTest()
+        #expect(rig.model.servers[0].name == "Living Room")
+    }
+
+    @Test func addDiscoveredServerDropsAGenericAdvertisedName() throws {
+        let rig = try SettingsRig()
+        defer { rig.cleanUp() }
+        let offer = MusicAssistantDiscoveredServer(
+            id: "id-new", url: URL(string: "http://a.local:8095")!, name: "Music Assistant (abc123)")
+        rig.model.addDiscoveredServer(offer)
+        let added = try #require(rig.store.load().last)
+        #expect(added.name == MusicAssistantServerConfiguration.defaultName)
+        #expect(added.displayName == "a.local")
+    }
 }

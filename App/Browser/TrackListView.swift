@@ -60,7 +60,7 @@ struct TrackListView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(heading).font(.title3.bold()).lineLimit(1)
-                            Text("\(tracks.count) tracks, \(LibraryFormat.duration(tracks.reduce(0) { $0 + ($1.duration ?? 0) }))")
+                            Text(LibraryFormat.trackSummary(count: tracks.count, duration: tracks.reduce(0) { $0 + ($1.duration ?? 0) }))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

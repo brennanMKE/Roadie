@@ -26,4 +26,15 @@ struct LibraryFormatTests {
         #expect(LibraryFormat.countLabel(loaded: 23, total: 242) == "23 of 242")
         #expect(LibraryFormat.countLabel(loaded: 23, total: nil) == nil)
     }
+
+    @Test func countUsesTheSingularForOne() {
+        #expect(LibraryFormat.count(0, "track") == "0 tracks")
+        #expect(LibraryFormat.count(1, "track") == "1 track")
+        #expect(LibraryFormat.count(2, "track") == "2 tracks")
+    }
+
+    @Test func trackSummaryUsesTheSingularForOne() {
+        #expect(LibraryFormat.trackSummary(count: 1, duration: 221) == "1 track, 3:41")
+        #expect(LibraryFormat.trackSummary(count: 2, duration: 442) == "2 tracks, 7:22")
+    }
 }

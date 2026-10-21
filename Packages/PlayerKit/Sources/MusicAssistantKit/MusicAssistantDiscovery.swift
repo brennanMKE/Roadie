@@ -31,6 +31,9 @@ public struct MusicAssistantDiscoveredServer: Identifiable, Hashable, Sendable {
         self.url = url
         self.name = name
     }
+
+    /// `name`, or the host when the name is generic. UI only, never logged.
+    public var displayName: String { MusicAssistantServerConfiguration.displayName(name, host: url.host()) }
 }
 
 public enum MusicAssistantDiscovery {

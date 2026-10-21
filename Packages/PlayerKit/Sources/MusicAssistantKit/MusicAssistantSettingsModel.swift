@@ -195,7 +195,8 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
             select(existing.id)
             return
         }
-        let name = found.name.flatMap { $0.isEmpty ? nil : $0 } ?? MusicAssistantServerConfiguration.defaultName
+        let name = MusicAssistantServerConfiguration.isGenericName(found.name)
+            ? MusicAssistantServerConfiguration.defaultName : found.name!
         let server = MusicAssistantServerConfiguration(name: name, address: MusicAssistantServerAddress(baseURL: found.url))
         servers.append(server)
         persist()
@@ -453,7 +454,8 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
             log.info("test failed")
         case .connected(let info):
             servers[index].address.serverID = info.serverID
-            if servers[index].name == MusicAssistantServerConfiguration.defaultName, let found = info.name, !found.isEmpty {
+            if MusicAssistantServerConfiguration.isGenericName(servers[index].name),
+               let found = info.name, !MusicAssistantServerConfiguration.isGenericName(found) {
                 servers[index].name = found
             }
             persist()

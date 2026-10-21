@@ -221,7 +221,7 @@ private struct ServerRow: View {
             statusDot
                 .help(outcome == .mismatch ? "Different server at this address" : "")
             VStack(alignment: .leading) {
-                Text(server.name)
+                Text(server.displayName)
                 Text(server.hasNoAddress ? "No address" : server.address.baseURL.host ?? "")
                     .font(.caption)
                     .foregroundStyle(.secondary)

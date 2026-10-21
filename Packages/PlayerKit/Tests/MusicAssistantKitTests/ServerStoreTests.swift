@@ -109,4 +109,22 @@ struct ActiveServerTests {
         _ = await Task.detached { box.set(nil) }.value
         #expect(box.current == nil)
     }
+
+    @Test func genericNamesAreRecognized() {
+        typealias C = MusicAssistantServerConfiguration
+        #expect(C.isGenericName("Music Assistant"))
+        #expect(C.isGenericName("  Music Assistant "))
+        #expect(C.isGenericName("music assistant (a1b2c3)"))
+        #expect(C.isGenericName(nil))
+        #expect(C.isGenericName(""))
+        #expect(!C.isGenericName("Home"))
+        #expect(!C.isGenericName("Music Assistant Kitchen"))
+        #expect(!C.isGenericName("Music Assistant (Living Room)"))
+    }
+
+    @Test func displayNameFallsBackToTheHostForAGenericName() {
+        #expect(makeServer("http://a.local:8095", name: "Home").displayName == "Home")
+        #expect(makeServer("http://a.local:8095", name: "Music Assistant (abc123)").displayName == "a.local")
+        #expect(makeServer("http://a.local:8095", name: "Music Assistant").displayName == "a.local")
+    }
 }

@@ -27,6 +27,29 @@ public struct MusicAssistantServerConfiguration: Identifiable, Hashable, Sendabl
         self.networks = networks
     }
 
+    /// Music Assistant's generic label: nil, blank, "Music Assistant", or "Music Assistant (<token>)" where the
+    /// token (typically the server id) has no spaces. Such a name says nothing to the user.
+    public static func isGenericName(_ name: String?) -> Bool {
+        guard let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return true }
+        let lower = trimmed.lowercased()
+        let base = defaultName.lowercased()
+        if lower == base { return true }
+        guard lower.hasPrefix(base + " ("), lower.hasSuffix(")") else { return false }
+        let token = lower.dropFirst(base.count + 2).dropLast()
+        return !token.isEmpty && !token.contains(where: { $0.isWhitespace || $0 == "(" || $0 == ")" })
+    }
+
+    /// The label for `name` in the UI: itself unless generic, else the host, else `defaultName`. User data: UI only,
+    /// never logged.
+    public static func displayName(_ name: String?, host: String?) -> String {
+        if !isGenericName(name), let name { return name.trimmingCharacters(in: .whitespacesAndNewlines) }
+        if let host, !host.isEmpty { return host }
+        return defaultName
+    }
+
+    /// `name`, or the host when the name is generic. UI only, never logged.
+    public var displayName: String { Self.displayName(name, host: address.baseURL.host()) }
+
     public var isVerified: Bool { address.serverID != nil }
     /// The Keychain `account` of this server's token.
     public var keychainAccount: String { id.uuidString }
