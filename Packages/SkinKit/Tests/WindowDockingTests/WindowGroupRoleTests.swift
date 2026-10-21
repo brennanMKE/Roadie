@@ -15,4 +15,10 @@ struct WindowGroupRoleTests {
     @Test func exactlyOnePrimaryWindow() {
         #expect(WindowKind.allCases.filter { $0.windowGroupRole == .primary } == [.main])
     }
+
+    @Test func equalizerAndPlaylistAreChildWindowsOfMain() {
+        #expect(WindowKind.main.parentWindow == nil)
+        #expect(WindowKind.equalizer.parentWindow == .main)
+        #expect(WindowKind.playlist.parentWindow == .main)
+    }
 }

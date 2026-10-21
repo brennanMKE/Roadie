@@ -63,6 +63,18 @@ public enum WindowKind: String, Codable, CaseIterable, Sendable {
         case .equalizer, .playlist: .auxiliary
         }
     }
+
+    /// The window this one is attached to as an AppKit child window while both are shown, or nil for the main window
+    /// (#0120). On macOS 27, Stage Manager ("One at a time") puts an auxiliary window into whichever of the app's sets
+    /// it likes, the Library's for one, which takes the main window off stage; a child window always stays in its
+    /// parent's set. AppKit moves child windows with their parent, so the app puts them back when the docking engine
+    /// moves the main window on its own.
+    public var parentWindow: WindowKind? {
+        switch self {
+        case .main: nil
+        case .equalizer, .playlist: .main
+        }
+    }
 }
 
 /// A skinned window's role in the window manager's grouping: see `WindowKind.windowGroupRole`.

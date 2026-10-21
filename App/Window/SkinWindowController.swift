@@ -188,7 +188,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
 
     /// Brings the window forward. Each time it comes back from hidden, it keeps its saved spot unless that spot covers
     /// another visible skinned window, else it sits directly under `reference` (Webamp's default layout, #0120); with no
-    /// reference an unpositioned window centres.
+    /// reference an unpositioned window centres. The equalizer and playlist are attached to the main window as child
+    /// windows before they come forward, so Stage Manager keeps them on stage together (#0120).
     func show(below reference: NSWindow? = nil) {
         if !window.isVisible || !hasBeenShown {
             if let reference, let coordinator {
@@ -207,11 +208,16 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
             applyLayout()
         }
         if window.isMiniaturized { window.deminiaturize(nil) }
+        coordinator?.attachChildWindows(around: self)
         window.makeKeyAndOrderFront(nil)
+        coordinator?.attachChildWindows(around: self)
     }
 
     /// Hides without tearing the window down (`performClose` hides; `show` brings the same window back).
-    func hide() { window.orderOut(nil) }
+    func hide() {
+        coordinator?.detachFromParent(self)
+        window.orderOut(nil)
+    }
 
     func close() { window.performClose(nil) }
     func minimize() { window.miniaturize(nil) }
@@ -265,8 +271,10 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         let pixelSize = CGSize(width: skinSize.width * scale, height: skinSize.height * scale)
         // Keep the top-left corner where it is when the height changes.
         let oldFrame = window.frame
-        window.setContentSize(pixelSize)
-        window.setFrameTopLeftPoint(NSPoint(x: oldFrame.minX, y: oldFrame.maxY))
+        window.keepingChildWindowsInPlace {
+            window.setContentSize(pixelSize)
+            window.setFrameTopLeftPoint(NSPoint(x: oldFrame.minX, y: oldFrame.maxY))
+        }
         shape.frame = NSRect(origin: .zero, size: pixelSize)
 
         let region = model.skin?.region
@@ -288,7 +296,9 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         cursorController.apply(cursors: model.skin?.cursors ?? .empty, window: kind.cursorWindow(mode), scale: scale)
         // Winamp lets an unshaded window hang off the bottom of the screen; here it is pushed back on.
         if modeChanged, window.isVisible, let screen = window.screen {
-            window.setFrame(window.constrainFrameRect(window.frame, to: screen), display: true)
+            window.keepingChildWindowsInPlace {
+                window.setFrame(window.constrainFrameRect(window.frame, to: screen), display: true)
+            }
         }
     }
 
@@ -328,7 +338,16 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         model.playlist.openMenu = nil
     }
 
+    func windowWillMiniaturize(_ notification: Notification) {
+        coordinator?.skinnedWindowWillMinimize()
+    }
+
+    func windowDidDeminiaturize(_ notification: Notification) {
+        coordinator?.skinnedWindowDidDeminimize()
+    }
+
     func windowWillClose(_ notification: Notification) {
+        coordinator?.detachFromParent(self)
         onClose?()
     }
 }

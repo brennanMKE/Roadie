@@ -58,7 +58,7 @@ final class WindowDockingCoordinator {
     private func move(_ kind: WindowKind, toTopLeft position: Offset) {
         guard let window = controllers[kind]?.window else { return }
         let box = Box(x: position.x, y: position.y, width: window.frame.width, height: window.frame.height)
-        window.setFrameOrigin(desktop.rect(box).origin)
+        window.keepingChildWindowsInPlace { window.setFrameOrigin(desktop.rect(box).origin) }
     }
 
     // MARK: Dragging
@@ -123,6 +123,37 @@ final class WindowDockingCoordinator {
         layoutDidChange()
     }
 
+    // MARK: Child windows
+
+    /// Attaches `controller`'s window to its parent's (`WindowKind.parentWindow`) when the parent is on screen, and any
+    /// visible windows whose parent it is, so Stage Manager keeps the skinned windows in one set (#0120). Idempotent;
+    /// `show` calls it before and after ordering the window in.
+    func attachChildWindows(around controller: SkinWindowController) {
+        for (kind, child) in controllers {
+            guard let parentKind = kind.parentWindow, let parent = controllers[parentKind] else { continue }
+            let involved = child === controller ? isVisible(parent) : parent === controller && isVisible(child)
+            guard involved, isVisible(parent), child.window.parent !== parent.window else { continue }
+            parent.window.addChildWindow(child.window, ordered: .above)
+        }
+    }
+
+    /// Called as any skinned window minimizes: detaches every child window first, so only that window goes to the Dock,
+    /// as before #0120. AppKit would otherwise hide the children with a minimized parent (or the family with a
+    /// minimized child), and on macOS 27 the group came back moved and overlapping.
+    func skinnedWindowWillMinimize() {
+        for controller in controllers.values { detachFromParent(controller) }
+    }
+
+    /// Called when a skinned window comes back from the Dock: reattaches the child windows that are on screen.
+    func skinnedWindowDidDeminimize() {
+        for controller in controllers.values { attachChildWindows(around: controller) }
+    }
+
+    /// Detaches `controller`'s window from its parent before it is hidden or closed.
+    func detachFromParent(_ controller: SkinWindowController) {
+        controller.window.parent?.removeChildWindow(controller.window)
+    }
+
     // MARK: Z-order
 
     /// Brings the visible skinned windows forward together, directly beneath `controller`'s window and in their current
@@ -136,7 +167,13 @@ final class WindowDockingCoordinator {
         }
         let frontToBack = NSApp.orderedWindows.compactMap { kinds[ObjectIdentifier($0)] }
         let steps = WindowStacking.raise(
-            group: Set(kinds.values), key: controller.kind.windowKind, frontToBack: frontToBack)
+            group: Set(kinds.values), key: controller.kind.windowKind, frontToBack: frontToBack,
+            parent: { [controllers] kind in
+                // Only an attached child is held above its parent.
+                guard let parent = kind.parentWindow, controllers[kind]?.window.parent === controllers[parent]?.window
+                else { return nil }
+                return parent
+            })
         for step in steps {
             guard let window = controllers[step.window]?.window, let anchor = controllers[step.below]?.window else { continue }
             window.order(.below, relativeTo: anchor.windowNumber)
@@ -252,5 +289,15 @@ final class WindowDockingCoordinator {
             stack(windows.map(\.kind))
         }
         layoutDidChange()
+    }
+}
+
+extension NSWindow {
+    /// Runs `change`, which moves or resizes this window, and puts its child windows back where they were: AppKit
+    /// moves child windows with their parent, but the docking engine places every skinned window itself (#0120).
+    func keepingChildWindowsInPlace(_ change: () -> Void) {
+        let children = (childWindows ?? []).map { ($0, $0.frame.origin) }
+        change()
+        for (child, origin) in children where child.frame.origin != origin { child.setFrameOrigin(origin) }
     }
 }

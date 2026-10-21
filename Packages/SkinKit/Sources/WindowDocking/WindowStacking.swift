@@ -26,4 +26,13 @@ public enum WindowStacking {
         }
         return placements
     }
+
+    /// `raise(group:key:frontToBack:)` without the steps that would put a child window below its own parent, which
+    /// AppKit can't do (a child window stays above its parent, #0120). `parent` gives each window's parent, nil for a
+    /// window that has none.
+    public static func raise<ID: Hashable>(
+        group: Set<ID>, key: ID, frontToBack: [ID], parent: (ID) -> ID?
+    ) -> [Placement<ID>] {
+        raise(group: group, key: key, frontToBack: frontToBack).filter { parent($0.window) != $0.below }
+    }
 }

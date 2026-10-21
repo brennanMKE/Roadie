@@ -33,4 +33,19 @@ private let group: Set<String> = ["main", "equalizer", "playlist"]
             WindowStacking.raise(group: group, key: "main", frontToBack: ["equalizer", "main", "equalizer"])
                 == [P(window: "equalizer", below: "main")])
     }
+
+    // #0120: the equalizer and playlist are child windows of main, which AppKit always keeps above it.
+    private static func parent(_ id: String) -> String? { id == "main" ? nil : "main" }
+
+    @Test func raiseNeverPutsAChildBelowItsParent() {
+        let steps = WindowStacking.raise(
+            group: group, key: "equalizer", frontToBack: ["equalizer", "main", "playlist"], parent: Self.parent)
+        #expect(steps == [P(window: "main", below: "equalizer")])
+    }
+
+    @Test func raiseStillOrdersSiblingChildren() {
+        let steps = WindowStacking.raise(
+            group: group, key: "main", frontToBack: ["playlist", "main", "equalizer"], parent: Self.parent)
+        #expect(steps == [P(window: "equalizer", below: "playlist")])
+    }
 }
