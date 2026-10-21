@@ -8,7 +8,7 @@ struct MAFixtureTests {
 
     @Test func everyFixtureLoadsAndParses() throws {
         #expect(MAFixture.baseline.count == 42)
-        #expect(MAFixture.baseline.allSatisfy(\.isRecorded))
+        #expect(MAFixture.baseline.allSatisfy { $0.isRecorded })
         #expect(MAFixture.baseline.last == .events)
         for fixture in MAFixture.recorded {
             _ = try fixture.json
