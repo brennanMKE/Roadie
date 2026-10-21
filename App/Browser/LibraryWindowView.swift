@@ -35,7 +35,17 @@ struct LibraryWindowView: View {
                     .disabled(library.connection != .connected)
                     .accessibilityIdentifier("library.refresh")
             }
+            if library.sections.contains(.radio) {
+                ToolbarItem {
+                    Button("Add Radio URL\u{2026}", systemImage: "antenna.radiowaves.left.and.right") {
+                        library.isAddingRadio = true
+                    }
+                    .disabled(library.connection != .connected)
+                    .accessibilityIdentifier("library.radio.add")
+                }
+            }
         }
+        .sheet(isPresented: $library.isAddingRadio) { AddRadioSheet(library: library) }
         .frame(minWidth: 720, minHeight: 420)
     }
 
@@ -79,6 +89,7 @@ struct LibraryWindowView: View {
                     DiscoverRowView(library: library, discover: discover)
                 }
             case .favorites: FavoriteKindsView(favorites: library.favorites)
+            case .radio: RadioListView(library: library)
             }
         }
     }
@@ -114,6 +125,10 @@ struct LibraryWindowView: View {
                     description: Text("Double-click an item to play it."))
             case .favorites:
                 FavoritesDetailView(library: library, favorites: library.favorites)
+            case .radio:
+                ContentUnavailableView(
+                    "Radio", systemImage: "antenna.radiowaves.left.and.right",
+                    description: Text("Double-click a station to play it."))
             }
         }
     }

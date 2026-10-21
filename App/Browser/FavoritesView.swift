@@ -30,6 +30,7 @@ struct FavoriteKindsView: View {
         case .albums: "Albums"
         case .artists: "Artists"
         case .playlists: "Playlists"
+        case .radios: "Radio"
         }
     }
 
@@ -39,6 +40,7 @@ struct FavoriteKindsView: View {
         case .albums: "square.stack"
         case .artists: "music.mic"
         case .playlists: "music.note.list"
+        case .radios: "antenna.radiowaves.left.and.right"
         }
     }
 }
@@ -124,6 +126,8 @@ struct FavoritesDetailView: View {
                 }
                 .contextMenu { FavoriteMenuItem(items: [playlist.id: playlist.isFavorite]) }
             }
+        case .radios:
+            RadioListView(library: library, list: favorites.radios)
         }
     }
 }

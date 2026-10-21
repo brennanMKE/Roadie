@@ -70,7 +70,7 @@ struct FavoritesModelTests {
         library.playlists[1].isFavorite = true
         let (_, model) = makeModel(library: library, capabilities: [.search, .playlists, .favorites])
         await model.favorites.loadCounts()
-        #expect(model.favorites.counts == [.tracks: 3, .albums: 1, .artists: 0, .playlists: 1])
+        #expect(model.favorites.counts == [.tracks: 3, .albums: 1, .artists: 0, .playlists: 1, .radios: 0])
         // The section loads the selected kind; unfavoriting a row removes it after the refetch.
         model.section = .favorites
         model.appeared()

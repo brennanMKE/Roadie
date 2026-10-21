@@ -9,6 +9,8 @@ public enum LibrarySection: String, Hashable, Sendable, CaseIterable, Identifiab
     case discover
     /// Favorited tracks, albums, artists and playlists (#0142); only with `.favorites`.
     case favorites
+    /// Radio stations (#0147); only with `.radio`.
+    case radio
     public var id: Self { self }
 }
 
@@ -50,6 +52,10 @@ public final class LibraryBrowserModel {
     public let artists: PagedList<LibraryArtist>
     public let allAlbums: PagedList<LibraryAlbum>
     public let playlists: PagedList<LibraryPlaylist>
+    /// The Radio section's stations (#0147).
+    public let radios: PagedList<LibraryRadio>
+    /// Set to show the "Add Radio URL…" sheet (the Radio toolbar, or PL ADD › URL).
+    public var isAddingRadio = false
     /// Discover rows (#0143); nil without `.recommendations`.
     public let discover: DiscoverModel?
     /// Albums of `selectedArtist`.
@@ -147,7 +153,9 @@ public final class LibraryBrowserModel {
         var sections: [LibrarySection] = [.artists, .albums]
         if backend.capabilities.contains(.playlists) { sections.append(.playlists) }
         if backend.capabilities.contains(.favorites) { sections.append(.favorites) }
+        if backend.capabilities.contains(.radio) { sections.append(.radio) }
         self.sections = sections
+        radios = PagedList(pageSize: pageSize)
         artists = PagedList(pageSize: pageSize)
         allAlbums = PagedList(pageSize: pageSize)
         playlists = PagedList(pageSize: pageSize)
@@ -159,6 +167,7 @@ public final class LibraryBrowserModel {
         playlists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         artistAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         favorites.onConfirmed = { [weak self] id, on in self?.patchFavorite(id, on) }
+        radios.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
     }
 
     private func reportFailure(_ error: any Error, _ phase: FailurePhase) {
@@ -197,6 +206,7 @@ public final class LibraryBrowserModel {
         artistAlbums.cancel()
         discover?.cancel()
         favorites.cancelLists()
+        radios.cancel()
         tracksGeneration += 1
         tracksTask?.cancel()
         tracksTask = nil
@@ -381,6 +391,10 @@ public final class LibraryBrowserModel {
             }
         case .favorites:
             favorites.sectionAppeared(reloading: reloading)
+        case .radio:
+            if reloading || radios.phase == .idle {
+                radios.reload(with: { try await backend.radios(page: $0) })
+            }
         }
     }
 

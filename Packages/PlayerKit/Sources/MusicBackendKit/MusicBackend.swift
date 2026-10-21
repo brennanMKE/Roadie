@@ -98,6 +98,10 @@ public protocol MusicBackend: AnyObject, Sendable {
     func favoriteAlbums(page: PageRequest) async throws -> Page<LibraryAlbum>
     func favoriteArtists(page: PageRequest) async throws -> Page<LibraryArtist>
     func favoritePlaylists(page: PageRequest) async throws -> Page<LibraryPlaylist>
+    /// Radio (#0147); the defaults throw `.unsupported`.
+    func radios(page: PageRequest) async throws -> Page<LibraryRadio>
+    func addRadio(url: String, name: String) async throws -> LibraryRadio
+    func favoriteRadios(page: PageRequest) async throws -> Page<LibraryRadio>
 }
 
 extension MusicBackend {

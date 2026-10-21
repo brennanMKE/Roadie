@@ -2,9 +2,9 @@ import Foundation
 import MusicBackendKit
 import Observation
 
-/// The kinds the Favorites section lists (#0142), in sidebar order. Radio waits for W12.
+/// The kinds the Favorites section lists (#0142), in sidebar order. Radio joined with W12 (#0147).
 public enum FavoriteKind: String, Hashable, Sendable, CaseIterable, Identifiable {
-    case tracks, albums, artists, playlists
+    case tracks, albums, artists, playlists, radios
     public var id: Self { self }
 
     public var mediaKind: MediaKind {
@@ -13,6 +13,7 @@ public enum FavoriteKind: String, Hashable, Sendable, CaseIterable, Identifiable
         case .albums: .album
         case .artists: .artist
         case .playlists: .playlist
+        case .radios: .radio
         }
     }
 
@@ -22,7 +23,7 @@ public enum FavoriteKind: String, Hashable, Sendable, CaseIterable, Identifiable
         case .album: self = .albums
         case .artist: self = .artists
         case .playlist: self = .playlists
-        case .radio: return nil
+        case .radio: self = .radios
         }
     }
 }
@@ -53,6 +54,7 @@ public final class FavoritesModel {
     public let albums: PagedList<LibraryAlbum>
     public let artists: PagedList<LibraryArtist>
     public let playlists: PagedList<LibraryPlaylist>
+    public let radios: PagedList<LibraryRadio>
     @ObservationIgnored private var countsTask: Task<Void, Never>?
     @ObservationIgnored private var countsGeneration = 0
 
@@ -62,6 +64,7 @@ public final class FavoritesModel {
         albums = PagedList(pageSize: pageSize)
         artists = PagedList(pageSize: pageSize)
         playlists = PagedList(pageSize: pageSize)
+        radios = PagedList(pageSize: pageSize)
     }
 
     /// Loads every kind's count at once; one failing kind leaves the others.
@@ -100,6 +103,7 @@ public final class FavoritesModel {
         albums.cancel()
         artists.cancel()
         playlists.cancel()
+        radios.cancel()
     }
 
     private func loadListIfNeeded(_ kind: FavoriteKind) {
@@ -112,6 +116,7 @@ public final class FavoritesModel {
         case .albums: albums.phase
         case .artists: artists.phase
         case .playlists: playlists.phase
+        case .radios: radios.phase
         }
     }
 
@@ -123,6 +128,7 @@ public final class FavoritesModel {
         case .albums: albums.reload(with: { try await backend.favoriteAlbums(page: $0) })
         case .artists: artists.reload(with: { try await backend.favoriteArtists(page: $0) })
         case .playlists: playlists.reload(with: { try await backend.favoritePlaylists(page: $0) })
+        case .radios: radios.reload(with: { try await backend.favoriteRadios(page: $0) })
         }
     }
 
@@ -134,7 +140,7 @@ public final class FavoritesModel {
         case .album: albums.update(id: id) { $0.isFavorite = on }
         case .artist: artists.update(id: id) { $0.isFavorite = on }
         case .playlist: playlists.update(id: id) { $0.isFavorite = on }
-        case .radio: break
+        case .radio: radios.update(id: id) { $0.isFavorite = on }
         }
         guard let kind = FavoriteKind(id.kind) else { return }
         if phase(of: kind) != .idle { reloadList(kind) }
@@ -202,6 +208,7 @@ public final class FavoritesModel {
         albums.reset()
         artists.reset()
         playlists.reset()
+        radios.reset()
     }
 }
 
@@ -214,7 +221,8 @@ extension LibraryBrowserModel {
             allAlbums.update(id: id) { $0.isFavorite = on }
             artistAlbums.update(id: id) { $0.isFavorite = on }
         case .playlist: playlists.update(id: id) { $0.isFavorite = on }
-        case .track, .radio: break
+        case .radio: radios.update(id: id) { $0.isFavorite = on }
+        case .track: break
         }
         favorites.favoritesChanged(id, on)
     }
