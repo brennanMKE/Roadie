@@ -1,4 +1,5 @@
 import AudioCore
+import LibraryBrowser
 import SkinKit
 import SwiftUI
 
@@ -304,6 +305,7 @@ struct PlaylistMiniTimeView: View {
 struct PlaylistMenusView: View {
     let skin: Skin
     @Environment(PlayerModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @State private var hovered: String?
 
     var body: some View {
@@ -348,8 +350,14 @@ struct PlaylistMenusView: View {
         switch sprite {
         case "PLAYLIST_ADD_FILE": model.openFiles(replace: false)
         case "PLAYLIST_ADD_DIR": model.openFolder()
-        // No stream support yet, so Add URL highlights and closes and does nothing.
-        case "PLAYLIST_ADD_URL": break
+        // With a radio-capable source (Music Assistant), Add URL adds a radio station (#0147); otherwise nothing.
+        case "PLAYLIST_ADD_URL":
+            let library = model.library
+            if library.sections.contains(.radio) {
+                library.section = .radio
+                library.isAddingRadio = true
+                openWindow(id: "library")
+            }
         case "PLAYLIST_REMOVE_SELECTED": playlist.removeSelected()
         case "PLAYLIST_CROP": playlist.crop()
         case "PLAYLIST_REMOVE_ALL", "PLAYLIST_NEW_LIST": playlist.removeAll()
