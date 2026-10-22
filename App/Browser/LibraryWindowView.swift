@@ -42,6 +42,14 @@ struct LibraryWindowView: View {
                         .help("New Playlist")
                         .accessibilityIdentifier("library.playlists.new")
                 }
+                ToolbarItem {
+                    Button("Import Playlist\u{2026}", systemImage: "square.and.arrow.down") {
+                        player.importLibraryPlaylist()
+                    }
+                    .disabled(library.connection != .connected)
+                    .help("Import an M3U playlist into Music Assistant")
+                    .accessibilityIdentifier("library.playlists.import")
+                }
             }
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { library.refresh() }

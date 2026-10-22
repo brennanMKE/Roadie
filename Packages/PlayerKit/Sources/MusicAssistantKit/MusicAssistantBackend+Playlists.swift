@@ -51,6 +51,30 @@ extension MusicAssistantBackend {
         _ = try await write(.addPlaylistTracks(playlistID: libraryID, uris: uris))
     }
 
+    // MARK: M3U (#0148)
+
+    public func exportPlaylist(_ id: MediaID) async throws -> String {
+        let (_, _, playlist) = try await fetchPlaylist(id)
+        guard let libraryID = playlist.libraryID else { throw MusicBackendError.notFound(id) }
+        let result = try await write(.exportPlaylist(playlistID: libraryID))
+        guard let text = result.stringValue else {
+            throw MusicBackendError.backend("Music Assistant's answer could not be read.")
+        }
+        return text
+    }
+
+    public func importPlaylist(m3u: String) async throws -> LibraryPlaylist {
+        guard !m3u.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw MusicBackendError.backend("The playlist file is empty.")
+        }
+        let created = try await write(.importPlaylist(m3u: m3u, libraryMatching: true))
+        do {
+            return LibraryPlaylist(ma: try created.decode(as: MAPlaylist.self))
+        } catch {
+            throw MusicBackendError.backend("Music Assistant's answer could not be read.")
+        }
+    }
+
     // MARK: Helpers
 
     /// The playlist as the server has it now: its URI, the raw object (for `update`) and the mapped value.

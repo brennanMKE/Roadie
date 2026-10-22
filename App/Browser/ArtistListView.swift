@@ -44,6 +44,10 @@ struct PlaylistListView: View {
             Button("Delete\u{2026}") { model.askToDelete(playlist) }
                 .disabled(!model.canDelete(playlist))
                 .help(model.refusal(for: playlist) ?? "")
+            Divider()
+            Button("Export as M3U8\u{2026}") { player.exportLibraryPlaylist(playlist) }
+                .disabled(!model.canExport(playlist))
+            Button("Import Playlist\u{2026}") { player.importLibraryPlaylist() }
         }
     }
 

@@ -137,4 +137,29 @@ extension BackendPlaylistTests {
         #expect(!rig.transport.sentRequests.contains { $0.command == "music/playlists/add_playlist_tracks" })
         await rig.backend.disconnect()
     }
+
+    @Test func exportSendsTheLibraryIDAndReturnsTheText() async throws {
+        let m3u = "#EXTM3U\n#EXTINF:200,Artist - Song\n/music/song.flac\n"
+        let rig = try await playlistBackend([
+            .result(command: "music/playlists/get", roadTrip),
+            .result(command: "music/playlists/export_playlist", .string(m3u)),
+        ])
+        let text = try await rig.backend.exportPlaylist(roadTripID)
+        #expect(text == m3u)
+        let sent = try #require(rig.transport.sentRequests.first { $0.command == "music/playlists/export_playlist" })
+        #expect(sent.args == ["db_playlist_id": "12"])
+        await rig.backend.disconnect()
+    }
+
+    @Test func importSendsTheTextWithLibraryMatching() async throws {
+        let m3u = "#EXTM3U\n/music/song.flac\n"
+        let rig = try await playlistBackend([.result(command: "music/playlists/import_playlist", roadTrip)])
+        let created = try await rig.backend.importPlaylist(m3u: m3u)
+        #expect(created.id == roadTripID)
+        #expect(created.source == .user)
+        let sent = try #require(rig.transport.sentRequests.first { $0.command == "music/playlists/import_playlist" })
+        #expect(sent.args == ["m3u_data": .string(m3u), "library_matching": true])
+        await #expect(throws: MusicBackendError.self) { try await rig.backend.importPlaylist(m3u: "  \n") }
+        await rig.backend.disconnect()
+    }
 }

@@ -8,6 +8,7 @@ public actor StubMusicBackend: MusicBackend {
         case connect, artists, albums, tracks, playlists, playlistTracks, search, artwork, outputs, play, transport, transfer, setGroupMembers
         case setFavorite, favoriteCurrentTrack
         case createPlaylist, renamePlaylist, deletePlaylist, addToPlaylist
+        case exportPlaylist, importPlaylist
     }
 
     public enum Call: Hashable, Sendable {
@@ -21,6 +22,7 @@ public actor StubMusicBackend: MusicBackend {
         case setFavorite(MediaID, Bool), favoriteCurrentTrack(OutputDevice.ID)
         case createPlaylist(String), renamePlaylist(MediaID, String), deletePlaylist(MediaID)
         case addToPlaylist([MediaID], MediaID)
+        case exportPlaylist(MediaID), importPlaylist(String)
 
         /// The method a call belongs to; `disconnect` has none.
         public var method: Method? {
@@ -45,6 +47,8 @@ public actor StubMusicBackend: MusicBackend {
             case .renamePlaylist: .renamePlaylist
             case .deletePlaylist: .deletePlaylist
             case .addToPlaylist: .addToPlaylist
+            case .exportPlaylist: .exportPlaylist
+            case .importPlaylist: .importPlaylist
             }
         }
     }
@@ -347,5 +351,28 @@ public actor StubMusicBackend: MusicBackend {
         guard library.playlists.contains(where: { $0.id == id }) else { throw MusicBackendError.notFound(id) }
         let tracks = items.flatMap { item in item.kind == .album ? library.tracks(of: item).map(\.id) : [item] }
         library.playlistTracks[id, default: []].append(contentsOf: tracks)
+    }
+
+    /// `#EXTM3U` and one `#EXTINF` + id line per track (#0148).
+    public func exportPlaylist(_ id: MediaID) async throws -> String {
+        try await enter(.exportPlaylist(id))
+        guard library.playlists.contains(where: { $0.id == id }) else { throw MusicBackendError.notFound(id) }
+        let lines = (library.playlistTracks[id] ?? []).flatMap { ["#EXTINF:-1,\($0.rawValue)", $0.rawValue] }
+        return (["#EXTM3U"] + lines).joined(separator: "\n") + "\n"
+    }
+
+    /// A new editable playlist named "Imported Playlist" with the file's non-comment lines as tracks (#0148).
+    public func importPlaylist(m3u: String) async throws -> LibraryPlaylist {
+        try await enter(.importPlaylist(m3u))
+        createdPlaylists += 1
+        let playlist = LibraryPlaylist(
+            id: MediaID(.playlist, "new\(createdPlaylists)"), name: "Imported Playlist", isEditable: true,
+            owner: "you", source: .user, editing: [.addRemove, .rename, .delete], libraryID: "new\(createdPlaylists)")
+        library.playlists.append(playlist)
+        library.playlistTracks[playlist.id] = m3u.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
+            .map { MediaID(.track, $0) }
+        return playlist
     }
 }

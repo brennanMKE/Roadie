@@ -200,6 +200,42 @@ public final class PlaylistsModel {
         }
     }
 
+    // MARK: M3U (#0148)
+
+    /// Export needs the server's library row; import makes a new playlist, so it needs editing.
+    public func canExport(_ playlist: LibraryPlaylist) -> Bool { canEdit && playlist.libraryID != nil }
+
+    /// The playlist as M3U8 text, nil on failure (`message` says why).
+    public func exportM3U(_ playlist: LibraryPlaylist) async -> String? {
+        guard canExport(playlist) else { return nil }
+        message = nil
+        do {
+            let text = try await backend.exportPlaylist(playlist.id)
+            Self.log.info("exported a playlist")
+            return text
+        } catch {
+            fail(error, for: nil)
+            return nil
+        }
+    }
+
+    /// Imports M3U8 text as a new playlist, lists it first and selects it. nil on failure (`message` says why).
+    @discardableResult
+    public func importM3U(_ text: String) async -> LibraryPlaylist? {
+        guard canEdit else { return nil }
+        message = nil
+        do {
+            let created = try await backend.importPlaylist(m3u: text)
+            if list.phase == .loaded { list.insert(created, at: 0) }
+            browser?.select(created)
+            Self.log.info("imported a playlist")
+            return created
+        } catch {
+            fail(error, for: nil)
+            return nil
+        }
+    }
+
     private func apply(_ playlist: LibraryPlaylist) {
         list.replace(playlist)
         if let browser, browser.selectedPlaylist?.id == playlist.id { browser.selectedPlaylist = playlist }

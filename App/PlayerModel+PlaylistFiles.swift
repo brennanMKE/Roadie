@@ -86,6 +86,55 @@ extension PlayerModel {
     }
 }
 
+/// The Library's playlist context menu: M3U8 export and import through Music Assistant (#0148).
+extension PlayerModel {
+    /// Saves the server's M3U8 for `playlist`; its entries are paths and URIs on the server.
+    func exportLibraryPlaylist(_ playlist: LibraryPlaylist) {
+        let model = library.playlistsModel
+        Task {
+            guard let text = await model.exportM3U(playlist) else { return }
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [UTType(filenameExtension: "m3u8", conformingTo: .data) ?? .data]
+            panel.nameFieldStringValue = playlist.name + ".m3u8"
+            panel.message = "Entries refer to paths and URIs on the Music Assistant server"
+            panel.prompt = "Export"
+            guard await panel.begin() == .OK, let url = panel.url else { return }
+            do {
+                try Data(text.utf8).write(to: url, options: .atomic)
+                post(StatusNotice(text: "Exported \u{201C}\(playlist.name)\u{201D}"))
+            } catch {
+                post(StatusNotice(text: "Could not save \(url.lastPathComponent)", detail: error.localizedDescription))
+            }
+        }
+    }
+
+    /// Sends an M3U/M3U8 file to Music Assistant, which makes a new playlist and matches entries to the library.
+    func importLibraryPlaylist() {
+        let model = library.playlistsModel
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = ["m3u8", "m3u"].compactMap { UTType(filenameExtension: $0, conformingTo: .data) }
+        panel.message = "Choose an M3U playlist to import into Music Assistant"
+        panel.prompt = "Import"
+        Task {
+            guard await panel.begin() == .OK, let url = panel.url else { return }
+            let text: String
+            do {
+                let data = try Data(contentsOf: url)
+                text = String(decoding: data, as: UTF8.self)
+            } catch {
+                post(StatusNotice(text: "Could not read \(url.lastPathComponent)", detail: error.localizedDescription))
+                return
+            }
+            if let created = await model.importM3U(text) {
+                post(StatusNotice(text: "Imported \u{201C}\(created.name)\u{201D}"))
+            }
+        }
+    }
+}
+
 /// The save panel's format popup. Changing it sets `allowedContentTypes`, which rewrites the name's extension.
 @MainActor
 private final class PlaylistFormatChooser: NSObject {

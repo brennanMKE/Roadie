@@ -115,6 +115,10 @@ public protocol MusicBackend: AnyObject, Sendable {
     func deletePlaylist(_ id: MediaID) async throws
     /// Tracks and albums (albums expand server-side), appended in order (#0136).
     func add(_ items: [MediaID], toPlaylist id: MediaID) async throws
+    /// The playlist as M3U8 text; its entries are the server's paths and URIs (#0148).
+    func exportPlaylist(_ id: MediaID) async throws -> String
+    /// Creates a playlist from M3U8 text, matching its entries to the library (#0148).
+    func importPlaylist(m3u: String) async throws -> LibraryPlaylist
 }
 
 extension MusicBackend {

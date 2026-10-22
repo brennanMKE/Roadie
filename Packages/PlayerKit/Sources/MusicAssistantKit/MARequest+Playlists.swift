@@ -30,4 +30,16 @@ extension MARequest {
             command: "music/playlists/add_playlist_tracks",
             args: ["db_playlist_id": .string(playlistID), "uris": .array(uris.map { .string($0) })])
     }
+
+    /// M3U8 text for the playlist with library id `playlistID` (#0148).
+    public static func exportPlaylist(playlistID: String) -> MARequest {
+        MARequest(command: "music/playlists/export_playlist", args: ["db_playlist_id": .string(playlistID)])
+    }
+
+    /// A new builtin playlist from `m3u`; `library_matching` looks up entries whose provider isn't available.
+    public static func importPlaylist(m3u: String, libraryMatching: Bool = true) -> MARequest {
+        MARequest(
+            command: "music/playlists/import_playlist",
+            args: ["m3u_data": .string(m3u), "library_matching": .bool(libraryMatching)])
+    }
 }

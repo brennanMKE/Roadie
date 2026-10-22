@@ -101,4 +101,33 @@ struct PlaylistsModelTests {
         #expect(await editor.add([track], to: second) == "Read-only")
         #expect(editor.recentTargets == [first.id, second.id])
     }
+
+    @Test func importInsertsAndSelects() async throws {
+        let (backend, model) = await connectedOnPlaylists()
+        let editor = model.playlistsModel
+        let created = try #require(await editor.importM3U("#EXTM3U\n#EXTINF:-1,Song\nlibrary://track/1\n"))
+        #expect(model.playlists.items.first?.id == created.id)
+        #expect(model.selectedPlaylist?.id == created.id)
+        #expect(await backend.library.playlistTracks[created.id] == [MediaID(.track, "library://track/1")])
+
+        await backend.setError(.forbidden("Missing scope library.write"), for: .importPlaylist)
+        #expect(await editor.importM3U("#EXTM3U\n") == nil)
+        #expect(editor.message == "Missing scope library.write")
+        #expect(model.playlists.items.count == 4)
+    }
+
+    @Test func exportReturnsTextOrReportsFailure() async throws {
+        let (backend, model) = await connectedOnPlaylists()
+        let editor = model.playlistsModel
+        let playlist = model.playlists.items[0]
+        #expect(editor.canExport(playlist))
+        let text = try #require(await editor.exportM3U(playlist))
+        #expect(text.hasPrefix("#EXTM3U"))
+        #expect(await backend.calls(.exportPlaylist) == [.exportPlaylist(playlist.id)])
+
+        await backend.setError(.unreachable("Can't reach Music Assistant"), for: .exportPlaylist)
+        #expect(await editor.exportM3U(playlist) == nil)
+        #expect(editor.message == "Can't reach Music Assistant")
+        #expect(!editor.canExport(LibraryPlaylist(id: MediaID(.playlist, "x"), name: "No row")))
+    }
 }
