@@ -160,6 +160,7 @@ extension BackendPlaylistTests {
         let sent = try #require(rig.transport.sentRequests.first { $0.command == "music/playlists/import_playlist" })
         #expect(sent.args == ["m3u_data": .string(m3u), "library_matching": true])
         await #expect(throws: MusicBackendError.self) { try await rig.backend.importPlaylist(m3u: "  \n") }
+        await rig.backend.disconnect()
     }
 
     // MARK: Remove and reorder (#0138)

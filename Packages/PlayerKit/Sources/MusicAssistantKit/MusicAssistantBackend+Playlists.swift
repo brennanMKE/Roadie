@@ -69,7 +69,7 @@ extension MusicAssistantBackend {
         }
         let created = try await write(.importPlaylist(m3u: m3u, libraryMatching: true))
         do {
-            return LibraryPlaylist(ma: try created.decode(as: MAPlaylist.self))
+            return LibraryPlaylist(ma: try created.decode(as: MAPlaylist.self), canReorder: canReorderPlaylists)
         } catch {
             throw MusicBackendError.backend("Music Assistant's answer could not be read.")
         }
