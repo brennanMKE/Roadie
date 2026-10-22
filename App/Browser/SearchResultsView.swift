@@ -48,6 +48,7 @@ struct SearchResultsView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .libraryAlbumMenu(album.id, favorite: album.isFavorite, model: player)
+                                    .draggable(MediaIDTransfer([album.id]))
                                 }
                             }
                         }
@@ -58,6 +59,7 @@ struct SearchResultsView: View {
                                         Text(track.title).lineLimit(1)
                                         Text(ArtistName.display(track.artistName)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                     }
+                                    .draggable(MediaIDTransfer([track.id]))
                                 }
                             }
                         }

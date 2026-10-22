@@ -79,6 +79,12 @@ struct DiscoverRowView: View {
                         Button("Play") { play(picked) }.disabled(picked.isEmpty)
                         Button("Add to Queue") { player.playFromLibrary(request(picked, mode: .append)) }
                             .disabled(picked.isEmpty)
+                        // Tracks and albums only (#0132 decision 3).
+                        let addable = picked.filter { $0.kind == .track || $0.kind == .album }
+                        if library.playlistsModel.canEdit {
+                            Divider()
+                            AddToPlaylistMenu(items: addable, model: player)
+                        }
                     } primaryAction: { ids in
                         play(playable(ids, in: items))
                     }
