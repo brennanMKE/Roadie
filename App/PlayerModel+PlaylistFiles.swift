@@ -2,10 +2,31 @@ import AppKit
 import AudioCore
 import Foundation
 import LibraryBrowser
+import MusicBackendKit
 import UniformTypeIdentifiers
 
 /// The playlist window's LIST › Save List / Load List and the File menu's playlist items (#0082).
 extension PlayerModel {
+    /// LIST › Load (#0146): the shown queue decides, like Save (`QueueSaveTarget`). The local queue opens a playlist
+    /// file; a Music Assistant queue picks one of its playlists.
+    func loadList() {
+        let output = selectedOutput
+        switch QueueSaveTarget.load(
+            output: output, feed: thisMacFeed, capabilities: router.backend(for: output).capabilities)
+        {
+        case .file: loadPlaylistFile()
+        case .refused: post(StatusNotice(text: "Can't load a playlist", detail: "This music source has no playlists"))
+        case .remote:
+            library.loadPlaylistsIfNeeded()
+            isPickingPlaylist = true
+        }
+    }
+
+    /// Plays a Music Assistant playlist, replacing the shown queue.
+    func loadPlaylist(_ playlist: LibraryPlaylist) {
+        playFromLibrary(PlayRequest(items: [playlist.id], mode: .replace()))
+    }
+
     /// Single playlist file; replaces the queue and plays, like File › Open.
     func loadPlaylistFile() {
         if let text = LocalPlaybackGate.refusal(forLocalFilesOn: outputSelection) {

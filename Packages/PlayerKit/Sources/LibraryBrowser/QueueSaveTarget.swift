@@ -21,4 +21,12 @@ public enum QueueSaveTarget: Hashable, Sendable {
         case .none: .refused
         }
     }
+
+    /// The playlist editor's LIST › Load (#0146) follows the same choice: the local queue loads a playlist file; a queue
+    /// Music Assistant plays loads one of its playlists, replacing that queue.
+    public static func load(
+        output: OutputDevice.ID, feed: ThisMacFeed, capabilities: BackendCapabilities
+    ) -> QueueSaveTarget {
+        choose(output: output, feed: feed, capabilities: capabilities)
+    }
 }

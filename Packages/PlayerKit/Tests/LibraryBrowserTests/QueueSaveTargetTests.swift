@@ -24,4 +24,18 @@ struct QueueSaveTargetTests {
     @Test func folderBackendOnASpeakerIsRefused() {
         #expect(QueueSaveTarget.choose(output: speaker, feed: .local, capabilities: folder) == .refused)
     }
+
+    @Test func loadFollowsTheSameChoice() {
+        let outputs = [OutputDevice.thisMacID, speaker]
+        let feeds: [ThisMacFeed] = [.local, .musicAssistant]
+        for output in outputs {
+            for feed in feeds {
+                for capabilities in [ma, folder] {
+                    #expect(QueueSaveTarget.load(output: output, feed: feed, capabilities: capabilities)
+                        == QueueSaveTarget.choose(output: output, feed: feed, capabilities: capabilities))
+                }
+            }
+        }
+        #expect(QueueSaveTarget.load(output: speaker, feed: .local, capabilities: ma) == .remote(speaker))
+    }
 }

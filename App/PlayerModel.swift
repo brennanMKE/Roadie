@@ -153,6 +153,8 @@ final class PlayerModel {
     private(set) var isMainWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.mainWindowShadeKey)
     /// Whether the equalizer and playlist windows are collapsed to their shade strips; persisted like the main window's.
     private(set) var isEQWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.eqWindowShadeKey)
+    /// LIST › Load on a Music Assistant queue shows the playlist picker sheet (#0146).
+    var isPickingPlaylist = false
     private(set) var isPlaylistWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.playlistWindowShadeKey)
     /// The main window's size in skin pixels in its current mode.
     var mainWindowSkinSize: CGSize { isMainWindowShaded ? MainWindowLayout.shadeSize : MainWindowLayout.size }

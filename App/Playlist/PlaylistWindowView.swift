@@ -57,6 +57,12 @@ struct PlaylistView: View {
         .dropDestination(for: URL.self) { urls, _ in
             model.open(urls, replace: false)
         }
+        .sheet(isPresented: Bindable(model).isPickingPlaylist) {
+            PlaylistPickerSheet(library: model.library) { playlist in
+                model.isPickingPlaylist = false
+                if let playlist { model.loadPlaylist(playlist) }
+            }
+        }
     }
 }
 
@@ -361,8 +367,8 @@ struct PlaylistMenusView: View {
         case "PLAYLIST_REMOVE_SELECTED": playlist.removeSelected()
         case "PLAYLIST_CROP": playlist.crop()
         case "PLAYLIST_REMOVE_ALL", "PLAYLIST_NEW_LIST": playlist.removeAll()
-        case "PLAYLIST_SAVE_LIST": model.savePlaylistFile()
-        case "PLAYLIST_LOAD_LIST": model.loadPlaylistFile()
+        case "PLAYLIST_SAVE_LIST": model.saveQueue()
+        case "PLAYLIST_LOAD_LIST": model.loadList()
         case "PLAYLIST_INVERT_SELECTION": playlist.invertSelection()
         case "PLAYLIST_SELECT_ZERO": playlist.selectNone()
         case "PLAYLIST_SELECT_ALL": playlist.selectAll()
