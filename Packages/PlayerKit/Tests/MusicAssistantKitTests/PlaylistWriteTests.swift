@@ -160,6 +160,56 @@ extension BackendPlaylistTests {
         let sent = try #require(rig.transport.sentRequests.first { $0.command == "music/playlists/import_playlist" })
         #expect(sent.args == ["m3u_data": .string(m3u), "library_matching": true])
         await #expect(throws: MusicBackendError.self) { try await rig.backend.importPlaylist(m3u: "  \n") }
+    }
+
+    // MARK: Remove and reorder (#0138)
+
+    @Test func removeSendsOneBasedPositions() async throws {
+        let rig = try await playlistBackend([
+            .result(command: "music/playlists/get", roadTrip),
+            .result(command: "music/playlists/remove_playlist_tracks", ["id": "t2", "name": "remove", "status": "pending"]),
+        ])
+        try await rig.backend.remove(positions: [1, 3, 3], fromPlaylist: roadTripID)
+        let sent = try #require(rig.transport.sentRequests.first { $0.command == "music/playlists/remove_playlist_tracks" })
+        #expect(sent.args == ["db_playlist_id": "12", "positions_to_remove": [3, 1]])
+        await rig.backend.disconnect()
+    }
+
+    @Test func moveSendsFromAndTo() async throws {
+        var script = try FixtureScript.recorded(token: testToken)
+        script.routes.insert(contentsOf: [
+            .result(command: "music/playlists/get", roadTrip),
+            .result(command: "music/playlists/move_playlist_track", nil),
+            .result(command: "music/playlists/library_items", [roadTrip]),
+        ], at: 0)
+        let rig = try makeBackend(script: script)
+        let names: [[String: String]] = [
+            ["command": "music/playlists/remove_playlist_tracks"], ["command": "music/playlists/move_playlist_track"],
+        ]
+        rig.http.setResponse(
+            pathPrefix: "/api-docs/", MAHTTPResponse(status: 200, body: try JSONSerialization.data(withJSONObject: names)))
+        try await rig.backend.connect()
+        await rig.backend.awaitCommandProbe()
+        try await rig.backend.movePlaylistTrack(roadTripID, from: 4, to: 1)
+        let sent = try #require(rig.transport.sentRequests.first { $0.command == "music/playlists/move_playlist_track" })
+        #expect(sent.args == ["db_playlist_id": "12", "from_position": 4, "to_position": 1])
+        let page = try await rig.backend.playlists(page: PageRequest(offset: 0, limit: 10))
+        #expect(page.items.contains { $0.editing.contains(.reorder) })
+        await rig.backend.disconnect()
+    }
+
+    @Test func moveThrowsUnsupportedWithoutTheCommand() async throws {
+        let rig = try await playlistBackend([
+            .result(command: "music/playlists/get", roadTrip),
+            .result(command: "music/playlists/library_items", [roadTrip]),
+        ])
+        await rig.backend.awaitCommandProbe()
+        await #expect(throws: MusicBackendError.unsupported(.playlistEditing)) {
+            try await rig.backend.movePlaylistTrack(roadTripID, from: 2, to: 1)
+        }
+        #expect(!rig.transport.sentRequests.contains { $0.command == "music/playlists/move_playlist_track" })
+        let page = try await rig.backend.playlists(page: PageRequest(offset: 0, limit: 10))
+        #expect(!page.items.contains { $0.editing.contains(.reorder) })
         await rig.backend.disconnect()
     }
 }

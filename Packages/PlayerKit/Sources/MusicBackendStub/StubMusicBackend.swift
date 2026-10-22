@@ -9,6 +9,7 @@ public actor StubMusicBackend: MusicBackend {
         case setFavorite, favoriteCurrentTrack
         case createPlaylist, renamePlaylist, deletePlaylist, addToPlaylist
         case exportPlaylist, importPlaylist
+        case removeFromPlaylist, movePlaylistTrack
     }
 
     public enum Call: Hashable, Sendable {
@@ -23,6 +24,7 @@ public actor StubMusicBackend: MusicBackend {
         case createPlaylist(String), renamePlaylist(MediaID, String), deletePlaylist(MediaID)
         case addToPlaylist([MediaID], MediaID)
         case exportPlaylist(MediaID), importPlaylist(String)
+        case removeFromPlaylist([Int], MediaID), movePlaylistTrack(MediaID, Int, Int)
 
         /// The method a call belongs to; `disconnect` has none.
         public var method: Method? {
@@ -49,6 +51,8 @@ public actor StubMusicBackend: MusicBackend {
             case .addToPlaylist: .addToPlaylist
             case .exportPlaylist: .exportPlaylist
             case .importPlaylist: .importPlaylist
+            case .removeFromPlaylist: .removeFromPlaylist
+            case .movePlaylistTrack: .movePlaylistTrack
             }
         }
     }
@@ -343,6 +347,29 @@ public actor StubMusicBackend: MusicBackend {
         guard let index = library.playlists.firstIndex(where: { $0.id == id }) else { throw MusicBackendError.notFound(id) }
         library.playlists.remove(at: index)
         library.playlistTracks[id] = nil
+    }
+
+    /// 1-based positions (#0138).
+    public func remove(positions: [Int], fromPlaylist id: MediaID) async throws {
+        try await enter(.removeFromPlaylist(positions, id))
+        guard var ids = library.playlistTracks[id] else { throw MusicBackendError.notFound(id) }
+        for position in Set(positions).sorted(by: >) where ids.indices.contains(position - 1) {
+            ids.remove(at: position - 1)
+        }
+        library.playlistTracks[id] = ids
+    }
+
+    /// Refused (`.unsupported`) unless the playlist offers `.reorder`, as a server without the command.
+    public func movePlaylistTrack(_ id: MediaID, from: Int, to: Int) async throws {
+        try await enter(.movePlaylistTrack(id, from, to))
+        guard let playlist = library.playlists.first(where: { $0.id == id }), playlist.editing.contains(.reorder) else {
+            throw MusicBackendError.unsupported(.playlistEditing)
+        }
+        guard var ids = library.playlistTracks[id], ids.indices.contains(from - 1), ids.indices.contains(to - 1) else {
+            throw MusicBackendError.notFound(id)
+        }
+        ids.insert(ids.remove(at: from - 1), at: to - 1)
+        library.playlistTracks[id] = ids
     }
 
     /// Tracks append; an album appends its tracks (#0136).

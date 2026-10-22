@@ -9,7 +9,7 @@ extension MusicAssistantBackend {
         guard !trimmed.isEmpty else { throw MusicBackendError.backend("A playlist needs a name.") }
         let created = try await write(.createPlaylist(name: trimmed))
         do {
-            return LibraryPlaylist(ma: try created.decode(as: MAPlaylist.self))
+            return LibraryPlaylist(ma: try created.decode(as: MAPlaylist.self), canReorder: canReorderPlaylists)
         } catch {
             throw MusicBackendError.backend("Music Assistant's answer could not be read.")
         }
@@ -75,7 +75,38 @@ extension MusicAssistantBackend {
         }
     }
 
+    /// One `remove_playlist_tracks` with the 1-based positions, highest first (#0138).
+    public func remove(positions: [Int], fromPlaylist id: MediaID) async throws {
+        let positions = Set(positions).sorted(by: >)
+        guard !positions.isEmpty else { return }
+        let libraryID = try await editablePlaylistID(id)
+        _ = try await write(.removePlaylistTracks(playlistID: libraryID, positions: positions))
+    }
+
+    /// `move_playlist_track` (1-based); refused without a request when the server lacks the command (2.10.6).
+    public func movePlaylistTrack(_ id: MediaID, from: Int, to: Int) async throws {
+        guard supports(MARequest.movePlaylistTrackCommand) else {
+            throw MusicBackendError.unsupported(.playlistEditing)
+        }
+        guard from != to else { return }
+        let libraryID = try await editablePlaylistID(id)
+        _ = try await write(.movePlaylistTrack(playlistID: libraryID, from: from, to: to))
+    }
+
     // MARK: Helpers
+
+    /// The library id of a playlist whose tracks can be edited.
+    private func editablePlaylistID(_ id: MediaID) async throws -> String {
+        let (_, _, playlist) = try await fetchPlaylist(id)
+        guard playlist.editing.contains(.addRemove) else {
+            throw MusicBackendError.forbidden("\u{201C}\(playlist.name)\u{201D} is read-only.")
+        }
+        guard let libraryID = playlist.libraryID else { throw MusicBackendError.notFound(id) }
+        return libraryID
+    }
+
+    /// Whether playlists from this server can be reordered (the command probe, #0137).
+    var canReorderPlaylists: Bool { supports(MARequest.movePlaylistTrackCommand) }
 
     /// The playlist as the server has it now: its URI, the raw object (for `update`) and the mapped value.
     func fetchPlaylist(_ id: MediaID) async throws -> (MAURI, MAJSON, LibraryPlaylist) {
@@ -84,7 +115,7 @@ extension MusicAssistantBackend {
         }
         let raw = try await write(.get(.playlist, itemID: uri.itemID, provider: uri.provider))
         guard let decoded = try? raw.decode(as: MAPlaylist.self) else { throw MusicBackendError.notFound(id) }
-        return (uri, raw, LibraryPlaylist(ma: decoded))
+        return (uri, raw, LibraryPlaylist(ma: decoded, canReorder: canReorderPlaylists))
     }
 
     /// `perform(_:)` plus the scope rule.

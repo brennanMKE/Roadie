@@ -25,4 +25,12 @@ extension MusicBackend {
     public func importPlaylist(m3u: String) async throws -> LibraryPlaylist {
         throw MusicBackendError.unsupported(.playlistEditing)
     }
+
+    public func remove(positions: [Int], fromPlaylist id: MediaID) async throws {
+        throw MusicBackendError.unsupported(.playlistEditing)
+    }
+
+    public func movePlaylistTrack(_ id: MediaID, from: Int, to: Int) async throws {
+        throw MusicBackendError.unsupported(.playlistEditing)
+    }
 }

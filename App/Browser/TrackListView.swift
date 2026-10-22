@@ -32,7 +32,7 @@ struct TrackRow: View {
     }
 }
 
-/// The tracks of the selected album or playlist.
+/// The tracks of the selected album or playlist; a playlist's are `PlaylistTracksView` (#0138).
 struct TrackListView: View {
     let library: LibraryBrowserModel
     @Environment(PlayerModel.self) private var player
@@ -86,12 +86,15 @@ struct TrackListView: View {
                         }
                         .padding([.horizontal, .top])
                         .padding(.bottom, 8)
-                        List(tracks, selection: $selection) { track in
-                            TrackRow(track: track, albumArtist: albumArtist)
-                                .draggable(MediaIDTransfer([track.id]))
+                        if let openPlaylist {
+                            PlaylistTracksView(library: library, playlist: openPlaylist, tracks: tracks)
+                        } else {
+                            List(tracks, selection: $selection) { track in
+                                TrackRow(track: track, albumArtist: albumArtist)
+                                    .draggable(MediaIDTransfer([track.id]))
+                            }
+                            .libraryTrackActions(rows: tracks, album: library.selectedAlbum?.id, model: player)
                         }
-                        .libraryTrackActions(rows: tracks, album: library.selectedAlbum?.id, model: player)
-                        .addsDroppedItems(to: openPlaylist, model: player)
                     }
                 }
             }

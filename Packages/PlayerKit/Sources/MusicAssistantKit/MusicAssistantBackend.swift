@@ -443,9 +443,12 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     }
 
     public func playlists(page: PageRequest) async throws -> Page<LibraryPlaylist> {
-        try await guarded {
+        // Reorder is offered from the command probe (#0138), so the list waits for it.
+        await awaitCommandProbe()
+        let canReorder = canReorderPlaylists
+        return try await guarded {
             let (items, total) = try await listing(.playlist, as: MAPlaylist.self, page: page, albumArtistsOnly: false)
-            return Page.make(items: items.map { LibraryPlaylist(ma: $0) }, request: page, total: total)
+            return Page.make(items: items.map { LibraryPlaylist(ma: $0, canReorder: canReorder) }, request: page, total: total)
         }
     }
 

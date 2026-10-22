@@ -54,7 +54,10 @@ extension MusicAssistantBackend {
     }
 
     public func favoritePlaylists(page: PageRequest) async throws -> Page<LibraryPlaylist> {
-        try await favoriteListing(.playlist, as: MAPlaylist.self, page: page) { LibraryPlaylist(ma: $0) }
+        let canReorder = canReorderPlaylists
+        return try await favoriteListing(.playlist, as: MAPlaylist.self, page: page) {
+            LibraryPlaylist(ma: $0, canReorder: canReorder)
+        }
     }
 
     /// One page plus the favorite-only count (the total), fetched together.

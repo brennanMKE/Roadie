@@ -119,6 +119,10 @@ public protocol MusicBackend: AnyObject, Sendable {
     func exportPlaylist(_ id: MediaID) async throws -> String
     /// Creates a playlist from M3U8 text, matching its entries to the library (#0148).
     func importPlaylist(m3u: String) async throws -> LibraryPlaylist
+    /// Removes the tracks at 1-based `positions` (#0138).
+    func remove(positions: [Int], fromPlaylist id: MediaID) async throws
+    /// Moves the track at 1-based `from` to `to` (#0138); `.unsupported` when the server can't reorder.
+    func movePlaylistTrack(_ id: MediaID, from: Int, to: Int) async throws
 }
 
 extension MusicBackend {

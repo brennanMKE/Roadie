@@ -92,7 +92,7 @@ extension LibraryTrack {
 }
 
 extension LibraryPlaylist {
-    /// `canReorder`: the server has `music/playlists/move_playlist_track` (absent on 2.10.6; detected in a later item).
+    /// `canReorder`: the server has `music/playlists/move_playlist_track` (absent on 2.10.6; from the command probe, #0137).
     init(ma playlist: MAPlaylist, canReorder: Bool = false) {
         let isEditable = playlist.isEditable ?? false
         let isDynamic = playlist.isDynamic ?? false

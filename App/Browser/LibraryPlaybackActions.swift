@@ -1,10 +1,15 @@
+import LibraryBrowser
 import MusicBackendKit
 import SwiftUI
 
 extension View {
     /// Double-click (or Return) plays; the context menu offers Play, Add to Queue and Add to Playlist ▸. Attach to the
     /// list of `rows`; `album` is the album the rows belong to, nil for search results.
-    func libraryTrackActions(rows: [LibraryTrack], album: MediaID?, model: PlayerModel) -> some View {
+    /// `editor`: the open playlist's editor, which adds Remove from Playlist and Move Up/Down (#0138).
+    func libraryTrackActions(
+        rows: [LibraryTrack], album: MediaID?, model: PlayerModel, editor: PlaylistEditor? = nil,
+        remove: ((Set<MediaID>) -> Void)? = nil
+    ) -> some View {
         contextMenu(forSelectionType: MediaID.self) { ids in
             Button("Play") { model.playFromLibrary(.play(ids, in: rows, album: album)) }
                 .disabled(ids.isEmpty)
@@ -16,6 +21,19 @@ extension View {
             FavoriteMenuItem(items: Dictionary(
                 rows.filter { ids.contains($0.id) }.map { ($0.id, $0.isFavorite) },
                 uniquingKeysWith: { first, _ in first }))
+            if let editor, editor.playlist?.editing.contains(.addRemove) == true {
+                Divider()
+                Button("Remove from Playlist") {
+                    if let remove { remove(ids) } else { editor.remove(selected: ids) }
+                }
+                    .disabled(ids.isEmpty || !editor.canRemove)
+                if editor.playlist?.editing.contains(.reorder) == true, ids.count == 1, let id = ids.first {
+                    Button("Move Up") { editor.moveUp(id) }
+                        .disabled(!editor.canReorder || editor.rows.first?.id == id)
+                    Button("Move Down") { editor.moveDown(id) }
+                        .disabled(!editor.canReorder || editor.rows.last?.id == id)
+                }
+            }
         } primaryAction: { ids in
             model.playFromLibrary(.play(ids, in: rows, album: album))
         }

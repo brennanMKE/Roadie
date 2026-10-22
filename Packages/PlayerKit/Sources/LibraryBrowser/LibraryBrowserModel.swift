@@ -64,6 +64,8 @@ public final class LibraryBrowserModel {
     public let favorites: FavoritesModel
     /// Create, rename, delete and add-to edits on `playlists` (#0135, #0136).
     public let playlistsModel: PlaylistsModel
+    /// Remove and reorder on the open playlist's tracks (#0138).
+    public let playlistEditor: PlaylistEditor
     /// Of `selectedAlbum` or `selectedPlaylist`.
     public private(set) var tracks: LoadState<[LibraryTrack]> = .idle
 
@@ -90,6 +92,7 @@ public final class LibraryBrowserModel {
         didSet {
             guard selectedAlbum != oldValue else { return }
             if let album = selectedAlbum {
+                playlistEditor.close()
                 let backend = backend
                 let id = album.id
                 loadTracks { try await backend.tracks(of: id) }
@@ -103,6 +106,7 @@ public final class LibraryBrowserModel {
         didSet {
             // A rename (#0135) changes the value, not the playlist: the tracks stay.
             guard selectedPlaylist?.id != oldValue?.id else { return }
+            playlistEditor.close()
             if let playlist = selectedPlaylist {
                 let backend = backend
                 let id = playlist.id
@@ -166,7 +170,9 @@ public final class LibraryBrowserModel {
         discover = backend.capabilities.contains(.recommendations) ? DiscoverModel(backend: backend) : nil
         favorites = FavoritesModel(backend: backend, pageSize: pageSize)
         playlistsModel = PlaylistsModel(backend: backend, list: playlists)
+        playlistEditor = PlaylistEditor(backend: backend)
         playlistsModel.browser = self
+        playlistEditor.onRows = { [weak self] rows in self?.tracks = .loaded(rows) }
         artists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         allAlbums.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
         playlists.onFailure = { [weak self] in self?.reportFailure($0, .browse) }
@@ -307,8 +313,11 @@ public final class LibraryBrowserModel {
             if case .playlistDeleted(let id) = change, selectedPlaylist?.id == id { selectedPlaylist = nil }
             if playlists.phase != .idle { playlists.reload() }
         case .playlistUpdated(let id):
-            // Stand-in for `PlaylistEditor.reloadIfOpen(id)` until it lands.
-            if selectedPlaylist?.id == id { retryTracks() }
+            if playlistEditor.isOpen(id) {
+                playlistEditor.reloadIfOpen(id)
+            } else if selectedPlaylist?.id == id {
+                retryTracks()
+            }
             if playlists.phase != .idle { playlists.reload() }
         case .played:
             discover?.scheduleRefresh()
@@ -492,6 +501,9 @@ public final class LibraryBrowserModel {
     private func tracksFinished(_ state: LoadState<[LibraryTrack]>, generation: Int) {
         guard generation == tracksGeneration else { return }
         tracks = state
+        if selectedAlbum == nil, let playlist = selectedPlaylist, case .loaded(let rows) = state {
+            playlistEditor.open(playlist, rows: rows)
+        }
     }
 
     private func dropTracks() {
@@ -500,6 +512,7 @@ public final class LibraryBrowserModel {
         tracksGeneration += 1
         trackLoader = nil
         tracks = .idle
+        playlistEditor.close()
     }
 
     // MARK: Search

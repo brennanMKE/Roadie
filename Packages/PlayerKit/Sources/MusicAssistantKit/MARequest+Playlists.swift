@@ -42,4 +42,20 @@ extension MARequest {
             command: "music/playlists/import_playlist",
             args: ["m3u_data": .string(m3u), "library_matching": .bool(libraryMatching)])
     }
+
+    /// `positions_to_remove` are 1-based, as each track's `position`.
+    public static func removePlaylistTracks(playlistID: String, positions: [Int]) -> MARequest {
+        MARequest(
+            command: "music/playlists/remove_playlist_tracks",
+            args: ["db_playlist_id": .string(playlistID), "positions_to_remove": .array(positions.map { .number(Double($0)) })])
+    }
+
+    /// Absent on 2.10.6 (#0137); 1-based positions.
+    public static let movePlaylistTrackCommand = "music/playlists/move_playlist_track"
+
+    public static func movePlaylistTrack(playlistID: String, from: Int, to: Int) -> MARequest {
+        MARequest(
+            command: movePlaylistTrackCommand,
+            args: ["db_playlist_id": .string(playlistID), "from_position": .number(Double(from)), "to_position": .number(Double(to))])
+    }
 }
