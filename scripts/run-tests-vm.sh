@@ -41,7 +41,7 @@
 #   5. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
 #      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
-#      scripts/check-identifiers.sh: no com.brennanmke outside the legacy allowlist (#0153)
+#      scripts/check-identifiers.sh: no pre-Roadie bundle id outside the legacy allowlist (#0153)
 #   7. optional: launch SkinAmp.app, check it stays up, quit it
 # Exit codes:
 #   0  everything passed and the host stayed silent
