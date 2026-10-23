@@ -3,6 +3,20 @@ import Testing
 @testable import SendspinKit
 
 struct SendspinMessagesTests {
+    /// Roadie's own Sendspin identity (#0155). The hello test reads the recorded probe's identity, so this pins ours.
+    @Test func identityAndDeviceInfoNameRoadie() throws {
+        let device = SendspinDeviceInfo(softwareVersion: "1")
+        #expect(device.productName == "Roadie")
+        #expect(device.manufacturer == "Roadie")
+        let suite = "SendspinMessagesTests.identity.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let minted = SendspinIdentity.load(defaults: defaults, hostName: "Test Mac")
+        #expect(minted.name == "Roadie (Test Mac)")
+        #expect(minted.clientID.hasPrefix("roadie-"))
+        #expect(SendspinIdentity.load(defaults: defaults, hostName: "Other").clientID == minted.clientID)
+    }
+
     @Test func clientHelloEncodesTheLegacyShape() throws {
         let recorded = try #require(try fixtureFrames().first { $0.dir == "out" && $0.frame["type"] as? String == "client/hello" })
         // The identity is whatever the probe sent when the fixture was recorded, so it comes from the fixture.
