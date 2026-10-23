@@ -49,7 +49,7 @@ An existing profile for the same team works too: `release.sh --notary-profile NA
 2. Check there's no key yet: `build/sparkle/bin/generate_keys --account Roadie -p`. It must find nothing.
 3. Generate: `build/sparkle/bin/generate_keys --account Roadie`. The private key goes into the login keychain and the
    public key is printed.
-4. **Back up now:** `generate_keys --account Roadie -x <outside the repo>/roadie-sparkle.key`. Store it in a password
+4. **Back up now:** `generate_keys --account Roadie -x <outside the repo>/sparkle-roadie.key`. Store it in a password
    manager or an encrypted volume, then delete that file.
 5. Put the public key in `project.yml` (`ROADIE_PUBLIC_ED_KEY`, Release). It's public.
 
@@ -63,15 +63,22 @@ scripts/export-release-credentials.sh ~/Backups/roadie-release-credentials   # o
 scripts/import-release-credentials.sh ~/Backups/roadie-release-credentials   # on the new Mac
 ```
 
-- Export refuses a destination inside the repo, creates it with mode 700, and only reads. It exports:
-  - the `.p8`;
-  - the Developer ID identity as `DeveloperID.p12` (`security` asks for the passphrase in its own dialog; `-P` is never
-    used);
-  - the Sparkle key as `roadie-sparkle.key`.
-- Import skips anything already present:
+- `setup-notary.sh [--profile NAME] [--force]` (default `Roadie-notary`) prompts for the `.p8` path (must be outside
+  the repo), key id and issuer id. It does nothing if `notarytool history` already works with that profile, unless
+  `--force` is given.
+- `export-release-credentials.sh [--sparkle-bin DIR] [--p8 PATH] DEST_DIR` refuses a destination inside the repo
+  (real paths compared) or one that isn't empty, creates it with mode 700, and only reads the keychain. Each file is
+  mode 600. It exports:
+  - the `.p8`, when `--p8` is given;
+  - the identities as `DeveloperID.p12` (`security` asks for the passphrase in its own dialog; `-P` is never used);
+  - the Sparkle key as `sparkle-roadie.key` (`generate_keys` from `build/sparkle/bin` or `--sparkle-bin`).
+- `import-release-credentials.sh [--sparkle-bin DIR] SRC_DIR` imports what's in the folder and skips anything already
+  present:
   - an existing identity is never duplicated;
   - an existing Sparkle key is never replaced (`-p` is checked before `-f`).
-  It then prints the `setup-notary.sh` command and runs `preflight.sh --credentials-only`.
+  If a `.p8` is present it prints the `setup-notary.sh` step.
+- Both export and import finish with `preflight.sh --credentials-only` (or tell you to run it). Neither runs with
+  `set -x`; they refuse to.
 - Move the bundle only over a channel you trust, then delete the copies.
 
 ## Back up
