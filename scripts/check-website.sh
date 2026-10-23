@@ -38,6 +38,7 @@ FONT_HOSTS = {"fonts.googleapis.com", "fonts.gstatic.com"}
 LINK_HOSTS = {"github.com", "roadie.sstools.co"}
 problems = []
 gh_cache = {}
+skipped_release_checks = set()
 
 def release_exists(version):
     if version not in gh_cache:
@@ -79,6 +80,9 @@ def check(where, ref, kind):
     if m:
         v = m.group(1)
         if v == expect or release_exists(v):
+            return
+        if not shutil.which("gh"):
+            skipped_release_checks.add(v)  # e.g. the VM guest: no gh, so the release can't be checked here
             return
         problems.append(f"{where}: {ref} has no GitHub release v{v} (pass --expect-dmg {v} during a release)")
         return
@@ -138,6 +142,8 @@ if os.path.isdir(css_dir):
             for u in refs:
                 check(name, u, "font")
 
+for v in sorted(skipped_release_checks):
+    print(f"(gh not available; skipped the GitHub release check for v{v})")
 for p in problems:
     print(f"!! {p}", file=sys.stderr)
 sys.exit(1 if problems else 0)
