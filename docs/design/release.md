@@ -150,7 +150,8 @@ The `com.brennanmke.SkinAmp.plex` constant in `LegacyDataCleanup` stays: it stil
    - Renamed entitlements and app files.
    - Every script path (`SkinAmp.xcodeproj`, `SkinAmp.app`, `SkinAmpThumbnail.appex`, `pgrep -x SkinAmp`,
      `release/SkinAmp.app.zip`, `make-dmg.sh` names).
-   - The VM clone prefix and lease label. The stale-clone cleanup keeps matching `skinamp-test-` for one transition.
+   - The VM clone prefix and lease label. (A transitional `skinamp-test-` cleanup was added here and dropped in #0155;
+     the sweep now matches only `roadie-test-`.)
 
    This is **one commit**, because the VM runner builds by project and scheme name. Afterwards, delete the stale local
    `SkinAmp.xcodeproj`; it is gitignored.
@@ -167,14 +168,19 @@ The `com.brennanmke.SkinAmp.plex` constant in `LegacyDataCleanup` stays: it stil
 **Gate A: ready to push** (all of these, before `git push`):
 
 - [ ] `scripts/verify.sh --head --full --launch --dmg` passes.
-- [ ] Outside `issues/NNNN.md`, `git grep -i skinamp` finds only:
-  - `LegacyDataCleanup` (its `com.brennanmke.SkinAmp.plex` constant);
-  - the GitHub URL in `issues/project.json`;
-  - the `README` sentence "formerly SkinAmp";
-  - the transitional VM clone cleanup pattern.
+- [ ] `scripts/check-rename.sh` passes (run on the host; it only reads, with `git grep`). Outside `issues/NNNN.md`,
+      `SkinAmp` (case-insensitive) and `com.brennanmke` appear only in its allowlist:
+  - `LegacyDataCleanup` (its `com.brennanmke.SkinAmp.plex` constant) and `scripts/check-identifiers.sh`;
+  - the GitHub URL in `issues/project.json` and the repo name in `docs/website-hosting.md`, until the repo rename;
+  - the README sentence "The project was called SkinAmp during development.";
+  - `scripts/worklog.py` (the real `~/.claude/projects/…-SkinAmp` folder);
+  - recorded fixtures (`MusicAssistantKitStub/Fixtures/players-all-sendspin{,-unavailable}.json`,
+    `error-unknown-{player,command}.json`, `SendspinKitTests/Fixtures/sendspin-legacy-session.json`,
+    `docs/ma-protocol/sendspin-probe.json`) and the probe record in `docs/sendspin-notes.md`;
+  - history: this file, `docs/plex-music-library.md`, `winamp-skin-player-brief.md`;
+  - the AirPlay spike's own `com.brennanmke.AirPlaySpike` (`Spikes/AirPlaySpike/`, `docs/airplay-spike-results.md`).
 
-  The allowlist lives in `scripts/check-rename.sh` (added in W5), which exits non-zero on anything else.
-- [ ] `git grep com.brennanmke` finds only the same allowlist.
+  It exits non-zero and lists anything else.
 - [ ] **The user** installs a locally signed, unnotarized Roadie DMG (`scripts/make-dmg.sh`), enters their Music
       Assistant server and token, picks their folders, and confirms Roadie works.
 - [ ] The user says "push".
@@ -380,7 +386,7 @@ website/
 - **New:** `docs/sparkle.md`, `docs/releasing.md`, `docs/release-credentials.md`, `docs/code-signing.md`, this file,
   and `website/README.md`.
 - **`README.md`:**
-  - Title "Roadie", the tagline, "formerly SkinAmp".
+  - Title "Roadie", the tagline, one sentence saying it was called SkinAmp during development.
   - Download link to the website.
   - Requirements.
   - Development: XcodeGen; builds and tests only in the VM through `scripts/verify.sh`.
@@ -430,8 +436,8 @@ Each item fits one agent. Builds and tests run only through `scripts/verify.sh`.
 
 **W3. Product rename.** Depends on: W2.
 - `project.yml` name, targets, scheme, display names; rename the entitlements files and `RoadieApp.swift`.
-- `run-tests-vm.sh` (project, scheme, app paths, `pgrep`/`osascript` names, zip name, clone prefix and lease label with
-  the transitional cleanup), `verify.sh`, `check-*.sh`, `make-dmg.sh` (`Roadie.app`, `Roadie-<v>-<build>-<commit>.dmg`,
+- `run-tests-vm.sh` (project, scheme, app paths, `pgrep`/`osascript` names, zip name, clone prefix and lease label; the
+  transitional cleanup was dropped in #0155), `verify.sh`, `check-*.sh`, `make-dmg.sh` (`Roadie.app`, `Roadie-<v>-<build>-<commit>.dmg`,
   volname `Roadie`).
 - One commit.
 - Accept: `verify.sh --launch --dmg` passes and reports `release/Roadie.app.zip`.
@@ -446,7 +452,7 @@ Each item fits one agent. Builds and tests run only through `scripts/verify.sh`.
 **W5. Docs, tracker, NOTICE, rename check.** Depends on: W3 (can run alongside W4).
 - §2.7 renames (not the GitHub URL), `issues/project.json` name, the `Issues.md` heading.
 - Add this doc and the four docs.
-- `scripts/check-rename.sh` with the allowlist, added as a VM step.
+- `scripts/check-rename.sh` with the allowlist, run on the host (not a VM step: it needs `git grep`).
 - Accept: `check-rename.sh` passes; every relative link in `docs/` resolves.
 
 **Gate A (user).** The §2.1 checklist, including the user's check on their own Mac with a DMG from
@@ -554,7 +560,8 @@ through `--notary-profile`.
 7. **Screenshot skin.** *Default:* an original Roadie skin (could seed the default look); never the Winamp base skin.
 8. **Test tier for releases.** *Default:* `--full --launch --dmg` (slow tier included).
 9. **Notarize the app on its own as well as the DMG?** *Default:* no. One DMG submission, stapled.
-10. **Rename the VM clone prefix and lease label.** *Default:* yes, with one transitional cleanup pattern.
+10. **Rename the VM clone prefix and lease label.** *Default:* yes. (Done; the transitional cleanup pattern was
+   dropped in #0155.)
 11. **Sendspin player name.** *Default:* "Roadie (<host>)". Roadie starts with a new client id, so Music Assistant
    sees a new player.
 12. **Idle marquee text.** *Default:* "Roadie".
