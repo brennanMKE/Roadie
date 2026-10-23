@@ -38,7 +38,7 @@ struct FallbackTextTests {
         #expect(FallbackText.summary(missing) == "Using Local Folder: Server isn't set up.")
         let down = status(preferred: ("server", "Server"), active: ("folder", "Local Folder"), reason: .unreachable("x"))
         #expect(FallbackText.summary(down)
-            == "Using Local Folder: Server can't be reached. SkinAmp switches back when it is.")
+            == "Using Local Folder: Server can't be reached. Roadie switches back when it is.")
         #expect(FallbackText.subtitle(down) == "Local Folder (Server unavailable)")
     }
 }

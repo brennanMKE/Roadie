@@ -190,7 +190,7 @@ public struct SearchResults: Hashable, Sendable {
     public var isEmpty: Bool { artists.isEmpty && albums.isEmpty && tracks.isEmpty }
 }
 
-/// One Music Assistant player's playback as SkinAmp sees it (#0121). SkinAmp's own player is `OutputDevice.thisMacID`.
+/// One Music Assistant player's playback as Roadie sees it (#0121). Roadie's own player is `OutputDevice.thisMacID`.
 public struct OutputActivity: Hashable, Sendable {
     public var output: OutputDevice.ID
     public var name: String

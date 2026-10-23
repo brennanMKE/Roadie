@@ -6,7 +6,7 @@ import ZIPFoundation
 /// Writes small synthetic `.wsz` archives into a fresh temp folder.
 enum ZipFixtures {
     static func tempURL(_ name: String) -> URL {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("skinamp-ql-\(UUID().uuidString)")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("roadie-ql-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent(name)
     }

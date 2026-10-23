@@ -3,7 +3,7 @@ import MusicBackendKit
 import Testing
 @testable import LibraryBrowser
 
-/// #0121: which output SkinAmp adopts from Music Assistant, and what an exclusive start stops.
+/// #0121: which output Roadie adopts from Music Assistant, and what an exclusive start stops.
 struct PlaybackOwnershipTests {
     let mac = OutputDevice.thisMacID
     let homePod = OutputDevice.ID(rawValue: "homepod")

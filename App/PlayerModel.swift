@@ -133,7 +133,7 @@ final class PlayerModel {
     /// The next activity snapshot follows a `.connected`, so it may adopt a paused player too.
     @ObservationIgnored var activityAfterConnect = true
     @ObservationIgnored var musicAssistantIsConnected = false
-    /// SkinAmp itself asked Music Assistant to play on This Mac; cleared when the stream starts.
+    /// Roadie itself asked Music Assistant to play on This Mac; cleared when the stream starts.
     @ObservationIgnored var ownStreamRequested = false
     private(set) var nowPlaying: NowPlaying = .idle(on: OutputDevice.thisMacID)
     private var nowPlayingTask: Task<Void, Never>?
@@ -266,7 +266,7 @@ final class PlayerModel {
     /// Winamp's Generate HTML Playlist: writes the page to the temporary directory and opens it in the browser.
     /// Never touches the queue.
     func generateHTMLPlaylist() {
-        let url = FileManager.default.temporaryDirectory.appending(path: "SkinAmp Playlist.html")
+        let url = FileManager.default.temporaryDirectory.appending(path: "Roadie Playlist.html")
         do {
             try PlaylistHTML.document(entries: playlist.htmlEntries)
                 .write(to: url, atomically: true, encoding: .utf8)
@@ -420,7 +420,7 @@ final class PlayerModel {
         }
         playlist.onEditRemote = { [weak self] edit in try await self?.editRemoteQueue(edit) }
         playlist.onRemoteNotice = { [weak self] text in self?.post(StatusNotice(text: text)) }
-        // Music Assistant started playing on this Mac (from SkinAmp, its own UI, Home Assistant or a phone).
+        // Music Assistant started playing on this Mac (from Roadie, its own UI, Home Assistant or a phone).
         stack.sendspin.onStreamStarted = { [weak self] in self?.streamStarted() }
         // The server ended the stream, or the session dropped or was stopped: This Mac plays its local queue again.
         stack.sendspin.onStreamStopped = { [weak self] in self?.applyFeed(.streamStopped) }
@@ -461,7 +461,7 @@ final class PlayerModel {
         fallback.onNotice = { [weak self] in self?.post(StatusNotice(text: $0.text, detail: $0.detail)) }
         fallback.start()
         selection.start()
-        // #0121: connect at launch when a verified server exists, so SkinAmp follows what Music Assistant plays.
+        // #0121: connect at launch when a verified server exists, so Roadie follows what Music Assistant plays.
         if MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) {
             Task { [weak self] in
                 _ = await selection.resolveNow()

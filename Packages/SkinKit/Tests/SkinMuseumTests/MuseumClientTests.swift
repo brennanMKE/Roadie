@@ -22,7 +22,7 @@ import Testing
         #expect(request.httpMethod == "POST")
         #expect(request.url == MuseumClient.defaultEndpoint)
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
-        #expect(request.value(forHTTPHeaderField: "User-Agent") == "SkinAmp/9.9 (+https://github.com/brennanMKE/SkinAmp)")
+        #expect(request.value(forHTTPHeaderField: "User-Agent") == "Roadie/9.9 (+https://roadie.sstools.co/)")
         let body = try transport.body()
         #expect(body["operationName"] as? String == "MuseumSearch")
         let query = try #require(body["query"] as? String)

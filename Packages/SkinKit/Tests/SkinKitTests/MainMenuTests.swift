@@ -26,7 +26,7 @@ struct MainMenuTests {
         }
         #expect(
             labels == [
-                "About SkinAmp", "-", "Play File…", "Add to Playlist…", "-", "Equalizer", "Playlist Editor", "-",
+                "About Roadie", "-", "Play File…", "Add to Playlist…", "-", "Equalizer", "Playlist Editor", "-",
                 "Skins >", "Options >", "Playback >", "-", "Exit",
             ])
     }

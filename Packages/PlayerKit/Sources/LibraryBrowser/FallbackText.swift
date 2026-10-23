@@ -24,7 +24,7 @@ public enum FallbackText {
         switch status.reason {
         case .notConfigured?: return "Using \(status.activeName): \(status.preferredName) isn't set up."
         case .unreachable?:
-            return "Using \(status.activeName): \(status.preferredName) can't be reached. SkinAmp switches back when it is."
+            return "Using \(status.activeName): \(status.preferredName) can't be reached. Roadie switches back when it is."
         case nil: return "Using \(status.activeName)."
         }
     }

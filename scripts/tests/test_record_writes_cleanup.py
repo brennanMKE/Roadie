@@ -14,7 +14,7 @@ _spec = importlib.util.spec_from_file_location(
 rmf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(rmf)
 
-NAME = "SkinAmp fixture test"
+NAME = "Roadie fixture test"
 TRACKS = [
     {"item_id": "1", "uri": "library://track/1", "name": "First Song", "favorite": False},
     {"item_id": "2", "uri": "library://track/2", "name": "Second Song", "favorite": False},

@@ -162,7 +162,7 @@ final class Rig {
         let rig = try Rig()
         try await rig.connect()
         await rig.startStream()
-        let url = URL(fileURLWithPath: "/nonexistent/skinamp-test.mp3")
+        let url = URL(fileURLWithPath: "/nonexistent/roadie-test.mp3")
         rig.player.enqueue([Track(title: "Local", artist: "Test", duration: 1, source: .file(url))])
         rig.player.play(at: 0)
         #expect(rig.preempted == 1)

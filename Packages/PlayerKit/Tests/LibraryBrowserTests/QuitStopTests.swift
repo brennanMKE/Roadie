@@ -4,7 +4,7 @@ import MusicBackendStub
 import Testing
 @testable import LibraryBrowser
 
-/// #0121: what SkinAmp stops on quit, and that a dead connection never holds quitting up.
+/// #0121: what Roadie stops on quit, and that a dead connection never holds quitting up.
 struct QuitStopTests {
     let mac = OutputDevice.thisMacID
     let homePod = OutputDevice.ID(rawValue: "homepod")

@@ -52,7 +52,7 @@ struct MAFixtureTests {
         for fixture in MAFixture.allCases where !MAFixture.baseline.contains(fixture) && fixture.isRecorded {
             _ = try fixture.json
         }
-        #expect(throws: MAFixture.Missing.self) { try MAFixture.recommendationItems(row: "skinamp-no-such-row") }
+        #expect(throws: MAFixture.Missing.self) { try MAFixture.recommendationItems(row: "roadie-no-such-row") }
     }
 
     @Test func authAnswersByToken() throws {

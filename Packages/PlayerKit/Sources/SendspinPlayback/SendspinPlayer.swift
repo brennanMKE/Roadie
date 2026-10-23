@@ -19,7 +19,7 @@ public final class SendspinPlayer {
     public private(set) var status: Status = .off
     public private(set) var isStreaming = false
     public let player: Player
-    /// Called when a stream starts (Music Assistant began playing on this Mac, from SkinAmp or elsewhere).
+    /// Called when a stream starts (Music Assistant began playing on this Mac, from Roadie or elsewhere).
     @ObservationIgnored public var onStreamStarted: (() -> Void)?
     /// Called when local playback took the node (the app asks Music Assistant to stop sending, #0109).
     @ObservationIgnored public var onStreamPreempted: (() -> Void)?

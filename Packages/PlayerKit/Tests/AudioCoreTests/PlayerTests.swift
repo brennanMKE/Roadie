@@ -197,7 +197,7 @@ import Testing
 /// the load open; everything is headless and silent (offline rendering where a load completes).
 @MainActor
 @Suite struct LoadingStateTests {
-    private static let missing = URL(filePath: "/nonexistent/skinamp-missing.wav")
+    private static let missing = URL(filePath: "/nonexistent/roadie-missing.wav")
 
     private func makePlayer(_ count: Int = 2, honorsCancellation: Bool = true) -> (Player, GateResolver, [Track]) {
         let gate = GateResolver(honorsCancellation: honorsCancellation)

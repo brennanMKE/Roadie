@@ -14,7 +14,7 @@ private final class Box<T>: @unchecked Sendable {
 
 private enum CorpusFixtures {
     static func tempDirectory() -> URL {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("skinamp-corpus-\(UUID().uuidString)")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("roadie-corpus-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

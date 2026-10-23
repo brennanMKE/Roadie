@@ -1,5 +1,5 @@
 /// The main window's options menu (Winamp's main menu, Webamp `MainContextMenu`), as plain data. The app builds the
-/// `NSMenu` from these entries in one place; features SkinAmp does not have yet are left out rather than disabled.
+/// `NSMenu` from these entries in one place; features Roadie does not have yet are left out rather than disabled.
 public enum MainMenuCommand: Hashable, Sendable {
     case about, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow
     case openSkin, nextSkin, previousSkin, randomSkin
@@ -92,7 +92,7 @@ public indirect enum MainMenuEntry: Equatable, Sendable {
 public enum MainMenu {
     public static func entries(_ state: MainMenuState) -> [MainMenuEntry] {
         [
-            .item(MainMenuItem(.about, "About SkinAmp")),
+            .item(MainMenuItem(.about, "About Roadie")),
             .separator,
             .item(MainMenuItem(.openFiles, "Play File…", shortcut: MainMenuShortcut("o"))),
             .item(MainMenuItem(.addFiles, "Add to Playlist…", shortcut: MainMenuShortcut("o", [.command, .option]))),

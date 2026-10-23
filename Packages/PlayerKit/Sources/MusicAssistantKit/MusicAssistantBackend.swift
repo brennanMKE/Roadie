@@ -21,7 +21,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
 
     public nonisolated let sourceID = "musicAssistant"
     public nonisolated let displayName = "Music Assistant"
-    /// `.localOutput`: This Mac plays through the MA player wrapping SkinAmp's Sendspin client (#0107).
+    /// `.localOutput`: This Mac plays through the MA player wrapping Roadie's Sendspin client (#0107).
     public nonisolated let capabilities: BackendCapabilities = [
         .search, .playlists, .artwork, .remoteOutputs, .localOutput, .recommendations, .queueEditing,
         .favorites, .radio, .playlistEditing,
@@ -54,7 +54,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     private var counts: [String: Int] = [:]
     /// Players by id, from `outputs()`, `players/get` and the watchers: commands never list every player.
     private var players: [String: MAPlayer] = [:]
-    /// SkinAmp's own Sendspin client id, set by the app while its Sendspin session runs (#0109).
+    /// Roadie's own Sendspin client id, set by the app while its Sendspin session runs (#0109).
     private var localClientID: String?
     /// The MA player that wraps `localClientID`, once found.
     private var localPlayerID: String?
@@ -218,7 +218,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         if let raced, raced !== fresh { await raced.disconnect() }
     }
 
-    /// Where SkinAmp's Sendspin session connects (#0109): the server the API is connected to, with its token. nil
+    /// Where Roadie's Sendspin session connects (#0109): the server the API is connected to, with its token. nil
     /// when not connected.
     public func sendspinEndpoint() -> MusicAssistantSendspinEndpoint? {
         guard client != nil, let baseURL = connectedBaseURL, let token = connectedToken else { return nil }
@@ -756,7 +756,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         for (watcherID, watcher) in watchers where watcher.output == OutputDevice.thisMacID { startWatcher(watcherID) }
     }
 
-    /// The MA player hosting SkinAmp's Sendspin client: the cache first, else `players/all`.
+    /// The MA player hosting Roadie's Sendspin client: the cache first, else `players/all`.
     private func resolveLocalPlayer() async throws -> MAPlayer {
         guard let clientID = localClientID else { throw MusicBackendError.backend(Self.thisMacNotRegisteredText) }
         if let cachedID = localPlayerID, let cached = players[cachedID], cached.available {
@@ -859,7 +859,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     }
 }
 
-/// The Music Assistant server SkinAmp's Sendspin session targets (#0109).
+/// The Music Assistant server Roadie's Sendspin session targets (#0109).
 public struct MusicAssistantSendspinEndpoint: Sendable, Equatable, CustomStringConvertible {
     public let baseURL: URL
     public let token: MusicAssistantToken

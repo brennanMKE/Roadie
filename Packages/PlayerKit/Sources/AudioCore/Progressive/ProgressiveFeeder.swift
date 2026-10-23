@@ -76,7 +76,7 @@ final class ProgressiveFeeder: @unchecked Sendable {
 
     func start() {
         let thread = Thread { [self] in run() }
-        thread.name = "SkinAmp.progressive-feeder"
+        thread.name = "Roadie.progressive-feeder"
         thread.qualityOfService = .userInitiated
         thread.start()
     }

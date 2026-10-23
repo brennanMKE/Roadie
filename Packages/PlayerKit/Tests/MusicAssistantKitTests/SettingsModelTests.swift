@@ -548,7 +548,7 @@ struct SettingsModelTests {
         note()
         for failure: MusicAssistantConnectionFailure in [
             .invalidAddress(.httpsRequired), .blockedByATS, .tokenRejected, .needsToken(foundName: nil),
-            .serverMismatch(foundName: nil), .schema("This Music Assistant server is too old for SkinAmp (schema 3; needs 28 or later)."),
+            .serverMismatch(foundName: nil), .schema("This Music Assistant server is too old for Roadie (schema 3; needs 28 or later)."),
         ] {
             messages.append(failure.message)
         }

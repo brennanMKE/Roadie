@@ -4,7 +4,7 @@ import Foundation
 /// computed from the source-neutral `NowPlaying` snapshot.
 public enum MarqueeText {
     /// Webamp: "Winamp 2.91".
-    public static let idle = "SkinAmp"
+    public static let idle = "Roadie"
     /// Shown while a backend track is still loading.
     public static let buffering = "Buffering\u{2026}"
 

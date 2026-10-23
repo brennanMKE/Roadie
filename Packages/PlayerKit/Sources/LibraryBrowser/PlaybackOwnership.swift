@@ -2,7 +2,7 @@ import Foundation
 import MusicBackendKit
 import os
 
-/// Which output SkinAmp's transport follows, and what it stops so only one place plays (#0121). Pure: the app wires
+/// Which output Roadie's transport follows, and what it stops so only one place plays (#0121). Pure: the app wires
 /// these into `PlayerModel`.
 public enum PlaybackOwnership {
     public enum Trigger: Sendable { case connected, activityChanged(previous: [OutputActivity]) }
@@ -30,7 +30,7 @@ public enum PlaybackOwnership {
 
     public enum Stop: Hashable, Sendable { case thisMacLocal, musicAssistant(OutputDevice.ID) }
 
-    /// What to stop when SkinAmp starts playback on `target`. `thisMacSounding`: AudioCore plays, or a Sendspin
+    /// What to stop when Roadie starts playback on `target`. `thisMacSounding`: AudioCore plays, or a Sendspin
     /// stream runs. Players other than This Mac and the previous target are never touched.
     public static func stops(
         startingOn target: OutputDevice.ID, previous: OutputDevice.ID?, thisMacFeed: ThisMacFeed,
@@ -52,7 +52,7 @@ public enum PlaybackOwnership {
     }
 }
 
-/// Stopping Music Assistant playback when SkinAmp quits (#0121).
+/// Stopping Music Assistant playback when Roadie quits (#0121).
 public enum QuitStop {
     public static let defaultsKey = "musicAssistant.stopOnQuit"
     public static let timeout: Duration = .milliseconds(1500)

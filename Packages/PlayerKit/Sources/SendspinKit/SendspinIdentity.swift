@@ -1,6 +1,6 @@
 import Foundation
 
-/// SkinAmp's Sendspin player identity. The client id is minted once and kept in `UserDefaults`.
+/// Roadie's Sendspin player identity. The client id is minted once and kept in `UserDefaults`.
 ///
 /// It is only ever used on the legacy wire: a future encrypted (Noise) client must mint a new id, because MA's
 /// downgrade protection refuses a legacy hello for an id that has connected encrypted.
@@ -20,9 +20,9 @@ public struct SendspinIdentity: Sendable, Equatable {
         if let stored = defaults.string(forKey: clientIDKey), !stored.isEmpty {
             clientID = stored
         } else {
-            clientID = "skinamp-" + UUID().uuidString.lowercased()
+            clientID = "roadie-" + UUID().uuidString.lowercased()
             defaults.set(clientID, forKey: clientIDKey)
         }
-        return SendspinIdentity(clientID: clientID, name: "SkinAmp (\(hostName))")
+        return SendspinIdentity(clientID: clientID, name: "Roadie (\(hostName))")
     }
 }

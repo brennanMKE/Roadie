@@ -57,11 +57,13 @@ struct ClientCallTests {
     }
 
     @Test func aNullResultDecodesAsNil() async throws {
+        // The id the recorder probed with, so the recorded null reply matches.
+        let unknownPlayerID = try #require(MAFixture.errorUnknownPlayer.args?["player_id"]?.stringValue)
         let rig = try await connected()
-        let missing = try await rig.client.call(.player(id: "skinamp-no-such-player"), as: MAPlayer?.self)
+        let missing = try await rig.client.call(.player(id: unknownPlayerID), as: MAPlayer?.self)
         #expect(missing == nil)
         do {
-            _ = try await rig.client.call(.player(id: "skinamp-no-such-player"), as: MAPlayer.self)
+            _ = try await rig.client.call(.player(id: unknownPlayerID), as: MAPlayer.self)
             Issue.record("expected a decoding error")
         } catch let error as MusicAssistantError {
             guard case .decoding(let command, _) = error else {
@@ -77,8 +79,9 @@ struct ClientCallTests {
         var script = try FixtureScript.recorded(token: testToken)
         script.routes.insert(.error(command: "providers", code: 20, details: "Authentication is required."), at: 0)
         let rig = try await connected(script: script)
+        let unknownCommand = try #require(MAFixture.errorUnknownCommand.command)   // the recorder's probe
         await #expect(throws: MusicAssistantError.server(code: 12, details: "Invalid or unsupported command.")) {
-            try await rig.client.call(MARequest(command: "skinamp/no_such_command"))
+            try await rig.client.call(MARequest(command: unknownCommand))
         }
         await #expect(throws: MusicAssistantError.unauthenticated) { try await rig.client.call(.providers()) }
         await rig.client.disconnect()

@@ -351,7 +351,7 @@ struct RenderingTests {
 
         let idle = MainWindowState.idle
         #expect(idle.status.transport == .stopped)
-        #expect(idle.marqueeText == "SkinAmp")   // MarqueeText.idle; MusicBackendKitTests pins the same literal
+        #expect(idle.marqueeText == "Roadie")   // MarqueeText.idle; MusicBackendKitTests pins the same literal
         #expect(idle.focused && !idle.shuffle && !idle.repeatOn && !idle.eqOpen && !idle.playlistOpen)
         #expect(idle.visualizer == .off)
     }

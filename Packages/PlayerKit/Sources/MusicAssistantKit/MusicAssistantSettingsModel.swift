@@ -52,7 +52,7 @@ public final class MusicAssistantSettingsModel: CustomStringConvertible, CustomD
         public var text: String {
             switch self {
             case .needsLocationAccess:
-                "Using the network name needs Location access. SkinAmp still finds your server by trying each one."
+                "Using the network name needs Location access. Roadie still finds your server by trying each one."
             case .notOnWiFi: "Not connected to Wi-Fi."
             }
         }

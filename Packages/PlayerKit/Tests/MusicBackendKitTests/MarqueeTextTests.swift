@@ -17,7 +17,7 @@ import Testing
 
     /// SkinKit cannot import MusicBackendKit, so `MainWindowState.idle` repeats this literal; RenderingTests pins it there.
     @Test func idleTextIsTheLiteralSkinKitsIdleStateRepeats() {
-        #expect(MarqueeText.idle == "SkinAmp")
+        #expect(MarqueeText.idle == "Roadie")
     }
 
     @Test func formatsSliderFocusTextLikeWebamp() {

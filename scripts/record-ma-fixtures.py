@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Records Music Assistant protocol fixtures for SkinAmp (#0060). Host only, network only, read-only.
+"""Records Music Assistant protocol fixtures for Roadie (#0060). Host only, network only, read-only.
 
 Run:   /usr/bin/python3 -I scripts/record-ma-fixtures.py [--out DIR] [--events-seconds N]
 Check: /usr/bin/python3 -I scripts/record-ma-fixtures.py --check
@@ -71,7 +71,7 @@ WRITE_FIXTURES = frozenset([
 TRUNCATE = {"playlist-tracks": 5, "player-queue-items-loaded": 5,
             "playlist-tracks-after-add": 5, "playlist-tracks-after-remove": 5}
 # Error-envelope probes. Harmless: an unknown command, never the real token on a failing path.
-PROBES = frozenset(["skinamp/no_such_command"])
+PROBES = frozenset(["roadie/no_such_command"])
 
 FAKE_SERVER_ID = "0123456789abcdef0123456789abcdef"
 FAKE_UUID = "00000000-0000-0000-0000-000000000000"
@@ -145,7 +145,7 @@ def http_get(base, path_or_url, bearer=None, timeout=10, maxbytes=4000000):
         conn = http.client.HTTPSConnection(netloc, timeout=timeout, context=TLS)
     else:
         conn = http.client.HTTPConnection(netloc, timeout=timeout)
-    headers = {"Accept": "*/*", "User-Agent": "SkinAmp-recorder"}
+    headers = {"Accept": "*/*", "User-Agent": "Roadie-recorder"}
     if bearer:
         headers["Authorization"] = "Bearer " + bearer
     try:
@@ -415,7 +415,7 @@ class Targets:
                         out[k] = "user"
                         continue
                     if k == "device_name" and isinstance(v, str):
-                        out[k] = "SkinAmp"
+                        out[k] = "Roadie"
                         continue
                     if k in BULK_EMPTY and isinstance(v, list):
                         out[k] = []
@@ -692,7 +692,7 @@ def record_playlist_writes(args):
     if len(tracks) < 2:
         s.ws.close()
         die("the library needs at least two tracks")
-    name = "SkinAmp fixture " + run_id
+    name = "Roadie fixture " + run_id
     failed = None
     try:
         failed = run_playlist_writes(s, tracks, name, fixtures, scrub=targets.scrub_str)
@@ -805,8 +805,8 @@ def record(args):
     pid = players[0].get("player_id") if players and isinstance(players, list) else None
     if pid:
         R("player-get", "players/get", {"player_id": pid})
-    R("error-unknown-player", "players/get", {"player_id": "skinamp-no-such-player"})
-    R("error-unknown-command", "skinamp/no_such_command", {}, probe=True)
+    R("error-unknown-player", "players/get", {"player_id": "roadie-no-such-player"})
+    R("error-unknown-command", "roadie/no_such_command", {}, probe=True)
 
     queues = R("player-queues-all", "player_queues/all") or []
     qid = queues[0].get("queue_id") if queues and isinstance(queues, list) else pid
@@ -1300,7 +1300,7 @@ def check_live():
 
         # 9. null-result, 10. error-frame
         try:
-            rec = call("players/get", {"player_id": "skinamp-no-such-player"})
+            rec = call("players/get", {"player_id": "roadie-no-such-player"})
             f = rec["frames"][0] if rec["frames"] else {}
             if "result" in f and f["result"] is None and f.get("partial") is False:
                 rep.ok("null-result")
@@ -1309,7 +1309,7 @@ def check_live():
         except Exception as e:
             rep.fail("null-result", type(e).__name__)
         try:
-            rec = call("skinamp/no_such_command", probe=True)
+            rec = call("roadie/no_such_command", probe=True)
             f = rec["frames"][0] if rec["frames"] else {}
             if f.get("error_code") == 12 and isinstance(f.get("details"), str):
                 rep.ok("error-frame")
@@ -1395,7 +1395,7 @@ def stream_get(base, target, bearer=None, timeout=45, maxbytes=16000000):
     else:
         conn = http.client.HTTPConnection(b.netloc, timeout=timeout)
     prefix = b.path.rstrip("/")
-    headers = {"Accept": "*/*", "User-Agent": "SkinAmp-recorder"}
+    headers = {"Accept": "*/*", "User-Agent": "Roadie-recorder"}
     if bearer:
         headers["Authorization"] = "Bearer " + bearer
     t0 = time.time()
@@ -1529,7 +1529,7 @@ def probe_audio(write, wait):
     h = urllib.parse.urlsplit(base)
     try:
         conn = http.client.HTTPConnection(h.hostname, 8097, timeout=10)
-        conn.request("GET", "/info", headers={"User-Agent": "SkinAmp-recorder"})
+        conn.request("GET", "/info", headers={"User-Agent": "Roadie-recorder"})
         r = conn.getresponse()
         body = r.read(100000)
         conn.close()

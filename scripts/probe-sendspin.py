@@ -3,7 +3,7 @@
 
 Run:   /usr/bin/python3 -I scripts/probe-sendspin.py [--write]
 
-Connects to the Music Assistant server in .env as a Sendspin player named "SkinAmp probe" through the
+Connects to the Music Assistant server in .env as a Sendspin player named "Roadie probe" through the
 authenticated `/sendspin` proxy on the API port (first frame `{"type": "auth", "token", "client_id"}`), speaks
 the legacy unencrypted wire that aiosendspin 9.1.1 (MA 2.10.6) and 10.x accept (`client/hello` with
 `client_id` and `version`), syncs clocks with five `client/time` exchanges, reports `client/state`, checks
@@ -29,8 +29,8 @@ _spec = importlib.util.spec_from_file_location("record_ma_fixtures", os.path.joi
 rmf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(rmf)
 
-CLIENT_ID = "skinamp-probe"
-CLIENT_NAME = "SkinAmp probe"
+CLIENT_ID = "roadie-probe"
+CLIENT_NAME = "Roadie probe"
 OUT_REL = os.path.join(rmf.DOCS_REL, "sendspin-probe.json")
 FAKE_SENDSPIN_ID = "A" * 43  # a Sendspin server_id is a 43-character base64url Curve25519 key
 # Message types the probe may send on the Sendspin socket. None asks for playback.
@@ -158,7 +158,7 @@ def probe(write):
     hello = {"type": "client/hello", "payload": {
         "client_id": CLIENT_ID, "name": CLIENT_NAME, "version": 1,
         "supported_roles": ["player@v1"],
-        "device_info": {"product_name": "SkinAmp", "manufacturer": "SkinAmp", "software_version": "probe"},
+        "device_info": {"product_name": "Roadie", "manufacturer": "Roadie", "software_version": "probe"},
         "player@v1_support": {
             "supported_formats": [{"codec": "pcm", "channels": 2, "sample_rate": 48000, "bit_depth": 16}],
             "buffer_capacity": 1048576,

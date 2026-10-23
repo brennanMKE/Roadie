@@ -57,7 +57,7 @@ extension LibraryArtist {
 
 extension LibraryAlbum {
     /// MA stores some albums with an empty name (the folder name is only in the provider mapping); the fallback
-    /// to that name, then "Untitled", is SkinAmp's choice. MA's own UI shows a blank.
+    /// to that name, then "Untitled", is Roadie's choice. MA's own UI shows a blank.
     init(ma album: MAAlbum) {
         let title: String
         if !album.name.isEmpty {

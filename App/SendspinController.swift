@@ -6,7 +6,7 @@ import SendspinKit
 import SendspinPlayback
 import os
 
-/// Starts and stops SkinAmp's Sendspin session, which makes This Mac a Music Assistant player (#0109). It connects
+/// Starts and stops Roadie's Sendspin session, which makes This Mac a Music Assistant player (#0109). It connects
 /// only when the Music Assistant API does; since #0121 that is also at launch when a verified server exists.
 @MainActor
 @Observable
@@ -14,7 +14,7 @@ final class SendspinController {
     static let enabledKey = "sendspin.enabled"
 
     let sendspin: SendspinPlayer
-    /// The MA player name: "SkinAmp (<computer name>)".
+    /// The MA player name: "Roadie (<computer name>)".
     let identity: SendspinIdentity
     /// Settings › Music Assistant › Play Music Assistant on this Mac. Default on.
     var isEnabled: Bool {
@@ -131,7 +131,7 @@ final class SendspinController {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let configuration = SendspinConnectionConfiguration(
             baseURL: endpoint.baseURL, token: endpoint.token.rawValue, clientID: identity.clientID, name: identity.name,
-            deviceInfo: SendspinDeviceInfo(productName: "SkinAmp", manufacturer: "SkinAmp", softwareVersion: version),
+            deviceInfo: SendspinDeviceInfo(productName: "Roadie", manufacturer: "Roadie", softwareVersion: version),
             format: sendspin.advertisedFormat())
         log.info("Sendspin starting")
         sendspin.start(configuration)

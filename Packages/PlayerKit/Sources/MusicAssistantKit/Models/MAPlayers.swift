@@ -66,7 +66,7 @@ public struct MAPlayer: Codable, Hashable, Sendable {
     public var supportedFeatures: [String]?
     public var currentMedia: MAPlayerMedia?
     public var needsSetup: Bool?
-    /// The protocols a universal player plays through; SkinAmp's own Sendspin client shows up here (#0107).
+    /// The protocols a universal player plays through; Roadie's own Sendspin client shows up here (#0107).
     public var outputProtocols: [MAOutputProtocol]?
 
     public var state: MAPlaybackState { MAPlaybackState(playbackState) }
@@ -125,7 +125,7 @@ public struct MAOutputProtocol: Codable, Hashable, Sendable {
 }
 
 extension MAPlayer {
-    /// The player plays SkinAmp's Sendspin client `id`: a standalone Sendspin player with that id, or the universal
+    /// The player plays Roadie's Sendspin client `id`: a standalone Sendspin player with that id, or the universal
     /// player MA wraps it in (docs/sendspin-notes.md section 7).
     public func hosts(sendspinClientID id: String) -> Bool {
         if playerID == id { return true }

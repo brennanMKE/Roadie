@@ -3,12 +3,12 @@ import MusicBackendKit
 import Observation
 
 /// What feeds This Mac (#0109): AudioCore's own queue (local files, the folder source), or Music Assistant's queue
-/// for SkinAmp's own MA player, arriving over Sendspin.
+/// for Roadie's own MA player, arriving over Sendspin.
 public enum ThisMacFeed: Sendable, Equatable { case local, musicAssistant }
 
 /// What changes the feed of This Mac (#0114).
 public enum ThisMacFeedEvent: Sendable, Equatable {
-    /// SkinAmp asked Music Assistant to play on This Mac.
+    /// Roadie asked Music Assistant to play on This Mac.
     case musicAssistantPlayRequested
     /// That play failed. While a stream still runs (an earlier play), Music Assistant keeps the feed.
     case musicAssistantPlayFailed(isStreaming: Bool)

@@ -29,9 +29,9 @@ public enum MusicAssistantError: Error, Hashable, Sendable, LocalizedError {
         case .transport, .handshakeFailed, .timeout, .disconnected: "Can't reach the Music Assistant server."
         case .schemaUnsupported(let server, let minSupported):
             if server < MusicAssistantClient.minimumSchemaVersion {
-                "This Music Assistant server is too old for SkinAmp (schema \(server); needs \(MusicAssistantClient.minimumSchemaVersion) or later)."
+                "This Music Assistant server is too old for Roadie (schema \(server); needs \(MusicAssistantClient.minimumSchemaVersion) or later)."
             } else {
-                "This Music Assistant server is too new for SkinAmp (it needs clients newer than schema \(minSupported))."
+                "This Music Assistant server is too new for Roadie (it needs clients newer than schema \(minSupported))."
             }
         case .serverMismatch: "A different Music Assistant server answered at this address."
         case .tokenRejected: "The Music Assistant token was rejected."

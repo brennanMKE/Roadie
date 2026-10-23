@@ -98,7 +98,7 @@ final class ProgressiveAudioReader: @unchecked Sendable {
                         continuation.resume(throwing: error)
                     }
                 }
-                thread.name = "SkinAmp.progressive-open"
+                thread.name = "Roadie.progressive-open"
                 thread.qualityOfService = .userInitiated
                 thread.start()
             }
@@ -169,7 +169,7 @@ final class ProgressiveAudioReader: @unchecked Sendable {
                     continuation.resume(throwing: error)
                 }
             }
-            thread.name = "SkinAmp.progressive-format"
+            thread.name = "Roadie.progressive-format"
             thread.qualityOfService = .userInitiated
             thread.start()
         }
@@ -311,7 +311,7 @@ final class ProgressiveAudioReader: @unchecked Sendable {
             self.io.unlock()
             self.source.close()
         }
-        thread.name = "SkinAmp.progressive-close"
+        thread.name = "Roadie.progressive-close"
         thread.start()
     }
 

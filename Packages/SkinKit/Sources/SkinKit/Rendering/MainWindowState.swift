@@ -31,12 +31,12 @@ public struct MainWindowState: Sendable, Equatable {
         self.status = status
     }
 
-    /// Stopped, focused, marquee "SkinAmp" (MarqueeText.idle), everything else default.
+    /// Stopped, focused, marquee "Roadie" (MarqueeText.idle), everything else default.
     public static let idle: MainWindowState = {
         var state = MainWindowState(status: MainWindowStatus(
             transport: .stopped, timeMode: .elapsed, elapsed: 0, duration: 0,
             bitrateKbps: nil, sampleRate: nil, channels: nil))
-        state.marqueeText = "SkinAmp"
+        state.marqueeText = "Roadie"
         return state
     }()
 

@@ -4,9 +4,15 @@ import MusicBackendKit
 import Testing
 @testable import MusicAssistantKit
 
-/// This Mac as a Music Assistant player: the universal player wrapping SkinAmp's Sendspin client (#0107).
+/// This Mac as a Music Assistant player: the universal player wrapping Roadie's Sendspin client (#0107).
 struct MusicAssistantThisMacTests {
-    static let clientID = "skinamp-test"
+    /// The Sendspin client id the wrapper hosts in the recorded `players/all` (server output, read from the fixture).
+    static let clientID: String = {
+        let result = try! MAFixture.playersAllSendspin.frames()[0]["result"]!
+        let players = try! result.decode(as: [MAPlayer].self)
+        let wrapper = players.first { $0.playerID == wrapperID }!
+        return wrapper.outputProtocols!.first { $0.protocolDomain == "sendspin" }!.outputProtocolID
+    }()
     static let wrapperID = "upf00dfeed"
     let album = MediaID(.album, "library://album/27")
 
@@ -42,7 +48,7 @@ struct MusicAssistantThisMacTests {
         #expect(!airplay.hosts(sendspinClientID: Self.clientID))
     }
 
-    @Test func outputsHideSkinAmpsOwnPlayer() async throws {
+    @Test func outputsHideRoadiesOwnPlayer() async throws {
         let withID = try await rig()
         #expect(try await withID.backend.outputs().allSatisfy { $0.id.rawValue != Self.wrapperID })
         await withID.backend.disconnect()
@@ -56,7 +62,7 @@ struct MusicAssistantThisMacTests {
             $0.override(
                 "players/all",
                 result: [
-                    ["player_id": .string(Self.wrapperID), "type": "player", "name": "SkinAmp", "available": true,
+                    ["player_id": .string(Self.wrapperID), "type": "player", "name": "Roadie", "available": true,
                      "output_protocols": [["output_protocol_id": .string(Self.clientID), "protocol_domain": "sendspin"]]],
                     ["player_id": "kitchen", "type": "player", "name": "Kitchen", "available": true,
                      "can_group_with": [.string(Self.wrapperID), "bedroom"]],

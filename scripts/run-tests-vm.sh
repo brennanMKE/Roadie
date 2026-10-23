@@ -11,7 +11,7 @@
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --build-only  stop after the build stage (both packages with their tests, the app; with --spike the spike too):
 #                 a quick compile check before a full run, never verification
-#   --full    also run the slow tier: the 100k SkinLibrary scale tests (SKINAMP_SLOW_TESTS=1) and the
+#   --full    also run the slow tier: the 100k SkinLibrary scale tests (ROADIE_SLOW_TESTS=1) and the
 #             real-time AudioCore tests (AUDIOCORE_REALTIME=1); default is the fast tier
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
 #   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds steps skintool and skintool-png, runs sampleSkinsAreOk
@@ -35,7 +35,7 @@
 #   1. swift build --build-tests --package-path Packages/SkinKit, then Packages/PlayerKit
 #   2. xcodebuild ... build                             (project generated on the host; only if both packages built)
 #   Tests and checks, reusing those builds:
-#   3. swift test --skip-build --package-path Packages/SkinKit  (SKIN_SAMPLES_DIR=Skins with --skins; SKINAMP_SLOW_TESTS=1 with --full)
+#   3. swift test --skip-build --package-path Packages/SkinKit  (SKIN_SAMPLES_DIR=Skins with --skins; ROADIE_SLOW_TESTS=1 with --full)
 #      skintool Skins/ (only with --skins; fails unless every skin is ok), then skintool --png into results/png/
 #   4. swift test --skip-build --package-path Packages/PlayerKit  (with --full: AUDIOCORE_REALTIME=1, muted)
 #   5. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
@@ -103,7 +103,7 @@ if (( BUILD_ONLY )); then
   done
 fi
 TIER=fast; slow_env=""; rt_env=""
-(( FULL )) && { TIER=full; slow_env="SKINAMP_SLOW_TESTS=1 "; rt_env="AUDIOCORE_REALTIME=1 " }
+(( FULL )) && { TIER=full; slow_env="ROADIE_SLOW_TESTS=1 "; rt_env="AUDIOCORE_REALTIME=1 " }
 (( BUILD_ONLY )) && TIER=build-only
 [[ -n "$REFS_DIR" && -z "$SKINS_DIR" ]] && { print -r -- "--references needs --skins DIR" >&2; exit 2 }
 [[ -n "$CORPUS_SAMPLE" && -z "$CORPUS_DIR" ]] && { print -r -- "--corpus-sample needs --corpus DIR" >&2; exit 2 }
@@ -195,7 +195,7 @@ run_is_live() {   # true if <pid> is a live run-tests-vm.sh process
   [[ "$cmd" == *run-tests-vm.sh* ]]
 }
 for old in $(tart list --quiet); do
-  [[ "$old" =~ '^(roadie|skinamp)-test-([0-9]{8})-([0-9]{6})-([0-9]+)$' ]] || continue
+  [[ "$old" =~ '^roadie-test-([0-9]{8})-([0-9]{6})-([0-9]+)$' ]] || continue
   [[ "$old" == "$CLONE" || "$old" == "$GOLDEN" ]] && continue
   pid=$match[4]
   started=$(date -j -f '%Y%m%d%H%M%S' "$match[2]$match[3]" +%s 2>/dev/null) || started=0

@@ -78,7 +78,7 @@ public struct KeychainMusicAssistantTokenStore: MusicAssistantTokenStore {
         guard status == errSecItemNotFound else { throw MusicAssistantTokenStoreError.keychain(status) }
         var add = baseQuery
         add[kSecValueData as String] = data
-        add[kSecAttrLabel as String] = "SkinAmp Music Assistant token"
+        add[kSecAttrLabel as String] = "Roadie Music Assistant token"
         let addStatus = SecItemAdd(add as CFDictionary, nil)
         guard addStatus == errSecSuccess else { throw MusicAssistantTokenStoreError.keychain(addStatus) }
     }

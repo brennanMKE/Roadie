@@ -78,7 +78,7 @@ extension ModelDecodingTests {
         #expect(items[5].isMapping)
         #expect(items[5].mediaID == MediaID(.track, "spotify://track/6"))
         #expect(items[5].artwork == ArtworkRef("p6"))
-        // A kind SkinAmp has no MediaKind for shows but can't be played.
+        // A kind Roadie has no MediaKind for shows but can't be played.
         #expect(items[6].name == "Episode")
         #expect(items[6].mediaID == nil)
     }

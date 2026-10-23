@@ -1,6 +1,6 @@
 import Foundation
 
-/// When SkinAmp's Sendspin session should start, restart or stop (#0109). Pure, so the app's policy is tested here.
+/// When Roadie's Sendspin session should start, restart or stop (#0109). Pure, so the app's policy is tested here.
 public enum SendspinAutoConnect {
     public enum Action: Equatable, Sendable { case start, restart, stop, none }
 

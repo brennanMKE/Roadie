@@ -4,11 +4,17 @@ import Testing
 
 struct SendspinMessagesTests {
     @Test func clientHelloEncodesTheLegacyShape() throws {
+        let recorded = try #require(try fixtureFrames().first { $0.dir == "out" && $0.frame["type"] as? String == "client/hello" })
+        // The identity is whatever the probe sent when the fixture was recorded, so it comes from the fixture.
+        let sent = try #require(recorded.frame["payload"] as? [String: Any])
+        let device = try #require(sent["device_info"] as? [String: Any])
         let hello = SendspinClientHello(
-            clientID: "skinamp-probe", name: "SkinAmp probe", deviceInfo: SendspinDeviceInfo(softwareVersion: "probe"),
+            clientID: try #require(sent["client_id"] as? String), name: try #require(sent["name"] as? String),
+            deviceInfo: SendspinDeviceInfo(
+                productName: try #require(device["product_name"] as? String),
+                manufacturer: try #require(device["manufacturer"] as? String), softwareVersion: "probe"),
             playerSupport: SendspinPlayerSupport(supportedFormats: [SendspinAudioFormat(sampleRate: 48_000)], bufferCapacity: 1_048_576))
         let encoded = jsonObject(SendspinOutgoing.encode(hello))
-        let recorded = try #require(try fixtureFrames().first { $0.dir == "out" && $0.frame["type"] as? String == "client/hello" })
         #expect(NSDictionary(dictionary: encoded).isEqual(to: recorded.frame))
         let payload = try #require(encoded["payload"] as? [String: Any])
         #expect(payload["version"] as? Int == 1)

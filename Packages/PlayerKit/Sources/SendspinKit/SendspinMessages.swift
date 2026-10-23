@@ -29,7 +29,7 @@ public struct SendspinDeviceInfo: Codable, Sendable, Equatable {
     public var manufacturer: String
     public var softwareVersion: String
 
-    public init(productName: String = "SkinAmp", manufacturer: String = "SkinAmp", softwareVersion: String) {
+    public init(productName: String = "Roadie", manufacturer: String = "Roadie", softwareVersion: String) {
         self.productName = productName
         self.manufacturer = manufacturer
         self.softwareVersion = softwareVersion

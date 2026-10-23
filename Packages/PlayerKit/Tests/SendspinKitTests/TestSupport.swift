@@ -4,11 +4,11 @@ import Testing
 @testable import SendspinKit
 
 let testToken = "sendspin-UNIT-TEST-TOKEN"
-let testClientID = "skinamp-test-client"
+let testClientID = "roadie-test-client"
 
 func testConfiguration() -> SendspinConnectionConfiguration {
     SendspinConnectionConfiguration(
-        baseURL: URL(string: "http://ma.example:8095")!, token: testToken, clientID: testClientID, name: "SkinAmp test",
+        baseURL: URL(string: "http://ma.example:8095")!, token: testToken, clientID: testClientID, name: "Roadie test",
         deviceInfo: SendspinDeviceInfo(softwareVersion: "test"), format: SendspinAudioFormat(sampleRate: 48_000))
 }
 

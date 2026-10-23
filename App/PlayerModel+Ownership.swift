@@ -5,7 +5,7 @@ import MusicAssistantKit
 import MusicBackendKit
 import os
 
-/// #0121: SkinAmp follows what Music Assistant plays, only one place plays, and quitting stops the target.
+/// #0121: Roadie follows what Music Assistant plays, only one place plays, and quitting stops the target.
 /// The decisions are `PlaybackOwnership` and `QuitStop`; this only wires them in.
 extension PlayerModel {
     private static let ownershipLog = Logger(subsystem: "co.sstools.roadie", category: "PlaybackOwnership")
@@ -61,7 +61,7 @@ extension PlayerModel {
         }
     }
 
-    /// Stops SkinAmp's other place when it starts playback on `target` (`PlaybackOwnership.stops`). nil when nothing
+    /// Stops Roadie's other place when it starts playback on `target` (`PlaybackOwnership.stops`). nil when nothing
     /// needs stopping; otherwise the task sending the stops, which a play can await first.
     @discardableResult
     func stopOthers(startingOn target: OutputDevice.ID) -> Task<Void, Never>? {
@@ -84,7 +84,7 @@ extension PlayerModel {
         }
     }
 
-    /// Music Assistant started streaming to This Mac. A stream SkinAmp didn't ask for while a speaker is the target
+    /// Music Assistant started streaming to This Mac. A stream Roadie didn't ask for while a speaker is the target
     /// makes This Mac the target and stops the speaker, so the two never play at once.
     func streamStarted() {
         applyFeed(.streamStarted)

@@ -34,13 +34,13 @@ public struct RecommendationRow: Identifiable, Hashable, Sendable {
 }
 
 /// One item of a row: rows mix kinds. `.other` is an item the server sent only a slim mapping for (or a kind
-/// SkinAmp does not browse, like a radio station or a podcast): it carries what the mapping has.
+/// Roadie does not browse, like a radio station or a podcast): it carries what the mapping has.
 public enum RecommendationItem: Identifiable, Hashable, Sendable {
     case artist(LibraryArtist)
     case album(LibraryAlbum)
     case track(LibraryTrack)
     case playlist(LibraryPlaylist)
-    /// `kind` is nil for a media type SkinAmp has no `MediaKind` for; such an item can't be played or queued.
+    /// `kind` is nil for a media type Roadie has no `MediaKind` for; such an item can't be played or queued.
     case other(uri: String, kind: MediaKind?, name: String, subtitle: String?, artwork: ArtworkRef?)
 
     public var id: String {

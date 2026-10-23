@@ -20,8 +20,8 @@ public struct URLSessionMuseumTransport: MuseumTransport {
 }
 
 public enum MuseumUserAgent {
-    /// `SkinAmp/<version> (+https://github.com/brennanMKE/SkinAmp)`
+    /// `Roadie/<version> (+https://roadie.sstools.co/)`
     public static func make(version: String) -> String {
-        "SkinAmp/\(version) (+https://github.com/brennanMKE/SkinAmp)"
+        "Roadie/\(version) (+https://roadie.sstools.co/)"
     }
 }

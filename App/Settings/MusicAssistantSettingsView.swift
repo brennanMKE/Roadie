@@ -44,7 +44,7 @@ struct MusicAssistantSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(
-                        "SkinAmp picks a server automatically: servers tied to the current Wi-Fi network first, then the list from the top. Tailscale servers are tried like any other."
+                        "Roadie picks a server automatically: servers tied to the current Wi-Fi network first, then the list from the top. Tailscale servers are tried like any other."
                     )
                     HStack {
                         Text(selection.reasonText)
@@ -127,13 +127,13 @@ struct MusicAssistantSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("ma.sendspin.status")
-            Toggle("Stop playback when SkinAmp quits", isOn: $stopOnQuit)
+            Toggle("Stop playback when Roadie quits", isOn: $stopOnQuit)
                 .accessibilityIdentifier("ma.stopOnQuit")
         } header: {
             Text("This Mac")
         } footer: {
             Text(
-                "Music Assistant streams to SkinAmp over Sendspin. Group This Mac with other speakers in Music Assistant. "
+                "Music Assistant streams to Roadie over Sendspin. Group This Mac with other speakers in Music Assistant. "
                     + "Speakers keep playing after quit when Stop playback is off.")
         }
     }

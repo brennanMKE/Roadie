@@ -9,7 +9,7 @@ extension MusicAssistantBackend {
         var task: Task<Void, Never>?
     }
 
-    /// The queue playing on `output` (This Mac: the player wrapping SkinAmp's Sendspin client; a synced speaker: its
+    /// The queue playing on `output` (This Mac: the player wrapping Roadie's Sendspin client; a synced speaker: its
     /// leader's queue). Empty while not connected; `connect()` and `disconnect()` restart or empty the stream without
     /// ending it.
     public func queue(on output: OutputDevice.ID) async -> AsyncStream<RemoteQueueSnapshot> {

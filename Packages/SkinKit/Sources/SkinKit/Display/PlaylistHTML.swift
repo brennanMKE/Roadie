@@ -45,7 +45,7 @@ public enum PlaylistHTML {
         <html>
         <head>
         <meta charset="utf-8">
-        <title>SkinAmp Generated PlayList</title>
+        <title>Roadie Generated PlayList</title>
         <style>
         body { background: #000040; color: #4040FF; font-family: Arial, sans-serif; }
         .h { color: #FFFFFF; font-size: 32px; }
@@ -54,7 +54,7 @@ public enum PlaylistHTML {
         </style>
         </head>
         <body>
-        <div class="h">SkinAmp Generated PlayList</div>
+        <div class="h">Roadie Generated PlayList</div>
         <p><span class="t">\(count)</span> track\(count == 1 ? "" : "s") in playlist, average track length: \
         <span class="t">\(PlaylistText.time(average))</span></p>
         <p>Playlist length: <span class="t">\(PlaylistText.time(total))</span></p>

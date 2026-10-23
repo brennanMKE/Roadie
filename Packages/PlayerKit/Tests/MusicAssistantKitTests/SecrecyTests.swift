@@ -69,7 +69,7 @@ struct SecrecyTests {
         let rig = try makeClient()
         _ = try await rig.connect()
         do {
-            _ = try await rig.client.call(MARequest(command: "skinamp/no_such_command"))
+            _ = try await rig.client.call(MARequest(command: try #require(MAFixture.errorUnknownCommand.command)))
         } catch {
             collected.append(error)
         }

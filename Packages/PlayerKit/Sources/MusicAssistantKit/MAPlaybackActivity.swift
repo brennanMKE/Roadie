@@ -1,9 +1,9 @@
 import Foundation
 import MusicBackendKit
 
-/// `players/all` plus `player_queues/all` as SkinAmp's view of what plays where (#0121).
+/// `players/all` plus `player_queues/all` as Roadie's view of what plays where (#0121).
 public enum MAPlaybackActivity {
-    /// Enabled, visible players (and SkinAmp's own, as This Mac). A member's state comes from its leader's queue.
+    /// Enabled, visible players (and Roadie's own, as This Mac). A member's state comes from its leader's queue.
     public static func map(players: [MAPlayer], queues: [MAPlayerQueue], localClientID: String?) -> [OutputActivity] {
         let queuesByID = Dictionary(queues.map { ($0.queueID, $0) }, uniquingKeysWith: { _, last in last })
         let localPlayerID = localClientID.flatMap { id in
