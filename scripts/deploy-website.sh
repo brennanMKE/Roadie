@@ -12,12 +12,12 @@
 #
 # Usage: scripts/deploy-website.sh [--setup] [--dry-run]
 # Environment (all optional):
-#   ROADIE_DEPLOY_HOST  SSH host or alias (default: ec2)
+#   ROADIE_DEPLOY_HOST  SSH host or alias (default: photon, the host roadie.sstools.co resolves to)
 #   ROADIE_DEPLOY_PATH  document root (default: /var/www/vhosts/roadie.sstools.co)
 set -euo pipefail
 cd "${0:A:h}/.."
 
-HOST=${ROADIE_DEPLOY_HOST:-ec2}
+HOST=${ROADIE_DEPLOY_HOST:-photon}
 DOCROOT=${ROADIE_DEPLOY_PATH:-/var/www/vhosts/roadie.sstools.co}
 SITE=roadie.sstools.co
 REPO_SLUG=brennanMKE/Roadie
