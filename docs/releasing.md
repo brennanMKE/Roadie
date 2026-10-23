@@ -15,6 +15,21 @@ release.
 - `gh auth status` shows a login that can create releases on the repo.
 - `scripts/preflight.sh --credentials-only` passes.
 
+## Preflight
+
+`scripts/preflight.sh` prints one `PASS`/`FAIL`/`WARN` line per gate, then a summary, and exits non-zero if any gate
+fails. It never prints a secret: only identity and profile names and whether the Sparkle key matches.
+
+- `--release X.Y.Z`: clean tree on `main`; `MARKETING_VERSION` is X.Y.Z; X.Y.Z is newer than the appcast's newest
+  `sparkle:shortVersionString`; tag `vX.Y.Z` absent locally and on origin; `CHANGELOG.md` has `## [X.Y.Z]`. Plus
+  everything below.
+- `--credentials-only`: tools (`xcrun`, `hdiutil`, `codesign`, `stapler`, `spctl`, `xmllint`, `gh`, `python3`,
+  `tart`); a Developer ID Application identity whose certificate is valid for 30+ days (WARN under 30); the notary
+  profile; the Sparkle keychain key equals `ROADIE_PUBLIC_ED_KEY`; `gh auth status`.
+- `--build-number YYYYMMDD.HHMM`: must be greater than the appcast's highest `sparkle:version`.
+- `--strict`: warnings fail. `--identity NAME`, `--notary-profile NAME` (default `Roadie-notary`),
+  `--sparkle-bin DIR` (default `build/sparkle/bin`) override the defaults.
+
 ## Steps
 
 1. **Pick the version** (SemVer).
