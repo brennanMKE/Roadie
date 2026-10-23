@@ -46,7 +46,7 @@ short=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")
 build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
 cleanup; trap - EXIT
 [[ $short == $version ]] || die "the app says $short, not $version"
-[[ $build =~ '^[0-9]+$' ]] || die "CFBundleVersion '$build' isn't an integer"
+[[ $build =~ '^[0-9]{8}\.[0-9]{4}$' ]] || die "CFBundleVersion '$build' isn't a YYYYMMDD.HHMM build number"
 
 size=$(stat -f %z "$dmg")
 if (( stub )); then
