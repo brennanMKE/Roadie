@@ -39,11 +39,19 @@ LINK_HOSTS = {"github.com", "roadie.sstools.co"}
 problems = []
 gh_cache = {}
 skipped_release_checks = set()
+gh_ready = None
+
+def gh_usable():
+    """gh is installed and signed in. False in the VM guest, which has no GitHub credentials (AGENTS.md)."""
+    global gh_ready
+    if gh_ready is None:
+        gh_ready = bool(shutil.which("gh")) and subprocess.run(["gh", "auth", "status"], capture_output=True).returncode == 0
+    return gh_ready
 
 def release_exists(version):
     if version not in gh_cache:
         ok = False
-        if shutil.which("gh"):
+        if gh_usable():
             r = subprocess.run(["gh", "release", "view", f"v{version}", "--repo", "brennanMKE/Roadie"],
                                capture_output=True)
             ok = r.returncode == 0
@@ -81,8 +89,8 @@ def check(where, ref, kind):
         v = m.group(1)
         if v == expect or release_exists(v):
             return
-        if not shutil.which("gh"):
-            skipped_release_checks.add(v)  # e.g. the VM guest: no gh, so the release can't be checked here
+        if not gh_usable():
+            skipped_release_checks.add(v)  # e.g. the VM guest: no signed-in gh, so the release can't be checked here
             return
         problems.append(f"{where}: {ref} has no GitHub release v{v} (pass --expect-dmg {v} during a release)")
         return
@@ -143,7 +151,7 @@ if os.path.isdir(css_dir):
                 check(name, u, "font")
 
 for v in sorted(skipped_release_checks):
-    print(f"(gh not available; skipped the GitHub release check for v{v})")
+    print(f"(gh not available or not signed in; skipped the GitHub release check for v{v})")
 for p in problems:
     print(f"!! {p}", file=sys.stderr)
 sys.exit(1 if problems else 0)
