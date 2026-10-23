@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike] [--dmg]
+# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike] [--dmg [--build-number N]]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --build-only  stop after the build stage (both packages with their tests, the app; with --spike the spike too):
 #                 a quick compile check before a full run, never verification
@@ -28,7 +28,9 @@
 #   --spike  also build, test and smoke-launch the AirPlay routing spike harness (#0050): steps spike-pkg-build, spike-build, spike-tests, spike-smoke;
 #            the smoke launch constructs every engine and never plays
 #   --dmg    also build the app in the Release configuration (step app-release) and bring it back, zipped, as
-#            build/vm-tests/<run-id>/release/Roadie.app.zip; scripts/make-dmg.sh signs it on the host and makes the DMG
+#            build/vm-tests/<run-id>/release/Roadie.app.zip; scripts/make-dmg.sh signs it on the host and makes the DMG;
+#            also release/Roadie.app.dSYM.zip and release/dsym-uuids.txt (dwarfdump --uuid, run in the guest)
+#   --build-number N  the Release build's CFBundleVersion, YYYYMMDD.HHMM (#0157); default: now, in UTC
 #
 # In the guest, in order:
 #   Build stage (a failure here skips everything below and prints the compiler errors):
@@ -67,6 +69,7 @@ STRESS_PACKAGE=""
 LOAD=0
 SPIKE=0
 DMG=0
+BUILD_NUMBER=
 SKINS_DIR=""
 REFS_DIR=""
 CORPUS_DIR=""
@@ -85,6 +88,8 @@ while (( $#args )); do
     --load) LOAD=1 ;;
     --spike) SPIKE=1 ;;
     --dmg) DMG=1 ;;
+    --build-number) BUILD_NUMBER=${args[1]:-}; shift args 2>/dev/null
+      [[ "$BUILD_NUMBER" =~ '^[0-9]{8}\.[0-9]{4}$' ]] || { print -r -- "--build-number needs YYYYMMDD.HHMM (UTC), e.g. 20261023.1200" >&2; print -r -- "usage: scripts/run-tests-vm.sh --dmg --build-number YYYYMMDD.HHMM" >&2; exit 2 } ;;
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
     --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
     --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
@@ -96,6 +101,7 @@ done
 
 (( LOAD && ! STRESS )) && { print -r -- "--load needs --stress N" >&2; exit 2 }
 [[ -n "$STRESS_FILTER" ]] && (( ! STRESS )) && { print -r -- "--stress-filter needs --stress N" >&2; exit 2 }
+[[ -n "$BUILD_NUMBER" ]] && (( ! DMG )) && { print -r -- "--build-number needs --dmg" >&2; exit 2 }
 [[ -n "$STRESS_PACKAGE" ]] && (( ! STRESS )) && { print -r -- "--stress-package needs --stress N" >&2; exit 2 }
 if (( BUILD_ONLY )); then
   for f v in --stress "$STRESS" --stress-package "$STRESS_PACKAGE" --load "$LOAD" --launch "$LAUNCH" --corpus "$CORPUS_DIR" --corpus-sample "$CORPUS_SAMPLE" \
@@ -399,8 +405,12 @@ if (( DMG )); then
   # Release build for scripts/make-dmg.sh. Zipped with ditto so the bundle's symlinks and signature survive the tar back.
   # The build number (CFBundleVersion) is a UTC date and time, computed once on the host (#0127); the command-line
   # override reaches every target, so the app and its Quick Look extensions share it. Debug builds keep project.yml's 1.
-  BUILD_NUMBER=$(date -u +%Y%m%d.%H%M)
-  run_step app-release "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Release -derivedDataPath build/DerivedData-release CURRENT_PROJECT_VERSION=$BUILD_NUMBER build && mkdir -p $GUEST_RESULTS/release && print -r -- $BUILD_NUMBER > $GUEST_RESULTS/release/build.txt && ditto -c -k --keepParent build/DerivedData-release/Build/Products/Release/Roadie.app $GUEST_RESULTS/release/Roadie.app.zip"
+  # --build-number N (#0157) sets it instead, so a release can name its build ahead of time.
+  [[ -n "$BUILD_NUMBER" ]] || BUILD_NUMBER=$(date -u +%Y%m%d.%H%M)
+  # The dSYM comes back zipped with its UUIDs (dwarfdump runs in the guest) so crash reports can be symbolicated.
+  # W7 (#0158): copy the Sparkle tools (sparkle-bin) into $GUEST_RESULTS/release here too.
+  REL=build/DerivedData-release/Build/Products/Release
+  run_step app-release "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Release -derivedDataPath build/DerivedData-release CURRENT_PROJECT_VERSION=$BUILD_NUMBER build && mkdir -p $GUEST_RESULTS/release && print -r -- $BUILD_NUMBER > $GUEST_RESULTS/release/build.txt && ditto -c -k --keepParent $REL/Roadie.app $GUEST_RESULTS/release/Roadie.app.zip && ditto -c -k --keepParent $REL/Roadie.app.dSYM $GUEST_RESULTS/release/Roadie.app.dSYM.zip && dwarfdump --uuid $REL/Roadie.app.dSYM > $GUEST_RESULTS/release/dsym-uuids.txt"
 fi
 
 # --- Results back ----------------------------------------------------------
