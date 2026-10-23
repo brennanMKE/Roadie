@@ -1,7 +1,7 @@
 #!/bin/zsh
 # check-info-plist.sh — assert the app's Info.plist carries the networking keys (#0012, #0063), the location descriptions (#0075), NSBonjourServices (#0104)
 # and still carries the .wsz type (#0047) and claims it as a document type (#0043). Reads only; runs on the host against the
-# regenerated App/Info.plist and in the guest against the built SkinAmp.app.
+# regenerated App/Info.plist and in the guest against the built Roadie.app.
 # Usage: scripts/check-info-plist.sh <path/to/Info.plist>
 set -euo pipefail
 P=${1:?usage: check-info-plist.sh <Info.plist>}

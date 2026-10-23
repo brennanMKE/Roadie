@@ -45,11 +45,11 @@
 		<string>_sendspin-server._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>SkinAmp connects to your Music Assistant server on your local network to browse and play your music.</string>
+	<string>Roadie connects to your Music Assistant server on your local network to browse and play your music.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
+	<string>Roadie reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SkinAmp reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
+	<string>Roadie reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -75,7 +75,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>SkinAmp Library Item</string>
+			<string>Roadie Library Item</string>
 			<key>UTTypeIdentifier</key>
 			<string>co.sstools.roadie.media-id</string>
 		</dict>

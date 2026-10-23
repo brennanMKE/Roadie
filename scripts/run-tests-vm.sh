@@ -1,5 +1,5 @@
 #!/bin/zsh
-# run-tests-vm.sh — build and test SkinAmp inside a disposable Tart VM.
+# run-tests-vm.sh — build and test Roadie inside a disposable Tart VM.
 #
 # Tests and builds never run on the host; see docs/testing-in-vm.md. Each run
 # clones the shared golden image (resolved by `tart-golden`, never hardcoded),
@@ -28,7 +28,7 @@
 #   --spike  also build, test and smoke-launch the AirPlay routing spike harness (#0050): steps spike-pkg-build, spike-build, spike-tests, spike-smoke;
 #            the smoke launch constructs every engine and never plays
 #   --dmg    also build the app in the Release configuration (step app-release) and bring it back, zipped, as
-#            build/vm-tests/<run-id>/release/SkinAmp.app.zip; scripts/make-dmg.sh signs it on the host and makes the DMG
+#            build/vm-tests/<run-id>/release/Roadie.app.zip; scripts/make-dmg.sh signs it on the host and makes the DMG
 #
 # In the guest, in order:
 #   Build stage (a failure here skips everything below and prints the compiler errors):
@@ -42,7 +42,7 @@
 #      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
 #      scripts/check-identifiers.sh: no pre-Roadie bundle id outside the legacy allowlist (#0153)
-#   7. optional: launch SkinAmp.app, check it stays up, quit it
+#   7. optional: launch Roadie.app, check it stays up, quit it
 # Exit codes:
 #   0  everything passed and the host stayed silent
 #   1  a build/test/check step failed, the host's coreaudiod logged "Starting IO" during
@@ -115,8 +115,8 @@ fi
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
-CLONE="skinamp-test-$RUN_ID"
-EXPORT="$(mktemp -d "${TMPDIR:-/tmp}/skinamp-test-export.XXXXXX")"
+CLONE="roadie-test-$RUN_ID"
+EXPORT="$(mktemp -d "${TMPDIR:-/tmp}/roadie-test-export.XXXXXX")"
 RESULTS_DIR="$REPO/build/vm-tests/$RUN_ID"
 GUEST_SRC="/Users/admin/src"
 GUEST_RESULTS="/Users/admin/results"
@@ -175,7 +175,7 @@ if typeset -f memory_available_bytes >/dev/null; then
   if (( avail < need_bytes )); then
     log "Host memory short ($(( avail / 1073741824 )) of $(( need_bytes / 1073741824 )) GiB) -- asking the memory-signal observer"
     set +e
-    memory_request "$need_bytes" "skinamp-run-tests-vm" "Tart VM test run needs guest RAM plus headroom" 120
+    memory_request "$need_bytes" "roadie-run-tests-vm" "Tart VM test run needs guest RAM plus headroom" 120
     rc=$?
     set -e
     (( rc == 0 )) || fail "Memory request not fulfilled (rc=$rc); free memory and retry"
@@ -195,10 +195,10 @@ run_is_live() {   # true if <pid> is a live run-tests-vm.sh process
   [[ "$cmd" == *run-tests-vm.sh* ]]
 }
 for old in $(tart list --quiet); do
-  [[ "$old" =~ '^skinamp-test-([0-9]{8})-([0-9]{6})-([0-9]+)$' ]] || continue
+  [[ "$old" =~ '^(roadie|skinamp)-test-([0-9]{8})-([0-9]{6})-([0-9]+)$' ]] || continue
   [[ "$old" == "$CLONE" || "$old" == "$GOLDEN" ]] && continue
-  pid=$match[3]
-  started=$(date -j -f '%Y%m%d%H%M%S' "$match[1]$match[2]" +%s 2>/dev/null) || started=0
+  pid=$match[4]
+  started=$(date -j -f '%Y%m%d%H%M%S' "$match[2]$match[3]" +%s 2>/dev/null) || started=0
   age_h=$(( ($(date +%s) - started) / 3600 ))
   if run_is_live "$pid" && (( age_h < MAX_RUN_HOURS )); then
     log "Leaving clone of a live run: $old (pid $pid)"; continue
@@ -224,7 +224,7 @@ else
       | while IFS= read -r -d '' f; do [[ -e "$f" ]] && print -rN -- "$f"; done ) \
     | rsync -a --from0 --files-from=- "$REPO/" "$EXPORT/src/"
 fi
-# SkinAmp.xcodeproj is gitignored; generate it here so the guest needs no XcodeGen.
+# Roadie.xcodeproj is gitignored; generate it here so the guest needs no XcodeGen.
 xcodegen generate --quiet --spec "$EXPORT/src/project.yml"
 # The AirPlay spike is its own XcodeGen project (#0050); generate it here too.
 (( SPIKE )) && xcodegen generate --quiet --spec "$EXPORT/src/Spikes/AirPlaySpike/project.yml"
@@ -245,7 +245,7 @@ fi
 # --- Clone and boot --------------------------------------------------------
 
 if command -v tart-lease >/dev/null; then
-  LEASE_ID=$(tart-lease acquire --label skinamp --pid $$)
+  LEASE_ID=$(tart-lease acquire --label roadie --pid $$)
 else
   log "WARNING: tart-lease not on PATH -- running without admission control"
 fi
@@ -316,7 +316,7 @@ skip_step() {
 # Build everything once; the tests below reuse it. Both packages always build so one run reports both.
 run_step skinkit-build   "swift build --build-tests --package-path Packages/SkinKit" build
 run_step playerkit-build "swift build --build-tests --package-path Packages/PlayerKit" build
-APP_BUILD="xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Debug -derivedDataPath build/DerivedData build"
+APP_BUILD="xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData build"
 if (( build_failed )); then skip_step app-build; else run_step app-build "$APP_BUILD" build; fi
 if (( SPIKE )); then
   if (( build_failed )); then
@@ -350,12 +350,12 @@ if (( STRESS )); then
   stress_filter_arg="''"; [[ -n "$STRESS_FILTER" ]] && stress_filter_arg=${(q)STRESS_FILTER}
   run_step ${STRESS_PACKAGE:l}-stress "scripts/stress-realtime-gapless.sh $STRESS $LOAD $stress_filter_arg $STRESS_PACKAGE"
 fi
-run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/SkinAmp.app/Contents/Info.plist"
-run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build/Products/Debug/SkinAmp.app"
-run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/SkinAmp.app $GUEST_RESULTS/ql"
+run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/Roadie.app/Contents/Info.plist"
+run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build/Products/Debug/Roadie.app"
+run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/Roadie.app $GUEST_RESULTS/ql"
 run_step identifiers     "scripts/check-identifiers.sh"
 if (( LAUNCH )); then
-  run_step app-launch "open build/DerivedData/Build/Products/Debug/SkinAmp.app && sleep 5 && pgrep -x SkinAmp && osascript -e 'quit app \"SkinAmp\"' && sleep 1 && ! pgrep -x SkinAmp"
+  run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"
 fi
 
 if (( SPIKE )); then
@@ -398,7 +398,7 @@ if (( DMG )); then
   # The build number (CFBundleVersion) is a UTC date and time, computed once on the host (#0127); the command-line
   # override reaches every target, so the app and its Quick Look extensions share it. Debug builds keep project.yml's 1.
   BUILD_NUMBER=$(date -u +%Y%m%d.%H%M)
-  run_step app-release "xcodebuild -project SkinAmp.xcodeproj -scheme SkinAmp -configuration Release -derivedDataPath build/DerivedData-release CURRENT_PROJECT_VERSION=$BUILD_NUMBER build && mkdir -p $GUEST_RESULTS/release && print -r -- $BUILD_NUMBER > $GUEST_RESULTS/release/build.txt && ditto -c -k --keepParent build/DerivedData-release/Build/Products/Release/SkinAmp.app $GUEST_RESULTS/release/SkinAmp.app.zip"
+  run_step app-release "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Release -derivedDataPath build/DerivedData-release CURRENT_PROJECT_VERSION=$BUILD_NUMBER build && mkdir -p $GUEST_RESULTS/release && print -r -- $BUILD_NUMBER > $GUEST_RESULTS/release/build.txt && ditto -c -k --keepParent build/DerivedData-release/Build/Products/Release/Roadie.app $GUEST_RESULTS/release/Roadie.app.zip"
 fi
 
 # --- Results back ----------------------------------------------------------

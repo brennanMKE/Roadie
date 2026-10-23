@@ -1,13 +1,13 @@
 #!/bin/zsh
 # check-quicklook.sh — prove the Quick Look extensions work in the guest (#0043).
-# Usage: scripts/check-quicklook.sh <SkinAmp.app> <outdir>
+# Usage: scripts/check-quicklook.sh <Roadie.app> <outdir>
 # Checks the embedded appexes (sandbox, extension points), registers them, generates test skins with
 # scripts/make-test-skin.swift, and runs qlmanage -t / -p against them. Every assertion prints
 # "quicklook: <name> ok|FAIL"; the exit status is non-zero if any failed. Guest-side only: it registers
 # extensions with Launch Services and runs qlmanage, which must never happen on the host.
 set -uo pipefail
-app=${1:?usage: check-quicklook.sh <SkinAmp.app> <outdir>}
-out=${2:?usage: check-quicklook.sh <SkinAmp.app> <outdir>}
+app=${1:?usage: check-quicklook.sh <Roadie.app> <outdir>}
+out=${2:?usage: check-quicklook.sh <Roadie.app> <outdir>}
 app=${app:A}
 mkdir -p "$out"; out=${out:A}
 script_dir=${0:A:h}
@@ -19,8 +19,8 @@ check() { local name=$1; shift; if "$@" >/dev/null 2>&1; then ok "$name"; else b
 tmo() { local secs=$1; shift; perl -e 'alarm shift; exec @ARGV or exit 127' "$secs" "$@"; }
 plist() { plutil -extract "$2" raw -o - "$1" 2>/dev/null; }
 
-thumb=$app/Contents/PlugIns/SkinAmpThumbnail.appex
-prev=$app/Contents/PlugIns/SkinAmpPreview.appex
+thumb=$app/Contents/PlugIns/RoadieThumbnail.appex
+prev=$app/Contents/PlugIns/RoadiePreview.appex
 crash_dir=$HOME/Library/Logs/DiagnosticReports
 mkdir -p "$crash_dir"
 before_crashes=$(ls "$crash_dir" 2>/dev/null | sort)
@@ -99,21 +99,21 @@ for name in test bad; do
   alive=0
   for i in 1 2 3 4 5 6 7 8 9 10; do
     sleep 1
-    if pgrep -f SkinAmpPreview >/dev/null; then alive=1; break; fi
+    if pgrep -f RoadiePreview >/dev/null; then alive=1; break; fi
   done
-  (( alive )) && ok "preview-$name" || bad "preview-$name" "(no SkinAmpPreview process)"
+  (( alive )) && ok "preview-$name" || bad "preview-$name" "(no RoadiePreview process)"
   kill $qlpid 2>/dev/null; pkill -f 'qlmanage -p' 2>/dev/null; sleep 1
 done
 (( failures == 0 )) && print -r -- "quicklook: preview ok"
 
 # 6. No crashes
 after_crashes=$(ls "$crash_dir" 2>/dev/null | sort)
-new=$(comm -13 <(print -r -- "$before_crashes") <(print -r -- "$after_crashes") | grep -E '^SkinAmp' || true)
+new=$(comm -13 <(print -r -- "$before_crashes") <(print -r -- "$after_crashes") | grep -E '^Roadie' || true)
 if [[ -n "$new" ]]; then
   bad crash-reports "($new)"
   for f in ${(f)new}; do cp "$crash_dir/$f" "$out/" 2>/dev/null; done
 else ok no-crash-reports; fi
-/usr/bin/log show --last 5m --predicate 'process BEGINSWITH "SkinAmp" OR subsystem == "com.apple.quicklook" OR process == "pkd"' > "$out/quicklook.log" 2>&1 || true
+/usr/bin/log show --last 5m --predicate 'process BEGINSWITH "Roadie" OR subsystem == "com.apple.quicklook" OR process == "pkd"' > "$out/quicklook.log" 2>&1 || true
 
 (( failures == 0 )) || { print -r -- "quicklook: $failures check(s) FAILED"; exit 1; }
 print -r -- "quicklook: all checks passed"

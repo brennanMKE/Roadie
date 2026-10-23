@@ -2,7 +2,7 @@ import MusicAssistantKit
 import SwiftUI
 
 @main
-struct SkinAmpApp: App {
+struct RoadieApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
