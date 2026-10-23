@@ -42,7 +42,9 @@ chmod 700 "$dest_real"
 "$gk" --account Roadie -x "$dest_real/sparkle-roadie.key"
 chmod 600 "$dest_real/sparkle-roadie.key"
 
-print "Exporting identities; security will ask for an export passphrase."
+# security export can't pick one identity: DeveloperID.p12 holds every identity in the default keychain
+# (docs/release-credentials.md). Treat the file as that whole set.
+print "Exporting every identity in the default keychain (not only Developer ID); security will ask for a passphrase."
 security export -t identities -f pkcs12 -o "$dest_real/DeveloperID.p12"
 chmod 600 "$dest_real/DeveloperID.p12"
 

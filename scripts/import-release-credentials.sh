@@ -39,7 +39,8 @@ fi
 # Developer ID identity.
 p12="$src/DeveloperID.p12"
 if [[ -f "$p12" ]]; then
-  if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
+  identities=$(security find-identity -v -p codesigning 2>/dev/null || true)
+  if [[ $identities == *'"Developer ID Application: '* ]]; then
     print "A Developer ID Application identity is already present; skipped."
   else
     print "Importing DeveloperID.p12; security will ask for its passphrase."

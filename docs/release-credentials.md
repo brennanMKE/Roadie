@@ -70,14 +70,19 @@ scripts/import-release-credentials.sh ~/Backups/roadie-release-credentials   # o
   (real paths compared) or one that isn't empty, creates it with mode 700, and only reads the keychain. Each file is
   mode 600. It exports:
   - the `.p8`, when `--p8` is given;
-  - the identities as `DeveloperID.p12` (`security` asks for the passphrase in its own dialog; `-P` is never used);
+  - the identities as `DeveloperID.p12` (`security` asks for the passphrase in its own dialog; `-P` is never used).
+    **It holds every identity in the default (login) keychain**, not only Developer ID Application: Apple
+    Development, Developer ID Installer and any others with a private key. `security export` can't select one
+    identity. Protect the file as you would all of them, and expect the import on the new Mac to add all of them;
+    if that's not wanted, export just the Developer ID identity from Keychain Access (select it, File › Export
+    Items…) and save it as `DeveloperID.p12` instead;
   - the Sparkle key as `sparkle-roadie.key` (`generate_keys` from `build/sparkle/bin` or `--sparkle-bin`).
 - `import-release-credentials.sh [--sparkle-bin DIR] SRC_DIR` imports what's in the folder and skips anything already
   present:
-  - an existing identity is never duplicated;
+  - when any Developer ID Application identity is already present, the whole `.p12` is skipped;
   - an existing Sparkle key is never replaced (`-p` is checked before `-f`).
   If a `.p8` is present it prints the `setup-notary.sh` step.
-- Both export and import finish with `preflight.sh --credentials-only` (or tell you to run it). Neither runs with
+- `setup-notary.sh`, export and import all finish with `preflight.sh --credentials-only` (or tell you to run it). Neither runs with
   `set -x`; they refuse to.
 - Move the bundle only over a channel you trust, then delete the copies.
 

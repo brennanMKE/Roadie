@@ -22,6 +22,13 @@ if (( ! force )) && xcrun notarytool history --keychain-profile "$profile" >/dev
   print "Profile '$profile' already works; nothing to do (use --force to replace it)."
   exit 0
 fi
+finish() {
+  if [[ -x "$repo/scripts/preflight.sh" ]]; then
+    "$repo/scripts/preflight.sh" --credentials-only --notary-profile "$profile"
+  else
+    print "Run scripts/preflight.sh --credentials-only to check this Mac."
+  fi
+}
 
 read -r "p8?Path to App Store Connect API key (.p8): "
 p8="${~p8}"
@@ -33,4 +40,5 @@ read -r "issuer?Issuer ID: "
 [[ -n "$keyid" && -n "$issuer" ]] || { print -u2 "Key ID and issuer ID are required."; exit 1; }
 
 xcrun notarytool store-credentials "$profile" --key "$p8" --key-id "$keyid" --issuer "$issuer"
-print "Stored profile '$profile'. Check: xcrun notarytool history --keychain-profile $profile"
+print "Stored profile '$profile'."
+finish
