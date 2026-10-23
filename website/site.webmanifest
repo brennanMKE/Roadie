@@ -1,7 +1,7 @@
 {
   "name": "Roadie",
   "short_name": "Roadie",
-  "description": "A Winamp-skinned player for Music Assistant.",
+  "description": "A Winamp-skinned music player for macOS.",
   "start_url": "/",
   "display": "browser",
   "background_color": "#121315",
