@@ -6,6 +6,23 @@
     <description>Updates for Roadie, a Winamp-skinned player for Music Assistant.</description>
     <language>en</language>
     <item>
+      <title>Version 0.0.2</title>
+      <pubDate>Fri, 23 Oct 2026 23:06:14 +0000</pubDate>
+      <sparkle:version>20261023.2300</sparkle:version>
+      <sparkle:shortVersionString>0.0.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://roadie.sstools.co/changelog.html#v0-0-2</sparkle:releaseNotesLink>
+      <description><![CDATA[
+<h3>Added</h3>
+<ul>
+  <li>A Welcome window on first launch: skins (with a one-click way to the Winamp Skin Museum), a music folder, and optional Music Assistant. Help › Welcome to Roadie… brings it back.</li>
+  <li><code>~/Roadie/Skins</code> is created and used as the skins folder when none is set.</li>
+  <li>The No Skin Loaded placeholder has a Browse the Skin Museum… button.</li>
+</ul>
+      ]]></description>
+      <enclosure url="https://roadie.sstools.co/downloads/Roadie-0.0.2.dmg" length="15642791" type="application/octet-stream" sparkle:edSignature="H0u2I4umw4vnY+di0vRW/3Q9vkolQ1wzssEmdutyevEZBmfAmtcS3qfrq83zRM/3VXagkBtrZOaVfokrgkiNBw=="/>
+    </item>
+    <item>
       <title>Version 0.0.1</title>
       <pubDate>Fri, 23 Oct 2026 22:12:04 +0000</pubDate>
       <sparkle:version>20261023.2206</sparkle:version>
