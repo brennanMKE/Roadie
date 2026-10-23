@@ -16,6 +16,7 @@ let package = Package(
         .library(name: "MusicAssistantKitStub", targets: ["MusicAssistantKitStub"]),
         .library(name: "SendspinKit", targets: ["SendspinKit"]),
         .library(name: "SendspinPlayback", targets: ["SendspinPlayback"]),
+        .library(name: "AppMigration", targets: ["AppMigration"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).
@@ -52,5 +53,9 @@ let package = Package(
         // The bridge from a Sendspin session to AudioCore's stream input (#0108). Built by LocalPlaybackStack.
         .target(name: "SendspinPlayback", dependencies: ["SendspinKit", "AudioCore"]),
         .testTarget(name: "SendspinPlaybackTests", dependencies: ["SendspinPlayback", "SendspinKit", "AudioCore"]),
+        // One-time copy of SkinAmp's defaults, Application Support files and Keychain tokens into Roadie (#0152).
+        // Foundation, Security and AppKit only; every side effect is injected so the tests never touch real stores.
+        .target(name: "AppMigration"),
+        .testTarget(name: "AppMigrationTests", dependencies: ["AppMigration"]),
     ]
 )
