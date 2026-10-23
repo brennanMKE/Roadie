@@ -46,7 +46,8 @@ fails. It never prints a secret: only identity and profile names and whether the
      the zip from the `RELEASE` line, signs and packages with `make-dmg.sh --release`, and checks the DMG with
      `verify-dmg.sh --allow-unnotarized`.
    - Writes only under `build/release/X.Y.Z/`: the DMG, `.sha256`, dSYM zip and UUIDs, `appcast-item.xml` (stub
-     signature when `sign_update` or the Sparkle key is missing), `release-notes.md`, `rehearsal-index.html`.
+     signature; add `--sign` to run the real `sign_update` against the login-keychain key), `release-notes.md`,
+     `rehearsal-index.html`.
      Steps 9-11 edit a temporary copy of `website/`, checked with `check-website.sh --expect-dmg`.
    - Doesn't notarize. Doesn't touch `website/`, git or GitHub.
    - `--skip-build ZIP` reuses an existing VM `Roadie.app.zip` to rehearse only the host steps.
@@ -62,8 +63,11 @@ fails. It never prints a secret: only identity and profile names and whether the
    7. `check-website.sh --expect-dmg X.Y.Z`.
    8. Annotated tag `vX.Y.Z` on the built commit; commit `Release X.Y.Z: appcast, changelog, download link`.
    9. The prompt `Push main and vX.Y.Z to origin? [y/N]`; anything but y stops before the push.
+      `git push --atomic origin main vX.Y.Z`.
    10. `gh release create … --verify-tag` with both assets, then a re-download whose sha256 must match.
    11. The hand-off checklist, then "Ask for the site to be deployed."
+
+   If it stops partway, its last lines say how far it got and how to undo or retry.
 
    What you do: answer the push prompt, preview the site, smoke-test, and ask for the deploy.
 5. **Smoke test** on a fresh user account or a Mac that has never run Roadie:
@@ -112,5 +116,7 @@ fails. It never prints a secret: only identity and profile names and whether the
   was published.
 - **Failure after the tag but before the push.** Delete the local tag (`git tag -d vX.Y.Z`) and reset the website
   commit, then re-run.
-- **Failure after the push.** Never reuse a version. Bump to X.Y.(Z+1).
+- **`gh release create` failed after the push.** The script prints the exact command to retry; the site isn't
+  deployed yet, so nothing has reached users.
+- **Failure after the release or deploy.** Never reuse a version. Bump to X.Y.(Z+1).
 - Never edit a published DMG or its appcast item.

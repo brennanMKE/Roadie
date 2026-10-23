@@ -3,17 +3,18 @@
 # docs/design/release.md §2.5, docs/releasing.md).
 #
 # Usage: scripts/release.sh X.Y.Z [--publish] [--notary-profile NAME] [--identity NAME] [--repo OWNER/NAME]
-#                                 [--skip-build ZIP]
+#                                 [--skip-build ZIP] [--sign]
 #   (default)             rehearsal: every local step except notarization; writes only under build/release/X.Y.Z/
 #                         (steps 9-11 edit a temporary copy of website/); no tag, commit, push or gh.
-#                         Preflight and credential failures are reported but don't stop it; without the Sparkle
-#                         key the appcast item uses a stub signature.
+#                         Preflight and credential failures are reported but don't stop it. The appcast item
+#                         uses a stub signature: the Sparkle key is used only by --publish (or --sign).
 #   --publish             the real release (user only): strict preflight, notarize and staple, edit website/,
 #                         tag the built commit, commit website/, push after a y/N prompt, gh release create.
 #   --notary-profile NAME notarytool keychain profile (default Roadie-notary)
 #   --identity NAME       Developer ID Application identity (default: the first in the keychain)
 #   --repo OWNER/NAME     GitHub repo for the release (default brennanMKE/Roadie)
 #   --skip-build ZIP      rehearsal only: reuse an existing VM Roadie.app.zip instead of step 1
+#   --sign                rehearsal only: run the real sign_update (login-keychain Sparkle key) instead of the stub
 #
 # Secrets: never sources .env; no secret on any command line (notary profile, login-keychain Sparkle key,
 # gh's own auth); prints only names, ids, hashes and paths.
@@ -25,12 +26,13 @@ unsetopt xtrace
 ROOT=${0:A:h:h}
 cd "$ROOT"
 
-VERSION="" PUBLISH=0 PROFILE="Roadie-notary" IDENTITY="" REPO_SLUG="brennanMKE/Roadie" SKIP_ZIP=""
+VERSION="" PUBLISH=0 SIGN=0 PROFILE="Roadie-notary" IDENTITY="" REPO_SLUG="brennanMKE/Roadie" SKIP_ZIP=""
 usage() { awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"; }
 die() { print -u2 "release.sh: $*"; exit 1 }
 while (( $# )); do
   case $1 in
     --publish) PUBLISH=1; shift ;;
+    --sign) SIGN=1; shift ;;
     --notary-profile) PROFILE=${2:?}; shift 2 ;;
     --identity) IDENTITY=${2:?}; shift 2 ;;
     --repo) REPO_SLUG=${2:?}; shift 2 ;;
@@ -43,6 +45,7 @@ done
 [[ $VERSION =~ '^[0-9]+\.[0-9]+\.[0-9]+$' ]] || { usage >&2; exit 2 }
 [[ $REPO_SLUG =~ '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' ]] || die "--repo must be OWNER/NAME"
 (( PUBLISH && ${#SKIP_ZIP} )) && die "--skip-build is for rehearsals only"
+(( PUBLISH && SIGN )) && die "--sign is for rehearsals only (--publish always signs)"
 [[ -z $SKIP_ZIP || -f $SKIP_ZIP ]] || die "no zip at $SKIP_ZIP"
 
 OUT="$ROOT/build/release/$VERSION"
@@ -56,7 +59,26 @@ issue() { ISSUES+=("$1"); print "!!  $1 (rehearsal: continuing)" }
 
 mkdir -p "$OUT"
 TMPW=$(mktemp -d "${TMPDIR:-/tmp}/roadie-release.XXXXXX")
-trap 'rm -rf "$TMPW"' EXIT
+# STAGE tracks what --publish has changed so far, so a failure says what state it left and how to undo it.
+STAGE=none
+on_exit() {
+  local rc=$?
+  rm -rf "$TMPW"
+  (( PUBLISH && rc != 0 )) || return 0
+  print -u2
+  case $STAGE in
+    none) print -u2 "release.sh: stopped before website/, git or GitHub changed; nothing was published." ;;
+    website) print -u2 "release.sh: stopped after editing website/ (not committed). Undo: git checkout -- website" ;;
+    committed) print -u2 "release.sh: stopped after tagging $TAG and committing website/; nothing pushed." \
+      "Undo: git tag -d $TAG && git reset --hard HEAD~1" ;;
+    pushed) print -u2 "release.sh: main and $TAG are pushed but the GitHub release wasn't created." \
+      "Retry: gh release create $TAG $DMG $DMG.sha256 --repo $REPO_SLUG --verify-tag" \
+      "--title 'Roadie $VERSION' --notes-file $OUT/release-notes.md" ;;
+    released) print -u2 "release.sh: the $TAG GitHub release exists but its asset check failed; inspect it" \
+      "with gh release view $TAG --repo $REPO_SLUG before deploying. Never reuse $VERSION once deployed." ;;
+  esac
+}
+trap on_exit EXIT
 note "Roadie $VERSION, $MODE; output $OUT"
 
 BUILD=$(date -u +%Y%m%d.%H%M)
@@ -113,6 +135,7 @@ if (( PUBLISH )); then
 else
   scripts/verify-dmg.sh "$DMG" --allow-unnotarized || die "verify-dmg.sh failed"
 fi
+(cd "$OUT" && shasum -a 256 -c -s "$DMG_NAME.sha256") || die "$DMG_NAME doesn't match its .sha256"
 SHA=$(cut -d' ' -f1 "$DMG.sha256")
 SIZE=$(stat -f %z "$DMG")
 note "$DMG_NAME  $SIZE bytes  sha256 $SHA"
@@ -120,6 +143,7 @@ note "$DMG_NAME  $SIZE bytes  sha256 $SHA"
 # Steps 9-11 edit website/ (publish) or a temporary copy of the repo's website/ and checker (rehearsal).
 if (( PUBLISH )); then
   SITE_ROOT=$ROOT
+  STAGE=website
 else
   SITE_ROOT="$TMPW/site"
   mkdir -p "$SITE_ROOT/scripts"
@@ -142,11 +166,15 @@ if (( PUBLISH )); then
   scripts/appcast-item.sh "${ac[@]}" || die "appcast-item.sh failed"
   awk '/<item>/{f=1} f{print} /<\/item>/{exit}' "$SITE/appcast.xml" > "$OUT/appcast-item.xml"
 else
-  if scripts/appcast-item.sh "${ac[@]}" --dry-run > "$OUT/appcast-item.xml" 2>"$TMPW/ac.err"; then
-    note "signed with the Sparkle key (dry run)"
+  if (( SIGN )) && scripts/appcast-item.sh "${ac[@]}" --dry-run > "$OUT/appcast-item.xml" 2>"$TMPW/ac.err"; then
+    note "--sign: signed with the Sparkle key (dry run)"
   else
-    sed 's/^/    /' "$TMPW/ac.err" >&2
-    issue "sign_update unavailable or failed; appcast item uses a stub signature"
+    if (( SIGN )); then
+      sed 's/^/    /' "$TMPW/ac.err" >&2
+      issue "sign_update unavailable or failed; appcast item uses a stub signature"
+    else
+      note "rehearsal: stub signature (the Sparkle key is used only by --publish or --sign)"
+    fi
     scripts/appcast-item.sh "${ac[@]}" --dry-run --signature-stub > "$OUT/appcast-item.xml" \
       || die "appcast-item.sh failed"
   fi
@@ -192,8 +220,12 @@ if (( ! PUBLISH )); then
   exit 0
 fi
 
+NOTES="$OUT/release-notes.md"
+[[ -f $NOTES ]] || die "no $NOTES"
+
 # Step 12: tag the built commit, commit website/.
 step "12 Tag and commit"
+STAGE=committed
 git tag -a "$TAG" -m "Roadie $VERSION" "$BUILT_COMMIT"
 git add -- website
 git commit -q -m "Release $VERSION: appcast, changelog, download link"
@@ -201,21 +233,23 @@ note "tag $TAG on $BUILT_COMMIT; website commit $(git rev-parse --short HEAD)"
 
 # Step 13: push after a prompt.
 step "13 Push"
-read -r "?Push main and $TAG to origin? [y/N] " answer
-[[ $answer == [yY] ]] || die "not pushed. To undo: git tag -d $TAG && git reset --hard HEAD~1"
-git push origin main "$TAG"
+answer=""
+read -r "?Push main and $TAG to origin? [y/N] " answer || answer=""
+[[ $answer == [yY] ]] || die "not pushed"
+git push --atomic origin main "$TAG"
+STAGE=pushed
 
 # Step 14: GitHub release, then re-download and compare.
 step "14 GitHub release"
-NOTES="$OUT/release-notes.md"
-[[ -f $NOTES ]] || die "no $NOTES"
 gh release create "$TAG" "$DMG" "$DMG.sha256" --repo "$REPO_SLUG" --verify-tag \
   --title "Roadie $VERSION" --notes-file "$NOTES"
+STAGE=released
 DL="$TMPW/download"; mkdir "$DL"
 gh release download "$TAG" --repo "$REPO_SLUG" --pattern "$DMG_NAME" --dir "$DL"
 remote=$(shasum -a 256 "$DL/$DMG_NAME" | cut -d' ' -f1)
 [[ $remote == $SHA ]] || die "downloaded sha256 $remote != local $SHA"
 note "GitHub asset sha256 matches: $SHA"
+STAGE=done
 
 # Step 15: hand-off.
 step "15 Hand-off"
