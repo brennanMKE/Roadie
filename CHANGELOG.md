@@ -6,9 +6,16 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-10-23
+
+The first public build: a rough draft to get Roadie started. More is on the way.
+
 ### Added
 
-- Renders classic Winamp 2.x `.wsz` skins: the main window, equalizer and playlist.
-- Plays music from a [Music Assistant](https://music-assistant.io/) server or a local folder.
-- Plays on this Mac as a Sendspin player.
-- Browses and applies skins from a local skins folder or the Winamp Skin Museum.
+- Classic Winamp 2.x `.wsz` skins with the main, equalizer and playlist windows, docking, shade modes and the visualizer.
+- Browse and play your [Music Assistant](https://music-assistant.io/) library, or local files and folders.
+- This Mac as a Music Assistant player, and playback on any other Music Assistant player.
+- Music Assistant playlists you can create, edit and play.
+- A skin browser for your skins folder and the Winamp Skin Museum.
+- Quick Look thumbnails and previews for `.wsz` files.
+- Updates through Sparkle.
