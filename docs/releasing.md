@@ -74,6 +74,24 @@ fails. It never prints a secret: only identity and profile names and whether the
 - [ ] Smoke-tested on a clean account
 - [ ] Deploy requested; update offered to the previous version
 
+## Signing and the DMG by hand
+
+`release.sh` runs these two; they also work on their own against a VM zip (`scripts/verify.sh --head --dmg`):
+
+- `scripts/make-dmg.sh <Roadie.app.zip> --release X.Y.Z [--identity NAME] [--notary-profile NAME] [--out DIR]`
+  - Version gate: the app and both appexes must report `X.Y.Z (<build>)` with one build number.
+  - Signs inside-out in the [code-signing.md](code-signing.md) order (Sparkle helpers when present, a note when
+    not), then `codesign --verify --deep --strict` and a check of every Mach-O.
+  - Builds `Roadie.dmg` (volume `Roadie`), signs it; notarizes and staples only with `--notary-profile`
+    (printing only the submission id and status; on `Invalid` the log goes to `<out>/notary-log.json`).
+  - Renames it `Roadie-X.Y.Z.dmg`, writes `Roadie-X.Y.Z.dmg.sha256`, and copies the dSYM zip and `dsym-uuids.txt`.
+  - `--out` defaults to `build/release/X.Y.Z`. Without `--release`, the old dev mode writes
+    `build/dist/Roadie-<version>-<build>-<commit>.dmg`.
+- `scripts/verify-dmg.sh <dmg> [--expect-team ID] [--allow-unnotarized]` prints one `PASS`/`FAIL` line per check:
+  DMG signature and team, `stapler validate`, `spctl -t open`, the mounted app's deep verify and `spctl -t exec`,
+  every Mach-O's authority, team, runtime and timestamp, and a Safari-quarantine simulation. With
+  `--allow-unnotarized`, the four notarization checks are reported as expected failures and don't fail the exit code.
+
 ## If something fails
 
 - **Notarization `Invalid`.** The log is in `build/release/X.Y.Z/notary-log.json`. Usual causes: a nested binary

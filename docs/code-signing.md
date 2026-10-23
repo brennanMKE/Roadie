@@ -28,10 +28,11 @@ create, renew or revoke a certificate. Signing for distribution happens only on 
 
 ## What gets signed, in order
 
-`release.sh` (step 3) signs inside-out, each item with `--force --options runtime --timestamp` and the item's own
+`release.sh` (step 3, through `scripts/make-dmg.sh --release X.Y.Z`) signs inside-out, each item with `--force --options runtime --timestamp` and the item's own
 entitlements minus `com.apple.security.get-task-allow`:
 
-1. `Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc`
+1. `Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc` (`B` is whatever
+   `Versions/Current` points to; without Sparkle, steps 1-5 are skipped with a note)
 2. `…/XPCServices/Downloader.xpc` (keeps its entitlements)
 3. `…/Versions/B/Autoupdate`
 4. `…/Versions/B/Updater.app`
@@ -68,5 +69,7 @@ Then:
 ## Checks
 
 - `scripts/check-entitlements.sh` and `scripts/check-sparkle.sh` run in the VM on every run.
-- `scripts/verify-dmg.sh <dmg>` checks a finished DMG from a recipient's point of view.
+- `scripts/verify-dmg.sh <dmg> [--expect-team ID] [--allow-unnotarized]` checks a finished DMG from a recipient's
+  point of view, one `PASS`/`FAIL` line per check. `--allow-unnotarized` reports the notarization checks (stapler,
+  both `spctl` assessments, the quarantine simulation) as expected failures, for rehearsals.
 - `scripts/preflight.sh --credentials-only` checks the identity, its expiry, the notary profile and the Sparkle key.
