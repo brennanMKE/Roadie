@@ -29,7 +29,9 @@
 #            the smoke launch constructs every engine and never plays
 #   --dmg    also build the app in the Release configuration (step app-release) and bring it back, zipped, as
 #            build/vm-tests/<run-id>/release/Roadie.app.zip; scripts/make-dmg.sh signs it on the host and makes the DMG;
-#            also release/Roadie.app.dSYM.zip and release/dsym-uuids.txt (dwarfdump --uuid, run in the guest)
+#            also release/Roadie.app.dSYM.zip and release/dsym-uuids.txt (dwarfdump --uuid, run in the guest), and
+#            release/sparkle-bin/{sign_update,generate_keys} (#0158); then checks the Release bundle: steps
+#            app-release-plist (check-info-plist.sh --release) and app-sparkle (check-sparkle.sh)
 #   --build-number N  the Release build's CFBundleVersion, YYYYMMDD.HHMM (#0157); default: now, in UTC
 #
 # In the guest, in order:
@@ -412,9 +414,14 @@ if (( DMG )); then
   # --build-number N (#0157) sets it instead, so a release can name its build ahead of time.
   [[ -n "$BUILD_NUMBER" ]] || BUILD_NUMBER=$(date -u +%Y%m%d.%H%M)
   # The dSYM comes back zipped with its UUIDs (dwarfdump runs in the guest) so crash reports can be symbolicated.
-  # W7 (#0158): copy the Sparkle tools (sparkle-bin) into $GUEST_RESULTS/release here too.
+  # #0158: Sparkle's sign_update and generate_keys come back too (release/sparkle-bin), from the same pinned version
+  # the Release build resolved. They are never run in the guest.
   REL=build/DerivedData-release/Build/Products/Release
-  run_step app-release "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Release -derivedDataPath build/DerivedData-release CURRENT_PROJECT_VERSION=$BUILD_NUMBER build && mkdir -p $GUEST_RESULTS/release && print -r -- $BUILD_NUMBER > $GUEST_RESULTS/release/build.txt && ditto -c -k --keepParent $REL/Roadie.app $GUEST_RESULTS/release/Roadie.app.zip && ditto -c -k --keepParent $REL/Roadie.app.dSYM $GUEST_RESULTS/release/Roadie.app.dSYM.zip && dwarfdump --uuid $REL/Roadie.app.dSYM > $GUEST_RESULTS/release/dsym-uuids.txt"
+  SPARKLE_BIN=build/DerivedData-release/SourcePackages/artifacts/sparkle/Sparkle/bin
+  run_step app-release "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Release -derivedDataPath build/DerivedData-release CURRENT_PROJECT_VERSION=$BUILD_NUMBER build && mkdir -p $GUEST_RESULTS/release && print -r -- $BUILD_NUMBER > $GUEST_RESULTS/release/build.txt && ditto -c -k --keepParent $REL/Roadie.app $GUEST_RESULTS/release/Roadie.app.zip && ditto -c -k --keepParent $REL/Roadie.app.dSYM $GUEST_RESULTS/release/Roadie.app.dSYM.zip && dwarfdump --uuid $REL/Roadie.app.dSYM > $GUEST_RESULTS/release/dsym-uuids.txt && mkdir -p $GUEST_RESULTS/release/sparkle-bin && cp $SPARKLE_BIN/sign_update $SPARKLE_BIN/generate_keys $GUEST_RESULTS/release/sparkle-bin/"
+  # #0158: the Release bundle's Sparkle keys (exact feed URL; SUPublicEDKey only warns until W15) and its embedding.
+  run_step app-release-plist "scripts/check-info-plist.sh --release $REL/Roadie.app/Contents/Info.plist"
+  run_step app-sparkle "scripts/check-sparkle.sh $REL/Roadie.app"
 fi
 
 # --- Results back ----------------------------------------------------------

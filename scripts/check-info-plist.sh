@@ -2,9 +2,14 @@
 # check-info-plist.sh — assert the app's Info.plist carries the networking keys (#0012, #0063), the location descriptions (#0075), NSBonjourServices (#0104)
 # and still carries the .wsz type (#0047) and claims it as a document type (#0043). Reads only; runs on the host against the
 # regenerated App/Info.plist and in the guest against the built Roadie.app.
-# Usage: scripts/check-info-plist.sh <path/to/Info.plist>
+# #0158 Sparkle: default (Debug) mode asserts SUFeedURL is empty (or still the unexpanded $(ROADIE_FEED_URL) in the source
+# plist); --release asserts the exact feed URL and a non-empty SUPublicEDKey (only a WARN while W15 hasn't set it).
+# Both assert the sandboxed-installer/downloader service keys are absent: Roadie isn't sandboxed.
+# Usage: scripts/check-info-plist.sh [--release] <path/to/Info.plist>
 set -euo pipefail
-P=${1:?usage: check-info-plist.sh <Info.plist>}
+RELEASE=0
+[[ ${1:-} == --release ]] && { RELEASE=1; shift; }
+P=${1:?usage: check-info-plist.sh [--release] <Info.plist>}
 get()    { plutil -extract "$1" raw -o - "$P" 2>/dev/null; }
 expect() { local got; got="$(get "$1" || true)"; print -r -- "$1 = ${got:-<absent>}"
            [[ "$got" == "$2" ]] || { print -u2 -r -- "!! $1: expected '$2'"; return 1; }; }
@@ -42,4 +47,19 @@ expect UTExportedTypeDeclarations.0.UTTypeConformsTo.0 public.zip-archive
 expect UTExportedTypeDeclarations.1.UTTypeIdentifier co.sstools.roadie.media-id
 expect UTExportedTypeDeclarations.1.UTTypeConformsTo.0 public.data
 expect CFBundleDocumentTypes.0.LSItemContentTypes.0 co.sstools.roadie.wsz
+# #0158 Sparkle.
+absent SUEnableInstallerLauncherService
+absent SUEnableDownloaderService
+absent SUEnableAutomaticChecks
+absent SUEnableSystemProfiling
+if (( RELEASE )); then
+  expect SUFeedURL https://roadie.sstools.co/appcast.xml
+  edkey="$(get SUPublicEDKey || true)"
+  if [[ -n "$edkey" ]]; then print -r -- "SUPublicEDKey = $edkey"
+  else print -r -- "WARN: SUPublicEDKey is empty (set by W15); the updater stays off until then"; fi
+else
+  feed="$(get SUFeedURL || true)"
+  print -r -- "SUFeedURL = ${feed:-<empty>}"
+  [[ -z "$feed" || "$feed" == '$(ROADIE_FEED_URL)' ]] || { print -u2 -r -- "!! SUFeedURL must be empty in Debug"; exit 1; }
+fi
 print -r -- "Info.plist OK: $P"

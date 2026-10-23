@@ -43,10 +43,22 @@ packages and Quick Look extensions don't.
 | `SUEnableSystemProfiling` | not set (off) | not set |
 | `SUEnableInstallerLauncherService`, `SUEnableDownloaderService` | **must be absent**: Roadie isn't sandboxed | absent |
 
-They are set in `project.yml` (`info.properties` and per-configuration settings). `scripts/check-info-plist.sh
---release` checks the built bundle.
+They are set in `project.yml`: `info.properties` maps `SUFeedURL` and `SUPublicEDKey` to the per-configuration
+settings `ROADIE_FEED_URL` and `ROADIE_PUBLIC_ED_KEY` (Release: the feed URL and the public key; Debug: both empty).
+Until W15 sets the public key, `ROADIE_PUBLIC_ED_KEY` is empty in Release too, so the updater stays off there as well.
 
-The dependency is pinned with `exactVersion` in `project.yml`. To upgrade Sparkle:
+## Checks
+
+- `scripts/check-info-plist.sh <plist>` (the VM step `app-plist`, on the Debug app) asserts `SUFeedURL` is empty and
+  the installer and downloader service keys, `SUEnableAutomaticChecks` and `SUEnableSystemProfiling` are absent.
+- `scripts/check-info-plist.sh --release <plist>` (VM step `app-release-plist`, with `--dmg`) asserts the exact
+  `SUFeedURL` and the same absent keys. An empty `SUPublicEDKey` prints a `WARN` instead of failing until W15 lands.
+- `scripts/check-sparkle.sh <app>` (VM step `app-sparkle`, with `--dmg`) asserts `Contents/Frameworks/Sparkle.framework`
+  has `Autoupdate`, `Updater.app` and both XPC services, that the app links Sparkle and the Quick Look appexes don't
+  (`otool -L`), and that the sandbox-only `-spks`/`-spki` entitlements are absent.
+- `MainMenuTests` covers Check for Updates… right after About Roadie in the skinned main menu.
+
+The dependency is pinned with `exactVersion` in `project.yml` (2.10.0). To upgrade Sparkle:
 1. Change that version.
 2. Run `scripts/verify.sh --dmg`.
 3. Read Sparkle's release notes for signing changes.
@@ -58,9 +70,10 @@ The dependency is pinned with `exactVersion` in `project.yml`. To upgrade Sparkl
 - **Losing the private key means no installed copy can ever accept another update.** Back it up before 0.0.1 ships;
   see [release-credentials.md](release-credentials.md).
 - The **public** key is not secret. It lives in `project.yml`.
-- The tools (`generate_keys`, `sign_update`) come from the same pinned Sparkle version. A
-  `scripts/verify.sh --dmg` run brings them back from the VM to `build/vm-tests/<run>/release/sparkle-bin/`, and
-  `release.sh` copies them to `build/sparkle/bin/`.
+- The tools (`generate_keys`, `sign_update`) come from the same pinned Sparkle version (the guest's
+  `SourcePackages/artifacts/sparkle/Sparkle/bin/`). A `scripts/verify.sh --dmg` run brings them back from the VM to
+  `build/vm-tests/<run-id>/release/sparkle-bin/`; they are never run in the guest. `release.sh` (W12) will copy them
+  to `build/sparkle/bin/`.
 - Always pass `--account Roadie`. Without it the tools look under the default account and fail with
   "Signing key not found for account ed25519".
 
