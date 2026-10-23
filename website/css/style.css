@@ -108,6 +108,39 @@ strong { color: var(--text-strong); }
 }
 .screenshot-frame img { display: block; width: 100%; height: auto; border-radius: 8px; }
 
+/* Skin carousel (js/carousel.js). Without JavaScript it is still a swipeable, scroll-snapping strip. */
+.carousel { position: relative; }
+.carousel-track {
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+  border-radius: 8px; background: #0E0F11; cursor: grab; overscroll-behavior-x: contain;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-track.is-dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+.carousel-slide {
+  flex: 0 0 100%; scroll-snap-align: start; margin: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  padding: 32px 16px 20px;
+}
+.carousel-slide img {
+  display: block; width: auto; max-width: 100%; height: clamp(320px, 56vw, 640px); object-fit: contain;
+  border-radius: 0; -webkit-user-drag: none;
+}
+.carousel-slide figcaption { font-size: 14px; color: var(--text-muted); text-align: center; }
+.carousel-slide figcaption strong { font-weight: 600; }
+.carousel-dots { display: none; justify-content: center; gap: 4px; padding-top: 14px; }
+.carousel.is-ready .carousel-dots { display: flex; }
+.carousel-dot {
+  width: 28px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.carousel-dot::before {
+  content: ""; width: 9px; height: 9px; border-radius: 50%; background: #3A3E44; transition: background 0.2s, transform 0.2s;
+}
+.carousel-dot:hover::before { background: var(--text-muted); }
+.carousel-dot[aria-current="true"]::before { background: var(--accent); transform: scale(1.25); box-shadow: 0 0 8px rgba(99, 227, 90, 0.6); }
+.carousel-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 50%; }
+@media (prefers-reduced-motion: reduce) { .carousel-dot::before { transition: none; } }
+
 /* Features */
 .features { background: var(--bg-band); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .features .wrap { padding-top: 88px; padding-bottom: 88px; display: flex; flex-direction: column; gap: 40px; }
@@ -183,3 +216,5 @@ strong { color: var(--text-strong); }
 .footer-nav { display: flex; flex-wrap: wrap; gap: 24px; }
 .footer-nav a { color: var(--text); }
 .site-footer p { margin: 0; max-width: 80ch; line-height: 1.6; }
+
+.screenshot-caption [data-carousel-label] { text-transform: uppercase; }

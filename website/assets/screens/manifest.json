@@ -1,14 +1,5 @@
 [
   {
-    "slug": "deus-amp",
-    "file": "deus-amp.png",
-    "width": 550,
-    "height": 870,
-    "skin": "Deus AMP",
-    "author": "Josef \"BladeRay\" Novak",
-    "source": "Deus_AMP.wsz"
-  },
-  {
     "slug": "asian-dragon",
     "file": "asian-dragon.png",
     "width": 550,
@@ -25,23 +16,5 @@
     "skin": "The NightCrawler",
     "author": "Anuja and Arjuna Navaratna (t-k)",
     "source": "nightcrawler_by_t_k.wsz"
-  },
-  {
-    "slug": "make-me-sad",
-    "file": "make-me-sad.png",
-    "width": 550,
-    "height": 870,
-    "skin": "Make Me Sad",
-    "author": "Valerie",
-    "source": "makemesad.wsz"
-  },
-  {
-    "slug": "winamp-classic-cm",
-    "file": "winamp-classic-cm.png",
-    "width": 550,
-    "height": 870,
-    "skin": "Winamp Classic CM",
-    "author": null,
-    "source": "Winamp_Classic_CM.wsz"
   }
 ]

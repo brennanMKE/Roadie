@@ -49,13 +49,20 @@
 </div>
 </section>
 
-<section class="wrap screenshot" aria-label="Screenshot">
-<div class="screenshot-frame">
-<div class="screenshot-caption"><span>MAIN &middot; EQ &middot; PLAYLIST</span><span>DOCKED</span></div>
-<!-- Screenshot goes here once the file exists in assets/ (the deploy checks every src), e.g.
-<img src="assets/screenshot-main.png" alt="The main, EQ and playlist windows docked, wearing an original Roadie skin" width="1600" height="900">
-and remove the placeholder div below. -->
-<div class="screenshot-placeholder" role="img" aria-label="The main, EQ and playlist windows docked, wearing an original Roadie skin">The main, EQ and playlist windows docked, wearing an original Roadie skin</div>
+<section class="wrap screenshot" aria-label="Screenshots">
+<div class="screenshot-frame carousel" data-carousel aria-roledescription="carousel" aria-label="Roadie wearing different skins">
+<div class="screenshot-caption"><span>MAIN &middot; EQ &middot; PLAYLIST</span><span data-carousel-label aria-live="polite">DOCKED</span></div>
+<div class="carousel-track" tabindex="0">
+<figure class="carousel-slide" data-name="Asian Dragon" aria-roledescription="slide" aria-label="1 of 2">
+<picture><source srcset="assets/screens/asian-dragon.webp" type="image/webp"><img src="assets/screens/asian-dragon.png" alt="Roadie's main, equalizer and playlist windows docked, wearing the Asian Dragon skin: a painted dragon in orange clouds, playing Daft Punk's Technologic" width="550" height="870" draggable="false"></picture>
+<figcaption><strong>Asian Dragon</strong> by sir-akmal-ez</figcaption>
+</figure>
+<figure class="carousel-slide" data-name="The NightCrawler" aria-roledescription="slide" aria-label="2 of 2">
+<picture><source srcset="assets/screens/nightcrawler.webp" type="image/webp"><img src="assets/screens/nightcrawler.png" alt="Roadie's main, equalizer and playlist windows docked, wearing The NightCrawler skin: biomechanical grey metal with a playlist of Electronic tracks" width="550" height="870" loading="lazy" draggable="false"></picture>
+<figcaption><strong>The NightCrawler</strong> by Anuja and Arjuna Navaratna (t-k)</figcaption>
+</figure>
+</div>
+<div class="carousel-dots" role="group" aria-label="Choose a skin"></div>
 </div>
 </section>
 
@@ -125,5 +132,6 @@ and remove the placeholder div below. -->
 <p>&copy; Brennan Stehling</p>
 </div>
 </footer>
+<script src="js/carousel.js" defer></script>
 </body>
 </html>

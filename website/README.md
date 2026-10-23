@@ -72,10 +72,12 @@ first. Never remove a published item. `xmllint --noout website/appcast.xml` must
 
 ## Screenshots
 
-`index.html` has a styled placeholder frame and a commented-out `<img>`. Add the user-supplied screenshot to
-`assets/` (an original Roadie skin, or one whose author agreed; never the Winamp base skin, §2.8), then swap the
-placeholder for the `<img>`. Every `src` must exist before deploying. A 1200x630 `assets/social-card.png` and its
-`og:image` tag can be added the same way.
+`index.html` shows the skin screenshots in a carousel (`js/carousel.js`: swipe or drag, dot buttons, arrow keys,
+a new slide every 3 s; paused on hover or focus and still under reduced motion). Each slide is a `<figure>` with a
+WebP `<source>`, a PNG `<img>` and the skin's name and author. Feature only skins with no third-party trademarks or
+characters, and never the Winamp base skin (§2.8); `scripts/make-screenshots.sh` lists what is left out and why.
+Every `src` must exist before deploying. A 1200x630 `assets/social-card.png` and its `og:image` tag can be added the
+same way.
 
 ### Regenerating the skin screenshots (#0168)
 

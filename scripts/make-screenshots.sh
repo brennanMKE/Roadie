@@ -45,12 +45,13 @@ while (( $#args )); do
 done
 
 # The featured skins: source file | slug | display name | author (from the readme inside the .wsz; "-" when none).
+# Only skins with no third-party trademarks or characters are featured. Left out for that reason (they render fine):
+#   "Deus_AMP.wsz|deus-amp|Deus AMP|Josef \"BladeRay\" Novak"       (Deus Ex game art and logo)
+#   "makemesad.wsz|make-me-sad|Make Me Sad|Valerie"                  (Serial Experiments Lain character)
+#   "Winamp_Classic_CM.wsz|winamp-classic-cm|Winamp Classic CM|-"    (the Winamp base skin, docs/design/release.md §2.8)
 SKINS=(
-  "Deus_AMP.wsz|deus-amp|Deus AMP|Josef \"BladeRay\" Novak"
   "Asian Dragon.wsz|asian-dragon|Asian Dragon|sir-akmal-ez"
   "nightcrawler_by_t_k.wsz|nightcrawler|The NightCrawler|Anuja and Arjuna Navaratna (t-k)"
-  "makemesad.wsz|make-me-sad|Make Me Sad|Valerie"
-  "Winamp_Classic_CM.wsz|winamp-classic-cm|Winamp Classic CM|-"
 )
 # Roadie has no built-in skin: with none loaded it shows a "No Skin Loaded" placeholder, so there is nothing to feature.
 # Skins drawn for a different stack order (their readme says so): equalizer on top, then main, then playlist.
