@@ -31,7 +31,8 @@ finish() {
 }
 
 read -r "p8?Path to App Store Connect API key (.p8): "
-p8="${~p8}"
+# read gets the path verbatim; expand a leading ~ (typed or pasted) by hand.
+[[ "$p8" == "~" || "$p8" == "~/"* ]] && p8="$HOME${p8#\~}"
 [[ -f "$p8" ]] || { print -u2 "Not a file: $p8"; exit 1; }
 p8="${p8:A}"
 if [[ "$p8" == "$repo"/* ]]; then print -u2 "The .p8 must live outside the repo."; exit 1; fi
