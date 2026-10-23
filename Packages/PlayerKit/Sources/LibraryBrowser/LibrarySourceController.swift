@@ -43,7 +43,7 @@ public final class LibrarySourceController {
     private let searchLimit: Int
     private let artworkLimitBytes: Int
     private let artworkLimitCount: Int
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LibrarySource")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "LibrarySource")
 
     public init(
         sources: [LibrarySource], defaultSourceID: String, defaults: UserDefaults = .standard,

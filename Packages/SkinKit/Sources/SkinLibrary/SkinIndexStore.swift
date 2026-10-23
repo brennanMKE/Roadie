@@ -35,12 +35,12 @@ struct AppliedCounts: Sendable, Equatable {
 public actor SkinIndexStore {
     public static let schemaVersion: Int32 = 2
 
-    /// `~/Library/Application Support/com.brennanmke.SkinAmp/SkinLibrary/index.sqlite`; not Caches, because
+    /// `~/Library/Application Support/co.sstools.roadie/SkinLibrary/index.sqlite`; not Caches, because
     /// an index of 100k skins is minutes of work and must not be purged by the system.
     public static var defaultURL: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return support.appending(path: "com.brennanmke.SkinAmp", directoryHint: .isDirectory)
+        return support.appending(path: "co.sstools.roadie", directoryHint: .isDirectory)
             .appending(path: "SkinLibrary", directoryHint: .isDirectory)
             .appending(path: "index.sqlite", directoryHint: .notDirectory)
     }

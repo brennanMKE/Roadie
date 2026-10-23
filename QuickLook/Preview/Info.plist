@@ -26,7 +26,7 @@
 			<true/>
 			<key>QLSupportedContentTypes</key>
 			<array>
-				<string>com.brennanmke.skinamp.wsz</string>
+				<string>co.sstools.roadie.wsz</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

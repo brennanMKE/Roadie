@@ -11,7 +11,7 @@ actor MANowPlayingWatch {
     private let policy: MANowPlayingPolicy
     private let yield: @Sendable (NowPlaying) -> Void
     private let cachePlayer: @Sendable (MAPlayer) async -> Void
-    private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantBackend")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantBackend")
 
     private var player: MAPlayer?
     private var queue: MAPlayerQueue?

@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "AudioStream")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "AudioStream")
 
 /// A server-timed PCM stream on the player node (#0106): the server owns the queue and stamps each chunk
 /// with the local time its first frame must be heard. Never touches the local queue or the gapless scheduler.

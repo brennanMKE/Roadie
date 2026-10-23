@@ -37,7 +37,7 @@ public actor MusicAssistantClient {
     private let pongTimeout: Duration
     private let callTimeout: Duration
     private let reconnectPolicy: ReconnectPolicy
-    private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistant")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistant")
 
     public private(set) var state: ConnectionState = .disconnected
     public private(set) var serverInfo: MAServerInfo?

@@ -98,7 +98,7 @@ public final class SkinBrowserModel {
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var stepTask: Task<Void, Never>?
     @ObservationIgnored private var resolveTask: Task<Void, Never>?
-    @ObservationIgnored private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "SkinBrowser")
+    @ObservationIgnored private static let logger = Logger(subsystem: "co.sstools.roadie", category: "SkinBrowser")
 
     public init(
         index: @escaping IndexProvider,

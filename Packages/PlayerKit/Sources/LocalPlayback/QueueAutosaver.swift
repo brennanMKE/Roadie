@@ -16,7 +16,7 @@ public final class QueueAutosaver {
     /// The queue as it was when saving started; a quit with no change since leaves the file as found
     /// (an unreadable or newer-version file is not replaced by an empty queue).
     private var baseline: QueueSnapshot?
-    private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "QueueAutosaver")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "QueueAutosaver")
 
     /// Saves started so far (tests).
     public private(set) var saveCount = 0

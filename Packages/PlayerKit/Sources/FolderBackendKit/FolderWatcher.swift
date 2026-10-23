@@ -21,7 +21,7 @@ public final class FSEventsFolderWatcher: FolderWatching, @unchecked Sendable {
     }
 
     private let box: Box
-    private let queue = DispatchQueue(label: "com.brennanmke.SkinAmp.FolderWatcher")
+    private let queue = DispatchQueue(label: "co.sstools.roadie.FolderWatcher")
     private struct Handle: @unchecked Sendable { var stream: FSEventStreamRef }
     private let state = OSAllocatedUnfairLock<Handle?>(initialState: nil)
 

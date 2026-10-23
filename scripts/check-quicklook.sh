@@ -33,7 +33,7 @@ for appex in $thumb $prev; do
   n=${appex:t:r}
   codesign -d --entitlements :- "$appex" > "$out/$n.entitlements.txt" 2>&1
   grep -A1 'com.apple.security.app-sandbox' "$out/$n.entitlements.txt" | grep -q '<true/>' && ok "$n sandboxed" || bad "$n sandboxed" "(see $n.entitlements.txt)"
-  [[ "$(plist "$appex/Contents/Info.plist" NSExtension.NSExtensionAttributes.QLSupportedContentTypes.0)" == com.brennanmke.skinamp.wsz ]] && ok "$n content-type" || bad "$n content-type"
+  [[ "$(plist "$appex/Contents/Info.plist" NSExtension.NSExtensionAttributes.QLSupportedContentTypes.0)" == co.sstools.roadie.wsz ]] && ok "$n content-type" || bad "$n content-type"
 done
 [[ "$(plist "$thumb/Contents/Info.plist" NSExtension.NSExtensionPointIdentifier)" == com.apple.quicklook.thumbnail ]] && ok thumbnail-extension-point || bad thumbnail-extension-point
 [[ "$(plist "$prev/Contents/Info.plist" NSExtension.NSExtensionPointIdentifier)" == com.apple.quicklook.preview ]] && ok preview-extension-point || bad preview-extension-point
@@ -43,14 +43,14 @@ plutil -extract NSExtension.NSExtensionAttributes.QLIsDataBasedPreview raw -expe
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app" </dev/null >/dev/null 2>&1 || true
 pluginkit -a "$thumb" </dev/null || true
 pluginkit -a "$prev" || true
-pluginkit -e use -i com.brennanmke.SkinAmp.Thumbnail || true
-pluginkit -e use -i com.brennanmke.SkinAmp.Preview || true
+pluginkit -e use -i co.sstools.roadie.thumbnail || true
+pluginkit -e use -i co.sstools.roadie.preview || true
 sleep 2
-pluginkit -m -v -i com.brennanmke.SkinAmp.Thumbnail > "$out/pluginkit-thumbnail.txt" 2>&1 || true
-pluginkit -m -v -i com.brennanmke.SkinAmp.Preview > "$out/pluginkit-preview.txt" 2>&1 || true
+pluginkit -m -v -i co.sstools.roadie.thumbnail > "$out/pluginkit-thumbnail.txt" 2>&1 || true
+pluginkit -m -v -i co.sstools.roadie.preview > "$out/pluginkit-preview.txt" 2>&1 || true
 pluginkit -m -v > "$out/pluginkit-all.txt" 2>&1 || true
-grep -F com.brennanmke.SkinAmp.Thumbnail "$out/pluginkit-thumbnail.txt" | grep -qv '^-' && ok pluginkit-thumbnail || bad pluginkit-thumbnail "(see pluginkit-thumbnail.txt)"
-grep -F com.brennanmke.SkinAmp.Preview "$out/pluginkit-preview.txt" | grep -qv '^-' && ok pluginkit-preview || bad pluginkit-preview "(see pluginkit-preview.txt)"
+grep -F co.sstools.roadie.thumbnail "$out/pluginkit-thumbnail.txt" | grep -qv '^-' && ok pluginkit-thumbnail || bad pluginkit-thumbnail "(see pluginkit-thumbnail.txt)"
+grep -F co.sstools.roadie.preview "$out/pluginkit-preview.txt" | grep -qv '^-' && ok pluginkit-preview || bad pluginkit-preview "(see pluginkit-preview.txt)"
 
 # 3. Fixtures
 tmo 300 swift "$script_dir/make-test-skin.swift" "$out/test.wsz" </dev/null || bad make-test-skin
@@ -59,7 +59,7 @@ cp /etc/hosts "$out/bad.wsz"
 sleep 1
 ctype=$(mdls -name kMDItemContentType -raw "$out/test.wsz" 2>/dev/null)
 print -r -- "quicklook: mdls content type = $ctype"
-[[ "$ctype" == com.brennanmke.skinamp.wsz ]] && ok content-type-registered || bad content-type-registered "(got $ctype)"
+[[ "$ctype" == co.sstools.roadie.wsz ]] && ok content-type-registered || bad content-type-registered "(got $ctype)"
 # #0047: the open panel enables a file only when its type conforms to an allowed type (.zip), so check conformance.
 ctree=$(mdls -name kMDItemContentTypeTree -raw "$out/test.wsz" 2>/dev/null)
 [[ "$ctree" == *public.zip-archive* ]] && ok content-type-conforms-zip || bad content-type-conforms-zip "(tree: $ctree)"

@@ -35,7 +35,7 @@ actor MAQueueWatch {
     /// The queue playing on the output now (a synced speaker plays its leader's); asked on every refetch.
     private let resolveQueueID: @Sendable () async throws -> String
     private let yield: @Sendable (RemoteQueueSnapshot) -> Void
-    private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantBackend")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantBackend")
 
     private var queueID: String?
     private var generation = 0

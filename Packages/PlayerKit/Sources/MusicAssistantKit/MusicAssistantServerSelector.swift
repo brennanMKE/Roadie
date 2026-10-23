@@ -29,7 +29,7 @@ public actor MusicAssistantServerSelector {
     private let sleep: @Sendable (Duration) async throws -> Void
     private let probeTimeout: Duration
     private var running: (id: UUID, candidates: [MusicAssistantServerRanking.Candidate], task: Task<Result, Never>)?
-    private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantSelection")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantSelection")
     /// Calls that shared a running round, for tests.
     private(set) var joined = 0
 

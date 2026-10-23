@@ -42,7 +42,7 @@ public final class PlaylistEditor {
     /// The delayed refetch after an own write; the server's change event replaces it.
     @ObservationIgnored private var fallbackTask: Task<Void, Never>?
     @ObservationIgnored private var retryEdit: (@MainActor () -> Void)?
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "PlaylistEditor")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "PlaylistEditor")
 
     public init(backend: any MusicBackend, refetchFallback: Duration = .seconds(2)) {
         self.backend = backend

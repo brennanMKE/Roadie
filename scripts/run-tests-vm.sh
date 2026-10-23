@@ -41,6 +41,7 @@
 #   5. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
 #      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
+#      scripts/check-identifiers.sh: no com.brennanmke outside the legacy allowlist (#0153)
 #   7. optional: launch SkinAmp.app, check it stays up, quit it
 # Exit codes:
 #   0  everything passed and the host stayed silent
@@ -352,6 +353,7 @@ fi
 run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Products/Debug/SkinAmp.app/Contents/Info.plist"
 run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build/Products/Debug/SkinAmp.app"
 run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/SkinAmp.app $GUEST_RESULTS/ql"
+run_step identifiers     "scripts/check-identifiers.sh"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/SkinAmp.app && sleep 5 && pgrep -x SkinAmp && osascript -e 'quit app \"SkinAmp\"' && sleep 1 && ! pgrep -x SkinAmp"
 fi

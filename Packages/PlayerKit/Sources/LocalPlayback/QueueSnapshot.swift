@@ -80,7 +80,7 @@ public struct QueueStore: Sendable {
             items.append(LocalQueueItem(track: track, id: item.mediaID))
         }
         if dropped > 0 {
-            Logger(subsystem: "com.brennanmke.SkinAmp", category: "QueueStore")
+            Logger(subsystem: "co.sstools.roadie", category: "QueueStore")
                 .info("queue restore dropped \(dropped) item(s) of an unknown kind")
         }
         let snapshot = QueueSnapshot(

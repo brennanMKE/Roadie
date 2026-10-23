@@ -4,7 +4,7 @@ import Foundation
 import MusicBackendKit
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "FolderIndexer")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "FolderIndexer")
 
 /// Scans `Artist/Album/<tracks>` into a `FolderIndex`. A pure async function of the tree (and of the
 /// previous index, which only saves work): the folder structure decides artists and albums, tags only

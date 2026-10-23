@@ -75,7 +75,7 @@ public struct MusicAssistantServerConfiguration: Identifiable, Hashable, Sendabl
 /// The list in UserDefaults under `defaultsKey` (a JSON array in the user's order). Reads and writes defaults only.
 public struct MusicAssistantServerStore: Sendable {
     public static let defaultsKey = "MusicAssistantServers"
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantSettings")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantSettings")
 
     nonisolated(unsafe) private let defaults: UserDefaults
 

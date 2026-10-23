@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "SkinLibrary")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "SkinLibrary")
 
 /// Runs the incremental pass over a skins folder: scan, compare with the stamps in the store, hash the changed
 /// files, parse only hashes the store has not seen, and apply the results in batches.

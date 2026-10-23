@@ -65,7 +65,7 @@ public final class MusicAssistantSelectionController {
     @ObservationIgnored private var isValid = false
     @ObservationIgnored private var changesTask: Task<Void, Never>?
     @ObservationIgnored private var pendingTask: Task<Void, Never>?
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantSelection")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantSelection")
 
     /// No I/O here.
     public init<C: Clock>(

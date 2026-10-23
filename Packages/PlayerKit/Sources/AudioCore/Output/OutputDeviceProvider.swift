@@ -2,7 +2,7 @@ import AVFoundation
 import CoreAudio
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "AudioOutput")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "AudioOutput")
 
 /// Where the system default output device comes from, and how the engine is bound to it.
 /// The real one talks to CoreAudio; tests inject a manual one. Nothing here ever changes the default.
@@ -43,7 +43,7 @@ public struct OutputDeviceDescription: Sendable, Equatable {
 
 /// Holds the CoreAudio listener block so the stream's termination handler can remove it.
 private final class DefaultOutputListener: @unchecked Sendable {
-    let queue = DispatchQueue(label: "com.brennanmke.SkinAmp.AudioOutput")
+    let queue = DispatchQueue(label: "co.sstools.roadie.AudioOutput")
     var block: AudioObjectPropertyListenerBlock?
 }
 

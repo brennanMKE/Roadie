@@ -2,7 +2,7 @@ import AVFoundation
 import CoreAudio
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "AudioOutput")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "AudioOutput")
 
 /// Owns the AVAudioEngine and its nodes: player -> EQ -> main mixer -> output.
 @MainActor

@@ -37,7 +37,7 @@ struct TokenStoreTests {
         // Only the query dictionaries are compared: no Keychain call is made.
         #expect(a.baseQuery[kSecAttrAccount as String] as? String == "a")
         #expect(b.baseQuery[kSecAttrAccount as String] as? String == "b")
-        #expect(a.baseQuery[kSecAttrService as String] as? String == "com.brennanmke.SkinAmp.musicAssistant")
+        #expect(a.baseQuery[kSecAttrService as String] as? String == "co.sstools.roadie.musicAssistant")
         #expect(a.baseQuery[kSecAttrService as String] as? String == b.baseQuery[kSecAttrService as String] as? String)
     }
 

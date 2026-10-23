@@ -30,7 +30,7 @@ public enum MusicAssistantTokenStoreError: Error, Hashable, Sendable, LocalizedE
 /// A generic-password item in the login keychain, one per server (`account`). Not the data-protection
 /// keychain: the app is ad-hoc signed, which that keychain does not accept. Not synchronizable.
 public struct KeychainMusicAssistantTokenStore: MusicAssistantTokenStore {
-    public static let defaultService = "com.brennanmke.SkinAmp.musicAssistant"
+    public static let defaultService = "co.sstools.roadie.musicAssistant"
     public var service: String
     /// One per configured server; #0075 passes the server configuration's id.
     public var account: String

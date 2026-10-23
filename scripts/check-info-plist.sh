@@ -36,10 +36,10 @@ for key in NSLocationUsageDescription NSLocationWhenInUseUsageDescription; do
   print -r -- "$key = ${loc:-<absent>}"
   [[ "$loc" == *Wi-Fi* ]] || { print -u2 "!! $key is missing or does not mention Wi-Fi"; exit 1; }
 done
-expect UTExportedTypeDeclarations.0.UTTypeIdentifier com.brennanmke.skinamp.wsz
+expect UTExportedTypeDeclarations.0.UTTypeIdentifier co.sstools.roadie.wsz
 # #0047: the open panel filter relies on this conformance.
 expect UTExportedTypeDeclarations.0.UTTypeConformsTo.0 public.zip-archive
-expect UTExportedTypeDeclarations.1.UTTypeIdentifier com.brennanmke.skinamp.media-id
+expect UTExportedTypeDeclarations.1.UTTypeIdentifier co.sstools.roadie.media-id
 expect UTExportedTypeDeclarations.1.UTTypeConformsTo.0 public.data
-expect CFBundleDocumentTypes.0.LSItemContentTypes.0 com.brennanmke.skinamp.wsz
+expect CFBundleDocumentTypes.0.LSItemContentTypes.0 co.sstools.roadie.wsz
 print -r -- "Info.plist OK: $P"

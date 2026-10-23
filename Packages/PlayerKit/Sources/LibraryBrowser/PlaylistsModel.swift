@@ -54,7 +54,7 @@ public final class PlaylistsModel {
 
     /// The browser whose selection follows the edits.
     @ObservationIgnored weak var browser: LibraryBrowserModel?
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playlists")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "Playlists")
 
     /// Add to Playlist targets, most recent first (#0136); kept in `defaults`.
     public private(set) var recentTargets: [MediaID] = []

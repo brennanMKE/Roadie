@@ -148,7 +148,7 @@ public final class LibraryBrowserModel {
     /// Every library change after the model's own handling: the seam for `PlaylistsModel`, `PlaylistEditor`,
     /// until they are owned here (#0139).
     @ObservationIgnored public var onLibraryChange: (@MainActor (LibraryChange) -> Void)?
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LibraryBrowser")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "LibraryBrowser")
 
     public init(
         backend: any MusicBackend, pageSize: Int = 100,

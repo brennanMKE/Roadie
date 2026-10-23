@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Progressive")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "Progressive")
 
 /// The current track playing from a download still in flight (#0039): its reader, and the feeder that keeps
 /// the player node supplied with decoded buffers. The reader outlives feeders (a seek starts a new one).

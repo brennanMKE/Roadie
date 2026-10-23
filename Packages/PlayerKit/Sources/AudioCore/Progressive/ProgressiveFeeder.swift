@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Progressive")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "Progressive")
 
 /// What a feeder tells the player, from the feeder's own thread. The player hops to the main actor and
 /// ignores events from a feeder that is no longer current.

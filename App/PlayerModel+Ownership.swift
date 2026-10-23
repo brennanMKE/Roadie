@@ -8,7 +8,7 @@ import os
 /// #0121: SkinAmp follows what Music Assistant plays, only one place plays, and quitting stops the target.
 /// The decisions are `PlaybackOwnership` and `QuitStop`; this only wires them in.
 extension PlayerModel {
-    private static let ownershipLog = Logger(subsystem: "com.brennanmke.SkinAmp", category: "PlaybackOwnership")
+    private static let ownershipLog = Logger(subsystem: "co.sstools.roadie", category: "PlaybackOwnership")
 
     /// What the target plays now: AudioCore's state for This Mac on the local feed, else its now-playing state.
     var targetState: NowPlaying.State {

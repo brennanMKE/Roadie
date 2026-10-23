@@ -37,7 +37,7 @@ public final class SendspinPlayer {
     @ObservationIgnored private var preMuteVolume: Float = 1
     @ObservationIgnored private var lastReported: (volume: Int, muted: Bool)?
     @ObservationIgnored private let debounce: Duration
-    @ObservationIgnored private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "SendspinPlayback")
+    @ObservationIgnored private let log = Logger(subsystem: "co.sstools.roadie", category: "SendspinPlayback")
 
     /// Starts nothing: no session, no audio device, no network.
     public init(

@@ -75,7 +75,7 @@ public enum MusicAssistantDiscovery {
     }
 }
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantDiscovery")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantDiscovery")
 
 /// Finds Music Assistant servers on the current network (#0104) while someone is looking: `start()`/`stop()` are
 /// reference-counted and nothing runs before the first `start()`. Probes `/info` unauthenticated (the fetcher takes a

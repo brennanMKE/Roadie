@@ -65,7 +65,7 @@ public actor SendspinSession: SendspinSessionDriving {
     private let clock: any SendspinClock
     private let sleeper: any Clock<Duration>
     private let reconnect: SendspinReconnectPolicy
-    private let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Sendspin")
+    private let logger = Logger(subsystem: "co.sstools.roadie", category: "Sendspin")
 
     private let eventStream: AsyncStream<SendspinEvent>
     private let eventContinuation: AsyncStream<SendspinEvent>.Continuation

@@ -27,8 +27,8 @@ final class VisualizerModel {
     }
 
     private static let modeKey = "visualizerMode"
-    private static let signposter = OSSignposter(subsystem: "com.brennanmke.SkinAmp", category: "Visualizer")
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Visualizer")
+    private static let signposter = OSSignposter(subsystem: "co.sstools.roadie", category: "Visualizer")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "Visualizer")
 
     private(set) var mode: Mode
     /// nil draws nothing (stopped, or mode off).

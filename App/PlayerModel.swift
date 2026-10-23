@@ -56,7 +56,7 @@ final class PlayerModel {
         let userAgent = MuseumUserAgent.make(version: version)
         let caches = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory)
-            .appending(path: "com.brennanmke.SkinAmp/Museum", directoryHint: .isDirectory)
+            .appending(path: "co.sstools.roadie/Museum", directoryHint: .isDirectory)
         let results = MuseumResultCache(directory: caches.appending(path: "Results", directoryHint: .isDirectory))
         return MuseumBrowserModel(
             client: MuseumClient(transport: transport, userAgent: userAgent, resultCache: results),
@@ -967,7 +967,7 @@ final class PlayerModel {
         UserDefaults.standard.set(open, forKey: Self.playlistWindowOpenKey)
     }
 
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Playback")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "Playback")
 
     /// A track the local player could not play: the marquee says which (or how many), Console says why.
     private func showPlaybackFailure(_ failure: PlaybackFailure) {

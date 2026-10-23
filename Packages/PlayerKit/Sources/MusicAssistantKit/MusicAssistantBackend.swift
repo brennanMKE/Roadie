@@ -43,7 +43,7 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     let http: any MAHTTPTransport
     let clock: any Clock<Duration>
     private let policy: MANowPlayingPolicy
-    private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantBackend")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantBackend")
 
     /// The now-playing watchers subscribe to its events and states.
     public private(set) var client: MusicAssistantClient?

@@ -177,11 +177,11 @@ public enum FolderIndexStatus: Hashable, Sendable {
 
 /// One JSON file per root under Caches.
 public enum FolderIndexCache {
-    /// `~/Library/Caches/<bundle id or com.brennanmke.SkinAmp>/FolderIndex/`
+    /// `~/Library/Caches/<bundle id or co.sstools.roadie>/FolderIndex/`
     public static func defaultDirectory(bundleIdentifier: String? = Bundle.main.bundleIdentifier) -> URL {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return caches.appending(path: bundleIdentifier ?? "com.brennanmke.SkinAmp", directoryHint: .isDirectory)
+        return caches.appending(path: bundleIdentifier ?? "co.sstools.roadie", directoryHint: .isDirectory)
             .appending(path: "FolderIndex", directoryHint: .isDirectory)
     }
 

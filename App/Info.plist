@@ -15,7 +15,7 @@
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.brennanmke.skinamp.wsz</string>
+				<string>co.sstools.roadie.wsz</string>
 			</array>
 		</dict>
 	</array>
@@ -60,7 +60,7 @@
 			<key>UTTypeDescription</key>
 			<string>Winamp Classic Skin</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.brennanmke.skinamp.wsz</string>
+			<string>co.sstools.roadie.wsz</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -77,7 +77,7 @@
 			<key>UTTypeDescription</key>
 			<string>SkinAmp Library Item</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.brennanmke.skinamp.media-id</string>
+			<string>co.sstools.roadie.media-id</string>
 		</dict>
 	</array>
 </dict>

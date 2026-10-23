@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantSettings")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantSettings")
 
 /// Everything Settings › Music Assistant does, apart from drawing it: the server list, one Keychain item per
 /// server, address and token editing, and Test Connection.

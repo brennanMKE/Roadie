@@ -27,7 +27,7 @@ public enum LocalTrackLoader {
         }
     }
 
-    private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LocalTrackLoader")
+    private static let logger = Logger(subsystem: "co.sstools.roadie", category: "LocalTrackLoader")
     private static let maxConcurrent = 4
     private static let maxPlaylistDepth = 8
     static let maxPlaylistReads = 256

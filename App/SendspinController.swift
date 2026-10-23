@@ -31,7 +31,7 @@ final class SendspinController {
     /// Decisions run one after another so a fast connect / disconnect never interleaves a start and a stop.
     @ObservationIgnored private var work: Task<Void, Never>?
     @ObservationIgnored private var watchTask: Task<Void, Never>?
-    @ObservationIgnored private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Sendspin")
+    @ObservationIgnored private let log = Logger(subsystem: "co.sstools.roadie", category: "Sendspin")
 
     init(sendspin: SendspinPlayer, musicAssistant: MusicAssistantBackend, defaults: UserDefaults = .standard) {
         self.sendspin = sendspin

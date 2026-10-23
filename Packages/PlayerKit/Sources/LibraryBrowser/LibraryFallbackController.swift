@@ -46,7 +46,7 @@ public final class LibraryFallbackController {
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
     @ObservationIgnored private var probeTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var timerTasks: [String: Task<Void, Never>] = [:]
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LibraryFallback")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "LibraryFallback")
 
     public var timerCount: Int { timerTasks.count }
     public var probeCount: Int { probeTasks.count }

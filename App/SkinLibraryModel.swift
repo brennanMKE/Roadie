@@ -30,7 +30,7 @@ final class SkinLibraryModel {
     @ObservationIgnored private var scanTask: Task<Void, Never>?
     /// A Museum download arrived while a pass ran: run an incremental pass after it (#0126).
     @ObservationIgnored private var rescanAfterPass = false
-    @ObservationIgnored private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "SkinLibrary")
+    @ObservationIgnored private static let logger = Logger(subsystem: "co.sstools.roadie", category: "SkinLibrary")
 
     init(
         defaults: UserDefaults = .standard, databaseURL: URL = SkinIndexStore.defaultURL,

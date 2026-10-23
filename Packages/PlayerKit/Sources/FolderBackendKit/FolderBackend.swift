@@ -4,7 +4,7 @@ import LocalPlayback
 import MusicBackendKit
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "FolderBackend")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "FolderBackend")
 
 /// A local folder, organized `Artist/Album/<tracks>`, behind `MusicBackend`. Browsing is answered from an
 /// in-memory `FolderIndex` (cached on disk, rescanned in the background when the folder changes);

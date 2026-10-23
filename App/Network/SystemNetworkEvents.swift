@@ -19,7 +19,7 @@ struct SystemNetworkEvents: NetworkChangeSource {
 /// Owns one monitor; its state is touched only on `queue`.
 private final class MonitorBox: @unchecked Sendable {
     private let monitor = NWPathMonitor()
-    private let queue = DispatchQueue(label: "com.brennanmke.SkinAmp.network-path")
+    private let queue = DispatchQueue(label: "co.sstools.roadie.network-path")
     private var sawInitialPath = false
 
     func start(_ onChange: @escaping @Sendable () -> Void) {

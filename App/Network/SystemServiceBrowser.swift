@@ -18,8 +18,8 @@ struct SystemServiceBrowser: MusicAssistantServiceBrowser {
 
 /// Owns the browsers and pending connections; their state is touched only on `queue`.
 private final class BrowserBox: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "com.brennanmke.SkinAmp.bonjour")
-    private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "MusicAssistantDiscovery")
+    private let queue = DispatchQueue(label: "co.sstools.roadie.bonjour")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "MusicAssistantDiscovery")
     private let yield: @Sendable (MusicAssistantDiscoveredHost) -> Void
     private var browsers: [NWBrowser] = []
     private var connections: [ObjectIdentifier: NWConnection] = [:]

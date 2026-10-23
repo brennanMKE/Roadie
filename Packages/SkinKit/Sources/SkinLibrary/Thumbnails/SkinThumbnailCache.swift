@@ -3,7 +3,7 @@ import Foundation
 import os
 import SkinKit
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "SkinThumbnails")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "SkinThumbnails")
 
 /// One main-window thumbnail. `CGImage` is immutable; wrapped like `Skin` is.
 public struct SkinThumbnail: @unchecked Sendable {
@@ -32,7 +32,7 @@ public actor SkinThumbnailCache {
     public static func defaultDirectory(bundleIdentifier: String? = Bundle.main.bundleIdentifier) -> URL {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return caches.appending(path: bundleIdentifier ?? "com.brennanmke.SkinAmp", directoryHint: .isDirectory)
+        return caches.appending(path: bundleIdentifier ?? "co.sstools.roadie", directoryHint: .isDirectory)
             .appending(path: "SkinThumbnails", directoryHint: .isDirectory)
     }
 

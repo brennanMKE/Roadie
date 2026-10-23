@@ -3,7 +3,7 @@ import AudioToolbox
 import Foundation
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "Progressive")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "Progressive")
 
 enum ProgressiveError: Error, LocalizedError, Equatable {
     /// The container cannot be read while it is still downloading (a far jump past the side-fetch

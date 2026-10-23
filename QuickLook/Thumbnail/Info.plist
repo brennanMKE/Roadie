@@ -24,7 +24,7 @@
 		<dict>
 			<key>QLSupportedContentTypes</key>
 			<array>
-				<string>com.brennanmke.skinamp.wsz</string>
+				<string>co.sstools.roadie.wsz</string>
 			</array>
 			<key>QLThumbnailMinimumDimension</key>
 			<integer>0</integer>

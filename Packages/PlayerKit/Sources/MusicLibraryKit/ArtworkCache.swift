@@ -37,7 +37,7 @@ public actor ArtworkCache {
     private var missing: Set<ArtworkRef> = []
     private var tick: UInt64 = 0
     private var stats = Statistics()
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "ArtworkCache")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "ArtworkCache")
 
     public init(
         backend: any MusicBackend, maxPixels: Int = thumbnailPixels,

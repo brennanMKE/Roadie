@@ -89,7 +89,7 @@ public final class MuseumBrowserModel {
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var moreTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
-    @ObservationIgnored private static let logger = Logger(subsystem: "com.brennanmke.SkinAmp", category: "SkinMuseum")
+    @ObservationIgnored private static let logger = Logger(subsystem: "co.sstools.roadie", category: "SkinMuseum")
 
     public init(
         client: any MuseumPaging,

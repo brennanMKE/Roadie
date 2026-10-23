@@ -14,7 +14,7 @@ enum LegacyDataCleanup {
     static let keychainService = "com.brennanmke.SkinAmp.plex"
     static let removedSourceID = "plex"
 
-    private static let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "LegacyCleanup")
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "LegacyCleanup")
 
     static func run(defaults: UserDefaults = .standard, bundleIdentifier: String? = Bundle.main.bundleIdentifier) {
         guard defaults.integer(forKey: versionKey) < version else { return }
@@ -36,16 +36,16 @@ enum LegacyDataCleanup {
 
         // The track cache directory, off the main actor. Not retried: macOS purges Caches anyway.
         let cacheDir = URL.cachesDirectory
-            .appending(path: bundleIdentifier ?? "com.brennanmke.SkinAmp", directoryHint: .isDirectory)
+            .appending(path: bundleIdentifier ?? "co.sstools.roadie", directoryHint: .isDirectory)
             .appending(path: "Tracks", directoryHint: .isDirectory)
         let cacheExists = FileManager.default.fileExists(atPath: cacheDir.path)
         if cacheExists {
             Task.detached(priority: .utility) {
                 do {
                     try FileManager.default.removeItem(at: cacheDir)
-                    Logger(subsystem: "com.brennanmke.SkinAmp", category: "LegacyCleanup").info("cache directory removed")
+                    Logger(subsystem: "co.sstools.roadie", category: "LegacyCleanup").info("cache directory removed")
                 } catch {
-                    Logger(subsystem: "com.brennanmke.SkinAmp", category: "LegacyCleanup")
+                    Logger(subsystem: "co.sstools.roadie", category: "LegacyCleanup")
                         .error("could not remove the cache directory: \(error.localizedDescription, privacy: .public)")
                 }
             }

@@ -4,7 +4,7 @@ import Foundation
 import Observation
 import os
 
-private let log = Logger(subsystem: "com.brennanmke.SkinAmp", category: "AudioOutput")
+private let log = Logger(subsystem: "co.sstools.roadie", category: "AudioOutput")
 
 @MainActor
 @Observable
