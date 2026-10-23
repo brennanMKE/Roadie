@@ -10,7 +10,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     # #0157: the one version for the app and its extensions. Release builds override the build number
     # (scripts/run-tests-vm.sh --dmg [--build-number N]).
-    MARKETING_VERSION: "0.0.2"
+    MARKETING_VERSION: "0.0.3"
     CURRENT_PROJECT_VERSION: "1"
 packages:
   SkinKit:

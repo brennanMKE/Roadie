@@ -6,6 +6,8 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-10-23
+
 ### Fixed
 
 - A Music Assistant server can be added by its Tailscale name (`http://<machine>.<tailnet>.ts.net:8095`), and an https address on port 8095 that can't be reached now explains that Music Assistant serves plain http there.
