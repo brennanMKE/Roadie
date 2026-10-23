@@ -6,6 +6,10 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-10-23
+
+A friendlier first launch: Roadie now helps you get skins and pick your music folder. Music Assistant is optional.
+
 ### Added
 
 - A Welcome window on first launch: skins (with a one-click way to the Winamp Skin Museum), a music folder, and optional Music Assistant. Help › Welcome to Roadie… brings it back.
