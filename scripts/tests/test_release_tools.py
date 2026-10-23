@@ -81,7 +81,8 @@ class PreflightRepo:
         shutil.copy(PREFLIGHT, self.root / "scripts" / "preflight.sh")
         (self.root / "project.yml").write_text(
             'name: Roadie\nsettings:\n  base:\n    MARKETING_VERSION: "%s"\n'
-            'targets:\n  Roadie:\n    settings:\n      configs:\n        Release:\n'
+            'targets:\n  Roadie:\n    settings:\n      configs:\n        Debug:\n'
+            '          ROADIE_PUBLIC_ED_KEY: ""\n        Release:\n'
             '          ROADIE_PUBLIC_ED_KEY: "%s"\n' % (marketing, key))
         (self.root / "CHANGELOG.md").write_text("# Changelog\n\n## [%s] - 2026-10-24\n\n- x\n" % changelog)
         (self.root / "website").mkdir()

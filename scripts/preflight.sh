@@ -169,8 +169,10 @@ else
   fail "notary: profile $notary_profile not usable"
 fi
 
-project_key=$(grep -m1 'ROADIE_PUBLIC_ED_KEY:' project.yml 2>/dev/null \
-  | sed -E 's/.*ROADIE_PUBLIC_ED_KEY:[[:space:]]*"?([^"[:space:]]*)"?.*/\1/' || true)
+# The Release config's key; the Debug config above it is deliberately empty.
+project_key=$(awk '/^[[:space:]]*Release:[[:space:]]*$/ { rel = 1; next }
+  rel && /ROADIE_PUBLIC_ED_KEY:/ { sub(/.*ROADIE_PUBLIC_ED_KEY:[[:space:]]*"?/, ""); sub(/"?[[:space:]]*$/, ""); print; exit }' \
+  project.yml 2>/dev/null || true)
 if [[ -z $project_key ]]; then
   fail "sparkle: ROADIE_PUBLIC_ED_KEY empty in project.yml (W15 not done)"
 elif [[ ! -x $sparkle_bin/generate_keys ]]; then

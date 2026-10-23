@@ -112,14 +112,14 @@ targets:
         # Unsandboxed for now so the app can read a large local skin corpus by path.
         ENABLE_APP_SANDBOX: NO
         # If the sandbox is ever enabled, add com.apple.security.network.client (docs/music-assistant-integration.md).
-      # #0158: Sparkle's feed and EdDSA public key. The public key is set by W15; until then the updater stays off.
+      # #0158: Sparkle's feed and EdDSA public key. Public key from `generate_keys --account Roadie` (#0166); Debug leaves both empty so the updater stays off.
       configs:
         Debug:
           ROADIE_FEED_URL: ""
           ROADIE_PUBLIC_ED_KEY: ""
         Release:
           ROADIE_FEED_URL: https://roadie.sstools.co/appcast.xml
-          ROADIE_PUBLIC_ED_KEY: ""
+          ROADIE_PUBLIC_ED_KEY: 1ahuGzRXzcL46eqj/DaWBeqoYKioAZd5+wAWsY52vgc=
   RoadieThumbnail:
     type: app-extension
     platform: macOS
