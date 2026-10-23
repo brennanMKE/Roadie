@@ -39,20 +39,33 @@ fails. It never prints a secret: only identity and profile names and whether the
    - Commit both as `Bump version to X.Y.Z`.
    - Don't set a build number. The script stamps `CFBundleVersion` with the UTC `YYYYMMDD.HHMM`.
 2. **Preflight:** `scripts/preflight.sh --release X.Y.Z`. Fix every ✗.
-3. **Rehearse:** `scripts/release.sh X.Y.Z`.
-   - Builds and tests in the VM (`--full --launch --dmg`), signs, makes the DMG, `.sha256`, appcast item and notes
-     under `build/release/X.Y.Z/`.
+3. **Rehearse:** `scripts/release.sh X.Y.Z` (agents may run this).
+   - Preflight runs non-strict; its failures (credentials, branch, changelog) are listed at the end under "Fix
+     before --publish" but don't stop the rehearsal.
+   - Builds and tests in the VM (`scripts/verify.sh --head --full --launch --dmg --build-number <UTC build>`), reads
+     the zip from the `RELEASE` line, signs and packages with `make-dmg.sh --release`, and checks the DMG with
+     `verify-dmg.sh --allow-unnotarized`.
+   - Writes only under `build/release/X.Y.Z/`: the DMG, `.sha256`, dSYM zip and UUIDs, `appcast-item.xml` (stub
+     signature when `sign_update` or the Sparkle key is missing), `release-notes.md`, `rehearsal-index.html`.
+     Steps 9-11 edit a temporary copy of `website/`, checked with `check-website.sh --expect-dmg`.
    - Doesn't notarize. Doesn't touch `website/`, git or GitHub.
-4. **Publish (user):** `scripts/release.sh X.Y.Z --publish`. In order:
-   1. VM build and test.
-   2. Developer ID signing, inside-out, Sparkle helpers included.
-   3. DMG, notarize, staple, `verify-dmg.sh`.
-   4. `Roadie-X.Y.Z.dmg` and `.sha256`.
-   5. The appcast item prepended; `changelog.html` article; download link.
-   6. `check-website.sh`.
-   7. Annotated tag `vX.Y.Z` on the built commit; website commit.
-   8. A prompt before pushing main and the tag.
-   9. `gh release create` with both assets, then re-download to check the hash.
+   - `--skip-build ZIP` reuses an existing VM `Roadie.app.zip` to rehearse only the host steps.
+4. **Publish (user):** `scripts/release.sh X.Y.Z --publish [--notary-profile NAME] [--identity NAME]
+   [--repo OWNER/NAME]` (defaults: `Roadie-notary`, the first Developer ID identity, `brennanMKE/Roadie`). Any
+   failure stops it. In order:
+   1. `preflight.sh --release X.Y.Z --strict --build-number <build>`.
+   2. VM build and test.
+   3. Developer ID signing, inside-out, Sparkle helpers included.
+   4. DMG, notarize, staple, `stapler validate`, `spctl`, `verify-dmg.sh`.
+   5. `Roadie-X.Y.Z.dmg` and `.sha256`.
+   6. `changelog.html` article and release notes; the appcast item (real `sign_update`) prepended; download link.
+   7. `check-website.sh --expect-dmg X.Y.Z`.
+   8. Annotated tag `vX.Y.Z` on the built commit; commit `Release X.Y.Z: appcast, changelog, download link`.
+   9. The prompt `Push main and vX.Y.Z to origin? [y/N]`; anything but y stops before the push.
+   10. `gh release create … --verify-tag` with both assets, then a re-download whose sha256 must match.
+   11. The hand-off checklist, then "Ask for the site to be deployed."
+
+   What you do: answer the push prompt, preview the site, smoke-test, and ask for the deploy.
 5. **Smoke test** on a fresh user account or a Mac that has never run Roadie:
    - Open the DMG and drag Roadie to Applications.
    - It opens with no Gatekeeper warning.
