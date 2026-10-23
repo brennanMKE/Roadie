@@ -72,8 +72,8 @@ The dependency is pinned with `exactVersion` in `project.yml` (2.10.0). To upgra
 - The **public** key is not secret. It lives in `project.yml`.
 - The tools (`generate_keys`, `sign_update`) come from the same pinned Sparkle version (the guest's
   `SourcePackages/artifacts/sparkle/Sparkle/bin/`). A `scripts/verify.sh --dmg` run brings them back from the VM to
-  `build/vm-tests/<run-id>/release/sparkle-bin/`; they are never run in the guest. `release.sh` (W12) will copy them
-  to `build/sparkle/bin/`.
+  `build/vm-tests/<run-id>/release/sparkle-bin/`; they are never run in the guest. `release.sh` copies them
+  to `build/sparkle/bin/` after its build step.
 - Always pass `--account Roadie`. Without it the tools look under the default account and fail with
   "Signing key not found for account ed25519".
 

@@ -89,6 +89,13 @@ else
   note "zip $ZIP (build $BUILD), commit $BUILT_COMMIT"
 fi
 
+# The VM brings back Sparkle's host tools from the same pinned version; sign_update and generate_keys run from here.
+if [[ -d ${ZIP:h}/sparkle-bin ]]; then
+  mkdir -p build/sparkle/bin
+  cp -f "${ZIP:h}"/sparkle-bin/* build/sparkle/bin/
+  note "Sparkle tools copied to build/sparkle/bin"
+fi
+
 # Steps 2-8: unpack, version gate, sign, DMG, [notarize, staple], final name, sha256.
 step "2-8 Sign and package"
 md=("$ZIP" --release "$VERSION" --out "$OUT")
