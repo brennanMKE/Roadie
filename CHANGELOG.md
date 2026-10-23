@@ -13,7 +13,7 @@ The first public build: a rough draft to get Roadie started. More is on the way.
 ### Added
 
 - Classic Winamp 2.x `.wsz` skins with the main, equalizer and playlist windows, docking, shade modes and the visualizer.
-- Browse and play your [Music Assistant](https://music-assistant.io/) library, or local files and folders.
+- Browse and play your Music Assistant library, or local files and folders.
 - This Mac as a Music Assistant player, and playback on any other Music Assistant player.
 - Music Assistant playlists you can create, edit and play.
 - A skin browser for your skins folder and the Winamp Skin Museum.
