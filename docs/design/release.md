@@ -63,7 +63,7 @@ Counts are from `git grep` over 814 tracked files on 2026-10-23.
 - **Tracker and docs:** `issues/project.json` (name `SkinAmp`, url `https://github.com/brennanMKE/SkinAmp`), the
   `issues/Issues.md` heading, `README.md`, `AGENTS.md`, `docs/plan.md` (milestones end at M7).
 
-### Where user data lives (all keyed by the old identity)
+### Where user data lives
 
 | Data | Key / path | Source |
 |---|---|---|
@@ -130,18 +130,18 @@ first thing that reads defaults (`App/AppDelegate.swift:9`). The views that use 
 | `SKINAMP_SLOW_TESTS` | `ROADIE_SLOW_TESTS` |
 | VM clone prefix `skinamp-test-`, lease label `skinamp` | `roadie-test-`, `roadie` |
 
-The `com.brennanmke.SkinAmp.plex` constant in `LegacyDataCleanup` stays: it names a legacy item.
+The `com.brennanmke.SkinAmp.plex` constant in `LegacyDataCleanup` stays: it still deletes an old Plex Keychain item.
 
-**Ordering rule:** every commit must pass `scripts/verify.sh`, and the user's own data must never be orphaned. That
-means the migration code lands (tested) before the bundle id changes, and the id change and its wiring land in one commit.
+**Release 0.0.1** is a rough draft: its job is to start the release pipeline, not to be a finished product.
 
-1. **W1: migration module, not yet called.** A pure addition, so it builds.
+**Ordering rule:** every commit must pass `scripts/verify.sh`.
+
+1. **W1: dropped** ([#0152](../../issues/0152.md), won't fix). There is no migration (§2.2).
 2. **W2: identity switch.**
    - `project.yml` bundle ids, UTIs and Quick Look content types.
    - The check scripts and tests that pin them.
    - The Keychain service.
    - Hard-coded paths, logger subsystems and queue labels.
-   - Migration wired into `PlayerModel.init`.
 
    These go in **one commit**: `check-info-plist.sh` and `check-quicklook.sh` run in the same VM run as the build that
    changes them. The product is still named SkinAmp in this commit.
@@ -168,98 +168,23 @@ means the migration code lands (tested) before the bundle id changes, and the id
 
 - [ ] `scripts/verify.sh --head --full --launch --dmg` passes.
 - [ ] Outside `issues/NNNN.md`, `git grep -i skinamp` finds only:
-  - the migration's legacy constants;
-  - the legacy `.wsz` UTI in the document and Quick Look types;
-  - `LegacyDataCleanup`;
+  - `LegacyDataCleanup` (its `com.brennanmke.SkinAmp.plex` constant);
   - the GitHub URL in `issues/project.json`;
   - the `README` sentence "formerly SkinAmp";
   - the transitional VM clone cleanup pattern.
 
   The allowlist lives in `scripts/check-rename.sh` (added in W5), which exits non-zero on anything else.
 - [ ] `git grep com.brennanmke` finds only the same allowlist.
-- [ ] `AppMigrationTests` pass (`--expect`).
-- [ ] **The user** installs a locally signed, unnotarized Roadie DMG (`scripts/make-dmg.sh`) on their own Mac where
-      SkinAmp has been used, with SkinAmp quit. Roadie then opens with:
-  - the same skin and window layout;
-  - the same Music Assistant servers, connected without re-entering the token (one Keychain prompt is expected);
-  - the same queue;
-  - the same skin library, without a full re-index.
+- [ ] **The user** installs a locally signed, unnotarized Roadie DMG (`scripts/make-dmg.sh`), enters their Music
+      Assistant server and token, picks their folders, and confirms Roadie works.
 - [ ] The user says "push".
 
 Phase B tooling (W6–W13) may be in this push if it's ready. It doesn't block the gate.
 
-### 2.2 Migration from SkinAmp
+### 2.2 No migration
 
-**Where it lives:** a new `AppMigration` library target in `Packages/PlayerKit`, depending only on Foundation, Security
-and AppKit for `NSRunningApplication`. It has an `AppMigrationTests` test target. Both go in the `project.yml` app
-dependencies and the scheme's test list. The app target has no tests, so the logic must live in a package.
-
-**API sketch:**
-
-```swift
-public struct LegacyAppMigration {
-    public static let legacyBundleID = "com.brennanmke.SkinAmp"
-    public static let markerKey = "migration.fromSkinAmp"   // Int version, 1
-    public init(defaults: UserDefaults, legacyDomain: () -> [String: Any]?,
-                fileManager: FileManager, appSupport: URL, newBundleID: String,
-                keychain: any TokenItemCopier, isLegacyAppRunning: () -> Bool)
-    public func run() -> Report   // counts and statuses only
-}
-```
-
-**Behavior.** It runs once, as the first line of `PlayerModel.init`, before `LegacyDataCleanup.run()`.
-
-1. If `markerKey` is already set, stop.
-2. If SkinAmp is running (`NSRunningApplication.runningApplications(withBundleIdentifier:)`), log and stop **without**
-   setting the marker. It retries next launch, so a live SQLite file and queue are never copied.
-3. **Defaults:** read `UserDefaults.standard.persistentDomain(forName: "com.brennanmke.SkinAmp")`. This works because
-   the app isn't sandboxed. Copy every key that is **absent** from Roadie's domain, so nothing overwrites a Roadie
-   setting.
-   - This carries the paths (skins folder, library folder, last skin), the server list, the EQ, and window/shade state.
-   - It also carries `sendspin.clientID`, so Music Assistant keeps treating this Mac as the **same player**.
-4. **Files:** copy `~/Library/Application Support/com.brennanmke.SkinAmp/` to `…/co.sstools.roadie/`. Copy item by
-   item, only where the destination doesn't exist. That covers `queue.json` and `SkinLibrary/index.sqlite` with its
-   `-wal`/`-shm`.
-   - The paths stored in the index are absolute and stay valid.
-   - Caches are **not** copied: thumbnails, the folder index and Museum results all regenerate.
-5. **Keychain:**
-   - Look up `kSecClassGenericPassword` items with service `com.brennanmke.SkinAmp.musicAssistant`, asking for
-     attributes only. That never prompts.
-   - For each account not already present under `co.sstools.roadie.musicAssistant`, read the data and add a new item
-     labeled "Roadie Music Assistant token".
-   - The old item's access list trusts SkinAmp's signature, so macOS shows **one** "Roadie wants to use … SkinAmp Music
-     Assistant token" prompt per item.
-   - If the user denies it, log the status and move on. The Music Assistant settings already show "no token" for that
-     server and accept a paste.
-   - The token is never logged.
-6. Set `markerKey = 1`, then log one line with counts:
-   `migration: N defaults, M files, keychain copied/denied/absent`.
-
-**Copy, never move:** the old app and its data stay intact, so SkinAmp keeps working if the user keeps it. Old Keychain
-items aren't deleted, because deleting them would prompt again. The website and README say SkinAmp.app can be deleted
-after Roadie's first launch.
-
-**UTIs during the transition:**
-
-- Roadie exports only the `co.sstools.roadie.*` types.
-- For 0.0.x, `CFBundleDocumentTypes.LSItemContentTypes` and both extensions' `QLSupportedContentTypes` **also** list
-  `com.brennanmke.skinamp.wsz`. If SkinAmp.app is still installed and Launch Services binds `.wsz` to the old type,
-  double-click and Quick Look still reach Roadie.
-- `media-id` is used only inside the app, so it needs no compatibility entry.
-- The open-panel filter accepts both the type and the `wsz` extension.
-
-**Tests (W1):**
-
-- Defaults: copies only absent keys; preserves `sendspin.clientID`.
-- No legacy domain: no-op, marker set.
-- Legacy app running: no-op, marker not set.
-- Files: copies into an empty destination; never overwrites.
-- Keychain:
-  - uses a fake `TokenItemCopier`;
-  - copies every account;
-  - a denied read sets the marker and reports "denied";
-  - the token string never appears in the report.
-- Idempotent on a second run.
+Roadie starts fresh and does not migrate SkinAmp's settings, Keychain items or files, because only the user has run
+SkinAmp. The user re-enters the Music Assistant server and token and picks folders once.
 
 ### 2.3 Sparkle
 
@@ -423,8 +348,6 @@ website/
   - Updates through Sparkle.
 - **Requirements:** a Music Assistant server on your network (or reachable over HTTPS), macOS 14+, Apple silicon or
   Intel (per the build).
-- **"Coming from SkinAmp?":** Roadie brings your settings, servers and skin library over on first launch. Quit SkinAmp
-  first. You can delete SkinAmp.app afterwards.
 - **Footer:** Changelog, Privacy, Source on GitHub (added in W14, after the repo rename), the disclaimer (§2.8),
   "© Brennan Stehling".
 
@@ -492,23 +415,18 @@ Each item fits one agent. Builds and tests run only through `scripts/verify.sh`.
 
 ### Phase A: rename (Gate A, then push)
 
-**W1. AppMigration module.** Depends on: nothing.
-- Add the `AppMigration` target and `AppMigrationTests` to `Packages/PlayerKit/Package.swift`, plus the `project.yml`
-  dependency and scheme test entry. Behavior as in §2.2, not yet called by the app.
-- Tests: the cases listed in §2.2.
-- Accept: `scripts/verify.sh --expect <the new test names>` passes.
+**W1. Dropped** ([#0152](../../issues/0152.md), won't fix). No migration (§2.2).
 
-**W2. Identity switch.** Depends on: W1.
-- `project.yml` bundle ids, UTIs, document types and Quick Look types (new type plus legacy `.wsz`).
+**W2. Identity switch.** Depends on: nothing.
+- `project.yml` bundle ids, UTIs, document types and Quick Look types.
 - `MusicAssistantTokenStore.defaultService`.
 - Hard-coded paths: `SkinIndexStore.swift:43`, `PlayerModel.swift:59`, and the fallbacks in `QueueSnapshot`,
   `SkinThumbnailCache`, `FolderIndex`, `LegacyDataCleanup:39`.
 - Every `com.brennanmke.SkinAmp` logger subsystem and queue label → `co.sstools.roadie`.
 - `PlayerView.swift:37` and `MediaIDTransfer.swift:7`.
 - `check-info-plist.sh`, `check-quicklook.sh`, `TokenStoreTests.swift:40`.
-- Call `LegacyAppMigration` first in `PlayerModel.init`.
 - One commit.
-- Accept: a full VM run passes; `git grep com.brennanmke` outside `issues/` matches only the legacy allowlist.
+- Accept: a full VM run passes; `git grep com.brennanmke` outside `issues/` matches only the allowlist.
 
 **W3. Product rename.** Depends on: W2.
 - `project.yml` name, targets, scheme, display names; rename the entitlements files and `RoadieApp.swift`.
@@ -531,7 +449,7 @@ Each item fits one agent. Builds and tests run only through `scripts/verify.sh`.
 - `scripts/check-rename.sh` with the allowlist, added as a VM step.
 - Accept: `check-rename.sh` passes; every relative link in `docs/` resolves.
 
-**Gate A (user).** The §2.1 checklist, including the migration check on the user's own Mac with a DMG from
+**Gate A (user).** The §2.1 checklist, including the user's check on their own Mac with a DMG from
 `scripts/make-dmg.sh` (Developer ID signed, not notarized). Then the user pushes main.
 
 ### Phase B: release tooling (before or after the push)
@@ -617,31 +535,26 @@ through `--notary-profile`.
 
 **U4 (user).**
 - Run `scripts/release.sh 0.0.1 --publish`.
-- Smoke-test on a fresh user account: drag to Applications, open with no warning, migration as expected.
+- Smoke-test on a fresh user account: drag to Applications, open with no warning, enter a server and token, play.
 - Ask for the site to be deployed.
 - Accept: the `v0.0.1` GitHub release has both assets; the hand-off checklist is complete.
 
 ## 4. Open questions (recommended defaults)
 
-1. **Keychain token migration.** Copy at first launch and accept one macOS prompt; if denied, the user pastes the token
-   again. *Default: yes.*
-2. **Leave SkinAmp's data and app in place?** *Default: yes.* Copy, don't move or delete. The site and README say
-   SkinAmp.app can be deleted.
-3. **Accept the legacy `.wsz` type for 0.0.x?** *Default: yes.* Drop it at 0.1.0.
-4. **Automatic update checks.** *Default:* `SUEnableAutomaticChecks` unset, so Sparkle asks on the second launch.
+1. **Automatic update checks.** *Default:* `SUEnableAutomaticChecks` unset, so Sparkle asks on the second launch.
    Automatic download is off. Both are toggles in Settings › Updates.
-5. **Release notes source.** *Default:* `CHANGELOG.md` at the repo root, rendered into `changelog.html`, the appcast
+2. **Release notes source.** *Default:* `CHANGELOG.md` at the repo root, rendered into `changelog.html`, the appcast
    and GitHub.
-6. **Minimum macOS on the site.** *Default:* "macOS 14 Sonoma or later" (`project.yml:5`).
-7. **Sparkle private key.** *Default:* login keychain on the release Mac, account `Roadie`, with an exported backup in
+3. **Minimum macOS on the site.** *Default:* "macOS 14 Sonoma or later" (`project.yml:5`).
+4. **Sparkle private key.** *Default:* login keychain on the release Mac, account `Roadie`, with an exported backup in
    the user's password manager or an encrypted volume. Never in the repo or on the web host.
-8. **Notary profile name.** *Default:* `Roadie-notary`, created with an App Store Connect API key; `--notary-profile`
+5. **Notary profile name.** *Default:* `Roadie-notary`, created with an App Store Connect API key; `--notary-profile`
    accepts any existing profile for the same team.
-9. **Tagline and disclaimer wording.** *Default:* as in §2.8, plus a quick trademark search on "Roadie" before 0.0.1.
-10. **Screenshot skin.** *Default:* an original Roadie skin (could seed the default look); never the Winamp base skin.
-11. **Test tier for releases.** *Default:* `--full --launch --dmg` (slow tier included).
-12. **Notarize the app on its own as well as the DMG?** *Default:* no. One DMG submission, stapled.
-13. **Rename the VM clone prefix and lease label.** *Default:* yes, with one transitional cleanup pattern.
-14. **Sendspin player name.** *Default:* "Roadie (<host>)". The client id carries over, so Music Assistant keeps the
-    same player and only its name changes.
-15. **Idle marquee text.** *Default:* "Roadie".
+6. **Tagline and disclaimer wording.** *Default:* as in §2.8, plus a quick trademark search on "Roadie" before 0.0.1.
+7. **Screenshot skin.** *Default:* an original Roadie skin (could seed the default look); never the Winamp base skin.
+8. **Test tier for releases.** *Default:* `--full --launch --dmg` (slow tier included).
+9. **Notarize the app on its own as well as the DMG?** *Default:* no. One DMG submission, stapled.
+10. **Rename the VM clone prefix and lease label.** *Default:* yes, with one transitional cleanup pattern.
+11. **Sendspin player name.** *Default:* "Roadie (<host>)". Roadie starts with a new client id, so Music Assistant
+   sees a new player.
+12. **Idle marquee text.** *Default:* "Roadie".
