@@ -1,9 +1,9 @@
 # Roadie
 
-**Roadie: a Winamp-skinned player for Music Assistant.**
+**Roadie: a Winamp-skinned music player for macOS.**
 
 Roadie is a native macOS music player that renders classic Winamp 2.x `.wsz` skins (main window, equalizer
-and playlist) and plays music from a [Music Assistant](https://music-assistant.io/) server or a local folder.
+and playlist) and plays music from a local folder on your Mac, or optionally from a [Music Assistant](https://music-assistant.io/) server.
 It can also play on this Mac as a Sendspin player, and browse and apply skins from a local skins folder or the
 Winamp Skin Museum. The project was called SkinAmp during development.
 
@@ -14,7 +14,8 @@ Get the latest release from **https://roadie.sstools.co/**.
 ## Requirements
 
 - macOS 14 Sonoma or later.
-- A Music Assistant server, with a long-lived token for it.
+- A folder of music on your Mac.
+- Optional: a Music Assistant server, with a long-lived token for it, to stream its library.
 
 ## Development
 
