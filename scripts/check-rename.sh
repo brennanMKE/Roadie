@@ -26,7 +26,6 @@ allow_files=(
 allow_lines=(
   'App/LegacyDataCleanup.swift:keychainService = "com\.brennanmke\.SkinAmp\.plex"'
   'scripts/check-identifiers.sh:com\.brennanmke|SkinAmp'
-  'issues/project.json:"url": "https://github\.com/brennanMKE/SkinAmp"'
   'README.md:The project was called SkinAmp during development\.'
   'scripts/worklog.py:-Users-brennan-Developer-brennanMKE-SkinAmp"'
   'docs/website-hosting.md:`SkinAmp` to `Roadie`|brennanMKE/SkinAmp'

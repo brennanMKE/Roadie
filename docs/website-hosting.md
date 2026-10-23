@@ -123,7 +123,7 @@ the `.sha256` and the enclosure `length`, and verifies everything over HTTPS.
 
 ## Repo rename
 
-Until the GitHub repo is renamed from `SkinAmp` to `Roadie`, releases are read
-from `brennanMKE/SkinAmp`. The deploy side is told the current repo name, so
-nothing in `website/` changes when the repo is renamed. GitHub redirects the
+The GitHub repo was renamed from `SkinAmp` to `Roadie` on 2026-10-23, so
+releases are read from `brennanMKE/Roadie`. The deploy side is told the current
+repo name, so nothing in `website/` changed with the rename. GitHub redirects the
 old release URLs, but the deploy only needs to know the current name.
