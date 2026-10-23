@@ -6,6 +6,21 @@
     <description>Updates for Roadie, a Winamp-skinned player for Music Assistant.</description>
     <language>en</language>
     <item>
+      <title>Version 0.0.3</title>
+      <pubDate>Fri, 23 Oct 2026 23:56:02 +0000</pubDate>
+      <sparkle:version>20261023.2350</sparkle:version>
+      <sparkle:shortVersionString>0.0.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://roadie.sstools.co/changelog.html#v0-0-3</sparkle:releaseNotesLink>
+      <description><![CDATA[
+<h3>Fixed</h3>
+<ul>
+  <li>A Music Assistant server can be added by its Tailscale name (<code>http://&lt;machine&gt;.&lt;tailnet&gt;.ts.net:8095</code>), and an https address on port 8095 that can&#x27;t be reached now explains that Music Assistant serves plain http there.</li>
+</ul>
+      ]]></description>
+      <enclosure url="https://roadie.sstools.co/downloads/Roadie-0.0.3.dmg" length="15645968" type="application/octet-stream" sparkle:edSignature="fsjctyxMZozwV3Z8oD3m/zu/7Yi4aON+NSCiX2slgD5nmaOxJ21IqPdYGH4uQosApwYcMWCmLwuciPTNEmOaDQ=="/>
+    </item>
+    <item>
       <title>Version 0.0.2</title>
       <pubDate>Fri, 23 Oct 2026 23:06:14 +0000</pubDate>
       <sparkle:version>20261023.2300</sparkle:version>
