@@ -571,8 +571,10 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
             case .pause: request = .playerCommand(.pause, playerID: id)
             case .togglePlayPause: request = .playerCommand(.playPause, playerID: id)
             case .stop: request = .playerCommand(.stop, playerID: id)
-            case .next: request = .playerCommand(.next, playerID: id)
-            case .previous: request = .playerCommand(.previous, playerID: id)
+            // Next and previous act on the queue (#0150): `players/cmd/next` goes to the player itself, which for
+            // a Sendspin or speaker player fed by a Music Assistant queue is accepted and does nothing.
+            case .next: request = .queueNext(queueID: try await activeQueueID(playerID: id, client: client))
+            case .previous: request = .queuePrevious(queueID: try await activeQueueID(playerID: id, client: client))
             case .seek(let seconds):
                 let position = seconds.isFinite ? max(0, Int(seconds.rounded())) : 0
                 request = .seek(playerID: id, position: position)
@@ -628,6 +630,13 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// else its own.
     func queueID(for output: OutputDevice.ID, client: MusicAssistantClient) async throws -> String {
         let playerID = try await playerID(for: output)
+        let json = try await client.call(.activeQueue(playerID: playerID))
+        if !json.isNull, let queue = try? json.decode(as: MAPlayerQueue.self) { return queue.queueID }
+        return playerID
+    }
+
+    /// The queue `playerID` plays (`player_queues/get_active_queue`), else the player's own queue.
+    private func activeQueueID(playerID: String, client: MusicAssistantClient) async throws -> String {
         let json = try await client.call(.activeQueue(playerID: playerID))
         if !json.isNull, let queue = try? json.decode(as: MAPlayerQueue.self) { return queue.queueID }
         return playerID

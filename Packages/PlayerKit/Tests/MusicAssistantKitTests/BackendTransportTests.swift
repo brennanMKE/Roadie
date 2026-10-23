@@ -11,7 +11,7 @@ func controlScript(_ change: (inout FixtureScript) throws -> Void = { _ in }) th
     for command in [
         "players/cmd/play", "players/cmd/pause", "players/cmd/play_pause", "players/cmd/stop", "players/cmd/next",
         "players/cmd/previous", "players/cmd/seek", "players/cmd/volume_set", "players/cmd/shuffle",
-        "players/cmd/repeat", "player_queues/play_media", "player_queues/transfer", "players/cmd/set_members",
+        "players/cmd/repeat", "player_queues/play_media", "player_queues/next", "player_queues/previous", "player_queues/transfer", "players/cmd/set_members",
     ] {
         script.override(command, result: .null)
     }
@@ -118,14 +118,38 @@ struct BackendTransportTests {
 
     @Test(arguments: [
         (TransportCommand.play, "players/cmd/play"), (.pause, "players/cmd/pause"),
-        (.togglePlayPause, "players/cmd/play_pause"), (.stop, "players/cmd/stop"), (.next, "players/cmd/next"),
-        (.previous, "players/cmd/previous"),
+        (.togglePlayPause, "players/cmd/play_pause"), (.stop, "players/cmd/stop"),
     ])
     func transportCommandsMapToPlayerCommands(command: TransportCommand, expected: String) async throws {
         let rig = try await connectedBackend(script: controlScript())
         try await rig.backend.transport(command, on: player)
         let request = try #require(sent(rig, expected).first)
         #expect(request.args["player_id"] == .string(SyntheticPlayback.playerID))
+        await rig.backend.disconnect()
+    }
+
+    /// #0150: next and previous go to the queue the player plays, not `players/cmd/next`.
+    @Test func nextAndPreviousGoToTheActiveQueue() async throws {
+        let rig = try await connectedBackend(
+            script: controlScript {
+                $0.override(
+                    "player_queues/get_active_queue",
+                    result: ["queue_id": "the_queue", "active": true, "items": 3, "current_index": 1])
+            })
+        try await rig.backend.transport(.next, on: player)
+        try await rig.backend.transport(.previous, on: player)
+        #expect(sent(rig, "player_queues/next").map { $0.args["queue_id"] } == ["the_queue"])
+        #expect(sent(rig, "player_queues/previous").map { $0.args["queue_id"] } == ["the_queue"])
+        #expect(sent(rig, "players/cmd/next").isEmpty)
+        #expect(sent(rig, "players/cmd/previous").isEmpty)
+        await rig.backend.disconnect()
+    }
+
+    @Test func nextWithoutAnActiveQueueUsesThePlayersOwnQueue() async throws {
+        let rig = try await connectedBackend(
+            script: controlScript { $0.override("player_queues/get_active_queue", result: .null) })
+        try await rig.backend.transport(.next, on: player)
+        #expect(sent(rig, "player_queues/next").map { $0.args["queue_id"] } == [.string(SyntheticPlayback.playerID)])
         await rig.backend.disconnect()
     }
 

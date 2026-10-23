@@ -166,9 +166,9 @@ struct MusicAssistantThisMacTests {
 
     @Test func transportOnThisMacMapsToThePlayerID() async throws {
         let rig = try await rig()
-        try await rig.backend.transport(.next, on: OutputDevice.thisMacID)
-        let next = try #require(sent(rig, "players/cmd/next").first)
-        #expect(next.args["player_id"] == .string(Self.wrapperID))
+        try await rig.backend.transport(.stop, on: OutputDevice.thisMacID)
+        let stop = try #require(sent(rig, "players/cmd/stop").first)
+        #expect(stop.args["player_id"] == .string(Self.wrapperID))
         try await rig.backend.transport(.seek(42), on: OutputDevice.thisMacID)
         let seek = try #require(sent(rig, "players/cmd/seek").first)
         #expect(seek.args["player_id"] == .string(Self.wrapperID))

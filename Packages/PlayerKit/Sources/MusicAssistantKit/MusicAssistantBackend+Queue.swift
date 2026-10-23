@@ -151,6 +151,16 @@ extension MARequest {
         MARequest(command: "player_queues/save_as_playlist", args: ["queue_id": .string(queueID), "name": .string(name)])
     }
 
+    /// Skips to the queue's next track (#0150).
+    public static func queueNext(queueID: String) -> MARequest {
+        MARequest(command: "player_queues/next", args: ["queue_id": .string(queueID)])
+    }
+
+    /// Back to the queue's previous track, or the start of this one (#0150).
+    public static func queuePrevious(queueID: String) -> MARequest {
+        MARequest(command: "player_queues/previous", args: ["queue_id": .string(queueID)])
+    }
+
     /// Empties the queue (#0145).
     public static func queueClear(queueID: String) -> MARequest {
         MARequest(command: "player_queues/clear", args: ["queue_id": .string(queueID)])
