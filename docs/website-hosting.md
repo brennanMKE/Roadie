@@ -6,8 +6,9 @@ answers the hosting questions in [#0151](../issues/0151.md): domain, TLS,
 upload method and paths.
 
 The site follows the same pattern as the other sstools.co Mac app sites
-(Batty, Curator, Changeover). Deploying it is handled outside this repo. This
-repo only prepares `website/` and publishes GitHub releases.
+(Batty, Curator, Changeover): an Apache vhost on `photon` (the host
+`*.sstools.co` resolves to) serving `/var/www/vhosts/roadie.sstools.co`.
+`scripts/deploy-website.sh` deploys it (see "Per-release hand-off").
 
 ## What the host provides
 
@@ -117,7 +118,8 @@ A release is ready to deploy when:
 - [ ] Previewed locally with `cd website && python3 -m http.server 8000`.
 - [ ] Committed and pushed.
 
-Then ask for the site to be deployed. The deploy uploads `website/`, fetches
+Then run `scripts/deploy-website.sh`. It uploads `website/` over rsync (old DMGs in
+`downloads/` are kept), fetches
 any DMG the appcast lists that the site doesn't have yet, checks it against
 the `.sha256` and the enclosure `length`, and verifies everything over HTTPS.
 

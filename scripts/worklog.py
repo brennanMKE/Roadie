@@ -25,7 +25,9 @@ PRICING = ROOT / "issues" / "model-pricing.json"
 VM_COMMAND = re.compile(r"(^|&&|;|\|\||\n|\()\s*(time\s+)?(cd \S+\s*&&\s*)?([A-Z_]+=\S+\s+)*(\S*/)?scripts/(run-tests-vm|verify)\.sh\b(?!\s+(-h|--help)\b)")
 VM_SUMMARY = re.compile(r"==> (PASS|FAIL|SKIP|AUDIO|TIER|VERIFY)|Cleaning up \(exit")
 BACKGROUND_ID = re.compile(r"background with ID: (\w+)")
-DEFAULT_DIR = pathlib.Path.home() / ".claude" / "projects" / "-Users-brennan-Developer-brennanMKE-SkinAmp"
+# Claude Code names a project's transcript folder after the checkout path, every non-alphanumeric character a "-",
+# so this follows the folder wherever it lives (#0165).
+DEFAULT_DIR = pathlib.Path.home() / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(ROOT))
 
 
 def ts(value):
