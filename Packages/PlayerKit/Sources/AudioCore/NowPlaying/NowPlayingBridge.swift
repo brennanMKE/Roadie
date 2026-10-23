@@ -39,7 +39,7 @@ public final class NowPlayingBridge {
     /// What another output (a Music Assistant speaker, #0064) is playing. While set, it is published instead of the
     /// player's state and player events are ignored.
     private var external: (snapshot: NowPlayingSnapshot?, artwork: MPMediaItemArtwork?)?
-    private let log = Logger(subsystem: "SkinAmp", category: "NowPlaying")
+    private let log = Logger(subsystem: "co.sstools.roadie", category: "NowPlaying")
 
     public init(
         player: Player,

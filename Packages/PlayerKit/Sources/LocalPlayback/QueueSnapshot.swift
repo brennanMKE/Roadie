@@ -31,7 +31,7 @@ public struct QueueStore: Sendable {
     /// `~/Library/Application Support/<bundle id>/queue.json`.
     public static func defaultURL(bundleIdentifier: String? = Bundle.main.bundleIdentifier) -> URL {
         URL.applicationSupportDirectory
-            .appending(path: bundleIdentifier ?? "SkinAmp", directoryHint: .isDirectory)
+            .appending(path: bundleIdentifier ?? "co.sstools.roadie", directoryHint: .isDirectory)
             .appending(path: "queue.json", directoryHint: .notDirectory)
     }
 
