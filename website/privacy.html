@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadie privacy</title>
+<meta name="description" content="Roadie collects nothing: no accounts, no analytics, no tracking. What it connects to and what it keeps on your Mac.">
+<link rel="canonical" href="https://roadie.sstools.co/privacy.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Roadie">
+<meta property="og:title" content="Roadie privacy">
+<meta property="og:description" content="Roadie collects nothing: no accounts, no analytics, no tracking. What it connects to and what it keeps on your Mac.">
+<meta property="og:url" content="https://roadie.sstools.co/privacy.html">
+<meta name="theme-color" content="#121315">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="assets/icon-256.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="site-header">
+<div class="wrap">
+<a class="brand" href="index.html"><img src="assets/icon-128.png" alt="" width="36" height="36"><span>Roadie</span></a>
+<nav class="main-nav" aria-label="Main">
+<a href="index.html">Download</a>
+<a href="changelog.html">Changelog</a>
+<a href="privacy.html" aria-current="page">Privacy</a>
+<a href="https://github.com/brennanMKE/Roadie">GitHub</a>
+</nav>
+</div>
+</header>
+<main class="page privacy">
+<div class="page-head">
+<span class="eyebrow">PRIVACY</span>
+<h1 class="page-title">Roadie collects nothing.</h1>
+<p class="intro">No accounts, no analytics, no tracking. Roadie talks only to the services below, and only to do what you asked.</p>
+</div>
+
+<section>
+<h2>What Roadie connects to</h2>
+<ul class="ruled">
+<li><strong>Your Music Assistant servers.</strong> To browse your library, control players and stream audio.</li>
+<li><strong>The Winamp Skin Museum.</strong> Only when you open it, to show and download skins. Requests identify themselves as <code>Roadie/&lt;version&gt;</code>.</li>
+<li><strong>roadie.sstools.co.</strong> To check for updates. The check sends the app&rsquo;s version and no system profile.</li>
+</ul>
+</section>
+
+<section>
+<h2>On your Mac</h2>
+<ul class="bulleted">
+<li><strong>Location</strong> is used only to read your Wi-Fi network&rsquo;s name, so Roadie can pick the right server. It is never stored or sent.</li>
+<li><strong>Music Assistant tokens</strong> are kept in your login keychain.</li>
+<li><strong>Settings</strong> are stored in Roadie&rsquo;s preferences (<code>co.sstools.roadie</code>).</li>
+<li><strong>Your play queue and skin index</strong> are kept in <code>~/Library/Application Support/co.sstools.roadie</code>.</li>
+<li><strong>Caches</strong> (skin thumbnails, the folder index and Museum previews) are kept in <code>~/Library/Caches/co.sstools.roadie</code> and can be deleted at any time.</li>
+<li><strong>Skins you download from the Museum</strong> are saved in a <code>Museum</code> folder inside the skins folder you chose.</li>
+</ul>
+</section>
+
+<section class="callout">
+<h2>Questions</h2>
+<p>Open an issue on <a href="https://github.com/brennanMKE/Roadie/issues">GitHub</a>.</p>
+</section>
+</main>
+
+<footer class="site-footer">
+<div class="wrap">
+<nav class="footer-nav" aria-label="Footer">
+<a href="changelog.html">Changelog</a>
+<a href="privacy.html">Privacy</a>
+<a href="https://github.com/brennanMKE/Roadie">Source on GitHub</a>
+</nav>
+<p>Winamp is a trademark of its owner. Music Assistant is a project of its respective owners. Roadie is an independent project and is not affiliated with, sponsored by or endorsed by Winamp or Music Assistant. Roadie displays skins made in the classic Winamp 2.x format; skins are the work of their authors and are not included with Roadie.</p>
+<p>&copy; Brennan Stehling</p>
+</div>
+</footer>
+</body>
+</html>
