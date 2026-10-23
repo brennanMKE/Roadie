@@ -6,7 +6,8 @@
     "height": 870,
     "skin": "Asian Dragon",
     "author": "sir-akmal-ez",
-    "source": "Asian Dragon.wsz"
+    "source": "Asian Dragon.wsz",
+    "track": "Daft Punk - Technologic"
   },
   {
     "slug": "nightcrawler",
@@ -15,6 +16,37 @@
     "height": 870,
     "skin": "The NightCrawler",
     "author": "Anuja and Arjuna Navaratna (t-k)",
-    "source": "nightcrawler_by_t_k.wsz"
+    "source": "nightcrawler_by_t_k.wsz",
+    "track": "The Chemical Brothers - Leave Home"
+  },
+  {
+    "slug": "the-hustler",
+    "file": "the-hustler.png",
+    "width": 550,
+    "height": 870,
+    "skin": "The Hustler",
+    "author": null,
+    "source": "The_Hustler.wsz",
+    "track": "Aphex Twin - Windowlicker"
+  },
+  {
+    "slug": "matrix-code",
+    "file": "matrix-code.png",
+    "width": 550,
+    "height": 870,
+    "skin": "Matrix Code",
+    "author": "Jim from Germany",
+    "source": "Matrix_Code0110101.wsz",
+    "track": "BT - Smartbomb"
+  },
+  {
+    "slug": "technics-white",
+    "file": "technics-white.png",
+    "width": 550,
+    "height": 870,
+    "skin": "Technics White",
+    "author": "johnnyg0",
+    "source": "v2_technics_white_resting_by_johnnyg0.wsz",
+    "track": "Digitalism - Pogo"
   }
 ]
