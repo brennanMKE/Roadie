@@ -5,5 +5,26 @@
     <link>https://roadie.sstools.co/</link>
     <description>Updates for Roadie, a Winamp-skinned player for Music Assistant.</description>
     <language>en</language>
+    <item>
+      <title>Version 0.0.1</title>
+      <pubDate>Fri, 23 Oct 2026 22:12:04 +0000</pubDate>
+      <sparkle:version>20261023.2206</sparkle:version>
+      <sparkle:shortVersionString>0.0.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://roadie.sstools.co/changelog.html#v0-0-1</sparkle:releaseNotesLink>
+      <description><![CDATA[
+<h3>Added</h3>
+<ul>
+  <li>Classic Winamp 2.x <code>.wsz</code> skins with the main, equalizer and playlist windows, docking, shade modes and the visualizer.</li>
+  <li>Browse and play your Music Assistant library, or local files and folders.</li>
+  <li>This Mac as a Music Assistant player, and playback on any other Music Assistant player.</li>
+  <li>Music Assistant playlists you can create, edit and play.</li>
+  <li>A skin browser for your skins folder and the Winamp Skin Museum.</li>
+  <li>Quick Look thumbnails and previews for <code>.wsz</code> files.</li>
+  <li>Updates through Sparkle.</li>
+</ul>
+      ]]></description>
+      <enclosure url="https://roadie.sstools.co/downloads/Roadie-0.0.1.dmg" length="15496459" type="application/octet-stream" sparkle:edSignature="vnollg3ZvRHEUNj5DJxf+LwwOpVXyOHvLrIMD/N4v/LdtoYoSi5S2S9o6YGPm6CHNaHqeIn8vRQthNVO2jLqBQ=="/>
+    </item>
   </channel>
 </rss>
