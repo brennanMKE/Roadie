@@ -197,8 +197,8 @@ run_is_live() {   # true if <pid> is a live run-tests-vm.sh process
 for old in $(tart list --quiet); do
   [[ "$old" =~ '^roadie-test-([0-9]{8})-([0-9]{6})-([0-9]+)$' ]] || continue
   [[ "$old" == "$CLONE" || "$old" == "$GOLDEN" ]] && continue
-  pid=$match[4]
-  started=$(date -j -f '%Y%m%d%H%M%S' "$match[2]$match[3]" +%s 2>/dev/null) || started=0
+  pid=$match[3]
+  started=$(date -j -f '%Y%m%d%H%M%S' "$match[1]$match[2]" +%s 2>/dev/null) || started=0
   age_h=$(( ($(date +%s) - started) / 3600 ))
   if run_is_live "$pid" && (( age_h < MAX_RUN_HOURS )); then
     log "Leaving clone of a live run: $old (pid $pid)"; continue
