@@ -13,6 +13,7 @@ contract is [docs/website-hosting.md](../docs/website-hosting.md); the content p
 | `site.webmanifest`, `favicon.svg`, `favicon.ico` | Icons; the favicon is an original bolt mark, not Winamp artwork |
 | `css/style.css` | All styling; the one external reference is the Google Fonts import at its top |
 | `assets/icon-*.png` | Copies of `App/Assets.xcassets/AppIcon.appiconset` (32, 128, 256, 512) |
+| `assets/screens/` | Skin screenshots for the home-page carousel, plus `manifest.json`; made by `scripts/make-screenshots.sh` |
 | `downloads/` | DMGs are added at deploy time; `*.dmg` is gitignored |
 
 Preview locally with `cd website && python3 -m http.server 8000`. Lint with `scripts/check-website.sh`
@@ -75,3 +76,23 @@ first. Never remove a published item. `xmllint --noout website/appcast.xml` must
 `assets/` (an original Roadie skin, or one whose author agreed; never the Winamp base skin, §2.8), then swap the
 placeholder for the `<img>`. Every `src` must exist before deploying. A 1200x630 `assets/social-card.png` and its
 `og:image` tag can be added the same way.
+
+### Regenerating the skin screenshots (#0168)
+
+```sh
+scripts/make-screenshots.sh            # about 5 minutes; one Tart VM, silent
+```
+
+It builds Roadie in a disposable Tart VM (never on the host), docks the main, equalizer and playlist windows on a
+plain dark desktop, plays the same eight Electronic tracks as local files on This Mac (the guest boots with
+`--no-audio` and is muted; Music Assistant is not configured, so no speaker can be reached), and captures each skin
+4 s into the first track. It writes `assets/screens/<slug>.png` at twice the skin's native size (550 px wide for a
+classic skin, nearest-neighbour), `<slug>.webp` (lossless) when `cwebp` is installed, and `manifest.json`:
+`[{"slug", "file", "width", "height", "skin", "author", "source"}]`, author from the readme inside the `.wsz` or
+`null`. The run replaces the previous set.
+
+- Skins: the featured list is the `SKINS` table at the top of the script; the `.wsz` files come from the gitignored
+  `Skins/` of the main checkout (`--skins DIR` to override) and are never committed.
+- Music: fetched once over ssh from the media host (`MEDIA_HOST`, default `joe`) into
+  `~/Library/Caches/co.sstools.roadie-screens/music` (`--music DIR` to override); never committed.
+- Look at every image before committing: no server address or id may show, and no window but Roadie's.
