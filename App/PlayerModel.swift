@@ -43,6 +43,8 @@ final class PlayerModel {
     let fallback: LibraryFallbackController
     /// The skins folder and its SQLite index (Settings › Skins). Opens nothing until a folder is chosen.
     let skinLibrary = SkinLibraryModel()
+    /// The tab the Skins window shows the next time it appears or is brought forward (#0169); consumed by the window.
+    var pendingSkinsSource: SkinsSource?
     /// Main-window thumbnails keyed by content hash, rendered lazily on request (#0034). Does no I/O until the first request.
     let skinThumbnails = SkinThumbnailCache(directory: SkinThumbnailCache.defaultDirectory())
     /// The Skins window and menu (#0035). Lazy because its closures name `self`; it does no I/O until used.
@@ -224,7 +226,7 @@ final class PlayerModel {
     static let eqWindowShadeKey = "equalizerWindowShade"
     static let playlistWindowShadeKey = "playlistWindowShade"
     static let equalizerKey = "equalizer"
-    private static let lastSkinKey = "lastSkinPath"
+    static let lastSkinKey = "lastSkinPath"
     private static let timeModeKey = "timeMode"
     static let alwaysOnTopKey = "alwaysOnTop"
     static let doubleSizeKey = "doubleSize"
@@ -1063,6 +1065,20 @@ final class PlayerModel {
             guard await panel.begin() == .OK else { return }
             importLocalFiles(panel.urls, replace: false)
         }
+    }
+
+    /// #0169: what earlier launches left in the defaults. Read before the default skins folder is applied.
+    func firstRunState(defaults: UserDefaults = .standard) -> FirstRunState {
+        FirstRunState(
+            completedVersion: defaults.integer(forKey: FirstRunPolicy.defaultsKey),
+            hasSkinsFolder: defaults.string(forKey: SkinLibraryModel.folderKey) != nil,
+            hasLastSkin: defaults.string(forKey: Self.lastSkinKey) != nil,
+            hasMusicFolder: FolderBackend.storedFolder(in: defaults) != nil,
+            hasVerifiedServer: MusicAssistantServerStore.hasVerifiedServer(defaults: defaults))
+    }
+
+    func markFirstRunCompleted(defaults: UserDefaults = .standard) {
+        defaults.set(FirstRunPolicy.currentVersion, forKey: FirstRunPolicy.defaultsKey)
     }
 
     /// Shows the open panel for skins only.

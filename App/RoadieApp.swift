@@ -47,6 +47,9 @@ struct RoadieApp: App {
                 Button("Save Playlist…") { appDelegate.model.savePlaylistFile() }
                     .keyboardShortcut("s")
             }
+            CommandGroup(after: .help) {
+                Button("Welcome to Roadie…") { appDelegate.welcome.show(openMuseum: false) }
+            }
             SkinsCommands(model: appDelegate.model)
             PlaybackCommands(model: appDelegate.model)
             CommandGroup(after: .windowArrangement) {

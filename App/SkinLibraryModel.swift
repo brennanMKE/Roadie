@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import SkinBrowser
 import SkinLibrary
 import os
 
@@ -112,6 +113,22 @@ final class SkinLibraryModel {
         if let folderURL { panel.directoryURL = folderURL }
         guard panel.runModal() == .OK, let url = panel.url else { return }
         setFolder(url.path)
+    }
+
+    /// #0169: with no folder configured, creates `~/Roadie/Skins`, stores it and starts the index. Returns false when
+    /// the folder couldn't be created (logged; the Welcome window then offers Choose Folder…).
+    @discardableResult
+    func applyDefaultFolderIfNeeded() -> Bool {
+        guard folderPath == nil else { return true }
+        let url = DefaultSkinsFolder.url()
+        do {
+            try DefaultSkinsFolder.ensure(at: url)
+            setFolder(url.path(percentEncoded: false))
+            return true
+        } catch {
+            Self.logger.error("creating the default skins folder failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
     }
 
     func setFolder(_ path: String?) {

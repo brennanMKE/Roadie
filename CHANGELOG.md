@@ -6,6 +6,12 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+### Added
+
+- A Welcome window on first launch: skins (with a one-click way to the Winamp Skin Museum), a music folder, and optional Music Assistant. Help › Welcome to Roadie… brings it back.
+- `~/Roadie/Skins` is created and used as the skins folder when none is set.
+- The No Skin Loaded placeholder has a Browse the Skin Museum… button.
+
 ## [0.0.1] - 2026-10-23
 
 The first public build: a rough draft to get Roadie started. More is on the way.

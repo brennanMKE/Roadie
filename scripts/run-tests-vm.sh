@@ -369,7 +369,7 @@ run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p
 run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py'"
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
-  run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"
+  run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app --args -firstRunVersion 1 && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"
 fi
 
 if (( SPIKE )); then

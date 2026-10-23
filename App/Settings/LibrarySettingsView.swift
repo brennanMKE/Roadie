@@ -96,14 +96,20 @@ struct LibrarySettingsView: View {
     }
 
     private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = model.folderURL
-        panel.message = "Choose your music folder"
-        panel.prompt = "Choose"
-        // The app is unsandboxed, so the URL is directly readable; no security-scoped bookmark.
-        if panel.runModal() == .OK, let url = panel.url { model.choose(url) }
+        if let url = chooseMusicFolder(startingAt: model.folderURL) { model.choose(url) }
     }
+}
+
+/// The music-folder picker shared by Settings › Library and the Welcome window (#0169).
+@MainActor
+func chooseMusicFolder(startingAt folder: URL?) -> URL? {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.allowsMultipleSelection = false
+    panel.directoryURL = folder
+    panel.message = "Choose your music folder"
+    panel.prompt = "Choose"
+    // The app is unsandboxed, so the URL is directly readable; no security-scoped bookmark.
+    return panel.runModal() == .OK ? panel.url : nil
 }

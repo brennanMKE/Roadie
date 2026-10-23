@@ -23,6 +23,18 @@ struct SkinBrowserWindowView: View {
             case .museum: MuseumModeView(sourcePicker: AnyView(sourcePicker))
             }
         }
+        .task {
+            // #0169: a caller (the Welcome window, the placeholder's Browse button) asked for a tab.
+            if let pending = player.pendingSkinsSource {
+                source = pending
+                player.pendingSkinsSource = nil
+            }
+        }
+        .onChange(of: player.pendingSkinsSource) { _, pending in
+            guard let pending else { return }
+            source = pending
+            player.pendingSkinsSource = nil
+        }
         .alert(
             "Move to Trash", isPresented: Binding(get: { browser.trashError != nil }, set: { if !$0 { browser.trashError = nil } })
         ) {

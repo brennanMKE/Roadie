@@ -1,5 +1,7 @@
 import AppKit
+import LibraryBrowser
 import Observation
+import SkinBrowser
 import SwiftUI
 
 /// Owns the player model and the skinned windows. They are AppKit `NSWindow`s, not SwiftUI scenes, because a borderless
@@ -9,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = PlayerModel()
     /// Sparkle (#0158). Starts only when the build carries a feed URL and a public key, so Debug builds never check.
     let updater = Updater()
+    /// The Welcome window (#0169); Help › Welcome to Roadie… reopens it.
+    private(set) lazy var welcome = WelcomeWindowController(model: model, onDismiss: { [model] in model.markFirstRunCompleted() })
     private(set) lazy var docking = WindowDockingCoordinator(model: model)
     private(set) lazy var player = SkinWindowController(kind: .main, model: model, rootView: PlayerView())
     private(set) lazy var equalizer: SkinWindowController = {
@@ -25,6 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.updateActions = (canCheck: { [updater] in updater.canCheckForUpdates }, check: { [updater] in updater.checkForUpdates() })
+        // #0169: read what earlier launches left before the default skins folder fills `skinsFolderPath`.
+        let firstRun = FirstRunPolicy.decide(model.firstRunState())
+        model.skinLibrary.applyDefaultFolderIfNeeded()
         docking.register(player)
         docking.register(equalizer)
         docking.register(playlist)
@@ -36,12 +43,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         docking.ensureOnScreen()
         // The Library and Skins are the only SwiftUI window scenes, so SwiftUI opens the first at launch; they are
         // meant to open from ⌘L and ⌘K. (`defaultLaunchBehavior(.suppressed)` needs macOS 15, the target is 14.)
-        DispatchQueue.main.async { [player, equalizer, playlist] in
+        DispatchQueue.main.async { [player, equalizer, playlist, model, welcome] in
             for window in NSApp.windows
             where window !== player.window && window !== equalizer.window && window !== playlist.window
                 && ["library", "skins"].contains(where: { window.identifier?.rawValue.hasPrefix($0) == true })
             {
                 window.close()
+            }
+            switch firstRun {
+            case .skip: break
+            case .markCompleted: model.markFirstRunCompleted()
+            case .welcome: welcome.show(openMuseum: model.skinLibrary.folderURL.map(DefaultSkinsFolder.hasNoSkins) ?? false)
             }
         }
     }

@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct PlayerView: View {
     @Environment(PlayerModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
@@ -19,7 +20,14 @@ struct PlayerView: View {
                 } description: {
                     Text(model.placeholderText)
                 } actions: {
-                    Button("Open Skin…") { model.openSkin() }
+                    HStack {
+                        Button("Open Skin…") { model.openSkin() }
+                        Button("Browse the Skin Museum…") {
+                            model.pendingSkinsSource = .museum
+                            openWindow(id: "skins")
+                        }
+                        .accessibilityIdentifier("player.browseMuseum")
+                    }
                 }
                 .frame(width: MainWindowLayout.size.width * model.scale, height: model.mainWindowSkinSize.height * model.scale)
                 .background(.windowBackground, in: .rect(cornerRadius: 8))

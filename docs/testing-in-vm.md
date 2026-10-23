@@ -20,7 +20,7 @@ scripts/verify.sh --expect newTestName       # what agents run: the fast tier, r
 scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, Info.plist check (slow tests skipped)
 scripts/run-tests-vm.sh --build-only   # compile check only: both packages with their tests, then the app; no tests run, not verification
 scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)
-scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s, then quit it
+scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s (with -firstRunVersion 1, so no Welcome window), then quit it
 scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
 scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
 scripts/run-tests-vm.sh --skins "untitled folder" --references build/webamp-reference  # also diff each skin's skintool --png render against them

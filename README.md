@@ -11,6 +11,10 @@ Winamp Skin Museum. The project was called SkinAmp during development.
 
 Get the latest release from **https://roadie.sstools.co/**.
 
+## First launch
+
+Roadie creates `~/Roadie/Skins` as its skins folder when none is set. On a fresh install a Welcome window walks through skins (the Winamp Skin Museum opens right away when the folder is empty), choosing a music folder, and optionally connecting to Music Assistant. Help › Welcome to Roadie… opens it again.
+
 ## Requirements
 
 - macOS 14 Sonoma or later.
