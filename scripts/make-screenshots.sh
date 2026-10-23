@@ -49,15 +49,21 @@ done
 #   "Deus_AMP.wsz|deus-amp|Deus AMP|Josef \"BladeRay\" Novak"       (Deus Ex game art and logo)
 #   "makemesad.wsz|make-me-sad|Make Me Sad|Valerie"                  (Serial Experiments Lain character)
 #   "Winamp_Classic_CM.wsz|winamp-classic-cm|Winamp Classic CM|-"    (the Winamp base skin, docs/design/release.md §2.8)
+#   "Bag_Ends_Gardener.wsz|bag-ends-gardener|Bag End's Gardener|Anika_C"  (Lord of the Rings film stills of actors)
+# Borderline, featured for now (#0170): Matrix Code ("MATRIX" wordmark), Technics White (Technics logo).
 SKINS=(
   "Asian Dragon.wsz|asian-dragon|Asian Dragon|sir-akmal-ez"
   "nightcrawler_by_t_k.wsz|nightcrawler|The NightCrawler|Anuja and Arjuna Navaratna (t-k)"
+  "The_Hustler.wsz|the-hustler|The Hustler|-"
+  "Matrix_Code0110101.wsz|matrix-code|Matrix Code|Jim from Germany"
+  "v2_technics_white_resting_by_johnnyg0.wsz|technics-white|Technics White|johnnyg0"
 )
 # Roadie has no built-in skin: with none loaded it shows a "No Skin Loaded" placeholder, so there is nothing to feature.
 # Skins drawn for a different stack order (their readme says so): equalizer on top, then main, then playlist.
 EQ_FIRST=(deus-amp)
 
-# The Electronic tracks, relative to $MEDIA_ROOT on $MEDIA_HOST; played in this order.
+# The Electronic tracks, relative to $MEDIA_ROOT on $MEDIA_HOST. Shot N starts on track N (wrapping), so each
+# screenshot shows a different song title (#0170); TRACK_TITLES holds the matching "Artist - Title" for the manifest.
 TRACKS=(
   "Daft Punk/Human After All/09 Technologic.m4a"
   "The Chemical Brothers/The Chemical Brothers - Leave Home.mp3"
@@ -67,6 +73,16 @@ TRACKS=(
   "Orbital/Orbital - Chime.mp3"
   "Underworld/Underworld - Cow Girl.mp3"
   "The Crystal Method/The Crystal Method - Busy Child.mp3"
+)
+TRACK_TITLES=(
+  "Daft Punk - Technologic"
+  "The Chemical Brothers - Leave Home"
+  "Aphex Twin - Windowlicker"
+  "BT - Smartbomb"
+  "Digitalism - Pogo"
+  "Orbital - Chime"
+  "Underworld - Cow Girl"
+  "The Crystal Method - Busy Child"
 )
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
@@ -196,8 +212,18 @@ layout_hex() {  # order of kinds, top to bottom
 
 DOM=co.sstools.roadie
 captured=()
+shot=0
 for entry in $SKINS; do
   IFS='|' read -r src slug name author <<<"$entry"
+  # A per-shot copy of the folder (hard links), renumbered so this shot's track sorts first and plays.
+  first=$(( shot % ${#TRACKS} )); shot=$(( shot + 1 ))
+  shot_music="$GUEST_MUSIC-$slug"
+  link_cmd="rm -rf ${(qq)shot_music} && mkdir -p ${(qq)shot_music}"
+  for (( k = 0; k < ${#TRACKS}; k++ )); do
+    j=$(( (first + k) % ${#TRACKS} ))
+    link_cmd+=" && ln ${(qq):-$GUEST_MUSIC/${music_files[j+1]:t}} ${(qq):-$shot_music/$(printf %02d $(( k + 1 ))) ${TRACKS[j+1]:t}}"
+  done
+  gx "$link_cmd" || fail "could not stage music for $slug"
   if (( ${EQ_FIRST[(Ie)$slug]} )); then hex=$(layout_hex equalizer main playlist); else hex=$(layout_hex main equalizer playlist); fi
   skin_cmd="defaults delete $DOM lastSkinPath >/dev/null 2>&1 || true"
   [[ "$src" == "-" ]] || skin_cmd="defaults write $DOM lastSkinPath ${(qq):-/Users/admin/Skins/$src}"
@@ -209,9 +235,9 @@ for entry in $SKINS; do
     defaults write $DOM playlistWindowSize -array -integer 0 -integer 3
     defaults write $DOM windowLayout -data $hex
     defaults write $DOM SUEnableAutomaticChecks -bool NO
-    open -a $APP && sleep 4 && open -a $APP ${(qq)GUEST_MUSIC} && sleep 4.5 \
+    open -a $APP && sleep 4 && open -a $APP ${(qq)shot_music} && sleep 4.5 \
       && /Users/admin/capture-roadie-windows capture $GUEST_OUT/$slug.png $STACK_LEFT" || fail "capture failed for $slug"
-  captured+=("$entry")
+  captured+=("$entry|${TRACK_TITLES[first+1]}")
 done
 gx "pkill -x Roadie; true"
 
@@ -224,21 +250,21 @@ gx "tar -C $GUEST_OUT -cf - ." | tar -x -C "$OUT_DIR"
 
 manifest_rows=()
 for entry in $captured; do
-  IFS='|' read -r src slug name author <<<"$entry"
+  IFS='|' read -r src slug name author track <<<"$entry"
   png="$OUT_DIR/$slug.png"
   [[ -f "$png" ]] || fail "missing $png"
   w=$(sips -g pixelWidth "$png" | awk '/pixelWidth/ { print $2 }')
   h=$(sips -g pixelHeight "$png" | awk '/pixelHeight/ { print $2 }')
   if command -v cwebp >/dev/null; then cwebp -quiet -lossless -z 9 "$png" -o "$OUT_DIR/$slug.webp"; fi
-  manifest_rows+=("$slug"$'\t'"$slug.png"$'\t'"$w"$'\t'"$h"$'\t'"$name"$'\t'"$author"$'\t'"$src")
+  manifest_rows+=("$slug"$'\t'"$slug.png"$'\t'"$w"$'\t'"$h"$'\t'"$name"$'\t'"$author"$'\t'"$src"$'\t'"$track")
 done
 print -rl -- $manifest_rows | python3 -I -c '
 import json, sys
 rows = []
 for line in sys.stdin.read().splitlines():
-    slug, file, w, h, name, author, src = line.split("\t")
+    slug, file, w, h, name, author, src, track = line.split("\t")
     rows.append({"slug": slug, "file": file, "width": int(w), "height": int(h), "skin": name,
-                 "author": None if author == "-" else author, "source": None if src == "-" else src})
+                 "author": None if author == "-" else author, "source": None if src == "-" else src, "track": track})
 print(json.dumps(rows, indent=2, ensure_ascii=False))
 ' >"$OUT_DIR/manifest.json"
 log "Wrote ${#captured} screenshots and manifest.json to $OUT_DIR"
