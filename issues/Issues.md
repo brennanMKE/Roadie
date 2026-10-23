@@ -1,10 +1,10 @@
-# SkinAmp
+# Roadie
 
-SkinAmp is a native macOS music player that renders classic Winamp 2.x `.wsz` skins and plays music from a Music Assistant server and local files. Issues are grouped into milestones from [docs/plan.md](../docs/plan.md): each milestone has an umbrella issue (Module `Milestone`) whose children are the tasks. Bugs found along the way belong here too.
+Roadie is a native macOS music player that renders classic Winamp 2.x `.wsz` skins and plays music from a Music Assistant server and local files. Issues are grouped into milestones from [docs/plan.md](../docs/plan.md): each milestone has an umbrella issue (Module `Milestone`) whose children are the tasks. Bugs found along the way belong here too.
 
 This file is the local guide for managing issues in this project. The companion Mac app (Issues.app) watches the `issues/` folder and renders the current state. Markdown files (and `project.json`) are the source of truth — there is no generated artifact or index to keep in sync.
 
-The `# SkinAmp` heading above should match the `name` field in `issues/project.json`. `project.json` is the canonical source for the project's identity (name + repo URL); this guide is the workflow companion.
+The `# Roadie` heading above should match the `name` field in `issues/project.json`. `project.json` is the canonical source for the project's identity (name + repo URL); this guide is the workflow companion.
 
 ## Folder layout
 
@@ -26,7 +26,7 @@ A small JSON file naming the project and its repo. Two required fields:
 
 ```json
 {
-  "name": "SkinAmp",
+  "name": "Roadie",
   "url": "https://github.com/user/repo"
 }
 ```

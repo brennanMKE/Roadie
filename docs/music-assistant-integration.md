@@ -121,7 +121,7 @@ Recorded in the notes: `players/all`, the `players/cmd/*` transport commands, `m
 - Artwork: items carry `metadata.images[].proxy_id`; fetch `/imageproxy/<proxy_id>?size=<0|80|160|256|512|1024>` with no credentials (recorded in the notes).
 
 ### Discovery
-- The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060). SkinAmp finds servers by browsing `_home-assistant._tcp` and `_sendspin-server._tcp` (and `_music-assistant._tcp`), plus `homeassistant.local`, and probing `http://<host>:8095/info` (#0104, below). A manual address still works (#0063).
+- The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060). Roadie finds servers by browsing `_home-assistant._tcp` and `_sendspin-server._tcp` (and `_music-assistant._tcp`), plus `homeassistant.local`, and probing `http://<host>:8095/info` (#0104, below). A manual address still works (#0063).
 - Address rules (#0063): App Transport Security stays at the local-network exemption, so plain `http`/`ws` works for `.local` names, unqualified names and IP addresses (Tailscale `100.x` included). Any other address, a public DNS name or a Tailscale MagicDNS `*.ts.net` name, must be `https` (reached as `wss`), for example through `tailscale serve`. A bare non-local host defaults to `https`.
 
 ### Reference implementations worth reading
@@ -148,7 +148,7 @@ protocol MusicBackend {
 final class MusicAssistantBackend: MusicBackend { … }  // default
 final class FolderBackend: MusicBackend { … }          // local folder, the fallback
 ```
-- Settings > Library Source: **Music Assistant (default)** | Local folder. Settings › Music Assistant holds a list of servers (URL, learned `server_id`, one Keychain token item per server, keyed by the configuration's UUID); SkinAmp picks the server automatically (#0075, below).
+- Settings > Library Source: **Music Assistant (default)** | Local folder. Settings › Music Assistant holds a list of servers (URL, learned `server_id`, one Keychain token item per server, keyed by the configuration's UUID); Roadie picks the server automatically (#0075, below).
 - Skin/UI layer depends only on `MusicBackend` and domain models, never on MA or Plex types.
 
 ### 5.2 Two output modes under MA
@@ -188,7 +188,7 @@ Acceptance for milestone 1 (steps 1 to 5): with the Mac on the home LAN, the app
 - **Order.** Only tested servers (with a learned `server_id`) are candidates. Servers tied to the current Wi-Fi network (Settings › Music Assistant › Wi-Fi Networks) come first, in list order; then every other one, in list order. Tailscale addresses need no special case: they are tried like any other.
 - **Probe.** Every candidate gets an unauthenticated `GET /info` at once (3 s timeout each; two servers at one URL share one fetch). The winner is the highest-ranked candidate that answered with **its own stored `server_id`**; a lower-ranked success waits for higher-ranked probes to finish or time out. A different server at the address is a mismatch and never receives the token. The probes reveal to each configured server that the client exists; they carry nothing else.
 - **When.** Never at launch. The first resolution happens when the Library connects or #0067 probes Music Assistant. After that: a network path change (`NWPathMonitor`, debounced 2 s), a Settings edit, the Mac waking, a client that failed or kept reconnecting for more than 10 s, or a browse failure. The same winner causes no reload; a new winner disconnects and reloads the Library (or lets #0067 restore Music Assistant). Playback on This Mac is never touched. None reachable: #0067 falls back to the local folder. Renaming a server only relabels the winner and the reason, with no re-check, and the Library subtitle leaves out the reason until the first check (#0092).
-- **Wi-Fi name.** macOS returns it only with Location access. SkinAmp asks only when the user presses "Use Current Network" (the app has the `com.apple.security.personal-information.location` entitlement, needed under the hardened runtime). Without access, the order is the list order and the probe decides.
+- **Wi-Fi name.** macOS returns it only with Location access. Roadie asks only when the user presses "Use Current Network" (the app has the `com.apple.security.personal-information.location` entitlement, needed under the hardened runtime). Without access, the order is the list order and the probe decides.
 - **Privacy.** The "why" text ("Home — on network X", "Studio — via Tailscale", "No Music Assistant server reachable") is UI only. Logs carry decision kinds and counts, never a name, address, network name, server id or token.
 
 ### Discovery (#0104)

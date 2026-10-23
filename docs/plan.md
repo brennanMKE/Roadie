@@ -166,6 +166,10 @@ Follows `docs/plex-music-library.md`:
 **M7: Polish**
 - Cursors (`.cur`), performance across the full corpus, corpus run of 1,000 skins.
 
+**M14: Roadie release** ([#0151](../issues/0151.md))
+- Rename the app to Roadie, sign and notarize it, ship a DMG from https://roadie.sstools.co/ with
+  Sparkle updates. Work items W1 to W14 are in [design/release.md](design/release.md).
+
 ## Verification
 - `swift test` for SkinKit and PlayerKit: the folder index, queue save and restore, Music Assistant decoding against
   recorded fixtures, and the connection-test error paths.

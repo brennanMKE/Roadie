@@ -1,6 +1,6 @@
 # Sendspin notes (#0066)
 
-What SkinAmp needs to know to play Music Assistant audio on this Mac as a Sendspin player. Researched and probed on 2026-10-19 for #0066; the child issues #0105 to #0109 implement it.
+What Roadie needs to know to play Music Assistant audio on this Mac as a Sendspin player. Researched and probed on 2026-10-19 for #0066; the child issues #0105 to #0109 implement it.
 
 ## Sources and versions relied on
 
@@ -27,7 +27,7 @@ The spec moves weekly (encryption, pairing, the 13-byte audio header and fragmen
 | Who accepts it | MA 2.10.6 (`allow_unencrypted` = hidden provider setting `allow_legacy_clients`, default **true**, labelled "temporary") and MA dev / aiosendspin 10.x (same setting; such clients are "flagged noncompliant" and get the 9-byte header and legacy fragment framing) | MA 2.10.6 speaks the *9.1.1* flavour (msg-1 payload `{psk_id}` only, fragment types 2/3, `trust_level` in hello); 10.x speaks rc1 (`psk_category`, fragment id 1, 13-byte header) and a 10.x client cannot reach a 9.1.1 server |
 | Auth | through the MA proxy: the MA token | Noise `KKpsk2` with a Sentinel, pairing or long-term PSK; unpaired access needs operator approval (MA 2.10.6 auto-approves any client advertising `unpaired_access.enabled`) |
 
-**SkinAmp uses the legacy wire through the authenticated proxy**, as MA's own desktop app does (sendspin-rs v0.3.8 has no Noise code and connects to `/sendspin` with the MA token). It works on 2.10.6 today and on 2.11 as published. Risk: MA labels `allow_legacy_clients` temporary. The encrypted wire is a follow-up to plan when MA announces the removal (the desktop app would break at the same moment). Keep the wire choice behind one type (`SendspinWire`) so the 13-byte header and Noise can be added without touching the rest.
+**Roadie uses the legacy wire through the authenticated proxy**, as MA's own desktop app does (sendspin-rs v0.3.8 has no Noise code and connects to `/sendspin` with the MA token). It works on 2.10.6 today and on 2.11 as published. Risk: MA labels `allow_legacy_clients` temporary. The encrypted wire is a follow-up to plan when MA announces the removal (the desktop app would break at the same moment). Keep the wire choice behind one type (`SendspinWire`) so the 13-byte header and Noise can be added without touching the rest.
 
 ## 2. Connection (probed)
 
@@ -60,7 +60,7 @@ Server → client, 3 ms later:
 
 - `client_id` on the legacy wire is any stable string (MA uses it as the Sendspin player id). It must never have connected encrypted before (MA refuses a legacy hello that claims a paired or approved id: downgrade protection).
 - `player@v1_support.supported_commands` (`volume`, `mute`) belongs in the hello on this wire (spec `main` moved it to `client/state`). `supported_formats` must list `pcm` or `flac`; a client that lists one rate and channel count gets the server's resampler.
-- Roles: only `player@v1`. Metadata, controller and artwork come from the MA API SkinAmp already uses.
+- Roles: only `player@v1`. Metadata, controller and artwork come from the MA API Roadie already uses.
 - The initial `client/state` is due within **5 s** of the hello, or the server flags the client noncompliant (lenient: it marks it connected anyway).
 
 ## 4. Clock sync (probed)
@@ -69,15 +69,15 @@ Server → client, 3 ms later:
 - With T1 = sent (client µs), T2 = `server_received`, T3 = `server_transmitted`, T4 = received: `measurement = ((T2 − T1) + (T3 − T4)) / 2`, `max_error = ((T4 − T1) − (T3 − T2)) / 2`, `time_added = T4`.
 - Filter: port `SendspinTimeFilter` from time-filter `main` (2-state Kalman on offset and drift; defaults `process_std_dev 0`, `drift_process_std_dev 1e-11`, `forget_factor 2`, `adaptive_cutoff 3`, `min_samples 100`, `drift_significance_threshold 2`, `max_error_scale 0.5`). It ignores samples with non-increasing `time_added` or `max_error <= 0`. `compute_client_time(server) = round((server − offset + drift·last_update) / (1 + drift))` with drift used only when significant.
 - Cadence (time-filter "Recommended Usage"): a burst of 8 sequential exchanges, each waiting for its reply, feeding only the lowest-`max_error` sample; the first burst at connect, then every 10 s. sendspin-rs instead sends two samples 10 ms apart then one per second; either is fine.
-- A player must not report `available: true` until the filter has converged enough to schedule (SkinAmp: at least two accepted samples, the first burst finished).
+- A player must not report `available: true` until the filter has converged enough to schedule (Roadie: at least two accepted samples, the first burst finished).
 
 ## 5. Player state and commands
 
-- `client/state` on this wire (aiosendspin 9.1.1 keys): `{"available": true, "player": {"volume": 0-100, "muted": bool, "static_delay_ms": 0, "required_lead_time_ms": n, "min_buffer_ms": n, "supported_commands": []}}`. `static_delay_ms` is the old name of `output_delay_ms`; the state-level `supported_commands` may only hold `set_static_delay`. Every state message carries `available` and the full player object. Send it whenever volume or mute changes, including changes made in SkinAmp.
+- `client/state` on this wire (aiosendspin 9.1.1 keys): `{"available": true, "player": {"volume": 0-100, "muted": bool, "static_delay_ms": 0, "required_lead_time_ms": n, "min_buffer_ms": n, "supported_commands": []}}`. `static_delay_ms` is the old name of `output_delay_ms`; the state-level `supported_commands` may only hold `set_static_delay`. Every state message carries `available` and the full player object. Send it whenever volume or mute changes, including changes made in Roadie.
 - `server/command {"player": {"command": "volume", "volume": n}}`, `{"command": "mute", "mute": bool}`, `{"command": "set_static_delay", "static_delay_ms": n}` (only if offered). Apply, then report the new state.
-- Volume is perceived loudness 0 to 100; the spec suggests `amplitude = (volume/100)^1.5`. SkinAmp's own slider is linear (`Player.volume` 0…1, Winamp behaviour); map `volume = round(Player.volume × 100)` both ways and leave the curve to the slider.
+- Volume is perceived loudness 0 to 100; the spec suggests `amplitude = (volume/100)^1.5`. Roadie's own slider is linear (`Player.volume` 0…1, Winamp behaviour); map `volume = round(Player.volume × 100)` both ways and leave the curve to the slider.
 - `group/update {playback_state, group_id, group_name?}` (probed: `{"group_id": "<uuid>", "playback_state": "stopped"}` right after the state; no `group_name`). `playback_state` may be `playing`, `paused` or `stopped` on this wire.
-- `server/state` carries only roles SkinAmp does not ask for (metadata, controller, color); ignore unknown types and fields.
+- `server/state` carries only roles Roadie does not ask for (metadata, controller, color); ignore unknown types and fields.
 - `client/goodbye {"reason": "shutdown" | "restart" | "user_request" | "another_server"}` before a deliberate close.
 
 ## 6. Stream
@@ -93,10 +93,10 @@ Server → client, 3 ms later:
 ## 7. How the player appears in Music Assistant (probed)
 
 - A Sendspin client whose `device_info` does not look like MA's own web or app player registers as a **protocol player** (`PlayerType.PROTOCOL`, hidden). About **15 s** after its first connect MA wraps it in a **universal player**: provider `universal_player`, `player_id` `up` + 8 hex characters (not the client id), `name` = the hello's `name`, `type` `player`, `supported_features` `volume_mute`, `volume_set`, `set_members` (no `play_media`: MA routes playback to the protocol), and `output_protocols` containing `{"output_protocol_id": "<client_id>", "protocol_domain": "sendspin", "is_native": false, "available": true}`. `volume_control` and `mute_control` name the client id. After the client disconnects the universal player stays listed with `available: false`; on the next connect it is reused at once (probed: listed on the first poll).
-- So SkinAmp finds "its" MA player by scanning `players/all` for an entry whose `output_protocols` has `output_protocol_id == client_id` (or whose `player_id == client_id`, the shape a standalone player would have), and sends `player_queues/play_media`, transport and grouping commands to that player's id.
-- Alternative not taken: `device_info.manufacturer == "Music Assistant"` (or `product_name` `Web Player`, `Mobile Application`, `PWA`, `Web Browser`) makes MA treat the client as its own web/app player: a standalone `sendspin` player under the client id at once, but hidden by default, private and not exposed to Home Assistant. That is a heuristic meant for MA's own apps; SkinAmp identifies as itself.
-- Grouping with a HomePod is done in MA (`set_members` on the universal player or the HomePod); MA's Sendspin server then times both. SkinAmp needs no grouping UI for #0066.
+- So Roadie finds "its" MA player by scanning `players/all` for an entry whose `output_protocols` has `output_protocol_id == client_id` (or whose `player_id == client_id`, the shape a standalone player would have), and sends `player_queues/play_media`, transport and grouping commands to that player's id.
+- Alternative not taken: `device_info.manufacturer == "Music Assistant"` (or `product_name` `Web Player`, `Mobile Application`, `PWA`, `Web Browser`) makes MA treat the client as its own web/app player: a standalone `sendspin` player under the client id at once, but hidden by default, private and not exposed to Home Assistant. That is a heuristic meant for MA's own apps; Roadie identifies as itself.
+- Grouping with a HomePod is done in MA (`set_members` on the universal player or the HomePod); MA's Sendspin server then times both. Roadie needs no grouping UI for #0066.
 
 ## 8. Left on the server by the probe
 
-The probe registered a Sendspin client `skinamp-probe`, so the server now has a universal player named **SkinAmp probe** (unavailable while nothing is connected). It is harmless; remove it in Music Assistant (Settings › Players) if it is in the way. SkinAmp itself registers under its own client id and name.
+The probe registered a Sendspin client `skinamp-probe`, so the server now has a universal player named **SkinAmp probe** (unavailable while nothing is connected). It is harmless; remove it in Music Assistant (Settings › Players) if it is in the way. Roadie itself registers under its own client id and name.

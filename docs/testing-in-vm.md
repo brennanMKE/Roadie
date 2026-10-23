@@ -1,6 +1,6 @@
 # Tests in a Tart VM
 
-SkinAmp is built and tested inside a disposable macOS VM, never on the host. That covers package
+Roadie is built and tested inside a disposable macOS VM, never on the host. That covers package
 tests, app builds, launching the app, and later the XCUITests. The VM also has no audio path to the
 host, so nothing a test does can reach the speakers. This doc covers why, how to run it, and how a
 run works. It is adapted from the host-level runbook, `~/Developer/Homelab/cameron/tart-ui-test-vm.md`,
@@ -181,7 +181,7 @@ Everything below already exists on cameron and is shared by every project that r
 | `tart-golden` | Resolves the one shared golden image and checks its Xcode version | `~/bin`; protocol at `~/Developer/Homelab/protocols/tart-golden/` |
 | `tart-lease` | Lets at most two guests run at once, gated on free memory | `~/bin`; protocol at `~/Developer/Homelab/protocols/tart-lease/` |
 | memory-signal | Asks the host's observer to free memory (unload LM Studio models) when it is short | `~/Developer/Homelab/protocols/memory-signal/` |
-| XcodeGen | Generates `SkinAmp.xcodeproj` into the export on the host | Homebrew |
+| XcodeGen | Generates `Roadie.xcodeproj` into the export on the host | Homebrew |
 
 The shell that runs the script must be in the GUI (Aqua) session with `login.keychain` unlocked.
 Otherwise Virtualization.framework refuses to boot a macOS guest, with the misleading error
@@ -201,8 +201,8 @@ There is one golden image per host, `uitest-golden`, and no project gets its own
 | Baked in | admin auto-login, Automation Mode without authentication, developer mode, no screen lock, no sleep, SSH logins refused |
 | Access | `tart exec` only (Tart Guest Agent) |
 
-SkinAmp targets macOS 14, so the guest's 26.6.2 is fine. Never clone the golden into a
-`skinamp-golden`. When SkinAmp needs a newer Xcode, the golden is replaced for every project with
+Roadie targets macOS 14, so the guest's 26.6.2 is fine. Never clone the golden into a
+`roadie-golden`. When Roadie needs a newer Xcode, the golden is replaced for every project with
 `tart-golden stage` → `validate` → `promote`. That is how seven 68 GB per-project images were
 consolidated on 2026-10-11.
 
@@ -214,15 +214,15 @@ consolidated on 2026-10-11.
    least 20 GiB free on `/`, and memory checked: the guest needs `GUEST_MEM_MB + 4096` (16 GB). If
    the host is short, the script sends a memory-signal request and waits for the observer.
 2. **Sweep stale clones.** A SIGKILL (for example, an OOM kill) skips the `EXIT` trap and leaves a
-   clone behind. The sweep removes `skinamp-test-<YYYYMMDD>-<HHMMSS>-<pid>` clones whose `<pid>`
+   clone behind. The sweep removes `roadie-test-<YYYYMMDD>-<HHMMSS>-<pid>` clones (and the older `skinamp-test-` ones) whose `<pid>`
    is no longer a live `run-tests-vm.sh` process, or whose run id is older than 8 h. Clones of a
    live run (another agent's concurrent run) are left alone, and nothing outside that exact name
    shape is ever touched. A prefix match once deleted a golden image.
 3. **Export a snapshot.** By default, the working tree: tracked files plus untracked files that
    aren't ignored, so a change can be verified before it is committed. With `--head`,
    `git archive HEAD`. Then `xcodegen generate` runs on the host against the export, because
-   `SkinAmp.xcodeproj` is gitignored and the guest has no XcodeGen.
-4. **Take a slot.** `tart-lease acquire --label skinamp`. If `tart-lease` is missing, the script
+   `Roadie.xcodeproj` is gitignored and the guest has no XcodeGen.
+4. **Take a slot.** `tart-lease acquire --label roadie`. If `tart-lease` is missing, the script
    warns and continues; it must never be a reason a run fails.
 5. **Clone and boot.** `tart clone`, then
    `tart run "$CLONE" --no-graphics --no-audio --dir=run:"$EXPORT":ro &`, polling `tart exec … true`
@@ -255,12 +255,12 @@ Run it in the foreground of a terminal. A dropped session costs a clone, not a w
 The XCUITests will run the same way, as a further step in the guest:
 
 ```bash
-xcodebuild -project SkinAmp.xcodeproj -scheme 'SkinAmp UI Tests' \
+xcodebuild -project Roadie.xcodeproj -scheme 'Roadie UI Tests' \
   -destination 'platform=macOS' -resultBundlePath ~/results/UITests.xcresult test
 ```
 
-The `SkinAmp` scheme's Test action holds unit tests only. UI tests go in a separate scheme,
-`SkinAmp UI Tests`, that only the VM script runs. A passing UI run also needs:
+The `Roadie` scheme's Test action holds unit tests only. UI tests go in a separate scheme,
+`Roadie UI Tests`, that only the VM script runs. A passing UI run also needs:
 
 - No prompt appeared in the guest. A blocking prompt shows up as a timeout, not a pass.
 - No new crash reports on the host (`ls -lt ~/Library/Logs/DiagnosticReports | head` before and
@@ -287,7 +287,7 @@ Test design for a headless, silent guest:
 - To keep a failed clone, comment out the `tart delete` in `cleanup`, then `tart exec <clone> …` to
   look around. Delete it by hand afterwards; a kept clone still counts against the two-guest limit.
   The next run sweeps it once its run has exited; to keep it longer, `tart rename` it to a name
-  outside the pattern (e.g. `skinamp-keep-<id>`) and delete it by hand later.
+  outside the pattern (e.g. `roadie-keep-<id>`) and delete it by hand later.
 - To see the guest's screen, `tart run <clone> --no-audio` without `--no-graphics`. Memory is the
   constraint on cameron: an idle VM opened with graphics was OOM-killed after about an hour on
   2026-09-12.

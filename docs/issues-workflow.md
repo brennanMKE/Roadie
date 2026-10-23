@@ -1,6 +1,6 @@
 # Issues workflow
 
-How SkinAmp's issues move from filed to resolved, as revised on 2026-10-18 and 2026-10-19, and why.  The verify-runner change (implementers never see build or test logs) is explained in [verify-runner-plan.md](verify-runner-plan.md). The rules live in [issues/Issues.md](../issues/Issues.md) (authoritative) and [docs/testing-in-vm.md](testing-in-vm.md); this page explains the shape and the measured benefits.
+How Roadie's issues move from filed to resolved, as revised on 2026-10-18 and 2026-10-19, and why.  The verify-runner change (implementers never see build or test logs) is explained in [verify-runner-plan.md](verify-runner-plan.md). The rules live in [issues/Issues.md](../issues/Issues.md) (authoritative) and [docs/testing-in-vm.md](testing-in-vm.md); this page explains the shape and the measured benefits.
 
 ## The pipeline
 
