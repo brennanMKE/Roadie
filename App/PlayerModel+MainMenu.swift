@@ -8,12 +8,14 @@ extension PlayerModel {
             timeMode: timeMode, isEQWindowOpen: isEQWindowOpen, isPlaylistWindowOpen: isPlaylistWindowOpen,
             isMainShaded: isMainWindowShaded, isEQShaded: isEQWindowShaded, isPlaylistShaded: isPlaylistWindowShaded,
             isRepeating: isRepeating, isShuffled: isShuffled, canNavigateSkins: skinBrowser.canNavigate,
-            isAlwaysOnTop: isAlwaysOnTop, isDoubleSize: isDoubleSize)
+            isAlwaysOnTop: isAlwaysOnTop, isDoubleSize: isDoubleSize,
+            canCheckForUpdates: updateActions?.canCheck() ?? false)
     }
 
     func perform(_ command: MainMenuCommand) {
         switch command {
         case .about: NSApp.orderFrontStandardAboutPanel(nil)
+        case .checkForUpdates: updateActions?.check()
         case .openFiles: openFiles(replace: true)
         case .addFiles: openFiles(replace: false)
         case .toggleEQWindow: toggleEQWindow()

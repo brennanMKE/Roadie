@@ -50,6 +50,10 @@
 	<string>Roadie reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Roadie reads your Wi-Fi network name to pick the Music Assistant server for where you are. Your location is not stored or shared.</string>
+	<key>SUFeedURL</key>
+	<string>$(ROADIE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(ROADIE_PUBLIC_ED_KEY)</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

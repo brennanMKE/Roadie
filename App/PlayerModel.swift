@@ -27,6 +27,9 @@ final class PlayerModel {
     /// A transient message that takes over the marquee (and the no-skin placeholder) for a few seconds.
     private(set) var notice: StatusNotice?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    /// Check for Updates… in the skinned main menu (#0158). The app injects these from `Updater`, so the model and
+    /// SkinKit stay free of Sparkle; nil leaves the item disabled.
+    @ObservationIgnored var updateActions: (canCheck: () -> Bool, check: () -> Void)?
     /// The sources and the active one. `backend`, `library` and `artwork` below follow its choice; only
     /// `sources.select(_:)` swaps them. The composition in `init` is the one place that names Music Assistant and the folder.
     let sources: LibrarySourceController

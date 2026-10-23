@@ -31,8 +31,10 @@ struct RoadieApp: App {
                 .environment(appDelegate.model.sources)
                 .environment(appDelegate.model.fallback)
                 .environment(appDelegate.model.skinLibrary)
+                .environment(appDelegate.updater)
         }
         .commands {
+            UpdateCommands(updater: appDelegate.updater)
             CommandGroup(replacing: .newItem) {
                 Button("Open…") { appDelegate.model.openFiles(replace: true) }
                     .keyboardShortcut("o")

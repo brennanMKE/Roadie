@@ -9,6 +9,8 @@ struct SettingsView: View {
                 .tabItem { Label("Music Assistant", systemImage: "hifispeaker.2") }
             SkinsSettingsView()
                 .tabItem { Label("Skins", systemImage: "paintpalette") }
+            UpdatesSettingsView()
+                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
         }
         .frame(width: 480)
         .scenePadding()

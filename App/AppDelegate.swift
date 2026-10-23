@@ -7,6 +7,8 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = PlayerModel()
+    /// Sparkle (#0158). Starts only when the build carries a feed URL and a public key, so Debug builds never check.
+    let updater = Updater()
     private(set) lazy var docking = WindowDockingCoordinator(model: model)
     private(set) lazy var player = SkinWindowController(kind: .main, model: model, rootView: PlayerView())
     private(set) lazy var equalizer: SkinWindowController = {
@@ -22,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        model.updateActions = (canCheck: { [updater] in updater.canCheckForUpdates }, check: { [updater] in updater.checkForUpdates() })
         docking.register(player)
         docking.register(equalizer)
         docking.register(playlist)

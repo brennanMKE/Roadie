@@ -1,7 +1,7 @@
 /// The main window's options menu (Winamp's main menu, Webamp `MainContextMenu`), as plain data. The app builds the
 /// `NSMenu` from these entries in one place; features Roadie does not have yet are left out rather than disabled.
 public enum MainMenuCommand: Hashable, Sendable {
-    case about, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow
+    case about, checkForUpdates, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow
     case openSkin, nextSkin, previousSkin, randomSkin
     case timeElapsed, timeRemaining, toggleAlwaysOnTop, toggleDoubleSize, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle
     case previous, play, pause, stop, next
@@ -21,12 +21,14 @@ public struct MainMenuState: Equatable, Sendable {
     public var canNavigateSkins: Bool
     public var isAlwaysOnTop: Bool
     public var isDoubleSize: Bool
+    /// Sparkle's updater can check now (#0158); false in Debug builds, where it never starts.
+    public var canCheckForUpdates: Bool
 
     public init(
         timeMode: TimeMode = .elapsed, isEQWindowOpen: Bool = false, isPlaylistWindowOpen: Bool = false,
         isMainShaded: Bool = false, isEQShaded: Bool = false, isPlaylistShaded: Bool = false,
         isRepeating: Bool = false, isShuffled: Bool = false, canNavigateSkins: Bool = false,
-        isAlwaysOnTop: Bool = false, isDoubleSize: Bool = false
+        isAlwaysOnTop: Bool = false, isDoubleSize: Bool = false, canCheckForUpdates: Bool = false
     ) {
         self.timeMode = timeMode
         self.isEQWindowOpen = isEQWindowOpen
@@ -39,6 +41,7 @@ public struct MainMenuState: Equatable, Sendable {
         self.canNavigateSkins = canNavigateSkins
         self.isAlwaysOnTop = isAlwaysOnTop
         self.isDoubleSize = isDoubleSize
+        self.canCheckForUpdates = canCheckForUpdates
     }
 }
 
@@ -93,6 +96,7 @@ public enum MainMenu {
     public static func entries(_ state: MainMenuState) -> [MainMenuEntry] {
         [
             .item(MainMenuItem(.about, "About Roadie")),
+            .item(MainMenuItem(.checkForUpdates, "Check for Updates…", isEnabled: state.canCheckForUpdates)),
             .separator,
             .item(MainMenuItem(.openFiles, "Play File…", shortcut: MainMenuShortcut("o"))),
             .item(MainMenuItem(.addFiles, "Add to Playlist…", shortcut: MainMenuShortcut("o", [.command, .option]))),

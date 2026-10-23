@@ -26,9 +26,16 @@ struct MainMenuTests {
         }
         #expect(
             labels == [
-                "About Roadie", "-", "Play File…", "Add to Playlist…", "-", "Equalizer", "Playlist Editor", "-",
+                "About Roadie", "Check for Updates…", "-", "Play File…", "Add to Playlist…", "-", "Equalizer", "Playlist Editor", "-",
                 "Skins >", "Options >", "Playback >", "-", "Exit",
             ])
+    }
+
+    @Test func checkForUpdatesFollowsAbout() {
+        let commands = items(MainMenu.entries(MainMenuState())).map(\.command)
+        #expect(Array(commands.prefix(2)) == [.about, .checkForUpdates])
+        #expect(item(.checkForUpdates)?.isEnabled == false)
+        #expect(item(.checkForUpdates, MainMenuState(canCheckForUpdates: true))?.isEnabled == true)
     }
 
     @Test func timeModeRadioChecksCurrentMode() {
@@ -71,7 +78,7 @@ struct MainMenuTests {
     @Test func everyCommandAppearsOnce() {
         let commands = items(MainMenu.entries(MainMenuState())).map(\.command)
         #expect(Set(commands).count == commands.count)
-        #expect(commands.count == 24)
+        #expect(commands.count == 25)
     }
 
     @Test func unsupportedEntriesAreAbsent() {
