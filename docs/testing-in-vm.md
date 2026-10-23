@@ -214,7 +214,7 @@ consolidated on 2026-10-11.
    least 20 GiB free on `/`, and memory checked: the guest needs `GUEST_MEM_MB + 4096` (16 GB). If
    the host is short, the script sends a memory-signal request and waits for the observer.
 2. **Sweep stale clones.** A SIGKILL (for example, an OOM kill) skips the `EXIT` trap and leaves a
-   clone behind. The sweep removes `roadie-test-<YYYYMMDD>-<HHMMSS>-<pid>` clones (and the older `skinamp-test-` ones) whose `<pid>`
+   clone behind. The sweep removes `roadie-test-<YYYYMMDD>-<HHMMSS>-<pid>` clones whose `<pid>`
    is no longer a live `run-tests-vm.sh` process, or whose run id is older than 8 h. Clones of a
    live run (another agent's concurrent run) are left alone, and nothing outside that exact name
    shape is ever touched. A prefix match once deleted a golden image.
