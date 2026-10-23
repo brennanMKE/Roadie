@@ -122,7 +122,7 @@ Recorded in the notes: `players/all`, the `players/cmd/*` transport commands, `m
 
 ### Discovery
 - The Home Assistant add-on does not advertise `_music-assistant._tcp` (checked in #0060). Roadie finds servers by browsing `_home-assistant._tcp` and `_sendspin-server._tcp` (and `_music-assistant._tcp`), plus `homeassistant.local`, and probing `http://<host>:8095/info` (#0104, below). A manual address still works (#0063).
-- Address rules (#0063): App Transport Security stays at the local-network exemption, so plain `http`/`ws` works for `.local` names, unqualified names and IP addresses (Tailscale `100.x` included). Any other address, a public DNS name or a Tailscale MagicDNS `*.ts.net` name, must be `https` (reached as `wss`), for example through `tailscale serve`. A bare non-local host defaults to `https`.
+- Address rules (#0063, #0172): App Transport Security has the local-network exemption plus one exception domain, `ts.net` with subdomains allowing insecure HTTP loads. So plain `http`/`ws` works for `.local` names, unqualified names, IP addresses (Tailscale `100.x` included) and Tailscale MagicDNS `*.ts.net` names (WireGuard encrypts tailnet traffic); a bare one of these defaults to `http` on 8095. Any other address must be `https` (reached as `wss`), for example through a reverse proxy; a bare one defaults to `https`. When Test Connection can't reach an `https` address on port 8095, it explains that Music Assistant serves plain http there.
 
 ### Reference implementations worth reading
 - `github.com/music-assistant/client`: official Python client (handshake, models, every controller). Primary source for message shapes.

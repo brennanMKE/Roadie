@@ -70,6 +70,11 @@ targets:
         SUPublicEDKey: $(ROADIE_PUBLIC_ED_KEY)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          # #0172: Tailscale MagicDNS names over plain http/ws; WireGuard encrypts tailnet traffic.
+          NSExceptionDomains:
+            "ts.net":
+              NSIncludesSubdomains: true
+              NSExceptionAllowsInsecureHTTPLoads: true
         NSLocalNetworkUsageDescription: Roadie connects to your Music Assistant server on your local network to browse and play your music.
         # #0104: Music Assistant discovery browses these (macOS lists them for Local Network access).
         NSBonjourServices:

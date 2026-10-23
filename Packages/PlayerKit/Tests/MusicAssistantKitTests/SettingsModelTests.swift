@@ -505,6 +505,35 @@ struct SettingsModelTests {
         #expect(rig.model.networks == ["Studio"])
     }
 
+    @Test func aTailscaleNameOverHTTPIsAccepted() async throws {
+        let rig = try SettingsRig(servers: [makeServer()])
+        defer { rig.cleanUp() }
+        rig.model.appeared()
+        rig.model.addressText = "http://box.tail1234.ts.net:8095"
+        #expect(rig.model.addressProblem == nil)
+        rig.model.disappeared()
+        let saved = try #require(rig.store.load().first)
+        #expect(saved.address.baseURL == URL(string: "http://box.tail1234.ts.net:8095"))
+    }
+
+    @Test func httpsOnPort8095HintsThatMusicAssistantServesPlainHTTP() async throws {
+        func status(for url: String) async throws -> (MusicAssistantSettingsModel.Status, String?) {
+            let rig = try SettingsRig(servers: [makeServer(url, id: nil)])
+            defer { rig.cleanUp() }
+            rig.stub.setFailure(pathPrefix: "/info", code: .secureConnectionFailed)
+            rig.model.appeared()
+            await rig.runTest()
+            return (rig.model.selectedStatus, rig.model.statusMessage)
+        }
+        let (hinted, message) = try await status(for: "https://box.tail1234.ts.net:8095")
+        #expect(hinted == .failed(.httpsOnMusicAssistantPort))
+        #expect(message?.contains("http://") == true)
+        for url in ["https://music.example.test:8443", "http://ma.local:8095"] {
+            let (other, _) = try await status(for: url)
+            if case .failed(.unreachable) = other {} else { Issue.record("\(url): \(String(describing: other))") }
+        }
+    }
+
     @Test func aTransportBlockedByATSIsNamedAsSuch() async throws {
         let server = makeServer(id: nil)
         let rig = try SettingsRig(servers: [server])
@@ -547,7 +576,7 @@ struct SettingsModelTests {
         await rig.runTest()
         note()
         for failure: MusicAssistantConnectionFailure in [
-            .invalidAddress(.httpsRequired), .blockedByATS, .tokenRejected, .needsToken(foundName: nil),
+            .invalidAddress(.httpsRequired), .blockedByATS, .httpsOnMusicAssistantPort, .tokenRejected, .needsToken(foundName: nil),
             .serverMismatch(foundName: nil), .schema("This Music Assistant server is too old for Roadie (schema 3; needs 28 or later)."),
         ] {
             messages.append(failure.message)

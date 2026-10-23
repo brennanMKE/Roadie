@@ -22,7 +22,6 @@ struct AddressInputTests {
 
     @Test func aBareNonLocalHostDefaultsToHTTPS() {
         #expect(parsed("music.example.test") == "https://music.example.test")
-        #expect(parsed("box.tail1234.ts.net") == "https://box.tail1234.ts.net")
         #expect(parsed("music.example.test:8443") == "https://music.example.test:8443")
     }
 
@@ -60,12 +59,39 @@ struct AddressInputTests {
     }
 
     @Test func plainHTTPToANonLocalAddressNeedsHTTPS() {
-        let message = "Use https for this address; plain http works only on the local network."
-        for text in ["http://music.example.test", "http://box.tail1234.ts.net:8095", "ws://music.example.test"] {
+        let message = "Use https for this address; plain http works only on the local network or Tailscale."
+        for text in ["http://music.example.test", "ws://music.example.test"] {
             #expect(problem(text) == .httpsRequired)
         }
         #expect(MusicAssistantAddressInput.Problem.httpsRequired.message == message)
         #expect(parsed("http://music.example.test") == nil)
+    }
+
+    @Test func tailscaleMagicDNSOverHTTPIsAccepted() {
+        #expect(parsed("http://homeassistant.sawfish-byzantine.ts.net:8095") == "http://homeassistant.sawfish-byzantine.ts.net:8095")
+        #expect(parsed("ws://box.tail1234.ts.net:8095") == "http://box.tail1234.ts.net:8095")
+        #expect(parsed("http://box.tail1234.ts.net:8095/ma") == "http://box.tail1234.ts.net:8095/ma")
+    }
+
+    @Test func tailscaleMagicDNSOverHTTPGetsPort8095() {
+        #expect(parsed("http://box.tail1234.ts.net") == "http://box.tail1234.ts.net:8095")
+        #expect(parsed("box.tail1234.ts.net") == "http://box.tail1234.ts.net:8095")
+        #expect(parsed("https://box.tail1234.ts.net") == "https://box.tail1234.ts.net")
+    }
+
+    @Test func tailscaleMagicDNSMatchIgnoresCase() {
+        #expect(parsed("HTTP://Box.Tail1234.TS.NET:8095") == "http://box.tail1234.ts.net:8095")
+        #expect(parsed("BOX.TAIL1234.TS.NET") == "http://box.tail1234.ts.net:8095")
+    }
+
+    @Test func tsNetLookalikesStillNeedHTTPS() {
+        for text in [
+            "http://evil-ts.net", "http://boxts.net:8095", "http://ts.net", "http://ts.net.example.com",
+            "http://box.ts.net.example.com:8095", "ws://evil-ts.net",
+        ] {
+            #expect(problem(text) == .httpsRequired, "\(text)")
+        }
+        #expect(parsed("ts.net.example.com") == "https://ts.net.example.com")
     }
 
     @Test func emptyInvalidCredentialsAndUnsupportedSchemeAreRejected() {
@@ -112,10 +138,16 @@ struct AddressSecurityTests {
         }
     }
 
-    @Test func magicDNSAndPublicNamesOverHTTPNeedTLS() {
+    @Test func magicDNSOverHTTPIsTailnet() {
+        for text in ["http://box.tail1234.ts.net:8095", "http://HOMEASSISTANT.example-tailnet.TS.NET", "ws://box.tail1234.ts.net"] {
+            #expect(classify(text) == .tailnet, "\(text)")
+        }
+    }
+
+    @Test func publicNamesAndTSNetLookalikesOverHTTPNeedTLS() {
         for text in [
-            "http://box.tail1234.ts.net:8095", "http://music.example.test:8095", "http://example.com", "http://1.2.3.example.com",
-            "http://256.1.1.1",
+            "http://music.example.test:8095", "http://example.com", "http://1.2.3.example.com", "http://256.1.1.1",
+            "http://evil-ts.net", "http://ts.net.example.com:8095", "http://ts.net",
         ] {
             #expect(classify(text) == .requiresTLS, "\(text)")
         }

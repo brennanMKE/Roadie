@@ -6,8 +6,11 @@ public enum MusicAssistantConnectionFailure: Hashable, Sendable {
     case invalidAddress(MusicAssistantAddressInput.Problem)
     /// From `MusicAssistantError.errorDescription`, which names no host.
     case unreachable(String)
-    /// `.transport(.appTransportSecurityRequiresSecureConnection)`: should not happen once the address rules hold.
+    /// `.transport(.appTransportSecurityRequiresSecureConnection)`: should not happen once the address rules and the
+    /// ATS `ts.net` exception agree.
     case blockedByATS
+    /// `/info` over https on port 8095 couldn't be reached: Music Assistant serves plain http there.
+    case httpsOnMusicAssistantPort
     /// A different server answered. `foundName` is the server's own name, if it gave one.
     case serverMismatch(foundName: String?)
     case needsToken(foundName: String?)
@@ -20,7 +23,9 @@ public enum MusicAssistantConnectionFailure: Hashable, Sendable {
         switch self {
         case .invalidAddress(let problem): problem.message
         case .unreachable(let text): text
-        case .blockedByATS: "macOS blocks this connection. Use https; plain http works only on the local network."
+        case .blockedByATS: "macOS blocks this connection. Use https; plain http works only on the local network or Tailscale."
+        case .httpsOnMusicAssistantPort:
+            "Can't reach Music Assistant over https on port 8095. Music Assistant serves plain http on 8095: use http:// for a local or .ts.net address, or https without a port if you use tailscale serve."
         case .serverMismatch(let name):
             name.map { "A different server answered (\($0)). Its token was not sent." }
                 ?? "A different server answered. Its token was not sent."
@@ -67,7 +72,7 @@ public struct MusicAssistantConnectionTest: Sendable {
         } catch is CancellationError {
             return nil
         } catch {
-            return .failed(Self.failure(for: error, found: nil))
+            return .failed(Self.failure(for: error, found: nil, baseURL: baseURL))
         }
         if Task.isCancelled { return nil }
         if info.schemaVersion < MusicAssistantClient.minimumSchemaVersion
@@ -110,6 +115,17 @@ public struct MusicAssistantConnectionTest: Sendable {
     static func friendlyName(_ info: MAServerInfo) -> String? {
         MusicAssistantServerConfiguration.isGenericName(info.name)
             ? nil : info.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The `/info` step's failure: an unreachable https address on Music Assistant's own port gets the plain-http hint.
+    static func failure(for error: any Error, found: String?, baseURL: URL) -> MusicAssistantConnectionFailure {
+        let failure = failure(for: error, found: found)
+        if case .unreachable = failure, baseURL.scheme?.lowercased() == "https",
+            baseURL.port == MusicAssistantAddressInput.defaultPort
+        {
+            return .httpsOnMusicAssistantPort
+        }
+        return failure
     }
 
     static func failure(for error: any Error, found: String?) -> MusicAssistantConnectionFailure {

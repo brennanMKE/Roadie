@@ -6,6 +6,10 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+### Fixed
+
+- A Music Assistant server can be added by its Tailscale name (`http://<machine>.<tailnet>.ts.net:8095`), and an https address on port 8095 that can't be reached now explains that Music Assistant serves plain http there.
+
 ## [0.0.2] - 2026-10-23
 
 A friendlier first launch: Roadie now helps you get skins and pick your music folder. Music Assistant is optional.

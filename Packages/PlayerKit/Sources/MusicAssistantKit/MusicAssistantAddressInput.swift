@@ -2,14 +2,14 @@ import Foundation
 
 /// Turns what the user typed into a base URL, and says whether App Transport Security lets the app use it.
 ///
-/// ATS stays at `NSAllowsLocalNetworking` (no `NSAllowsArbitraryLoads`, no exception domains), so plain `http`/`ws`
-/// works only for the addresses ATS treats as local: `.local` names, unqualified host names and IP addresses
-/// (Tailscale `100.x` included). Every other address, a public DNS name or a Tailscale MagicDNS `*.ts.net` name,
-/// must use `https`/`wss`.
+/// ATS has `NSAllowsLocalNetworking` plus one exception domain, `ts.net` with subdomains, allowing insecure HTTP
+/// loads (#0172); there is no `NSAllowsArbitraryLoads`. So plain `http`/`ws` works for the addresses ATS treats as
+/// local (`.local` names, unqualified host names and IP addresses, Tailscale `100.x` included) and for Tailscale
+/// MagicDNS `*.ts.net` names, whose traffic WireGuard encrypts. Every other address must use `https`/`wss`.
 public enum MusicAssistantAddressInput {
     public enum Problem: Hashable, Sendable, Error {
         case empty, invalid, unsupportedScheme, credentialsNotAllowed
-        /// `http://` to an address that is not local.
+        /// `http://` to an address that is neither local nor a Tailscale MagicDNS name.
         case httpsRequired
 
         public var message: String {
@@ -18,7 +18,7 @@ public enum MusicAssistantAddressInput {
             case .invalid: "That address isn't valid."
             case .unsupportedScheme: "Use an http or https address."
             case .credentialsNotAllowed: "Don't put a user name or password in the address."
-            case .httpsRequired: "Use https for this address; plain http works only on the local network."
+            case .httpsRequired: "Use https for this address; plain http works only on the local network or Tailscale."
             }
         }
     }
@@ -26,10 +26,10 @@ public enum MusicAssistantAddressInput {
     public static let defaultPort = 8095
 
     /// "host", "host:port", "[v6]:port", "http(s)://host[:port][/path]", "ws(s)://..." (mapped to http(s)).
-    /// - No scheme: `http` for a local host, `https` for any other.
+    /// - No scheme: `http` for a local host or a `*.ts.net` name, `https` for any other.
     /// - `http` with no port gets 8095; `https` with no port stays on the default (443, a reverse proxy or `tailscale serve`).
     /// - Keeps a path (a reverse-proxy prefix); drops the query and fragment; trims whitespace; lowercases scheme and host.
-    /// - `http` (or `ws`) to a non-local host is `.httpsRequired`.
+    /// - `http` (or `ws`) to a host that is neither local nor `*.ts.net` is `.httpsRequired`.
     public static func parse(_ text: String) -> Result<URL, Problem> {
         var rest = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rest.isEmpty else { return .failure(.empty) }
@@ -89,9 +89,9 @@ public enum MusicAssistantAddressInput {
             port = value
         }
 
-        let local = isLocalHost(host)
-        let resolved = scheme ?? (local ? "http" : "https")
-        if resolved == "http", !local { return .failure(.httpsRequired) }
+        let plainHTTPAllowed = isLocalHost(host) || isTailscaleMagicDNS(host)
+        let resolved = scheme ?? (plainHTTPAllowed ? "http" : "https")
+        if resolved == "http", !plainHTTPAllowed { return .failure(.httpsRequired) }
         if resolved == "http", port == nil { port = defaultPort }
 
         var string = resolved + "://" + (host.contains(":") ? "[\(host)]" : host)
@@ -116,6 +116,16 @@ public enum MusicAssistantAddressInput {
         if host.hasSuffix(".local") { return true }
         return !host.contains(".")
     }
+
+    /// A Tailscale MagicDNS name, `<label>.….ts.net`, which the ATS `ts.net` exception covers (#0172).
+    /// Rejects `ts.net` itself, look-alikes such as `evil-ts.net`, and the trailing-dot form.
+    static func isTailscaleMagicDNS(_ host: String) -> Bool {
+        let host = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased()
+        let suffix = ".ts.net"
+        guard host.hasSuffix(suffix) else { return false }
+        let labels = host.dropLast(suffix.count).split(separator: ".", omittingEmptySubsequences: false)
+        return !labels.isEmpty && labels.allSatisfy { !$0.isEmpty }
+    }
 }
 
 /// How an address is carried, given the ATS rule above.
@@ -124,13 +134,19 @@ public enum MusicAssistantAddressSecurity: Hashable, Sendable {
     case encrypted
     /// Plain http to a host ATS treats as local.
     case local
-    /// Plain http to anything else. ATS blocks it (error -1022); Settings does not accept such an address.
+    /// Plain http to a Tailscale MagicDNS name: WireGuard encrypts it, and the ATS `ts.net` exception allows it.
+    case tailnet
+    /// Plain http to anything that is neither local nor `*.ts.net`. ATS blocks it (error -1022); Settings does not
+    /// accept such an address.
     case requiresTLS
 
     public static func classify(_ url: URL) -> Self {
         switch url.scheme?.lowercased() {
         case "https", "wss": return .encrypted
-        default: return MusicAssistantAddressInput.isLocalHost(url.host ?? "") ? .local : .requiresTLS
+        default:
+            let host = url.host ?? ""
+            if MusicAssistantAddressInput.isLocalHost(host) { return .local }
+            return MusicAssistantAddressInput.isTailscaleMagicDNS(host) ? .tailnet : .requiresTLS
         }
     }
 }

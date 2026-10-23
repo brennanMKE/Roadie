@@ -114,7 +114,8 @@ Follows `docs/plex-music-library.md`:
   adds to the queue.
 - **Settings** (SwiftUI `Settings` scene): Library, Music Assistant, Skins (the Plex and Cache
   sections were removed by #0074).
-- **Info.plist:** `NSAppTransportSecurity.NSAllowsLocalNetworking = YES`,
+- **Info.plist:** `NSAppTransportSecurity.NSAllowsLocalNetworking = YES` plus a `ts.net` exception domain
+  (subdomains, insecure HTTP loads; #0172),
   `NSLocalNetworkUsageDescription`, set through `project.yml`.
 
 ## Milestones

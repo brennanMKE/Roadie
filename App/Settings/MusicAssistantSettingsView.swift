@@ -75,7 +75,7 @@ struct MusicAssistantSettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.red)
                     } else {
-                        Text("A host name or IP address. Plain http works on your local network, including Tailscale IP addresses; any other address needs https.")
+                        Text("A host name or IP address. Plain http works on your local network and over Tailscale (IP addresses and .ts.net names); any other address needs https.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
