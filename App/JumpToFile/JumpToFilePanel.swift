@@ -7,6 +7,7 @@ import SkinKit
 private extension NSUserInterfaceItemIdentifier {
     static let number = NSUserInterfaceItemIdentifier("number")
     static let name = NSUserInterfaceItemIdentifier("name")
+    static let marker = NSUserInterfaceItemIdentifier("marker")
     static let time = NSUserInterfaceItemIdentifier("time")
 }
 
@@ -25,6 +26,7 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     private let searchField = NSSearchField()
     private let table = NSTableView()
     private let emptyLabel = NSTextField(labelWithString: "")
+    private let queueButton = NSButton(title: "Queue", target: nil, action: nil)
 
     /// The rows `index` was built from.
     private var indexedTracks: [Track] = []
@@ -61,6 +63,11 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     // MARK: Data
 
     private func observe(_ id: Int) {
+        observeRows(id)
+        observeUpNext(id)
+    }
+
+    private func observeRows(_ id: Int) {
         guard isObserving, id == observationID, let model else { return }
         withObservationTracking {
             _ = model.playlist.tracks
@@ -72,8 +79,30 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
 
     private func queueChanged(_ id: Int) {
         guard isObserving, id == observationID else { return }
-        observe(id)
+        observeRows(id)
         rebuild()
+    }
+
+    /// The play-next list changes markers only, so it reloads the visible marker cells, not the index.
+    private func observeUpNext(_ id: Int) {
+        guard isObserving, id == observationID, let model else { return }
+        withObservationTracking {
+            _ = model.player.queue.upNext
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.upNextChanged(id) }
+        }
+    }
+
+    private func upNextChanged(_ id: Int) {
+        guard isObserving, id == observationID else { return }
+        observeUpNext(id)
+        let column = table.column(withIdentifier: .marker)
+        let visible = table.rows(in: table.visibleRect)
+        if column >= 0, visible.length > 0 {
+            table.reloadData(
+                forRowIndexes: IndexSet(integersIn: visible.location..<NSMaxRange(visible)), columnIndexes: [column])
+        }
+        updateQueueButton()
     }
 
     private func rebuild() {
@@ -125,7 +154,33 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
             select(row)
         }
         updateEmptyState()
+        updateQueueButton()
     }
+
+    /// Queue works on the local queue only until #0182 fills in the Music Assistant branch.
+    private var canQueue: Bool {
+        guard let model else { return false }
+        return model.playlist.remote == nil && model.queueRowsSource == .local
+    }
+
+    /// The selected results' queue indices in result (playlist) order, else the first result.
+    private var selectedIndices: [Int] {
+        let rows = table.selectedRowIndexes.filter { results.indices.contains($0) }
+        if rows.isEmpty { return results.first.map { [$0] } ?? [] }
+        return rows.map { results[$0] }
+    }
+
+    /// "Dequeue" when every selected result is already queued, like the playlist menu's `selectionIsQueued`.
+    private func updateQueueButton() {
+        queueButton.isEnabled = !results.isEmpty && canQueue
+        guard let model else { return }
+        let queue = model.player.queue
+        let indices = selectedIndices.filter { shownTracks.indices.contains($0) }
+        let allQueued = !indices.isEmpty && indices.allSatisfy { queue.upNextPosition(of: shownTracks[$0].id) != nil }
+        queueButton.title = allQueued ? "Dequeue" : "Queue"
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) { updateQueueButton() }
 
     private func updateEmptyState() {
         let text: String? =
@@ -149,6 +204,10 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         switch id {
         case .number: field.stringValue = "\(index + 1)"
         case .time: field.stringValue = PlaylistText.time(track.duration > 0 ? track.duration : nil)
+        case .marker:
+            field.stringValue =
+                model?.playlist.remote == nil
+                ? PlaylistText.queueMarker(model?.player.queue.upNextPosition(of: track.id)) : ""
         default: field.stringValue = PlaylistModel.displayName(track)
         }
         return field
@@ -192,9 +251,7 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         case #selector(NSResponder.scrollPageUp(_:)), #selector(NSResponder.pageUp(_:)): move(by: -pageRows)
         case #selector(NSResponder.scrollPageDown(_:)), #selector(NSResponder.pageDown(_:)): move(by: pageRows)
         case #selector(NSResponder.insertNewline(_:)):
-            // ⇧Return queues the row once #0180 adds Queue; until then it does nothing.
-            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true { return true }
-            playSelected()
+            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true { queueSelected() } else { playSelected() }
         case #selector(NSResponder.cancelOperation(_:)): panel?.performClose(nil)
         default: return false
         }
@@ -214,8 +271,17 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         panel?.performClose(nil)
     }
 
-    /// Queue arrives with #0180; the button stays hidden until then.
-    @objc private func queueSelected() {}
+    /// Toggles the selected results in the play-next list (like the playlist's Q), leaving the panel open.
+    @objc private func queueSelected() {
+        let indices = selectedIndices
+        guard canQueue, !indices.isEmpty, let model else {
+            NSSound.beep()
+            return
+        }
+        model.playlist.toggleQueue(indices)
+        updateQueueButton()
+        if panel?.firstResponder !== searchField.currentEditor() { panel?.makeFirstResponder(searchField) }
+    }
 
     func windowWillClose(_ notification: Notification) {
         isObserving = false
@@ -241,7 +307,7 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         searchField.placeholderString = "Type to filter the playlist"
         searchField.delegate = self
 
-        for (id, width) in [(NSUserInterfaceItemIdentifier.number, 48.0), (.name, 260.0), (.time, 52.0)] {
+        for (id, width) in [(NSUserInterfaceItemIdentifier.number, 48.0), (.name, 220.0), (.marker, 40.0), (.time, 52.0)] {
             let column = NSTableColumn(identifier: id)
             column.width = width
             column.resizingMask = id == .name ? .autoresizingMask : []
@@ -267,8 +333,9 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         emptyLabel.isHidden = true
 
         let play = NSButton(title: "Play", target: self, action: #selector(playSelected))
-        let queue = NSButton(title: "Queue", target: self, action: #selector(queueSelected))
-        queue.isHidden = true
+        let queue = queueButton
+        queue.target = self
+        queue.action = #selector(queueSelected)
         let close = NSButton(title: "Close", target: panel, action: #selector(NSWindow.performClose(_:)))
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
