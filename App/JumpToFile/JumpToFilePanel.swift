@@ -157,10 +157,10 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         updateQueueButton()
     }
 
-    /// Queue works on the local queue only until #0182 fills in the Music Assistant branch.
+    /// Queue works on any listed queue; on a Music Assistant queue it moves the rows after the current item (#0182).
     private var canQueue: Bool {
         guard let model else { return false }
-        return model.playlist.remote == nil && model.queueRowsSource == .local
+        return model.queueRowsSource != QueueRowsSource.none
     }
 
     /// The selected results' queue indices in result (playlist) order, else the first result.
@@ -173,7 +173,10 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     /// "Dequeue" when every selected result is already queued, like the playlist menu's `selectionIsQueued`.
     private func updateQueueButton() {
         queueButton.isEnabled = !results.isEmpty && canQueue
-        guard let model else { return }
+        guard let model, model.playlist.remote == nil else {
+            queueButton.title = "Queue"
+            return
+        }
         let queue = model.player.queue
         let indices = selectedIndices.filter { shownTracks.indices.contains($0) }
         let allQueued = !indices.isEmpty && indices.allSatisfy { queue.upNextPosition(of: shownTracks[$0].id) != nil }

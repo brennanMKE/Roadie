@@ -46,10 +46,16 @@ final class PlaylistModel {
     @ObservationIgnored var onRemoteNotice: @MainActor (String) -> Void = { _ in }
     /// Remote edits run one after another, in the order made (drag steps arrive quickly).
     @ObservationIgnored private var remoteEditChain: Task<Void, Never>?
+    /// Counts Queue (Q) moves on the remote queue since the current item changed (#0182).
+    @ObservationIgnored private var remoteUpNext = RemoteUpNext()
 
     /// The remote queue the rows show; nil for the local queue. Set by `PlayerModel` (#0144).
     var remote: RemoteQueueSnapshot? {
-        didSet { remoteTracks = remote.map(remoteTracks(for:)) ?? [] }
+        didSet {
+            remoteTracks = remote.map(remoteTracks(for:)) ?? []
+            if oldValue?.output != remote?.output { remoteUpNext = RemoteUpNext() }
+            if let remote { remoteUpNext.sync(to: remote) }
+        }
     }
     /// `remote`'s items as rows; ids stay the same per queue item so the selection survives refetches.
     private var remoteTracks: [Track] = []
@@ -250,8 +256,14 @@ final class PlaylistModel {
     }
 
     /// Q, the menu's Queue/Dequeue and Jump to File's Queue (#0180): toggles `indices` (row order) in the play-next list.
+    /// On a Music Assistant queue (#0182) it moves them to play after the current item, one move per row.
     func toggleQueue(_ indices: [Int]) {
-        // #0182: the Music Assistant queue's branch goes here.
+        if let remote {
+            let edits = remoteUpNext.plan(queueing: indices, in: remote)
+            if remote.currentIndex == nil { onRemoteNotice("Nothing is playing") }
+            for edit in edits { sendRemote(edit) }
+            return
+        }
         guard remote == nil, isLocal() else { return }
         let tracks = player.queue.tracks
         let ids = indices.filter { tracks.indices.contains($0) }.map { tracks[$0].id }

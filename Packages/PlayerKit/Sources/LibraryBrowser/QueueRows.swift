@@ -120,3 +120,48 @@ public enum QueueEditPlan {
         return Removal(items: items, skippedCurrent: current.map(picked.contains) ?? false)
     }
 }
+
+/// Queue (Q) on a remote queue (#0182): moves rows to play right after the current item, each after the ones queued
+/// before it since the current item last changed. Music Assistant has no separate play-next list.
+public struct RemoteUpNext: Hashable, Sendable {
+    /// The current item's queue id when counting began.
+    public private(set) var anchorItemID: String?
+    /// How many rows were queued after the anchor.
+    public private(set) var count = 0
+
+    public init() {}
+
+    /// Resets the count when the snapshot's current item is no longer the anchor.
+    public mutating func sync(to snapshot: RemoteQueueSnapshot) {
+        let current = snapshot.currentIndex.flatMap { snapshot.items.indices.contains($0) ? snapshot.items[$0].id : nil }
+        guard current != anchorItemID else { return }
+        anchorItemID = current
+        count = 0
+    }
+
+    /// The moves that put `rows` (snapshot indices, in the order chosen) after the current item and the rows
+    /// queued before them. Skips the current row and rows that are already in place (they still count). Empty with
+    /// no current item.
+    public mutating func plan(queueing rows: [Int], in snapshot: RemoteQueueSnapshot) -> [QueueEdit] {
+        sync(to: snapshot)
+        guard let currentID = anchorItemID else { return [] }
+        var working = snapshot
+        var edits: [QueueEdit] = []
+        for row in rows where snapshot.items.indices.contains(row) {
+            let itemID = snapshot.items[row].id
+            guard itemID != currentID,
+                let from = working.items.firstIndex(where: { $0.id == itemID }),
+                let c = working.currentIndex
+            else { continue }
+            // Removing a row above the current one shifts the current one up.
+            let to = min((from < c ? c : c + 1) + count, working.items.count - 1)
+            if to != from {
+                let edit = QueueEdit.move(itemID: itemID, shift: to - from)
+                edits.append(edit)
+                working = QueueEditPlan.apply(edit, to: working)
+            }
+            count += 1
+        }
+        return edits
+    }
+}
