@@ -22,6 +22,14 @@ import Testing
         #expect(PlaylistText.runningTime(selected: 0, total: 0).count == 18)
     }
 
+    @Test func queueMarkerIsBracketedOneBasedOrEmpty() {
+        #expect(PlaylistText.queueMarker(1) == "[1]")
+        #expect(PlaylistText.queueMarker(12) == "[12]")
+        #expect(PlaylistText.queueMarker(nil) == "")
+        #expect(PlaylistText.queueMarker(0) == "")
+        #expect(PlaylistText.queueMarker(-1) == "")
+    }
+
     @Test func timeIsBlankWhenUnknown() {
         #expect(PlaylistText.time(nil) == "")
         #expect(PlaylistText.time(.nan) == "")

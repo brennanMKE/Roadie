@@ -113,6 +113,18 @@ final class PlaylistListInputView: NSView {
         }
     }
 
+    /// The row menu (#0179). Control-click stays a command-click in `mouseDown`.
+    override func rightMouseDown(with event: NSEvent) {
+        MainActor.assumeIsolated {
+            window?.makeFirstResponder(self)
+            let playlist = model.playlist
+            playlist.openMenu = nil
+            guard let index = row(atY: skinPoint(event).y) else { return }
+            if !playlist.isSelected(index) { playlist.click(index) }   // Finder-style: right-click selects the row
+            NSMenu.popUpContextMenu(PlaylistContextMenus.rowMenu(model), with: event, for: self)
+        }
+    }
+
     override func mouseDragged(with event: NSEvent) {
         MainActor.assumeIsolated {
             guard let dragStartY else { return }
@@ -143,6 +155,13 @@ final class PlaylistListInputView: NSView {
 
     override func keyDown(with event: NSEvent) {
         MainActor.assumeIsolated {
+            // A bare Q toggles the play-next queue (#0179); the menu bar's Quit takes command-Q first.
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if !event.isARepeat, modifiers.isDisjoint(with: [.command, .control, .option, .shift]),
+               event.charactersIgnoringModifiers?.lowercased() == "q" {
+                model.playlist.toggleQueueForSelection()
+                return
+            }
             switch event.keyCode {
             case 51, 117: model.playlist.removeSelected()        // delete, forward delete
             case 36, 76: model.playlist.playFirstSelected()      // return, enter

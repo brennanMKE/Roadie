@@ -162,6 +162,11 @@ struct PlaylistTrackListView: View {
                         .font(font).tracking(0.5)
                         .lineLimit(1).truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    if !row.marker.isEmpty {
+                        Text(" " + row.marker)
+                            .font(font).tracking(0.5)
+                            .lineLimit(1).fixedSize()
+                    }
                     Text(row.duration)
                         .font(font).tracking(0.5)
                         .lineLimit(1).fixedSize()

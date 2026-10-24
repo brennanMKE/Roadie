@@ -52,6 +52,28 @@ enum PlaylistContextMenus {
         ], enabled: enabled)
     }
 
+    /// The track list's right-click menu (#0179). Runs synchronously from the event; no skinned menu is open.
+    static func rowMenu(_ model: PlayerModel) -> NSMenu {
+        let playlist = model.playlist
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(ActionMenuItem(title: "Play") { playlist.playFirstSelected() })
+        if playlist.remote == nil {   // #0182 adds the Music Assistant queue
+            let title = playlist.selectionIsQueued ? "Dequeue" : "Queue"
+            menu.addItem(ActionMenuItem(title: title) { playlist.toggleQueueForSelection() })
+        }
+        if playlist.hasUpNext {
+            menu.addItem(ActionMenuItem(title: "Clear Queue") { playlist.clearUpNext() })
+        }
+        menu.addItem(.separator())
+        menu.addItem(ActionMenuItem(title: "Remove") { playlist.removeSelected() })
+        let track = playlist.fileInfoTrack
+        let info = ActionMenuItem(title: "File Info…") { if let track { model.showFileInfo(for: track) } }
+        info.isEnabled = track != nil
+        menu.addItem(info)
+        return menu
+    }
+
     static func miscOptions(_ model: PlayerModel) {
         popUp([("Generate HTML Playlist", { model.generateHTMLPlaylist() })])
     }

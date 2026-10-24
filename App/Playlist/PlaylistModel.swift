@@ -23,6 +23,8 @@ final class PlaylistModel {
         let duration: String
         let isCurrent: Bool
         let isSelected: Bool
+        /// The play-next place, "[n]", or "" (#0179).
+        let marker: String
         /// 0 for the first visible row.
         let position: Int
     }
@@ -126,6 +128,9 @@ final class PlaylistModel {
         let tracks = tracks
         let range = visibleRange.clamped(to: tracks.indices)
         let current = currentIndex
+        // Markers only on the local queue; with nothing queued, skip the lookups.
+        let queue = player.queue
+        let showsMarkers = remote == nil && isLocal() && !queue.upNext.isEmpty
         return range.map { index in
             let track = tracks[index]
             return Row(
@@ -134,6 +139,7 @@ final class PlaylistModel {
                 name: Self.displayName(track),
                 duration: PlaylistText.time(track.duration > 0 ? track.duration : nil),
                 isCurrent: index == current, isSelected: selection.contains(track),
+                marker: showsMarkers ? PlaylistText.queueMarker(queue.upNextPosition(of: track.id)) : "",
                 position: index - range.lowerBound)
         }
     }
@@ -229,6 +235,39 @@ final class PlaylistModel {
     }
 
     /// Return plays the first selected row.
+    // MARK: Play next (#0179)
+
+    /// Something is queued on the local queue (the menu shows Clear Queue).
+    var hasUpNext: Bool { remote == nil && isLocal() && !player.queue.upNext.isEmpty }
+
+    /// Every selected row is queued (the menu says Dequeue then).
+    var selectionIsQueued: Bool {
+        guard remote == nil, isLocal() else { return false }
+        let indices = selectedIndices
+        let queue = player.queue
+        return !indices.isEmpty && indices.allSatisfy {
+            queue.tracks.indices.contains($0) && queue.upNextPosition(of: queue.tracks[$0].id) != nil
+        }
+    }
+
+    /// Q, the menu's Queue/Dequeue and Jump to File's Queue (#0180): toggles `indices` (row order) in the play-next list.
+    func toggleQueue(_ indices: [Int]) {
+        // #0182: the Music Assistant queue's branch goes here.
+        guard remote == nil, isLocal() else { return }
+        let tracks = player.queue.tracks
+        let ids = indices.filter { tracks.indices.contains($0) }.map { tracks[$0].id }
+        guard !ids.isEmpty else { return }
+        // No onPlayLocal(): queueing doesn't start playback or take This Mac back from Music Assistant.
+        player.toggleUpNext(ids)
+    }
+
+    func toggleQueueForSelection() { toggleQueue(selectedIndices.sorted()) }
+
+    func clearUpNext() {
+        guard remote == nil, isLocal() else { return }
+        player.clearUpNext()
+    }
+
     func playFirstSelected() {
         if let first = selectedIndices.min() { playRow(first) }
     }
