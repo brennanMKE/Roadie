@@ -43,7 +43,7 @@ private func sampleSnapshot() -> QueueSnapshot {
         try QueueStore(fileURL: file).save(sampleSnapshot())
         let data = try Data(contentsOf: file)
         let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(Set(root.keys) == ["version", "items", "currentIndex", "repeat", "shuffle"])
+        #expect(Set(root.keys) == ["version", "items", "currentIndex", "repeat", "shuffle", "upNext"])
         #expect(root["version"] as? Int == 1)
         let items = try #require(root["items"] as? [[String: Any]])
         let allowed: Set<String> = ["id", "title", "artist", "album", "duration", "bitrate", "sampleRate", "channels", "source", "mediaID"]
@@ -168,9 +168,85 @@ private func sampleSnapshot() -> QueueSnapshot {
 
     @Test func queueSnapshotAfterRestoreIsTheIdentity() {
         let output = LocalPlayerOutput(player: Player())
-        let snapshot = sampleSnapshot()
+        var snapshot = sampleSnapshot()
         output.restore(snapshot)
         #expect(output.queueSnapshot() == snapshot)
+        let queued = LocalPlayerOutput(player: Player())
+        snapshot.upNext = [0]
+        queued.restore(snapshot)
+        #expect(queued.queueSnapshot() == snapshot)
+    }
+
+    @Test func upNextRoundTripsAsIndices() throws {
+        let (dir, file) = tempFile()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var snapshot = sampleSnapshot()
+        let extra = (0..<2).map { i in
+            LocalQueueItem(track: Track(title: "X\(i)", artist: "", duration: 1, source: .file(URL(fileURLWithPath: "/m/x\(i).wav"))), id: nil)
+        }
+        snapshot.items += extra
+        snapshot.upNext = [3, 0]
+        let store = QueueStore(fileURL: file)
+        try store.save(snapshot)
+        let loaded = try #require(store.load())
+        #expect(loaded.upNext == [3, 0])
+        #expect(loaded == snapshot)
+    }
+
+    @Test func aFileWithoutUpNextLoadsWithAnEmptyList() throws {
+        let (dir, file) = tempFile()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let body = #"{"version":1,"currentIndex":0,"repeat":"off","shuffle":false,"items":[{"title":"A","artist":"","duration":1,"source":{"kind":"file","path":"/m/a.wav"}}]}"#
+        try body.write(to: file, atomically: true, encoding: .utf8)
+        let loaded = try #require(QueueStore(fileURL: file).load())
+        #expect(loaded.items.count == 1)
+        #expect(loaded.upNext == [])
+    }
+
+    private func writeFiveItems(upNext: String, to file: URL) throws {
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        func item(_ title: String, _ source: String) -> String {
+            #"{"title":"\#(title)","artist":"","duration":1,"source":\#(source)}"#
+        }
+        func fileSource(_ name: String) -> String { #"{"kind":"file","path":"/m/\#(name).wav"}"# }
+        let plex = #"{"kind":"plex","partKey":"/library/parts/1/f.m4a","cacheKey":"k","size":10}"#
+        let items = [
+            item("A", fileSource("a")), item("B", plex), item("C", fileSource("c")),
+            item("D", fileSource("d")), item("E", fileSource("e")),
+        ].joined(separator: ",")
+        let body = #"{"version":1,"currentIndex":0,"repeat":"off","shuffle":false,"upNext":\#(upNext),"items":[\#(items)]}"#
+        try body.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    @Test func upNextFollowsItemsWhenSomeAreDropped() throws {
+        let (dir, file) = tempFile()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeFiveItems(upNext: "[4,1,2]", to: file)
+        let loaded = try #require(QueueStore(fileURL: file).loadQueue())
+        #expect(loaded.snapshot.items.map(\.track.title) == ["A", "C", "D", "E"])
+        #expect(loaded.droppedItems == 1)
+        #expect(loaded.snapshot.upNext == [3, 1])
+    }
+
+    @Test func upNextDropsDuplicatesAndOutOfRangeIndices() throws {
+        let (dir, file) = tempFile()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeFiveItems(upNext: "[3,9,0,3,-1,5,0]", to: file)
+        let loaded = try #require(QueueStore(fileURL: file).load())
+        #expect(loaded.upNext == [2, 0])
+    }
+
+    @Test func restoreRebuildsUpNextByEntry() {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        let items = (0..<3).map { i in
+            LocalQueueItem(track: Track(title: "T\(i)", artist: "", duration: 1, source: .file(URL(fileURLWithPath: "/m/t\(i).wav"))), id: nil)
+        }
+        let snapshot = QueueSnapshot(items: items, currentIndex: 1, repeatMode: .off, isShuffled: false, upNext: [2, 0])
+        #expect(output.restore(snapshot))
+        #expect(player.queue.upNext == [items[2].track.id, items[0].track.id])
+        #expect(output.queueSnapshot().upNext == [2, 0])
     }
 
     @Test func anOutOfRangeCurrentIndexRestoresWithNoCurrentTrack() {

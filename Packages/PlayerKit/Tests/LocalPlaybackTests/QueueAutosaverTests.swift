@@ -27,6 +27,20 @@ import Testing
         #expect(saver.saveCount == 1)
     }
 
+    @Test func queuingARowSchedulesASave() async {
+        let (dir, store) = makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let player = Player()
+        let saver = QueueAutosaver(output: LocalPlayerOutput(player: player), store: store, delay: .milliseconds(50))
+        saver.start()
+        player.enqueue(tracks(3))
+        #expect(await waitFor { store.load()?.items.count == 3 })
+        let before = saver.saveCount
+        player.toggleUpNext([player.queue.tracks[2].id])
+        #expect(await waitFor { store.load()?.upNext == [2] })
+        #expect(saver.saveCount > before)
+    }
+
     @Test func autosaverFollowsLaterChanges() async {
         let (dir, store) = makeStore()
         defer { try? FileManager.default.removeItem(at: dir) }

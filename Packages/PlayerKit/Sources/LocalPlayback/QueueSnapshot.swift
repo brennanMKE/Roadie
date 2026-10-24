@@ -6,17 +6,23 @@ import os
 /// The "This Mac" queue as saved to disk. Value type, `Sendable`, equatable; the file format is the private
 /// mirror below, not `Track`'s layout.
 public struct QueueSnapshot: Equatable, Sendable {
+    /// The optional `upNext` key (#0178) didn't need a bump: old files load with an empty list, older builds ignore it.
     public static let currentVersion = 1
     public var items: [LocalQueueItem]
     public var currentIndex: Int?
     public var repeatMode: RepeatMode
     public var isShuffled: Bool
+    /// Indices into `items`, in play-next order (#0178).
+    public var upNext: [Int]
 
-    public init(items: [LocalQueueItem], currentIndex: Int?, repeatMode: RepeatMode, isShuffled: Bool) {
+    public init(
+        items: [LocalQueueItem], currentIndex: Int?, repeatMode: RepeatMode, isShuffled: Bool, upNext: [Int] = []
+    ) {
         self.items = items
         self.currentIndex = currentIndex
         self.repeatMode = repeatMode
         self.isShuffled = isShuffled
+        self.upNext = upNext
     }
 }
 
@@ -58,6 +64,7 @@ public struct QueueStore: Sendable {
         var items: [LocalQueueItem] = []
         var currentIndex: Int?
         var dropped = 0
+        var newIndex: [Int: Int] = [:]
         for (index, item) in stored.items.enumerated() {
             guard let storedSource = item.source else {
                 dropped += 1
@@ -77,15 +84,21 @@ public struct QueueStore: Sendable {
                 id: id, title: item.title, artist: item.artist, album: item.album, duration: item.duration,
                 bitrate: item.bitrate, sampleRate: item.sampleRate, channels: item.channels, source: source)
             if index == stored.currentIndex { currentIndex = items.count }
+            newIndex[index] = items.count
             items.append(LocalQueueItem(track: track, id: item.mediaID))
         }
         if dropped > 0 {
             Logger(subsystem: "co.sstools.roadie", category: "QueueStore")
                 .info("queue restore dropped \(dropped) item(s) of an unknown kind")
         }
+        // Remapped past dropped items; duplicates (first kept), out-of-range and dropped entries go.
+        var upNext: [Int] = []
+        for index in (stored.upNext ?? []).compactMap({ newIndex[$0] }) where !upNext.contains(index) {
+            upNext.append(index)
+        }
         let snapshot = QueueSnapshot(
             items: items, currentIndex: currentIndex,
-            repeatMode: RepeatMode(storedName: stored.repeatName), isShuffled: stored.shuffle)
+            repeatMode: RepeatMode(storedName: stored.repeatName), isShuffled: stored.shuffle, upNext: upNext)
         return LoadedQueue(snapshot: snapshot, droppedItems: dropped)
     }
 
@@ -96,6 +109,7 @@ public struct QueueStore: Sendable {
             currentIndex: snapshot.currentIndex,
             repeatName: snapshot.repeatMode.storedName,
             shuffle: snapshot.isShuffled,
+            upNext: snapshot.upNext,
             items: snapshot.items.map { item in
                 let track = item.track
                 let source: StoredSource
@@ -123,10 +137,12 @@ private struct Stored: Codable {
     var currentIndex: Int?
     var repeatName: String
     var shuffle: Bool
+    /// Absent in files written before #0178. Always written (even empty) so the key set stays fixed.
+    var upNext: [Int]?
     var items: [StoredItem]
 
     enum CodingKeys: String, CodingKey {
-        case version, currentIndex, shuffle, items
+        case version, currentIndex, shuffle, upNext, items
         case repeatName = "repeat"
     }
 }

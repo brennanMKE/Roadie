@@ -251,15 +251,18 @@ public final class Player: NowPlayingCommandTarget {
     }
 
     /// Launch-time restore: only while stopped with an empty queue, and only with tracks. Appends, sets repeat,
-    /// selects `currentIndex` when in range, then turns shuffle on (so the current track heads the pass).
-    /// Never opens the engine or starts a load; emits `.trackChanged` like any queue change.
+    /// selects `currentIndex` when in range, then turns shuffle on (so the current track heads the pass), then
+    /// queues `upNext` (indices into `tracks`; out-of-range ones are skipped, #0178). Never opens the engine or starts a load; emits `.trackChanged` like any queue change.
     @discardableResult
-    public func restoreQueue(_ tracks: [Track], currentIndex: Int?, repeatMode: RepeatMode, isShuffled: Bool) -> Bool {
+    public func restoreQueue(
+        _ tracks: [Track], currentIndex: Int?, repeatMode: RepeatMode, isShuffled: Bool, upNext: [Int] = []
+    ) -> Bool {
         guard state == .stopped, queue.tracks.isEmpty, !tracks.isEmpty else { return false }
         queue.append(tracks)
         queue.repeatMode = repeatMode
         if let currentIndex, tracks.indices.contains(currentIndex) { queue.select(currentIndex) }
         if isShuffled { queue.setShuffle(true) }
+        queue.appendUpNext(upNext.compactMap { tracks.indices.contains($0) ? tracks[$0].id : nil })
         return true
     }
 

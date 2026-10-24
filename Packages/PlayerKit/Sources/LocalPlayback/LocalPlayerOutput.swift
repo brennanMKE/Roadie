@@ -67,11 +67,14 @@ public final class LocalPlayerOutput {
 
     /// The queue as it is now (tracks, their library ids, index, repeat, shuffle).
     public func queueSnapshot() -> QueueSnapshot {
-        QueueSnapshot(
-            items: player.queue.tracks.map { LocalQueueItem(track: $0, id: ids[$0.id]) },
+        let tracks = player.queue.tracks
+        let position = Dictionary(uniqueKeysWithValues: tracks.enumerated().map { ($1.id, $0) })
+        return QueueSnapshot(
+            items: tracks.map { LocalQueueItem(track: $0, id: ids[$0.id]) },
             currentIndex: player.queue.currentIndex,
             repeatMode: player.repeatMode,
-            isShuffled: player.isShuffled)
+            isShuffled: player.isShuffled,
+            upNext: player.queue.upNext.compactMap { position[$0] })
     }
 
     /// Fills an empty, stopped player from `snapshot` without starting anything; false (no change) otherwise.
@@ -79,7 +82,8 @@ public final class LocalPlayerOutput {
     public func restore(_ snapshot: QueueSnapshot) -> Bool {
         let restored = player.restoreQueue(
             snapshot.items.map(\.track), currentIndex: snapshot.currentIndex,
-            repeatMode: snapshot.repeatMode, isShuffled: snapshot.isShuffled)
+            repeatMode: snapshot.repeatMode, isShuffled: snapshot.isShuffled,
+            upNext: snapshot.upNext)
         if restored { register(snapshot.items) }
         return restored
     }
