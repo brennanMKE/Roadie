@@ -139,14 +139,37 @@ public struct RemoteUpNext: Hashable, Sendable {
         count = 0
     }
 
+    /// One Queue action's moves, sent in order; the first refusal stops the rest (#0182).
+    public struct Batch: Hashable, Sendable {
+        public var edits: [QueueEdit] = []
+        /// For each edit, the snapshot just before it, with no later edits applied: what a refusal of that edit
+        /// restores.
+        public var before: [RemoteQueueSnapshot] = []
+        /// For each edit, how many counted rows it and the rows after it in the batch account for: what a refusal
+        /// of that edit takes back out of `count`.
+        public var counted: [Int] = []
+        /// The snapshot with every edit applied, shown at once.
+        public var after: RemoteQueueSnapshot?
+        /// The current item's id the batch counted after.
+        public var anchorItemID: String?
+    }
+
     /// The moves that put `rows` (snapshot indices, in the order chosen) after the current item and the rows
     /// queued before them. Skips the current row and rows that are already in place (they still count). Empty with
     /// no current item.
     public mutating func plan(queueing rows: [Int], in snapshot: RemoteQueueSnapshot) -> [QueueEdit] {
+        batch(queueing: rows, in: snapshot).edits
+    }
+
+    /// `plan(queueing:in:)` with what's needed to undo a refusal part way through.
+    public mutating func batch(queueing rows: [Int], in snapshot: RemoteQueueSnapshot) -> Batch {
         sync(to: snapshot)
-        guard let currentID = anchorItemID else { return [] }
+        var batch = Batch(after: snapshot, anchorItemID: anchorItemID)
+        guard let currentID = anchorItemID else { return batch }
         var working = snapshot
-        var edits: [QueueEdit] = []
+        // Rows this batch counted before each edit's row; the rest of the batch, from that row on, is the total less this.
+        var countedBefore: [Int] = []
+        let startCount = count
         for row in rows where snapshot.items.indices.contains(row) {
             let itemID = snapshot.items[row].id
             guard itemID != currentID,
@@ -157,11 +180,22 @@ public struct RemoteUpNext: Hashable, Sendable {
             let to = min((from < c ? c : c + 1) + count, working.items.count - 1)
             if to != from {
                 let edit = QueueEdit.move(itemID: itemID, shift: to - from)
-                edits.append(edit)
+                batch.edits.append(edit)
+                batch.before.append(working)
+                countedBefore.append(count - startCount)
                 working = QueueEditPlan.apply(edit, to: working)
             }
             count += 1
         }
-        return edits
+        let added = count - startCount
+        batch.counted = countedBefore.map { added - $0 }
+        batch.after = working
+        return batch
+    }
+
+    /// Takes `n` refused rows back out of the count, only while `anchor` is still the current item, never below 0.
+    public mutating func uncount(_ n: Int, anchor: String?) {
+        guard anchor != nil, anchor == anchorItemID else { return }
+        count = max(0, count - n)
     }
 }

@@ -259,9 +259,9 @@ final class PlaylistModel {
     /// On a Music Assistant queue (#0182) it moves them to play after the current item, one move per row.
     func toggleQueue(_ indices: [Int]) {
         if let remote {
-            let edits = remoteUpNext.plan(queueing: indices, in: remote)
+            let batch = remoteUpNext.batch(queueing: indices, in: remote)
             if remote.currentIndex == nil { onRemoteNotice("Nothing is playing") }
-            for edit in edits { sendRemote(edit) }
+            sendRemote(batch)
             return
         }
         guard remote == nil, isLocal() else { return }
@@ -363,6 +363,31 @@ final class PlaylistModel {
             } catch {
                 if self.remote?.output == before.output { self.remote = before }
                 self.onRemoteNotice((error as? LocalizedError)?.errorDescription ?? "Music Assistant refused")
+            }
+        }
+    }
+
+    /// A Queue action's moves (#0182), shown at once and sent in order after any earlier edit. The first refusal
+    /// stops the batch: the rest aren't sent, the rows go back to just before the refused move, the refused row and
+    /// those after it leave the count, and the notice shows once.
+    private func sendRemote(_ batch: RemoteUpNext.Batch) {
+        guard let start = remote, let after = batch.after, !batch.edits.isEmpty else { return }
+        remote = after
+        let previous = remoteEditChain
+        remoteEditChain = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            for (index, edit) in batch.edits.enumerated() {
+                do {
+                    try await self.onEditRemote(edit)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    if self.remote?.output == start.output { self.remote = batch.before[index] }
+                    self.remoteUpNext.uncount(batch.counted[index], anchor: batch.anchorItemID)
+                    self.onRemoteNotice((error as? LocalizedError)?.errorDescription ?? "Music Assistant refused")
+                    return
+                }
             }
         }
     }

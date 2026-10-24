@@ -66,4 +66,41 @@ struct RemoteUpNextTests {
         var upNext = RemoteUpNext()
         #expect(upNext.plan(queueing: [7], in: Self.snapshot(current: nil)).isEmpty)
     }
+
+    @Test func aRefusedMoveIsNotCounted() {
+        var upNext = RemoteUpNext()
+        let batch = upNext.batch(queueing: [7, 8], in: Self.snapshot())
+        #expect(batch.counted == [2, 1])
+        upNext.uncount(batch.counted[0], anchor: batch.anchorItemID)
+        #expect(upNext.count == 0)
+        #expect(upNext.plan(queueing: [8], in: Self.snapshot()) == [.move(itemID: "qi8", shift: -4)])
+    }
+
+    @Test func aRefusalRestoresTheSnapshotJustBeforeIt() {
+        var upNext = RemoteUpNext()
+        let batch = upNext.batch(queueing: [7, 8], in: Self.snapshot())
+        #expect(batch.before.count == 2)
+        #expect(batch.before[0] == Self.snapshot())
+        #expect(batch.before[1] == Self.applying([batch.edits[0]], to: Self.snapshot()))
+        #expect(batch.after == Self.applying(batch.edits, to: Self.snapshot()))
+    }
+
+    @Test func aRowInPlaceBeforeTheRefusalStillCounts() {
+        var upNext = RemoteUpNext()
+        let batch = upNext.batch(queueing: [4, 7], in: Self.snapshot())
+        #expect(batch.edits == [.move(itemID: "qi7", shift: -2)])
+        #expect(batch.counted == [1])
+        upNext.uncount(batch.counted[0], anchor: batch.anchorItemID)
+        #expect(upNext.count == 1)
+        #expect(upNext.plan(queueing: [7], in: Self.snapshot()) == [.move(itemID: "qi7", shift: -2)])
+    }
+
+    @Test func uncountIgnoresAStaleAnchor() {
+        var upNext = RemoteUpNext()
+        let batch = upNext.batch(queueing: [7], in: Self.snapshot())
+        upNext.sync(to: Self.snapshot(current: 5))
+        _ = upNext.plan(queueing: [8], in: Self.snapshot(current: 5))
+        upNext.uncount(batch.counted[0], anchor: batch.anchorItemID)
+        #expect(upNext.count == 1)
+    }
 }
