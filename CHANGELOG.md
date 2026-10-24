@@ -6,6 +6,10 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-10-24
+
+Winamp-style music selection: Jump to File, a play-next queue with [n] markers, and Play Next from the Library.
+
 ### Added
 
 - Jump to File: press J in any skinned window (or ⌘J) and type a few letters to find a track in the playlist; Return plays it.
