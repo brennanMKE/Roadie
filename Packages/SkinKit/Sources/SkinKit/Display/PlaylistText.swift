@@ -24,6 +24,12 @@ public enum PlaylistText {
         return "\(whole / 60):" + String(format: "%02d", whole % 60)
     }
 
+    /// A queued row's place in the play-next list (#0179): "[n]" for 1-based `position`, "" when not queued.
+    public static func queueMarker(_ position: Int?) -> String {
+        guard let position, position > 0 else { return "" }
+        return "[\(position)]"
+    }
+
     /// "selected/total" padded with spaces to 18 text cells.
     public static func runningTime(selected: TimeInterval, total: TimeInterval) -> String {
         let text = "\(time(selected))/\(time(total))"
