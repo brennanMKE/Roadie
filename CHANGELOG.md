@@ -6,6 +6,10 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+### Fixed
+
+- Double-clicking a track in the playlist editor, or choosing one in Jump to File, plays that track on a Music Assistant queue instead of restarting the first one.
+
 ## [0.0.4] - 2026-10-24
 
 Winamp-style music selection: Jump to File, a play-next queue with [n] markers, and Play Next from the Library.

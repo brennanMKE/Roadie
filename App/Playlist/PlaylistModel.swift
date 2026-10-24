@@ -3,6 +3,7 @@ import Foundation
 import LibraryBrowser
 import MusicBackendKit
 import Observation
+import OSLog
 import SkinKit
 
 /// The playlist window's state: a view of the local player's queue plus selection, scroll position and size. Owned by
@@ -13,6 +14,7 @@ import SkinKit
 @Observable
 final class PlaylistModel {
     static let sizeKey = "playlistWindowSize"
+    private static let log = Logger(subsystem: "co.sstools.roadie", category: "PlaylistPlay")
 
     /// One visible row.
     struct Row: Identifiable, Equatable {
@@ -231,13 +233,16 @@ final class PlaylistModel {
     func invertSelection() { selection.invert(in: tracks) }
 
     func playRow(_ index: Int) {
+        Self.log.debug("play row \(index, privacy: .public) remote=\(self.remote != nil, privacy: .public) count=\(self.count, privacy: .public)")
         if let remote {
-            if remote.items.indices.contains(index) { onPlayRemote(remote.items[index].index) }
+            // The row is the queue position: `remote.items` is the fetched list from position 0 (#0187).
+            if remote.items.indices.contains(index) { onPlayRemote(index) }
             return
         }
         guard isLocal() else { return }
         onPlayLocal()
         player.play(at: index)
+        Self.log.debug("local current=\(self.player.queue.currentIndex ?? -1, privacy: .public)")
     }
 
     // MARK: Play next (#0179)

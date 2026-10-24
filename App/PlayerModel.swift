@@ -749,6 +749,7 @@ final class PlayerModel {
     private func playRemoteQueueRow(_ index: Int) {
         let output = selectedOutput
         let backend = router.backend(for: output)
+        Self.log.debug("play_index \(index, privacy: .public) on remote queue")
         Task { [weak self] in
             do {
                 try await backend.edit(.play(index: index), on: output)
