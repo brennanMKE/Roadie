@@ -234,7 +234,6 @@ final class PlaylistModel {
         player.play(at: index)
     }
 
-    /// Return plays the first selected row.
     // MARK: Play next (#0179)
 
     /// Something is queued on the local queue (the menu shows Clear Queue).
@@ -268,6 +267,7 @@ final class PlaylistModel {
         player.clearUpNext()
     }
 
+    /// Return plays the first selected row.
     func playFirstSelected() {
         if let first = selectedIndices.min() { playRow(first) }
     }
