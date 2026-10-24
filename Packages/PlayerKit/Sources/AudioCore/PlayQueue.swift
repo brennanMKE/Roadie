@@ -18,10 +18,18 @@ public struct PlayQueue: Equatable, Sendable {
 
     /// Permutation of `tracks.indices` while shuffled; empty otherwise.
     private var shuffleOrder: [Int] = []
-    /// Position of `currentIndex` in `shuffleOrder`; -1 when there is no current track.
+    /// Position of `currentIndex` in `shuffleOrder`, except while `isPlayingFromUpNext`: then it is the last pass entry
+    /// played (where the queue began, one step back if that entry was removed, so -1 is possible); -1 when there is no
+    /// current track.
     private var shufflePosition = -1
     /// The order used for the next pass (repeat all), so peeking and advancing agree.
     private var nextPass: [Int] = []
+    /// Winamp's play-next queue (#0177): entry ids (`Track.id`), played in order before list or shuffle order resumes.
+    /// Ids, not indices, so reorders keep it; removals drop their ids. Never holds an id that isn't in `tracks`.
+    public private(set) var upNext: [Track.ID] = []
+    /// The current entry was reached from `upNext`. While shuffled, `shufflePosition` then stays where the queue began
+    /// (so it no longer points at `currentIndex`), which is what lets the pass resume from there.
+    private var isPlayingFromUpNext = false
 
     public init(tracks: [Track] = []) {
         self.tracks = tracks
@@ -45,12 +53,16 @@ public struct PlayQueue: Equatable, Sendable {
     public mutating func remove(at index: Int) {
         guard tracks.indices.contains(index) else { return }
         let wasCurrent = currentIndex == index
+        let removedID = tracks[index].id
         tracks.remove(at: index)
+        upNext.removeAll { $0 == removedID }
 
         if isShuffled {
             if let p = shuffleOrder.firstIndex(of: index) {
                 shuffleOrder.remove(at: p)
-                if p < shufflePosition { shufflePosition -= 1 }
+                // Removing the anchor's own slot also steps back, so `shufflePosition` stays "the last pass entry
+                // played" and the entry that slid into the slot is the one `shufflePosition + 1` resumes at.
+                if p <= shufflePosition { shufflePosition -= 1 }
             }
             shuffleOrder = shuffleOrder.map { $0 > index ? $0 - 1 : $0 }
             nextPass.removeAll { $0 == index }
@@ -60,12 +72,22 @@ public struct PlayQueue: Equatable, Sendable {
         if tracks.isEmpty {
             currentIndex = nil
             shufflePosition = -1
+            isPlayingFromUpNext = false
         } else if wasCurrent {
-            if isShuffled {
-                shufflePosition = min(shufflePosition, shuffleOrder.count - 1)
+            if let id = upNext.first, let head = tracks.firstIndex(where: { $0.id == id }) {
+                // Keep `shufflePosition` (possibly -1): the pass resumes at `shufflePosition + 1` after the queue.
+                upNext.removeFirst()
+                currentIndex = head
+                isPlayingFromUpNext = true
+            } else if isShuffled {
+                // Play the pass entry after the last one played: after the track the queue began from rather than
+                // replaying it, or the entry that slid into the removed current's slot.
+                shufflePosition = min(max(shufflePosition + 1, 0), shuffleOrder.count - 1)
                 currentIndex = shuffleOrder[shufflePosition]
+                isPlayingFromUpNext = false
             } else {
                 currentIndex = min(index, tracks.count - 1)
+                isPlayingFromUpNext = false
             }
         } else if let c = currentIndex, c > index {
             currentIndex = c - 1
@@ -171,11 +193,16 @@ public struct PlayQueue: Equatable, Sendable {
         shuffleOrder = []
         nextPass = []
         shufflePosition = -1
+        upNext = []
+        isPlayingFromUpNext = false
     }
 
     public mutating func select(_ index: Int) {
         guard tracks.indices.contains(index) else { return }
         currentIndex = index
+        isPlayingFromUpNext = false
+        let id = tracks[index].id
+        upNext.removeAll { $0 == id }
         if isShuffled {
             // Picking a row starts a fresh pass headed by that track.
             var rest = Array(tracks.indices).filter { $0 != index }
@@ -185,11 +212,55 @@ public struct PlayQueue: Equatable, Sendable {
         }
     }
 
+    // MARK: Up next
+
+    /// 1-based place of `id` in `upNext`, nil when not queued.
+    public func upNextPosition(of id: Track.ID) -> Int? {
+        upNext.firstIndex(of: id).map { $0 + 1 }
+    }
+
+    /// Appends the ids not already queued, in the given order (Q, the Queue button). Unknown ids are ignored.
+    public mutating func appendUpNext(_ ids: [Track.ID]) {
+        let known = Set(tracks.map(\.id))
+        for id in ids where known.contains(id) && !upNext.contains(id) { upNext.append(id) }
+    }
+
+    /// Puts `ids` at the front of `upNext`, in the given order, taking them out of where they were (Play Next, #0181).
+    public mutating func prependUpNext(_ ids: [Track.ID]) {
+        let known = Set(tracks.map(\.id))
+        var front: [Track.ID] = []
+        for id in ids where known.contains(id) && !front.contains(id) { front.append(id) }
+        guard !front.isEmpty else { return }
+        let moved = Set(front)
+        upNext = front + upNext.filter { !moved.contains($0) }
+    }
+
+    public mutating func removeFromUpNext(_ ids: [Track.ID]) {
+        let gone = Set(ids)
+        upNext.removeAll { gone.contains($0) }
+    }
+
+    /// When every id is queued, dequeues them all; otherwise appends the ones that aren't (#0174 row 3 default).
+    public mutating func toggleUpNext(_ ids: [Track.ID]) {
+        let known = Set(tracks.map(\.id))
+        let relevant = ids.filter { known.contains($0) }
+        guard !relevant.isEmpty else { return }
+        if relevant.allSatisfy({ upNext.contains($0) }) {
+            removeFromUpNext(relevant)
+        } else {
+            appendUpNext(relevant)
+        }
+    }
+
+    public mutating func clearUpNext() {
+        upNext = []
+    }
+
     // MARK: Navigation
 
     @discardableResult
     public mutating func next() -> Track? {
-        guard let target = nextTarget(wrap: repeatMode == .all) else { return nil }
+        guard let target = upNextTarget() ?? nextTarget(wrap: repeatMode == .all) else { return nil }
         commit(target)
         return current
     }
@@ -217,6 +288,7 @@ public struct PlayQueue: Equatable, Sendable {
     public mutating func setShuffle<G: RandomNumberGenerator>(_ on: Bool, using rng: inout G) {
         guard on != isShuffled else { return }
         isShuffled = on
+        isPlayingFromUpNext = false
         guard on else {
             shuffleOrder = []
             nextPass = []
@@ -245,12 +317,19 @@ public struct PlayQueue: Equatable, Sendable {
         var index: Int
         var position: Int
         var rollover = false
+        var fromUpNext = false
+    }
+
+    /// The head of `upNext`, keeping `shufflePosition` (it stays where the queue began).
+    private func upNextTarget() -> Target? {
+        guard let id = upNext.first, let index = tracks.firstIndex(where: { $0.id == id }) else { return nil }
+        return Target(index: index, position: shufflePosition, fromUpNext: true)
     }
 
     private func endTarget() -> Target? {
         guard let current = currentIndex else { return nil }
         if repeatMode == .one { return Target(index: current, position: shufflePosition) }
-        return nextTarget(wrap: repeatMode == .all)
+        return upNextTarget() ?? nextTarget(wrap: repeatMode == .all)
     }
 
     private func nextTarget(wrap: Bool) -> Target? {
@@ -269,6 +348,10 @@ public struct PlayQueue: Equatable, Sendable {
     private func previousTarget(wrap: Bool) -> Target? {
         guard let c = currentIndex else { return nil }
         if isShuffled {
+            if isPlayingFromUpNext && shuffleOrder.indices.contains(shufflePosition) {
+                // Back to the track the queue began from.
+                return Target(index: shuffleOrder[shufflePosition], position: shufflePosition)
+            }
             if shufflePosition > 0 {
                 return Target(index: shuffleOrder[shufflePosition - 1], position: shufflePosition - 1)
             }
@@ -280,6 +363,13 @@ public struct PlayQueue: Equatable, Sendable {
     }
 
     private mutating func commit(_ target: Target) {
+        if target.fromUpNext {
+            upNext.removeFirst()
+            isPlayingFromUpNext = true
+            currentIndex = target.index
+            return
+        }
+        isPlayingFromUpNext = false
         if target.rollover {
             shuffleOrder = nextPass
             nextPass = Array(tracks.indices).shuffled()

@@ -471,6 +471,16 @@ struct PlayerRestoreQueueTests {
         #expect(p.currentTime == 0)
     }
 
+    @Test func upNextChangesWhileStoppedDoNotStartPlayback() {
+        let p = Player()
+        #expect(p.restoreQueue(makeTracks(3), currentIndex: 0, repeatMode: .off, isShuffled: false))
+        p.toggleUpNext([p.queue.tracks[2].id])
+        #expect(p.queue.upNext == [p.queue.tracks[2].id])
+        #expect(p.queue.indexAfterCurrentEnds() == 2)
+        #expect(p.state == .stopped)
+        #expect(p._graph == nil)
+    }
+
     @Test func sortQueueKeepsStateAndCurrentTrack() {
         let p = Player()
         #expect(p.restoreQueue(Array(makeTracks(4).reversed()), currentIndex: 1, repeatMode: .off, isShuffled: false))
