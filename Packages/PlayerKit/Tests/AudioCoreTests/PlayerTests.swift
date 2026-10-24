@@ -402,6 +402,19 @@ import Testing
         await gate.releaseAll()
     }
 
+    @Test func insertTracksKeepsTheCurrentTrackIdentity() async {
+        let (p, gate, tracks) = makePlayer(4)
+        p.play(at: 2)
+        #expect(await gate.waitForCalls(1))
+        let new = makeTracks(2, from: 10)
+        p.insert(new, at: 1)
+        #expect(p.queue.current?.id == tracks[2].id)
+        #expect(p.queue.currentIndex == 4)
+        #expect(p.queue.tracks.map(\.id) == [tracks[0].id, new[0].id, new[1].id, tracks[1].id, tracks[2].id, tracks[3].id])
+        p.stop()
+        await gate.releaseAll()
+    }
+
     @Test func removeLastCurrentWhileLoadingStops() async {
         let (p, gate, _) = makePlayer(1)
         p.play(at: 0)

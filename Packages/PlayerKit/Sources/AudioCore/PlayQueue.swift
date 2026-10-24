@@ -41,9 +41,35 @@ public struct PlayQueue: Equatable, Sendable {
         guard !new.isEmpty else { return }
         let start = tracks.count
         tracks.append(contentsOf: new)
+        addToShuffle(start..<tracks.count)
+    }
+
+    /// Inserts `new` before row `index` (clamped to 0...count; `count` appends). The current track keeps its identity,
+    /// `upNext` keeps its ids, and while shuffled the new rows join the rest of this pass and the next pass at random
+    /// places, as `append` does (#0183).
+    public mutating func insert(_ new: [Track], at index: Int) {
+        guard !new.isEmpty else { return }
+        let index = min(max(index, 0), tracks.count)
+        guard index < tracks.count else {
+            append(new)
+            return
+        }
+        let n = new.count
+        tracks.insert(contentsOf: new, at: index)
+        if let c = currentIndex, c >= index { currentIndex = c + n }
+        guard isShuffled else { return }
+        shuffleOrder = shuffleOrder.map { $0 >= index ? $0 + n : $0 }
+        nextPass = nextPass.map { $0 >= index ? $0 + n : $0 }
+        // `shufflePosition` stays: the new entries go in after it.
+        addToShuffle(index..<index + n)
+    }
+
+    /// While shuffled, puts each of `indices` (rows not yet in the bookkeeping) somewhere in the rest of this pass and
+    /// anywhere in the next pass.
+    private mutating func addToShuffle(_ indices: Range<Int>) {
         guard isShuffled else { return }
         var rng = SystemRandomNumberGenerator()
-        for index in start..<tracks.count {
+        for index in indices {
             let lower = min(shufflePosition + 1, shuffleOrder.count)
             shuffleOrder.insert(index, at: Int.random(in: lower...shuffleOrder.count, using: &rng))
             nextPass.insert(index, at: Int.random(in: 0...nextPass.count, using: &rng))

@@ -178,6 +178,12 @@ public final class Player: NowPlayingCommandTarget {
         reconcileSchedule()
     }
 
+    /// Inserts before row `index` (see `PlayQueue.insert`); the pre-scheduled next file may now be the wrong one.
+    public func insert(_ tracks: [Track], at index: Int) {
+        queue.insert(tracks, at: index)
+        reconcileSchedule()
+    }
+
     public func removeTrack(at index: Int) {
         let removingCurrent = queue.currentIndex == index
         if removingCurrent { currentTime = 0 }   // before the queue change publishes the new track

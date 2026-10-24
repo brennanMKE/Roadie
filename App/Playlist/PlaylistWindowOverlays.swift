@@ -43,6 +43,7 @@ final class PlaylistListInputView: NSView {
     init(model: PlayerModel) {
         self.model = model
         super.init(frame: .zero)
+        registerForDraggedTypes([.fileURL])
     }
 
     required init?(coder: NSCoder) { nil }
@@ -55,7 +56,11 @@ final class PlaylistListInputView: NSView {
     private var scale: CGFloat { MainActor.assumeIsolated { model.scale } }
 
     private func skinPoint(_ event: NSEvent) -> CGPoint {
-        let point = convert(event.locationInWindow, from: nil)
+        skinPoint(windowPoint: event.locationInWindow)
+    }
+
+    private func skinPoint(windowPoint: NSPoint) -> CGPoint {
+        let point = convert(windowPoint, from: nil)
         return CGPoint(x: point.x / scale, y: point.y / scale)
     }
 
@@ -167,6 +172,32 @@ final class PlaylistListInputView: NSView {
             case 36, 76: model.playlist.playFirstSelected()      // return, enter
             default: super.keyDown(with: event)
             }
+        }
+    }
+
+    // MARK: File drops (#0183)
+
+    private static let fileURLOptions: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+
+    private func dragOperation(_ sender: NSDraggingInfo) -> NSDragOperation {
+        sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: Self.fileURLOptions) ? .copy : []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { dragOperation(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { dragOperation(sender) }
+
+    /// Files and folders go in before the row under the pointer, or at the end below the last row (Winamp). A remote
+    /// queue's row means nothing in the local queue, so there the drop appends as before.
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: Self.fileURLOptions)
+            as? [URL]) ?? []
+        guard !urls.isEmpty else { return false }
+        return MainActor.assumeIsolated {
+            let playlist = model.playlist
+            let row: Int? = playlist.remote != nil
+                ? nil
+                : (row(atY: skinPoint(windowPoint: sender.draggingLocation).y) ?? playlist.count)
+            return model.open(urls, replace: false, at: row)
         }
     }
 
