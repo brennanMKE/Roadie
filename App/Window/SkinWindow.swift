@@ -32,7 +32,7 @@ final class SkinWindow: NSWindow {
         if event.type == .leftMouseDown { onLeftMouseDown?() }
     }
 
-    /// A bare Winamp key (Z X C V B, arrows, S R L) pressed while this window is key.
+    /// A bare Winamp key (Z X C V B, arrows, S R L J) pressed while this window is key.
     var onHotkey: ((WinampHotkey) -> Void)?
 
     /// Reached only at the end of a skinned window's responder chain, so text fields in other windows never lose keys.

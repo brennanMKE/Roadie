@@ -4,10 +4,10 @@ import Foundation
 public enum WinampHotkey: Sendable, CaseIterable {
     case previous, play, pause, stop, next
     case seekBack, seekForward, volumeUp, volumeDown
-    case toggleShuffle, toggleRepeat, openFile
+    case toggleShuffle, toggleRepeat, openFile, jumpToFile
 }
 
-/// Winamp's bare-key bindings (Z X C V B, arrows, S R L) and the seek and volume steps they apply.
+/// Winamp's bare-key bindings (Z X C V B, arrows, S R L J) and the seek and volume steps they apply.
 public enum WinampHotkeys {
     public static let seekStep: TimeInterval = 5
     /// Webamp's `adjustVolume(±1)` on its 0–100 scale.
@@ -43,6 +43,7 @@ public enum WinampHotkeys {
         case "s": return .toggleShuffle
         case "r": return .toggleRepeat
         case "l": return .openFile
+        case "j": return .jumpToFile
         default: return nil
         }
     }

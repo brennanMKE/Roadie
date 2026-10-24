@@ -4,7 +4,7 @@ public enum MainMenuCommand: Hashable, Sendable {
     case about, checkForUpdates, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow, toggleLibraryWindow
     case openSkin, nextSkin, previousSkin, randomSkin
     case timeElapsed, timeRemaining, toggleAlwaysOnTop, toggleDoubleSize, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle
-    case previous, play, pause, stop, next
+    case previous, play, pause, stop, next, jumpToFile
     case quit
 }
 
@@ -166,6 +166,8 @@ public enum MainMenu {
             .item(MainMenuItem(.pause, "Pause", shortcut: MainMenuShortcut("c", [.command, .control]))),
             .item(MainMenuItem(.stop, "Stop", shortcut: MainMenuShortcut("v", [.command, .control]))),
             .item(MainMenuItem(.next, "Next", shortcut: MainMenuShortcut("b", [.command, .control]))),
+            .separator,
+            .item(MainMenuItem(.jumpToFile, "Jump to File\u{2026}", shortcut: MainMenuShortcut("j"))),
         ]
     }
 }

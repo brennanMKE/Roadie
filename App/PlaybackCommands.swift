@@ -30,6 +30,9 @@ private struct PlaybackMenuItems: View {
         Button("Next") { model.perform(WinampHotkey.next) }
             .keyboardShortcut("b", modifiers: [.command, .control])
         Divider()
+        Button("Jump to File\u{2026}") { model.showJumpToFile() }
+            .keyboardShortcut("j")
+        Divider()
         Button("Seek Back 5 Seconds") { model.perform(WinampHotkey.seekBack) }
             .keyboardShortcut(.leftArrow, modifiers: [.command, .control])
             .disabled(model.positionFraction == nil)

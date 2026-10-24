@@ -147,6 +147,8 @@ final class PlayerModel {
     private var nowPlayingTask: Task<Void, Never>?
     /// Follows the remote queue the playlist window shows (#0144).
     private var queueTask: Task<Void, Never>?
+    /// Where the playlist's rows come from; Jump to File tells "can't be listed" from an empty queue by it (#0176).
+    private(set) var queueRowsSource: QueueRowsSource = .local
     var playbackState: NowPlaying.State { nowPlaying.state }
     var isLoading: Bool { nowPlaying.state == .loading }
     /// Skin points per skin pixel: `baseScale`, or twice that in double size.
@@ -725,7 +727,9 @@ final class PlayerModel {
         queueTask = nil
         let output = selectedOutput
         let backend = router.backend(for: output)
-        switch QueueRowsSelection.choose(output: output, feed: thisMacFeed, remoteCapabilities: backend.capabilities) {
+        let source = QueueRowsSelection.choose(output: output, feed: thisMacFeed, remoteCapabilities: backend.capabilities)
+        queueRowsSource = source
+        switch source {
         case .local:
             playlist.remote = nil
         case .none:
@@ -934,8 +938,12 @@ final class PlayerModel {
         case .toggleShuffle: toggleShuffle()
         case .toggleRepeat: toggleRepeat()
         case .openFile: openFiles(replace: true)
+        case .jumpToFile: showJumpToFile()
         }
     }
+
+    /// Opens or brings forward the Jump to File panel (J, ⌘J, #0176).
+    func showJumpToFile() { JumpToFilePanel.shared.show(model: self) }
 
     /// Collapses the main window to its shade strip or restores it (the shade button, a title-bar double-click and
     /// Window > Windowshade all come here). `SkinWindowController` follows the flag.

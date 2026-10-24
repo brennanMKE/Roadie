@@ -40,6 +40,7 @@ extension PlayerModel {
         case .pause: pause()
         case .stop: stop()
         case .next: next()
+        case .jumpToFile: showJumpToFile()
         case .quit: NSApp.terminate(nil)
         }
     }

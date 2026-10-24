@@ -202,6 +202,16 @@ final class PlaylistModel {
     }
 
     func click(_ index: Int) { selection.click(index, in: tracks) }
+
+    /// Selects row `index` alone and scrolls it into view (Jump to File, #0176).
+    func reveal(_ index: Int) {
+        let tracks = tracks
+        guard tracks.indices.contains(index) else { return }
+        selection.click(index, in: tracks)
+        scrollPosition = PlaylistScroll.position(revealing: index, position: scrollPosition, count: tracks.count,
+                                                 visibleRows: layout.visibleRows)
+    }
+
     func commandClick(_ index: Int) { selection.commandClick(index, in: tracks) }
     func shiftClick(_ index: Int) { selection.shiftClick(index, in: tracks) }
     func selectAll() { selection.selectAll(in: tracks) }

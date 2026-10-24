@@ -8,6 +8,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ### Added
 
+- Jump to File: press J in any skinned window (or ⌘J) and type a few letters to find a track in the playlist; Return plays it.
 - Media Library in the skinned windows' menu (⌘L); the Library opens with the cursor in its search field.
 
 ## [0.0.3] - 2026-10-23

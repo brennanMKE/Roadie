@@ -17,6 +17,8 @@ struct WinampHotkeysTests {
         #expect(key("s") == .toggleShuffle)
         #expect(key("r") == .toggleRepeat)
         #expect(key("l") == .openFile)
+        #expect(key("j") == .jumpToFile)
+        #expect(key("J") == .jumpToFile)
     }
 
     @Test func capsLockLettersStillMap() {
@@ -37,10 +39,13 @@ struct WinampHotkeysTests {
         #expect(key("b", shift: true) == nil)
         #expect(key("\u{F702}", command: true) == nil)
         #expect(key("v", command: true, control: true) == nil)
+        #expect(key("j", command: true) == nil)
+        #expect(key("j", shift: true) == nil)
     }
 
     @Test func repeatsOnlyForArrows() {
         #expect(key("b", isRepeat: true) == nil)
+        #expect(key("j", isRepeat: true) == nil)
         #expect(key("\u{F703}", isRepeat: true) == .seekForward)
     }
 

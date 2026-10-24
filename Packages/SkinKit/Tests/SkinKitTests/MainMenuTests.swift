@@ -80,7 +80,7 @@ struct MainMenuTests {
     @Test func everyCommandAppearsOnce() {
         let commands = items(MainMenu.entries(MainMenuState())).map(\.command)
         #expect(Set(commands).count == commands.count)
-        #expect(commands.count == 26)
+        #expect(commands.count == 27)
     }
 
     @Test func unsupportedEntriesAreAbsent() {
@@ -108,9 +108,21 @@ struct MainMenuTests {
         #expect(item(.pause)?.shortcut == MainMenuShortcut("c", cc))
         #expect(item(.stop)?.shortcut == MainMenuShortcut("v", cc))
         #expect(item(.next)?.shortcut == MainMenuShortcut("b", cc))
+        #expect(item(.jumpToFile)?.shortcut == MainMenuShortcut("j"))
         #expect(item(.nextSkin)?.shortcut == MainMenuShortcut("]"))
         #expect(item(.previousSkin)?.shortcut == MainMenuShortcut("["))
         #expect(item(.randomSkin)?.shortcut == MainMenuShortcut("r", [.command, .shift]))
+    }
+
+    @Test func jumpToFileClosesThePlaybackSubmenu() {
+        let labels = MainMenu.playbackEntries(MainMenuState()).map { entry -> String in
+            switch entry {
+            case .item(let item): item.title
+            case .separator: "-"
+            default: "?"
+            }
+        }
+        #expect(labels == ["Previous", "Play", "Pause", "Stop", "Next", "-", "Jump to File\u{2026}"])
     }
 
     @Test func shortcutsAreUnique() {
