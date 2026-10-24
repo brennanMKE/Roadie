@@ -171,6 +171,16 @@ Follows `docs/plex-music-library.md`:
 - Rename the app to Roadie, sign and notarize it, ship a DMG from https://roadie.sstools.co/ with
   Sparkle updates. Work items W1 to W14 are in [design/release.md](design/release.md).
 
+**M15: Music selection** ([#0173](../issues/0173.md))
+- Pick music the way Winamp did, without a file dialog. The spec is
+  [music-selection-features.md](music-selection-features.md).
+  1. Jump to File: bare `J` or ⌘J opens a search over the playlist's rows; Return plays.
+  2. A play-next queue with `[n]` markers (`Q`, the playlist's right-click menu, Jump to File's Queue button),
+     plus Play Next in the Library, on This Mac and on Music Assistant.
+  3. Library ↔ playlist editor: drag Library rows and Finder files in at the drop row, a Media Library item in the
+     skinned menu, and the Library opens on its search field.
+- Children #0174 to #0185. #0174 checks the Winamp 5.x behaviours the spec leaves open; the user does it.
+
 ## Verification
 - `swift test` for SkinKit and PlayerKit: the folder index, queue save and restore, Music Assistant decoding against
   recorded fixtures, and the connection-test error paths.
