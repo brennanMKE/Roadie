@@ -29,4 +29,18 @@ public enum QueueSaveTarget: Hashable, Sendable {
     ) -> QueueSaveTarget {
         choose(output: output, feed: feed, capabilities: capabilities)
     }
+
+    /// What LIST › Load offers (#0190). A Music Assistant queue: its playlists. The local queue: a playlist file,
+    /// plus the Library's playlists when the Library's source has them (loading one moves This Mac onto that source).
+    public enum LoadChoice: Hashable, Sendable { case libraryPlaylist, file }
+
+    public static func loadChoices(
+        output: OutputDevice.ID, feed: ThisMacFeed, capabilities: BackendCapabilities, libraryHasPlaylists: Bool
+    ) -> [LoadChoice] {
+        switch load(output: output, feed: feed, capabilities: capabilities) {
+        case .remote: [.libraryPlaylist]
+        case .file: libraryHasPlaylists ? [.libraryPlaylist, .file] : [.file]
+        case .refused: []
+        }
+    }
 }

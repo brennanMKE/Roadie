@@ -52,6 +52,8 @@ private struct PlaybackMenuItems: View {
         Divider()
         Button("Save Queue as Playlist\u{2026}") { model.saveQueue() }
             .disabled(!model.canSaveQueue)
+        Button("Load Playlist from Library\u{2026}") { model.pickLibraryPlaylist() }
+            .disabled(!model.canLoadLibraryPlaylist)
         Button("Favorite Current Track") { model.favoriteCurrentTrack() }
             .keyboardShortcut("l", modifiers: [.command, .control])
             .disabled(!model.canFavoriteCurrentTrack)
