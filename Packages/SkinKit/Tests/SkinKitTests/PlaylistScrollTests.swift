@@ -40,4 +40,30 @@ import Testing
         #expect(abs(v - 0.33) < 1e-9)   // round(2.4) / 6 = 0.333, rounded to a whole percent
         #expect(PlaylistScroll.handleValue(position: 100, count: 10, visibleRows: 4) == 1)
     }
+
+    @Test func revealingAVisibleRowKeepsThePosition() {
+        #expect(PlaylistScroll.position(revealing: 5, position: 50, count: 10, visibleRows: 4) == 50)
+    }
+
+    @Test func revealingARowAboveMakesItTheFirstVisibleRow() {
+        let p = PlaylistScroll.position(revealing: 1, position: 100, count: 10, visibleRows: 4)
+        #expect(PlaylistScroll.visibleRange(position: p, count: 10, visibleRows: 4) == 1..<5)
+    }
+
+    @Test func revealingARowBelowMakesItTheLastVisibleRow() {
+        let p = PlaylistScroll.position(revealing: 8, position: 0, count: 10, visibleRows: 4)
+        let range = PlaylistScroll.visibleRange(position: p, count: 10, visibleRows: 4)
+        #expect(range.contains(8))
+        #expect(range.upperBound == 9)
+    }
+
+    @Test func revealingWithNoOverflowIsZero() {
+        #expect(PlaylistScroll.position(revealing: 2, position: 40, count: 3, visibleRows: 4) == 0)
+        #expect(PlaylistScroll.position(revealing: 0, position: 40, count: 0, visibleRows: 4) == 0)
+    }
+
+    @Test func revealingClampsAnOutOfRangeIndex() {
+        #expect(PlaylistScroll.position(revealing: 99, position: 0, count: 10, visibleRows: 4) == 100)
+        #expect(PlaylistScroll.position(revealing: -5, position: 100, count: 10, visibleRows: 4) == 0)
+    }
 }
