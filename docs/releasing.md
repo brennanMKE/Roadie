@@ -33,6 +33,8 @@ fails. It never prints a secret: only identity and profile names and whether the
 ## Steps
 
 1. **Pick the version** (SemVer).
+   - Bump only the patch number: 0.0.9 is followed by 0.0.10, not 0.1.0. Change the major or minor number only when
+     the user explicitly asks. The preflight and Sparkle compare each part as a number, so 0.0.10 > 0.0.9.
    - Set `MARKETING_VERSION` in `project.yml`, the only place it lives.
    - Move `CHANGELOG.md`'s `[Unreleased]` entries under `## [X.Y.Z] - YYYY-MM-DD`. User-visible changes only; link
      `#NNNN` issues.
