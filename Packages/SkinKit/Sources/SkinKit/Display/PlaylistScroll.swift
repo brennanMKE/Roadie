@@ -44,4 +44,18 @@ public enum PlaylistScroll {
         let start = offset(position: position, count: count, visibleRows: visibleRows)
         return start..<min(start + visibleRows, count)
     }
+
+    /// The position (0...100) that brings row `index` into view with the least scrolling: unchanged when it is already
+    /// visible, else it becomes the first visible row (when above) or the last (when below). 0 when nothing overflows
+    /// (#0175).
+    public static func position(revealing index: Int, position: Double, count: Int, visibleRows: Int) -> Double {
+        guard count > 0 else { return 0 }
+        let overflow = overflow(count: count, visibleRows: visibleRows)
+        guard overflow > 0 else { return 0 }
+        let index = min(max(index, 0), count - 1)
+        let start = offset(position: position, count: count, visibleRows: visibleRows)
+        if (start..<start + visibleRows).contains(index) { return position }
+        let target = min(max(index < start ? index : index - visibleRows + 1, 0), overflow)
+        return Double(target) / Double(overflow) * 100
+    }
 }
