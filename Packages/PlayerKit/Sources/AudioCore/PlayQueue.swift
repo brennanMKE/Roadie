@@ -18,8 +18,9 @@ public struct PlayQueue: Equatable, Sendable {
 
     /// Permutation of `tracks.indices` while shuffled; empty otherwise.
     private var shuffleOrder: [Int] = []
-    /// Position of `currentIndex` in `shuffleOrder`, except while `isPlayingFromUpNext` (then it stays where the queue
-    /// began); -1 when there is no current track.
+    /// Position of `currentIndex` in `shuffleOrder`, except while `isPlayingFromUpNext`: then it is the last pass entry
+    /// played (where the queue began, one step back if that entry was removed, so -1 is possible); -1 when there is no
+    /// current track.
     private var shufflePosition = -1
     /// The order used for the next pass (repeat all), so peeking and advancing agree.
     private var nextPass: [Int] = []
@@ -56,12 +57,12 @@ public struct PlayQueue: Equatable, Sendable {
         tracks.remove(at: index)
         upNext.removeAll { $0 == removedID }
 
-        var removedAnchor = false
         if isShuffled {
             if let p = shuffleOrder.firstIndex(of: index) {
-                removedAnchor = p == shufflePosition
                 shuffleOrder.remove(at: p)
-                if p < shufflePosition { shufflePosition -= 1 }
+                // Removing the anchor's own slot also steps back, so `shufflePosition` stays "the last pass entry
+                // played" and the entry that slid into the slot is the one `shufflePosition + 1` resumes at.
+                if p <= shufflePosition { shufflePosition -= 1 }
             }
             shuffleOrder = shuffleOrder.map { $0 > index ? $0 - 1 : $0 }
             nextPass.removeAll { $0 == index }
@@ -74,19 +75,14 @@ public struct PlayQueue: Equatable, Sendable {
             isPlayingFromUpNext = false
         } else if wasCurrent {
             if let id = upNext.first, let head = tracks.firstIndex(where: { $0.id == id }) {
-                if isShuffled { shufflePosition = min(shufflePosition, shuffleOrder.count - 1) }
+                // Keep `shufflePosition` (possibly -1): the pass resumes at `shufflePosition + 1` after the queue.
                 upNext.removeFirst()
                 currentIndex = head
                 isPlayingFromUpNext = true
-            } else if isPlayingFromUpNext && isShuffled {
-                // Resume after the track the queue began from rather than replaying it. If the removed entry was that
-                // anchor itself, the entry after it has already slid into its position.
-                let p = removedAnchor ? max(shufflePosition, 0) : shufflePosition + 1
-                shufflePosition = min(p, shuffleOrder.count - 1)
-                currentIndex = shuffleOrder[shufflePosition]
-                isPlayingFromUpNext = false
             } else if isShuffled {
-                shufflePosition = min(shufflePosition, shuffleOrder.count - 1)
+                // Play the pass entry after the last one played: after the track the queue began from rather than
+                // replaying it, or the entry that slid into the removed current's slot.
+                shufflePosition = min(max(shufflePosition + 1, 0), shuffleOrder.count - 1)
                 currentIndex = shuffleOrder[shufflePosition]
                 isPlayingFromUpNext = false
             } else {

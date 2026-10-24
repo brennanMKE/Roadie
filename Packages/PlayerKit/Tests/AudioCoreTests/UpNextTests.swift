@@ -198,6 +198,45 @@ import Testing
         #expect(q.current?.id == after)
     }
 
+    @Test func removingTheCurrentEntryWhileShuffledPlaysUpNextThenTheNextInPass() throws {
+        var q = queue(8)
+        var rng = SplitMix64(seed: 13)
+        q.select(0)
+        q.setShuffle(true, using: &rng)
+        q.next()
+        let anchor = try #require(q.current?.id)
+        var peek = q
+        let after = try #require(peek.next()?.id)
+        var back = q
+        let before = try #require(back.previous()?.id)
+        let queued = try #require(q.tracks.first { $0.id != anchor && $0.id != after && $0.id != before }?.id)
+        q.appendUpNext([queued])
+        q.remove(at: try #require(q.currentIndex))
+        #expect(q.current?.id == queued)
+        var probe = q
+        #expect(probe.previous()?.id == before)
+        #expect(q.indexAfterCurrentEnds().map { q.tracks[$0].id } == after)
+        #expect(q.advanceAfterTrackEnd()?.id == after)
+    }
+
+    @Test func removingTheAnchorWhileAQueuedEntryPlaysDoesNotSkip() throws {
+        var q = queue(8)
+        var rng = SplitMix64(seed: 13)
+        q.select(0)
+        q.setShuffle(true, using: &rng)
+        q.next()
+        let anchor = try #require(q.current?.id)
+        var peek = q
+        let after = try #require(peek.next()?.id)
+        let queued = try #require(q.tracks.first { $0.id != anchor && $0.id != after }?.id)
+        q.appendUpNext([queued])
+        q.next()
+        #expect(q.current?.id == queued)
+        q.remove(at: try #require(q.tracks.firstIndex { $0.id == anchor }))
+        #expect(q.current?.id == queued)
+        #expect(q.advanceAfterTrackEnd()?.id == after)
+    }
+
     @Test func reorderKeepsUpNextByIdentity() {
         var q = queue(6)
         let first = q.tracks[4].id
