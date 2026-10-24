@@ -232,6 +232,24 @@ public final class Player: NowPlayingCommandTarget {
         reconcileSchedule()
     }
 
+    // MARK: Up next (#0177)
+
+    public func appendUpNext(_ ids: [Track.ID]) { changeUpNext { $0.appendUpNext(ids) } }
+    public func prependUpNext(_ ids: [Track.ID]) { changeUpNext { $0.prependUpNext(ids) } }
+    public func removeFromUpNext(_ ids: [Track.ID]) { changeUpNext { $0.removeFromUpNext(ids) } }
+    public func toggleUpNext(_ ids: [Track.ID]) { changeUpNext { $0.toggleUpNext(ids) } }
+    public func clearUpNext() { changeUpNext { $0.clearUpNext() } }
+
+    /// Applies an up-next change and, when the list actually changed, reconciles the schedule so a pre-scheduled
+    /// gapless file that is no longer next gets replaced (the same path as `moveTracks`).
+    private func changeUpNext(_ change: (inout PlayQueue) -> Void) {
+        var copy = queue
+        change(&copy)
+        guard copy.upNext != queue.upNext else { return }
+        queue = copy
+        reconcileSchedule()
+    }
+
     /// Launch-time restore: only while stopped with an empty queue, and only with tracks. Appends, sets repeat,
     /// selects `currentIndex` when in range, then turns shuffle on (so the current track heads the pass).
     /// Never opens the engine or starts a load; emits `.trackChanged` like any queue change.

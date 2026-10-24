@@ -65,4 +65,30 @@ import Testing
         // Completion callbacks are not delivered in offline mode; promotion is covered by the pure tests.
         player.stop()
     }
+
+    @Test func queuingATrackReschedulesTheGaplessNext() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "upnext-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let urls = (0..<3).map { dir.appending(path: "\($0).wav") }
+        for (i, url) in urls.enumerated() { try Self.writeSine(to: url, hz: 441 * Double(i + 1)) }
+
+        let player = Player()
+        let tracks = try urls.map { try Track.file(at: $0) }
+        player.enqueue(tracks)
+        let engine = player.ensureGraph().engine
+        let renderFormat = AVAudioFormat(standardFormatWithSampleRate: Self.rate, channels: 2)!
+        try engine.enableManualRenderingMode(.offline, format: renderFormat, maximumFrameCount: 512)
+        player.play()
+
+        #expect(await waitUntil { player.hasPreScheduledNext })
+        #expect(player.scheduler.scheduledNextTrackID == tracks[1].id)
+
+        player.toggleUpNext([tracks[2].id])
+        #expect(await waitUntil { player.scheduler.scheduledNextTrackID == tracks[2].id })
+        #expect(player.queue.indexAfterCurrentEnds() == 2)
+
+        // Completion callbacks are not delivered offline; promotion is covered by the pure tests.
+        player.stop()
+    }
 }
