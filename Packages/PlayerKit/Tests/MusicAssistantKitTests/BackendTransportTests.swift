@@ -88,6 +88,15 @@ struct BackendTransportTests {
         await rig.backend.disconnect()
     }
 
+    @Test func playNextSendsOptionNext() async throws {
+        let rig = try await connectedBackend(script: controlScript())
+        try await rig.backend.play([MediaID(.album, "library://album/27")], on: player, mode: .next)
+        let request = try #require(sent(rig, "player_queues/play_media").first)
+        #expect(request.args["option"] == "next")
+        #expect(request.args["start_item"] == nil)
+        await rig.backend.disconnect()
+    }
+
     @Test func playOnThisMacWithoutSendspinExplains() async throws {
         let rig = try await connectedBackend(script: controlScript())
         await #expect(throws: MusicBackendError.backend(MusicAssistantBackend.thisMacNotRegisteredText)) {

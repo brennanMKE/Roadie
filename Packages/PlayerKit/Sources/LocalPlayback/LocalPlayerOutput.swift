@@ -44,7 +44,8 @@ public final class LocalPlayerOutput {
     }
 
     /// `.replace`: clear the queue, enqueue, play from `startIndex` (clamped). `.append`: enqueue, and start
-    /// playing the first new track only if the player was stopped with an empty queue.
+    /// playing the first new track only if the player was stopped with an empty queue. `.next`: as `.append`, and when
+    /// something is already queued, put the new entries at the front of up-next in order (#0181).
     public func play(_ items: [LocalQueueItem], mode: PlayMode) {
         let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty
         switch mode {
@@ -61,6 +62,12 @@ public final class LocalPlayerOutput {
             register(items)
             player.enqueue(items.map(\.track))
             if wasIdle { player.play(at: first) }
+        case .next:
+            guard !items.isEmpty else { return }
+            let first = player.queue.tracks.count
+            register(items)
+            player.enqueue(items.map(\.track))
+            if wasIdle { player.play(at: first) } else { player.prependUpNext(items.map(\.track.id)) }
         }
         prune()
     }
