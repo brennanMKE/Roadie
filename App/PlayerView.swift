@@ -36,6 +36,7 @@ struct PlayerView: View {
         .dropDestination(for: URL.self) { urls, _ in
             model.open(urls, replace: false)
         }
+        .onAppear { model.openWindowAction = openWindow }
     }
 }
 

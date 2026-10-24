@@ -26,7 +26,7 @@ struct MainMenuTests {
         }
         #expect(
             labels == [
-                "About Roadie", "Check for Updates…", "-", "Play File…", "Add to Playlist…", "-", "Equalizer", "Playlist Editor", "-",
+                "About Roadie", "Check for Updates…", "-", "Play File…", "Add to Playlist…", "-", "Equalizer", "Playlist Editor", "Media Library", "-",
                 "Skins >", "Options >", "Playback >", "-", "Exit",
             ])
     }
@@ -53,6 +53,8 @@ struct MainMenuTests {
         let open = MainMenuState(isEQWindowOpen: true, isPlaylistWindowOpen: true)
         #expect(item(.toggleEQWindow, open)?.state == .on)
         #expect(item(.togglePlaylistWindow, open)?.state == .on)
+        #expect(item(.toggleLibraryWindow)?.state == .off)
+        #expect(item(.toggleLibraryWindow, MainMenuState(isLibraryWindowOpen: true))?.state == .on)
     }
 
     @Test func shadeRepeatShuffleChecksReflectState() {
@@ -78,7 +80,7 @@ struct MainMenuTests {
     @Test func everyCommandAppearsOnce() {
         let commands = items(MainMenu.entries(MainMenuState())).map(\.command)
         #expect(Set(commands).count == commands.count)
-        #expect(commands.count == 25)
+        #expect(commands.count == 26)
     }
 
     @Test func unsupportedEntriesAreAbsent() {
@@ -94,6 +96,7 @@ struct MainMenuTests {
         #expect(item(.openSkin)?.shortcut == MainMenuShortcut("o", [.command, .shift]))
         #expect(item(.toggleEQWindow)?.shortcut == MainMenuShortcut("2"))
         #expect(item(.togglePlaylistWindow)?.shortcut == MainMenuShortcut("3"))
+        #expect(item(.toggleLibraryWindow)?.shortcut == MainMenuShortcut("l"))
         #expect(item(.toggleMainShade)?.shortcut == MainMenuShortcut("w", [.command, .control]))
         #expect(item(.toggleEQShade)?.shortcut == MainMenuShortcut("e", [.command, .control]))
         #expect(item(.togglePlaylistShade)?.shortcut == MainMenuShortcut("p", [.command, .control]))

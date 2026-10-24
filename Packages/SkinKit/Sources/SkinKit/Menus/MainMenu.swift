@@ -1,7 +1,7 @@
 /// The main window's options menu (Winamp's main menu, Webamp `MainContextMenu`), as plain data. The app builds the
 /// `NSMenu` from these entries in one place; features Roadie does not have yet are left out rather than disabled.
 public enum MainMenuCommand: Hashable, Sendable {
-    case about, checkForUpdates, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow
+    case about, checkForUpdates, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow, toggleLibraryWindow
     case openSkin, nextSkin, previousSkin, randomSkin
     case timeElapsed, timeRemaining, toggleAlwaysOnTop, toggleDoubleSize, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle
     case previous, play, pause, stop, next
@@ -13,6 +13,8 @@ public struct MainMenuState: Equatable, Sendable {
     public var timeMode: TimeMode
     public var isEQWindowOpen: Bool
     public var isPlaylistWindowOpen: Bool
+    /// The Library window is open (#0185).
+    public var isLibraryWindowOpen: Bool
     public var isMainShaded: Bool
     public var isEQShaded: Bool
     public var isPlaylistShaded: Bool
@@ -26,6 +28,7 @@ public struct MainMenuState: Equatable, Sendable {
 
     public init(
         timeMode: TimeMode = .elapsed, isEQWindowOpen: Bool = false, isPlaylistWindowOpen: Bool = false,
+        isLibraryWindowOpen: Bool = false,
         isMainShaded: Bool = false, isEQShaded: Bool = false, isPlaylistShaded: Bool = false,
         isRepeating: Bool = false, isShuffled: Bool = false, canNavigateSkins: Bool = false,
         isAlwaysOnTop: Bool = false, isDoubleSize: Bool = false, canCheckForUpdates: Bool = false
@@ -33,6 +36,7 @@ public struct MainMenuState: Equatable, Sendable {
         self.timeMode = timeMode
         self.isEQWindowOpen = isEQWindowOpen
         self.isPlaylistWindowOpen = isPlaylistWindowOpen
+        self.isLibraryWindowOpen = isLibraryWindowOpen
         self.isMainShaded = isMainShaded
         self.isEQShaded = isEQShaded
         self.isPlaylistShaded = isPlaylistShaded
@@ -106,6 +110,10 @@ public enum MainMenu {
                 MainMenuItem(
                     .togglePlaylistWindow, "Playlist Editor", checked: state.isPlaylistWindowOpen,
                     shortcut: MainMenuShortcut("3"))),
+            .item(
+                MainMenuItem(
+                    .toggleLibraryWindow, "Media Library", checked: state.isLibraryWindowOpen,
+                    shortcut: MainMenuShortcut("l"))),
             .separator,
             .submenu(title: "Skins", skinsEntries(state)),
             .submenu(title: "Options", optionsEntries(state)),

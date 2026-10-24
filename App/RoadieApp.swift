@@ -84,10 +84,14 @@ struct RoadieApp: App {
 /// Window menu without it; SwiftUI's automatic Window-menu entry for the scene doesn't appear in this app.
 struct OpenLibraryWindowButton: View {
     var showsShortcut = true
+    /// When set (the Playback menu's ⌘L), the Library comes forward with its search field focused (#0185).
+    var model: PlayerModel?
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        let button = Button("Library") { openWindow(id: "library") }
+        let button = Button("Library") {
+            if let model { model.showLibrary() } else { openWindow(id: "library") }
+        }
         if showsShortcut {
             button.keyboardShortcut("l")
         } else {

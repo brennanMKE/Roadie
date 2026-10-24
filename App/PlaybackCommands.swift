@@ -7,7 +7,7 @@ struct PlaybackCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Playback") {
-            OpenLibraryWindowButton()
+            OpenLibraryWindowButton(model: model)
             Divider()
             PlaybackMenuItems(model: model)
         }

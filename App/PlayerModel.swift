@@ -8,6 +8,7 @@ import MusicAssistantKit
 import MusicBackendKit
 import MusicLibraryKit
 import Observation
+import SwiftUI
 import SkinBrowser
 import SkinKit
 import SkinLibrary
@@ -29,6 +30,8 @@ final class PlayerModel {
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
     /// Check for Updates… in the skinned main menu (#0158). The app injects these from `Updater`, so the model and
     /// SkinKit stay free of Sparkle; nil leaves the item disabled.
+    /// Captured from `PlayerView` so the skinned menu can open SwiftUI windows (#0185).
+    @ObservationIgnored var openWindowAction: OpenWindowAction?
     @ObservationIgnored var updateActions: (canCheck: () -> Bool, check: () -> Void)?
     /// The sources and the active one. `backend`, `library` and `artwork` below follow its choice; only
     /// `sources.select(_:)` swaps them. The composition in `init` is the one place that names Music Assistant and the folder.
