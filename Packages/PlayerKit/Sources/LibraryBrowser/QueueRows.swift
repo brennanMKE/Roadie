@@ -120,3 +120,82 @@ public enum QueueEditPlan {
         return Removal(items: items, skippedCurrent: current.map(picked.contains) ?? false)
     }
 }
+
+/// Queue (Q) on a remote queue (#0182): moves rows to play right after the current item, each after the ones queued
+/// before it since the current item last changed. Music Assistant has no separate play-next list.
+public struct RemoteUpNext: Hashable, Sendable {
+    /// The current item's queue id when counting began.
+    public private(set) var anchorItemID: String?
+    /// How many rows were queued after the anchor.
+    public private(set) var count = 0
+
+    public init() {}
+
+    /// Resets the count when the snapshot's current item is no longer the anchor.
+    public mutating func sync(to snapshot: RemoteQueueSnapshot) {
+        let current = snapshot.currentIndex.flatMap { snapshot.items.indices.contains($0) ? snapshot.items[$0].id : nil }
+        guard current != anchorItemID else { return }
+        anchorItemID = current
+        count = 0
+    }
+
+    /// One Queue action's moves, sent in order; the first refusal stops the rest (#0182).
+    public struct Batch: Hashable, Sendable {
+        public var edits: [QueueEdit] = []
+        /// For each edit, the snapshot just before it, with no later edits applied: what a refusal of that edit
+        /// restores.
+        public var before: [RemoteQueueSnapshot] = []
+        /// For each edit, how many counted rows it and the rows after it in the batch account for: what a refusal
+        /// of that edit takes back out of `count`.
+        public var counted: [Int] = []
+        /// The snapshot with every edit applied, shown at once.
+        public var after: RemoteQueueSnapshot?
+        /// The current item's id the batch counted after.
+        public var anchorItemID: String?
+    }
+
+    /// The moves that put `rows` (snapshot indices, in the order chosen) after the current item and the rows
+    /// queued before them. Skips the current row and rows that are already in place (they still count). Empty with
+    /// no current item.
+    public mutating func plan(queueing rows: [Int], in snapshot: RemoteQueueSnapshot) -> [QueueEdit] {
+        batch(queueing: rows, in: snapshot).edits
+    }
+
+    /// `plan(queueing:in:)` with what's needed to undo a refusal part way through.
+    public mutating func batch(queueing rows: [Int], in snapshot: RemoteQueueSnapshot) -> Batch {
+        sync(to: snapshot)
+        var batch = Batch(after: snapshot, anchorItemID: anchorItemID)
+        guard let currentID = anchorItemID else { return batch }
+        var working = snapshot
+        // Rows this batch counted before each edit's row; the rest of the batch, from that row on, is the total less this.
+        var countedBefore: [Int] = []
+        let startCount = count
+        for row in rows where snapshot.items.indices.contains(row) {
+            let itemID = snapshot.items[row].id
+            guard itemID != currentID,
+                let from = working.items.firstIndex(where: { $0.id == itemID }),
+                let c = working.currentIndex
+            else { continue }
+            // Removing a row above the current one shifts the current one up.
+            let to = min((from < c ? c : c + 1) + count, working.items.count - 1)
+            if to != from {
+                let edit = QueueEdit.move(itemID: itemID, shift: to - from)
+                batch.edits.append(edit)
+                batch.before.append(working)
+                countedBefore.append(count - startCount)
+                working = QueueEditPlan.apply(edit, to: working)
+            }
+            count += 1
+        }
+        let added = count - startCount
+        batch.counted = countedBefore.map { added - $0 }
+        batch.after = working
+        return batch
+    }
+
+    /// Takes `n` refused rows back out of the count, only while `anchor` is still the current item, never below 0.
+    public mutating func uncount(_ n: Int, anchor: String?) {
+        guard anchor != nil, anchor == anchorItemID else { return }
+        count = max(0, count - n)
+    }
+}

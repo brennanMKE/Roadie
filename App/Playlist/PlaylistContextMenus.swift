@@ -58,10 +58,9 @@ enum PlaylistContextMenus {
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.addItem(ActionMenuItem(title: "Play") { playlist.playFirstSelected() })
-        if playlist.remote == nil {   // #0182 adds the Music Assistant queue
-            let title = playlist.selectionIsQueued ? "Dequeue" : "Queue"
-            menu.addItem(ActionMenuItem(title: title) { playlist.toggleQueueForSelection() })
-        }
+        // On a Music Assistant queue it's always Queue: a move to after the current item (#0182).
+        let title = playlist.selectionIsQueued ? "Dequeue" : "Queue"
+        menu.addItem(ActionMenuItem(title: title) { playlist.toggleQueueForSelection() })
         if playlist.hasUpNext {
             menu.addItem(ActionMenuItem(title: "Clear Queue") { playlist.clearUpNext() })
         }

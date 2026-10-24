@@ -46,10 +46,16 @@ final class PlaylistModel {
     @ObservationIgnored var onRemoteNotice: @MainActor (String) -> Void = { _ in }
     /// Remote edits run one after another, in the order made (drag steps arrive quickly).
     @ObservationIgnored private var remoteEditChain: Task<Void, Never>?
+    /// Counts Queue (Q) moves on the remote queue since the current item changed (#0182).
+    @ObservationIgnored private var remoteUpNext = RemoteUpNext()
 
     /// The remote queue the rows show; nil for the local queue. Set by `PlayerModel` (#0144).
     var remote: RemoteQueueSnapshot? {
-        didSet { remoteTracks = remote.map(remoteTracks(for:)) ?? [] }
+        didSet {
+            remoteTracks = remote.map(remoteTracks(for:)) ?? []
+            if oldValue?.output != remote?.output { remoteUpNext = RemoteUpNext() }
+            if let remote { remoteUpNext.sync(to: remote) }
+        }
     }
     /// `remote`'s items as rows; ids stay the same per queue item so the selection survives refetches.
     private var remoteTracks: [Track] = []
@@ -250,8 +256,14 @@ final class PlaylistModel {
     }
 
     /// Q, the menu's Queue/Dequeue and Jump to File's Queue (#0180): toggles `indices` (row order) in the play-next list.
+    /// On a Music Assistant queue (#0182) it moves them to play after the current item, one move per row.
     func toggleQueue(_ indices: [Int]) {
-        // #0182: the Music Assistant queue's branch goes here.
+        if let remote {
+            let batch = remoteUpNext.batch(queueing: indices, in: remote)
+            if remote.currentIndex == nil { onRemoteNotice("Nothing is playing") }
+            sendRemote(batch)
+            return
+        }
         guard remote == nil, isLocal() else { return }
         let tracks = player.queue.tracks
         let ids = indices.filter { tracks.indices.contains($0) }.map { tracks[$0].id }
@@ -351,6 +363,31 @@ final class PlaylistModel {
             } catch {
                 if self.remote?.output == before.output { self.remote = before }
                 self.onRemoteNotice((error as? LocalizedError)?.errorDescription ?? "Music Assistant refused")
+            }
+        }
+    }
+
+    /// A Queue action's moves (#0182), shown at once and sent in order after any earlier edit. The first refusal
+    /// stops the batch: the rest aren't sent, the rows go back to just before the refused move, the refused row and
+    /// those after it leave the count, and the notice shows once.
+    private func sendRemote(_ batch: RemoteUpNext.Batch) {
+        guard let start = remote, let after = batch.after, !batch.edits.isEmpty else { return }
+        remote = after
+        let previous = remoteEditChain
+        remoteEditChain = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            for (index, edit) in batch.edits.enumerated() {
+                do {
+                    try await self.onEditRemote(edit)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    if self.remote?.output == start.output { self.remote = batch.before[index] }
+                    self.remoteUpNext.uncount(batch.counted[index], anchor: batch.anchorItemID)
+                    self.onRemoteNotice((error as? LocalizedError)?.errorDescription ?? "Music Assistant refused")
+                    return
+                }
             }
         }
     }

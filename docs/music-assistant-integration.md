@@ -180,6 +180,7 @@ Acceptance for milestone 1 (steps 1 to 5): with the Mac on the home LAN, the app
 - Same flat L2 network for MA and all speakers; no VLANs, no restrictive firewall.
 - HomePod silent playback: fix the Home app speaker access setting (section 3).
 - Queues/playlists over ~1000 items get slow, especially on a Pi.
+- Queue (Q) in the playlist editor on a Music Assistant queue (#0182): MA has no play-next list, so Roadie moves each selected row to after the current item (and after rows queued before it), one `player_queues/move_item` per row. MA refuses a move at or before its buffered index ("Track already buffered"), so with crossfade or flow mode the slot right after the current item may be locked; the first refusal stops the batch (the remaining moves aren't sent), the rows snap back to just before the refused move, the marquee shows the error once, and the refused rows don't count toward where the next Queue lands. Only fetched rows (the first 2,000) can be queued.
 - First sync of a large library is slow (metadata API rate limits); later syncs are faster.
 - Remote (off-LAN) use: Sendspin needs the same network; over Tailscale, controller mode should work against the MA host's tailnet IP, but AirPlay targets are still at home.
 
