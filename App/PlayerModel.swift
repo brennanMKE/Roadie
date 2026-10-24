@@ -1110,19 +1110,20 @@ final class PlayerModel {
     @discardableResult
     /// Returns true even when the audio was refused on a speaker (#0084): the drop was received and the notice
     /// says why nothing played.
-    func open(_ urls: [URL], replace: Bool) -> Bool {
+    func open(_ urls: [URL], replace: Bool, at row: Int? = nil) -> Bool {
         let isSkin = { (url: URL) in url.pathExtension.lowercased() == "wsz" }
         let skin = urls.first(where: isSkin)
         let others = urls.filter { !isSkin($0) }
         if let skin { loadSkin(from: skin) }
-        importLocalFiles(others, replace: replace)
+        importLocalFiles(others, replace: replace, at: row)
         return skin != nil || !others.isEmpty
     }
 
     /// Loads files and folders off the main actor, then queues them. Replacing clears the queue
     /// and starts the first new track; appending only starts playback on an idle, empty player. Refused with a
-    /// notice while a speaker is selected, checked again after the load in case the output changed (#0084).
-    func importLocalFiles(_ urls: [URL], replace: Bool) {
+    /// notice while a speaker is selected, checked again after the load in case the output changed (#0084). Appending
+    /// with a `row` inserts before that row instead (a drop on the track list, #0183).
+    func importLocalFiles(_ urls: [URL], replace: Bool, at row: Int? = nil) {
         guard !urls.isEmpty else { return }
         if let text = LocalPlaybackGate.refusal(forLocalFilesOn: outputSelection) {
             post(StatusNotice(text: text))
@@ -1140,6 +1141,13 @@ final class PlayerModel {
             applyFeed(.localPlayRequested)
             stopOthers(startingOn: OutputDevice.thisMacID)
             let wasIdle = player.state == .stopped && player.queue.tracks.isEmpty
+            if !replace, let row {
+                // The queue may have changed during the load.
+                let at = min(row, player.queue.tracks.count)
+                player.insert(result.tracks, at: at)
+                if wasIdle { player.play(at: at) }
+                return
+            }
             if replace { player.clearQueue() }
             let start = player.queue.tracks.count
             player.enqueue(result.tracks)

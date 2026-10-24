@@ -320,4 +320,62 @@ extension PlayQueueTests {
         #expect(q.indexAfterCurrentEnds() == 1)
         #expect(q.tracks[1].title == "t1")
     }
+
+    // MARK: Insert (#0183)
+
+    @Test func insertPlacesTracksBeforeTheRowAndKeepsTheCurrentIdentity() {
+        var q = queue(4)
+        q.select(2)
+        let currentID = q.current!.id
+        q.insert(makeTracks(2, from: 10), at: 1)
+        #expect(q.tracks.map(\.title) == ["t0", "t10", "t11", "t1", "t2", "t3"])
+        #expect(q.currentIndex == 4)
+        #expect(q.current?.id == currentID)
+    }
+
+    @Test func insertAtTheEndAppends() {
+        var q = queue(2)
+        q.select(0)
+        q.insert(makeTracks(1, from: 5), at: 2)
+        #expect(q.tracks.map(\.title) == ["t0", "t1", "t5"])
+        #expect(q.currentIndex == 0)
+    }
+
+    @Test func insertClampsTheIndex() {
+        var q = queue(2)
+        q.insert(makeTracks(1, from: 5), at: -3)
+        #expect(q.tracks.map(\.title) == ["t5", "t0", "t1"])
+        q.insert(makeTracks(1, from: 6), at: 99)
+        #expect(q.tracks.map(\.title) == ["t5", "t0", "t1", "t6"])
+    }
+
+    @Test func insertWhileShuffledKeepsTheShuffleBookkeepingAPermutation() {
+        var q = queue(20)
+        var rng = SplitMix64(seed: 3)
+        q.select(0)
+        q.setShuffle(true, using: &rng)
+        var played: Set<Track.ID> = [q.current!.id]
+        for _ in 0..<7 { played.insert(q.next()!.id) }
+        let currentID = q.current!.id
+        q.insert(makeTracks(3, from: 100), at: 5)
+        #expect(q.current?.id == currentID)
+        #expect(q.tracks[q.currentIndex!].id == currentID)
+        var rest: [Track.ID] = []
+        while let t = q.next() { rest.append(t.id) }
+        let expected = Set(q.tracks.map(\.id)).subtracting(played)
+        #expect(rest.count == expected.count)
+        #expect(Set(rest) == expected)
+        #expect(expected.count == 15)
+    }
+
+    @Test func insertKeepsUpNextByIdentity() {
+        var q = queue(4)
+        q.select(0)
+        let queued = [q.tracks[3].id, q.tracks[1].id]
+        q.appendUpNext(queued)
+        q.insert(makeTracks(2, from: 10), at: 1)
+        #expect(q.upNext == queued)
+        #expect(q.indexAfterCurrentEnds() == 5)
+        #expect(q.tracks[5].id == queued[0])
+    }
 }
