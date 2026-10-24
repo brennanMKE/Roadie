@@ -68,6 +68,12 @@ public final class LocalPlayerOutput {
             register(items)
             player.enqueue(items.map(\.track))
             if wasIdle { player.play(at: first) } else { player.prependUpNext(items.map(\.track.id)) }
+        case .insert(let index):
+            guard !items.isEmpty else { return }
+            let at = min(max(index, 0), player.queue.tracks.count)
+            register(items)
+            player.insert(items.map(\.track), at: at)
+            if wasIdle { player.play(at: at) }
         }
         prune()
     }

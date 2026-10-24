@@ -53,6 +53,9 @@ public enum PlayMode: Hashable, Sendable {
     /// Append, then play these right after the current track, ahead of anything already queued to play next, in order
     /// (#0181; JTFE's `/ADD \\QUEUE`). Playback starts only if the output was idle with nothing queued.
     case next
+    /// Insert before row `index` of the queue (a drop in the playlist editor, #0184). A backend that can't place items
+    /// appends instead. Playback starts only if the output was idle with nothing queued.
+    case insert(at: Int)
 }
 
 public struct NowPlaying: Hashable, Sendable {

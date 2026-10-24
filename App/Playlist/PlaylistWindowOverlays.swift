@@ -1,5 +1,7 @@
 import AppKit
+import MusicBackendKit
 import SkinKit
+import UniformTypeIdentifiers
 
 /// The playlist window's two AppKit input views, laid over the SwiftUI content by `SkinWindowController`. They are
 /// siblings of the hosting view, not SwiftUI children, because `scaleEffect` does not scale an `NSView` and SwiftUI
@@ -43,7 +45,7 @@ final class PlaylistListInputView: NSView {
     init(model: PlayerModel) {
         self.model = model
         super.init(frame: .zero)
-        registerForDraggedTypes([.fileURL])
+        registerForDraggedTypes([.fileURL, Self.mediaIDType])
     }
 
     required init?(coder: NSCoder) { nil }
@@ -175,12 +177,17 @@ final class PlaylistListInputView: NSView {
         }
     }
 
-    // MARK: File drops (#0183)
+    // MARK: File drops (#0183) and Library drops (#0184)
+
+    /// What a Library row's `.draggable(MediaIDTransfer)` puts on the pasteboard (JSON, `CodableRepresentation`).
+    private static let mediaIDType = NSPasteboard.PasteboardType(UTType.roadieMediaID.identifier)
 
     private static let fileURLOptions: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
 
     private func dragOperation(_ sender: NSDraggingInfo) -> NSDragOperation {
-        sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: Self.fileURLOptions) ? .copy : []
+        let pasteboard = sender.draggingPasteboard
+        if pasteboard.availableType(from: [Self.mediaIDType]) != nil { return .copy }
+        return pasteboard.canReadObject(forClasses: [NSURL.self], options: Self.fileURLOptions) ? .copy : []
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { dragOperation(sender) }
@@ -189,6 +196,17 @@ final class PlaylistListInputView: NSView {
     /// Files and folders go in before the row under the pointer, or at the end below the last row (Winamp). A remote
     /// queue's row means nothing in the local queue, so there the drop appends as before.
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if let data = sender.draggingPasteboard.data(forType: Self.mediaIDType) {
+            guard let transfer = try? JSONDecoder().decode(MediaIDTransfer.self, from: data), !transfer.ids.isEmpty
+            else { return false }
+            return MainActor.assumeIsolated {
+                // Library items go through the selected output's backend and its gates (a folder library on a speaker
+                // is refused with a notice). Music Assistant can't place items, so there they append (#0173 decision 4).
+                let row = row(atY: skinPoint(windowPoint: sender.draggingLocation).y) ?? model.playlist.count
+                model.playFromLibrary(PlayRequest(items: transfer.ids, mode: .insert(at: row)))
+                return true
+            }
+        }
         let urls = (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: Self.fileURLOptions)
             as? [URL]) ?? []
         guard !urls.isEmpty else { return false }

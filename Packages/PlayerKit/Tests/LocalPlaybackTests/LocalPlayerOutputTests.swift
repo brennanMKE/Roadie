@@ -87,6 +87,40 @@ struct LocalPlayerOutputTests {
         #expect(player.queue.upNext.isEmpty)
     }
 
+    @Test func insertPutsItemsAtTheRowAndCarriesMediaIDs() async throws {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        let a = unreadableItem("A", id: "1"), b = unreadableItem("B", id: "2"), c = unreadableItem("C", id: "3")
+        let x = unreadableItem("X", id: "8"), y = unreadableItem("Y", id: "9")
+        output.play([a, b, c], mode: .replace(startIndex: 1))
+        #expect(await waitFor { player.errorMessage != nil })
+        // An unreadable B may skip on; whichever track is current must stay current.
+        let current = try #require(player.queue.current?.id)
+        output.play([x, y], mode: .insert(at: 1))
+        #expect(player.queue.tracks.map(\.title) == ["A", "X", "Y", "B", "C"])
+        #expect(player.queue.current?.id == current)
+        let items = output.queueSnapshot().items
+        #expect(items[1].id == MediaID(.track, "8"))
+        #expect(items[2].id == MediaID(.track, "9"))
+    }
+
+    @Test func insertOnAnIdlePlayerStartsTheFirstInsertedTrack() async throws {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        output.play([unreadableItem("X", id: "8"), unreadableItem("Y", id: "9")], mode: .insert(at: 4))
+        #expect(player.queue.tracks.map(\.title) == ["X", "Y"])
+        #expect(player.queue.currentIndex == 0)
+    }
+
+    @Test func insertClampsAPastTheEndRowToAppend() async throws {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        output.play([unreadableItem("A", id: "1"), unreadableItem("B", id: "2")], mode: .replace())
+        #expect(await waitFor { player.errorMessage != nil })
+        output.play([unreadableItem("X", id: "8")], mode: .insert(at: 99))
+        #expect(player.queue.tracks.map(\.title) == ["A", "B", "X"])
+    }
+
     @Test func performRoutesVolumeAndStop() async throws {
         let player = Player()
         let output = LocalPlayerOutput(player: player)
