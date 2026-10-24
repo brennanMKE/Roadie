@@ -6,6 +6,14 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+### Added
+
+- LIST › Load in the playlist editor can load a Library playlist while This Mac plays its own queue, and Playback › Load Playlist from Library… does the same from the menu bar.
+
+### Changed
+
+- Jump to File on an empty playlist says how to add music.
+
 ## [0.0.4] - 2026-10-24
 
 Winamp-style music selection: Jump to File, a play-next queue with [n] markers, and Play Next from the Library.
