@@ -338,6 +338,19 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         #expect(fixture.player.queue.currentIndex == index)
     }
 
+    @Test func playNextExpandsAnAlbumIntoUpNext() async throws {
+        let fixture = try BackendFixture(root: makeTempDir())
+        defer { fixture.cleanup() }
+        try await fixture.backend.connect()
+        try await fixture.backend.play([trackID(backDisc1)], on: OutputDevice.thisMacID, mode: .replace())
+        let index = fixture.player.queue.currentIndex
+        try await fixture.backend.play([albumID(eden)], on: OutputDevice.thisMacID, mode: .next)
+        let tracks = fixture.player.queue.tracks
+        #expect(tracks.count == 3)
+        #expect(fixture.player.queue.currentIndex == index)
+        #expect(fixture.player.queue.upNext == tracks[1...].map(\.id))
+    }
+
     @Test func playUnknownTrackThrowsNotFound() async throws {
         let fixture = try BackendFixture(root: makeTempDir())
         defer { fixture.cleanup() }

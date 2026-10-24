@@ -39,4 +39,16 @@ public struct PlayRequest: Hashable, Sendable {
         guard !picked.isEmpty else { return nil }
         return PlayRequest(items: picked.map(\.id), mode: .append)
     }
+
+    /// An album row: the album after the current track (#0181).
+    public static func next(album: MediaID) -> PlayRequest {
+        PlayRequest(items: [album], mode: .next)
+    }
+
+    /// The selected rows in display order, after the current track. nil when none is in `rows`.
+    public static func next(_ selected: Set<MediaID>, in rows: [LibraryTrack]) -> PlayRequest? {
+        let picked = rows.filter { selected.contains($0.id) }
+        guard !picked.isEmpty else { return nil }
+        return PlayRequest(items: picked.map(\.id), mode: .next)
+    }
 }

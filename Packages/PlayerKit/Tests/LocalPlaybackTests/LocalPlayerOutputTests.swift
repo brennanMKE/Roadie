@@ -61,6 +61,32 @@ struct LocalPlayerOutputTests {
         #expect(player.queue.currentIndex == 0)
     }
 
+    @Test func nextAppendsAndPutsTheNewEntriesAtTheFrontOfUpNext() async throws {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        let a = unreadableItem("A", id: "1"), b = unreadableItem("B", id: "2")
+        let c = unreadableItem("C", id: "3"), d = unreadableItem("D", id: "4")
+        output.play([a, b], mode: .replace())
+        #expect(await waitFor { player.errorMessage != nil })
+        // An unreadable A may skip on to B; whichever is current must stay current.
+        let current = player.queue.currentIndex
+        player.appendUpNext([b.track.id])
+        output.play([c, d], mode: .next)
+        #expect(player.queue.tracks.map(\.title) == ["A", "B", "C", "D"])
+        #expect(player.queue.currentIndex == current)
+        #expect(player.queue.upNext == [c.track.id, d.track.id, b.track.id])
+        #expect(output.queueSnapshot().items[2].id == MediaID(.track, "3"))
+    }
+
+    @Test func nextOnAnIdlePlayerStartsTheFirstNewTrack() async throws {
+        let player = Player()
+        let output = LocalPlayerOutput(player: player)
+        output.play([unreadableItem("C", id: "3"), unreadableItem("D", id: "4")], mode: .next)
+        #expect(player.queue.currentIndex == 0)
+        #expect(player.queue.tracks.map(\.title) == ["C", "D"])
+        #expect(player.queue.upNext.isEmpty)
+    }
+
     @Test func performRoutesVolumeAndStop() async throws {
         let player = Player()
         let output = LocalPlayerOutput(player: player)

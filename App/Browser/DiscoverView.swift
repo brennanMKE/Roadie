@@ -77,6 +77,8 @@ struct DiscoverRowView: View {
                     .contextMenu(forSelectionType: RecommendationItem.ID.self) { ids in
                         let picked = playable(ids, in: items)
                         Button("Play") { play(picked) }.disabled(picked.isEmpty)
+                        Button("Play Next") { player.playFromLibrary(request(picked, mode: .next)) }
+                            .disabled(picked.isEmpty)
                         Button("Add to Queue") { player.playFromLibrary(request(picked, mode: .append)) }
                             .disabled(picked.isEmpty)
                         // Tracks and albums only (#0132 decision 3).

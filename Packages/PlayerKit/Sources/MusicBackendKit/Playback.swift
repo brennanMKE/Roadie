@@ -50,6 +50,9 @@ public enum PlayMode: Hashable, Sendable {
     case replace(startIndex: Int = 0)
     /// Append; playback starts only if the output was idle with nothing queued.
     case append
+    /// Append, then play these right after the current track, ahead of anything already queued to play next, in order
+    /// (#0181; JTFE's `/ADD \\QUEUE`). Playback starts only if the output was idle with nothing queued.
+    case next
 }
 
 public struct NowPlaying: Hashable, Sendable {

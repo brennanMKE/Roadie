@@ -1008,6 +1008,7 @@ final class PlayerModel {
         switch request.mode {
         case .replace: mode = "replace"
         case .append: mode = "append"
+        case .next: mode = "next"
         }
         Self.log.info("play from library: \(request.items.count, privacy: .public) item(s), \(mode, privacy: .public)")
         let backend = backend

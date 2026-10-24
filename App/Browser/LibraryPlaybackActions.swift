@@ -3,7 +3,7 @@ import MusicBackendKit
 import SwiftUI
 
 extension View {
-    /// Double-click (or Return) plays; the context menu offers Play, Add to Queue and Add to Playlist ▸. Attach to the
+    /// Double-click (or Return) plays; the context menu offers Play, Play Next, Add to Queue and Add to Playlist ▸. Attach to the
     /// list of `rows`; `album` is the album the rows belong to, nil for search results.
     /// `editor`: the open playlist's editor, which adds Remove from Playlist and Move Up/Down (#0138).
     func libraryTrackActions(
@@ -12,6 +12,8 @@ extension View {
     ) -> some View {
         contextMenu(forSelectionType: MediaID.self) { ids in
             Button("Play") { model.playFromLibrary(.play(ids, in: rows, album: album)) }
+                .disabled(ids.isEmpty)
+            Button("Play Next") { model.playFromLibrary(.next(ids, in: rows)) }
                 .disabled(ids.isEmpty)
             // The queue is Winamp's playlist; real playlists get the submenu (#0136).
             Button("Add to Queue") { model.playFromLibrary(.append(ids, in: rows)) }
@@ -40,7 +42,7 @@ extension View {
     }
 
     /// Album rows in a selectable list: double-click plays the album, replacing the queue; the
-    /// context menu adds Add to Queue and Add to Playlist ▸. Single click keeps selecting (opening) the album: the
+    /// context menu adds Play, Play Next, Add to Queue and Add to Playlist ▸. Single click keeps selecting (opening) the album: the
     /// double-click is a simultaneous gesture so it never takes the click from the List's selection.
     func libraryAlbumActions(_ album: MediaID, favorite: Bool? = nil, model: PlayerModel) -> some View {
         libraryAlbumMenu(album, favorite: favorite, model: model)
@@ -51,6 +53,7 @@ extension View {
     func libraryAlbumMenu(_ album: MediaID, favorite: Bool? = nil, model: PlayerModel) -> some View {
         contextMenu {
             Button("Play") { model.playFromLibrary(.play(album: album)) }
+            Button("Play Next") { model.playFromLibrary(.next(album: album)) }
             Button("Add to Queue") { model.playFromLibrary(.append(album: album)) }
             Divider()
             AddToPlaylistMenu(items: [album], model: model)

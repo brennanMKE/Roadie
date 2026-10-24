@@ -45,6 +45,23 @@ struct PlayRequestTests {
         #expect(request.mode == .append)
     }
 
+    @Test func nextAlbumIsTheAlbumWithModeNext() {
+        let next = PlayRequest.next(album: Self.album)
+        #expect(next.items == [Self.album])
+        #expect(next.mode == .next)
+    }
+
+    @Test func nextSelectedRowsKeepDisplayOrder() throws {
+        let request = try #require(PlayRequest.next(ids("4", "1"), in: rows))
+        #expect(request.items == tracks("1", "4"))
+        #expect(request.mode == .next)
+    }
+
+    @Test func nextWithNothingSelectedIsNil() {
+        #expect(PlayRequest.next([], in: rows) == nil)
+        #expect(PlayRequest.next(ids("99"), in: rows) == nil)
+    }
+
     @Test func nothingSelectedIsNil() {
         #expect(PlayRequest.play([], in: rows, album: Self.album) == nil)
         #expect(PlayRequest.append([], in: rows) == nil)

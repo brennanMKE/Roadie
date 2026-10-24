@@ -540,6 +540,8 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
                 request = .playMedia(queueID: queueID, media: media, option: .replace, startItem: start)
             case .append:
                 request = .playMedia(queueID: queueID, media: media, option: .add)
+            case .next:
+                request = .playMedia(queueID: queueID, media: media, option: .next)
             }
             _ = try await client.call(request)
         }
