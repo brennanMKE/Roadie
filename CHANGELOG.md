@@ -12,6 +12,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 - A play-next queue: press Q in the playlist editor (or right-click › Queue) to play the selected tracks next. Queued tracks show [1], [2], … and play in order before the playlist continues.
 - Media Library in the skinned windows' menu (⌘L); the Library opens with the cursor in its search field.
 - Play Next in the Library: plays a track or album right after the current song without replacing the playlist (This Mac and Music Assistant).
+- Drag tracks and albums from the Library into the playlist editor; on This Mac they go in at the drop row, on Music Assistant at the end.
 
 ### Changed
 

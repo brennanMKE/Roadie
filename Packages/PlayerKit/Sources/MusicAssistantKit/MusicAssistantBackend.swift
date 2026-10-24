@@ -542,6 +542,10 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
                 request = .playMedia(queueID: queueID, media: media, option: .add)
             case .next:
                 request = .playMedia(queueID: queueID, media: media, option: .next)
+            case .insert:
+                // Music Assistant's play_media has no "insert at index" option; a drop on a speaker's queue appends
+                // (#0173 decision 4).
+                request = .playMedia(queueID: queueID, media: media, option: .add)
             }
             _ = try await client.call(request)
         }
