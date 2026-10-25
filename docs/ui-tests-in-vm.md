@@ -80,6 +80,12 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   scripted Music Assistant (`-RoadieMAScenario`, #0197), no discovery and recorded external opens. The guest is on
   Tart's NAT network and *can* reach cameron's LAN and the real Music Assistant server, so isolation has to come
   from the app's test mode, not the network. Test mode is Debug-only; Release ignores `-RoadieUITest`.
+- **A guest-only guard.** Before each launch the harness (`RoadieUIApp.launch`) runs
+  `defaults delete co.sstools.roadie` and empties its data directory. On a developer's Mac that would wipe their
+  real Roadie preferences, so the harness refuses (the test is skipped, and `launch` fails the test if reached) unless
+  both hold: `ROADIE_UI_GUEST=1`, which only `run-tests-vm.sh --ui` sets (as `ROADIE_UI_GUEST` and
+  `TEST_RUNNER_ROADIE_UI_GUEST`, like the `ROADIE_TEST_*` paths), and `NSUserName() == "admin"`, the guest's user.
+  Setting `ROADIE_TEST_SKINS`/`ROADIE_TEST_MUSIC` by hand on the host isn't enough.
 - **A timeout around the UI step** (`timeout 1200` in the guest). A blocking prompt shows up as a hang, never as a
   pass, and a timed-out step reports "a blocked prompt in the guest?".
 - **Results:** `UITests.xcresult` with `XCTAttachment` screenshots comes back under `build/vm-tests/<run-id>/ui/`.

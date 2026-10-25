@@ -9,9 +9,12 @@ extension View {
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// One accessibility element for a display: its identifier, label and value.
+    /// One accessibility element for a display: its identifier, label and value. It's static text because SwiftUI
+    /// (macOS) puts `accessibilityValue` in `AXValue` only for static text; on a bare `.ignore` element the role is
+    /// `AXUnknown` and the value goes to `AXValueDescription`, which XCUITest's `value` can't read (#0200).
     func skinDisplay(_ id: String, label: String, value: String) -> some View {
         accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isStaticText)
             .accessibilityIdentifier(id)
             .accessibilityLabel(label)
             .accessibilityValue(value)

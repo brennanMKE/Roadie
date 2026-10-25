@@ -76,5 +76,58 @@ class ExpectFailTests(unittest.TestCase):
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
 
 
+class UIReportTests(unittest.TestCase):
+    """#0200: a failed ui-tests step names the test, its assertion, the screenshot folder and the xcresult."""
+
+    def results(self, failed_name="testFoo", with_attachments=True, rc=1):
+        d = Path(tempfile.mkdtemp())
+        (d / "summary.txt").write_text(
+            "==> PASS  app-build\n==> PASS  ui-build\n==> FAIL  ui-tests (exit %d)\n"
+            "==> TIER  fast\n==> Cleaning up (exit 1)\n" % rc)
+        (d / "ui-tests.log").write_text(
+            "Test Case '-[RoadieUITests.SmokeUITests testBar]' passed (3.1 seconds).\n"
+            "/Users/admin/src/Tests/RoadieUITests/SmokeUITests.swift:41: warning: unused variable 'x'\n"
+            "/Users/admin/src/Tests/RoadieUITests/SmokeUITests.swift:42: error: -[RoadieUITests.SmokeUITests %s] : "
+            "XCTAssertEqual failed: (\"2. A - B\") is not equal to (\"9. wrong\") - pl.row.1 label\n"
+            "Test Case '-[RoadieUITests.SmokeUITests %s]' failed (4.2 seconds).\n" % (failed_name, failed_name))
+        (d / "ui" / "UITests.xcresult").mkdir(parents=True)
+        if with_attachments:
+            (d / "ui" / "attachments" / failed_name).mkdir(parents=True)
+            (d / "ui" / "attachments" / failed_name / "screen.png").write_bytes(b"png")
+        return d
+
+    def run_verify(self, d, *args):
+        return subprocess.run(["/bin/zsh", str(VERIFY), "--report", str(d), *args],
+                              capture_output=True, text=True)
+
+    def test_report_names_test_assertion_screenshots_and_xcresult(self):
+        d = self.results()
+        r = self.run_verify(d)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("testFoo", r.stdout)
+        self.assertIn("XCTAssertEqual failed", r.stdout)
+        self.assertIn("screenshots: %s/" % (d.resolve() / "ui" / "attachments" / "testFoo"), r.stdout)
+        self.assertIn("xcresult: %s" % (d.resolve() / "ui" / "UITests.xcresult"), r.stdout)
+        self.assertIn("warning: unused variable", r.stdout)
+        self.assertLess(len(r.stdout.splitlines()), 60, r.stdout)
+
+    def test_missing_attachments_say_none_exported(self):
+        r = self.run_verify(self.results(with_attachments=False))
+        self.assertIn("screenshots: none exported (testFoo)", r.stdout)
+
+    def test_timeout_is_reported(self):
+        r = self.run_verify(self.results(rc=124))
+        self.assertIn("ui-tests timed out (a blocked prompt in the guest?)", r.stdout)
+
+    def test_expect_accepts_names_with_or_without_the_test_prefix(self):
+        d = self.results()
+        (d / "summary.txt").write_text("==> PASS  ui-tests\n==> TIER  fast\n==> UI  2 tests passed (all classes) on base\n"
+                                       "==> Cleaning up (exit 0)\n")
+        for name in ("bar", "testBar"):
+            r = self.run_verify(d, "--expect", name, "--exit", "0")
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("==> UI  2 tests passed", r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

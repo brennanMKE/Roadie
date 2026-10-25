@@ -8,6 +8,8 @@
 # Usage: scripts/verify.sh [--expect NAME[,NAME…]]… [--expect-fail NAME[,NAME…]]… [run-tests-vm.sh options]
 #   --expect NAMES  test function names (comma-separated, repeatable) that must appear in the logs as passed;
 #                   a missing or failed one makes the run fail (exit 1). Use it for the tests a change adds.
+#                   XCTest names (RoadieTests, RoadieUITests) work with or without their `test` prefix:
+#                   `playsTheFixtureLibrary` and `testPlaysTheFixtureLibrary` both match.
 #   --expect-fail NAMES  test function names (comma-separated, repeatable) that must appear in the logs as FAILED.
 #                   The run then passes (exit 0) only if each named test failed and no other test or step did.
 #                   Bug-fix recipe: write the regression test first, run --expect-fail it (proves it fails before the
@@ -19,6 +21,8 @@
 #
 # Output:
 #   pass  ==> VERIFY PASS …, the TIER / AUDIO / BUILD-ONLY lines, a test total, the --expect result (≤ 8 lines)
+#   --ui runs (#0200) add the UI summary line on pass; on a failed ui-tests/app-unit-tests step, a `screenshots:` line
+#         per failed test (results/ui/attachments/<testName>/) and the xcresult path; exit 124 there is a timeout.
 #   fail  ==> VERIFY FAIL …, the FAIL/BUILD/ERRORS/INFRA/AUDIO lines from summary.txt, then from each failed
 #         step's log the failing tests (✘ lines with their ↳ details), crashes and XCTest failures; at most
 #         MAX_LINES (60) lines. Also written to build/vm-tests/<run-id>/failure.txt.
@@ -152,7 +156,7 @@ if (( RC == 0 )); then
     for f in "${step_logs[@]}"; do strip <"$f" 2>/dev/null | grep -oE 'Executed [0-9]+ tests?, with' | tail -1 | awk '$2 > 0 {print $2}'; done
   } | awk '{s+=$1; n++} END {if (n) print s " tests in " n " test runs"}')
   print "==> VERIFY  PASS (exit 0) ${RESULTS:t}: $(grep -c '^==> PASS' "$SUMMARY" 2>/dev/null) steps passed${total:+, $total}"
-  grep -E '^==> (TIER|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null
+  grep -E '^==> (TIER|UI|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null
   [[ -n "$expect_report" ]] && print -r -- "$expect_report"
   [[ -n "$expect_fail_report" ]] && print -r -- "$expect_fail_report"
   [[ -f "$RESULTS/release/Roadie.app.zip" ]] && print "==> RELEASE  $RESULTS/release/Roadie.app.zip build $(cat "$RESULTS/release/build.txt" 2>/dev/null || print unknown) (scripts/make-dmg.sh packages it)"
@@ -201,9 +205,24 @@ report=$(
     if [[ -n "$lines" ]]; then
       print "==> $step failures:"
       print -r -- "$lines" | sed 's/^/    /'
+      # Warnings from the files the step's errors name (dedup, at most 5).
+      files=(${(u)${(f)"$(print -r -- "$lines" | perl -ne 'print "$1\n" if m{([^\s:/]+\.swift):\d+(:\d+)?: error: }')"}})
+      if (( ${#files} )); then
+        warns=$(strip <"$f" | grep -E ': warning: ' | grep -F "${(F)files}" | awk '!seen[$0]++' | head -5)
+        [[ -n "$warns" ]] && print -r -- "$warns" | sed 's/^/    /'
+      fi
     else
       print "==> $step: no test-failure lines; last lines of its log:"
       strip <"$f" | grep -v '^[[:space:]]*$' | tail -10 | sed 's/^/    /'
+    fi
+    if [[ $step == ui-tests ]]; then
+      grep -q "^==> FAIL  $step (exit 124)" "$SUMMARY" 2>/dev/null && print "==> $step timed out (a blocked prompt in the guest?)"
+      attach="$RESULTS/ui/attachments"
+      for t in ${(u)${(f)"$(strip <"$f" | perl -ne "print \"\$1\\n\" if /Test Case '-\\[\\S+ (\\w+)\\]' failed/")"}}; do
+        if [[ -d "$attach/$t" ]]; then print "    screenshots: $attach/$t/"
+        else print "    screenshots: none exported ($t)"; fi
+      done
+      [[ -d "$RESULTS/ui/UITests.xcresult" ]] && print "    xcresult: $RESULTS/ui/UITests.xcresult"
     fi
   done
 )

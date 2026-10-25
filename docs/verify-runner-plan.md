@@ -186,6 +186,13 @@ Keep the verify runner. Also:
 - for a fair before/after, compare the next batch of ordinary feature issues against this baseline;
 - try reusing the implementer's passing run in review, which would remove about a third of VM time per issue.
 
+## UI runs
+
+`scripts/verify.sh --ui` (#0200) adds the `ui-build` and `ui-tests` steps (XCUITests, only ever in the guest). They
+make a run several minutes longer, so the runner starts UI runs in the background and waits for the completion
+notification rather than holding a 600 s foreground call. The report is the same shape: a `UI` line on a pass; the
+failing test, its assertion, a `screenshots:` folder and the xcresult path on a failure.
+
 ## Risks and open questions
 
 - **Continuation is untested in practice.** The loop relies on `SendMessage` resuming a finished implementer with its context intact. If that proves unreliable, the fallback is to let the implementer call `scripts/verify.sh` directly. That keeps the short reports and drops only the Haiku hop.

@@ -232,6 +232,23 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_IDENTITY: "-"
 
+  # #0200: XCUITests. Run only in the Tart guest by scripts/run-tests-vm.sh --ui (docs/ui-tests-in-vm.md), never on
+  # the host: their own scheme ("Roadie UI Tests"); the Roadie scheme's Test action stays unit tests only.
+  RoadieUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - Tests/RoadieUITests
+      - path: App/Accessibility/AXID.swift
+    dependencies:
+      - target: Roadie
+    settings:
+      base:
+        TEST_TARGET_NAME: Roadie
+        PRODUCT_BUNDLE_IDENTIFIER: co.sstools.roadie.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+
 schemes:
   Roadie:
     build:
@@ -253,3 +270,13 @@ schemes:
         - package: PlayerKit/MusicAssistantKitTests
         - package: PlayerKit/SendspinKitTests
         - package: PlayerKit/SendspinPlaybackTests
+  # #0200: only scripts/run-tests-vm.sh --ui runs this, inside the guest. ROADIE_TEST_* reach the runner through
+  # xcodebuild's environment (TEST_RUNNER_ prefix).
+  Roadie UI Tests:
+    build:
+      targets:
+        Roadie: all
+        RoadieUITests: [test]
+    test:
+      targets:
+        - RoadieUITests

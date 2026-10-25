@@ -24,7 +24,8 @@ struct SkinSlider: View {
 
     @GestureState private var isPressed = false
 
-    /// This slider exposed as one adjustable accessibility element. `adjust` moves it 2 % and commits.
+    /// This slider exposed as one accessibility slider. `value` is its value description; `AXValue` is the 0...100
+    /// position, and an increment or decrement moves it 2 % and commits.
     func skinSlider(_ id: String, label: String, value: String) -> SkinSlider {
         var copy = self
         copy.accessibility = (id, label, value)
@@ -33,26 +34,32 @@ struct SkinSlider: View {
 
     var body: some View {
         if let accessibility {
+            // A native Slider as the accessibility representation: SwiftUI (macOS) gives a custom adjustable element
+            // the role AXUnknown and no AXValue, so XCUITest read an empty value (#0200). This one is an AXSlider
+            // whose AXValue is the position in percent and whose AXValueDescription is `accessibility.value`.
             content
-                .accessibilityElement()
+                .accessibilityRepresentation {
+                    Slider(value: accessibilityPercent, in: 0...100, step: 2)
+                        .disabled(fraction == nil)
+                }
                 .accessibilityIdentifier(accessibility.id)
                 .accessibilityLabel(accessibility.label)
                 .accessibilityValue(accessibility.value)
-                .accessibilityAdjustableAction { direction in
-                    guard let fraction else { return }
-                    let step: Double =
-                        switch direction {
-                        case .increment: 0.02
-                        case .decrement: -0.02
-                        @unknown default: 0
-                        }
-                    let target = min(max(fraction + step, 0), 1)
-                    onChange(target)
-                    onCommit(target)
-                }
         } else {
             content
         }
+    }
+
+    /// The fraction as 0...100 for the accessibility slider; setting it moves the slider and commits.
+    private var accessibilityPercent: Binding<Double> {
+        Binding(
+            get: { (fraction ?? 0) * 100 },
+            set: { percent in
+                guard fraction != nil else { return }
+                let target = min(max(percent / 100, 0), 1)
+                onChange(target)
+                onCommit(target)
+            })
     }
 
     private var content: some View {

@@ -259,7 +259,7 @@ A subagent starts with fresh context, so its first job is loading the project's 
 
 A mechanical step, so it runs on the cheapest model. The orchestrator gives it one command line from the implementer's `VERIFY:` request.
 
-1. Run exactly that command from the repo root with the Bash tool. Use a timeout of 600000 ms; a `--stress` or `--corpus` run that may take longer goes in the background, and you wait for its completion notification.
+1. Run exactly that command from the repo root with the Bash tool. Use a timeout of 600000 ms; a `--stress` or `--corpus` run that may take longer goes in the background, and you wait for its completion notification. UI (`--ui`) and coverage runs always go in the background (#0200).
 2. Return the command's complete stdout **verbatim**, followed by `exit <code>`. It is short by design (5–10 lines on a pass, at most about 60 on a failure).
 3. Never read the logs under `build/vm-tests/`, run any other command, edit files, re-run on failure (`verify.sh` already retries INFRA once), or interpret the result. Diagnosis is the implementer's job.
 

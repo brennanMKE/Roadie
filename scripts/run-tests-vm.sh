@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike] [--dmg [--build-number N]]
+# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike] [--dmg [--build-number N]] [--ui [--ui-filter C[,C]] [--ui-skins base|all] [--test-skins DIR]]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --build-only  stop after the build stage (both packages with their tests, the app; with --spike the spike too):
 #                 a quick compile check before a full run, never verification
@@ -19,6 +19,12 @@
 #                     and diff each render against them in skintool-png (numbers only, never gated)
 #   --test-skins DIR  UI-test skins cache (default ~/Library/Caches/co.sstools.roadie-test-skins, from
 #                     scripts/fetch-test-skins.sh). Only --ui (#0200) uses it: checks it, copies it to TestSkins/ (#0198)
+#   --ui      also build and run the XCUITests (RoadieUITests, scheme "Roadie UI Tests"; steps ui-build, ui-tests),
+#             in the guest only (docs/ui-tests-in-vm.md). Needs the test-skins cache; lays out the fixture music folder
+#             (make-test-library.sh) into the export, sets the guest display to 2560x1300. Results in ui/ (xcresult,
+#             summary.json, attachments/)
+#   --ui-filter C[,C]  with --ui: only these RoadieUITests classes (-only-testing:RoadieUITests/C)
+#   --ui-skins base|all  with --ui: ROADIE_TEST_SKIN_SET for the tests (default base)
 #   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
 #   --stress-filter F  with --stress: loop the `swift test --filter` F instead (default: the gapless test)
 #   --stress-package P  with --stress: SkinKit or PlayerKit (default PlayerKit); the step is <p>-stress (#0094)
@@ -57,6 +63,7 @@
 #      scripts/tests/test_verify_report.py: verify.sh --report --expect-fail (#0201)
 #      scripts/check-website.sh: website/ lint, appcast XML and every local reference resolves (#0163)
 #   7. optional: launch Roadie.app, check it stays up, quit it
+#   8. optional (--ui): ui-build after app-build, ui-tests (XCUITests under with-timeout.sh 1200) after the checks
 # Exit codes:
 #   0  everything passed and the host stayed silent
 #   1  a build/test/check step failed, the host's coreaudiod logged "Starting IO" during
@@ -87,6 +94,8 @@ CORPUS_DIR=""
 CORPUS_SAMPLE=""
 TEST_SKINS_DIR="$HOME/Library/Caches/co.sstools.roadie-test-skins"
 UI=0  # set by --ui (#0200)
+UI_FILTER=""
+UI_SKINS=base
 args=("$@")
 while (( $#args )); do
   arg=$args[1]; shift args
@@ -107,6 +116,9 @@ while (( $#args )); do
     --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
     --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
     --test-skins) TEST_SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$TEST_SKINS_DIR" ]] || { print -r -- "--test-skins needs a directory" >&2; exit 2 } ;;
+    --ui) UI=1 ;;
+    --ui-filter) UI_FILTER=${args[1]:-}; shift args 2>/dev/null; [[ -n "$UI_FILTER" ]] || { print -r -- "--ui-filter needs Class[,Class]" >&2; exit 2 } ;;
+    --ui-skins) UI_SKINS=${args[1]:-}; shift args 2>/dev/null; [[ "$UI_SKINS" == (base|all) ]] || { print -r -- "--ui-skins needs base or all" >&2; exit 2 } ;;
     --corpus-sample) CORPUS_SAMPLE=${args[1]:-}; shift args 2>/dev/null; [[ "$CORPUS_SAMPLE" == <1-> ]] || { print -r -- "--corpus-sample needs a positive count" >&2; exit 2 } ;;
     -h|--help) awk 'NR > 1 { if (!/^#/) exit; print }' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
@@ -119,7 +131,7 @@ done
 [[ -n "$STRESS_PACKAGE" ]] && (( ! STRESS )) && { print -r -- "--stress-package needs --stress N" >&2; exit 2 }
 if (( BUILD_ONLY )); then
   for f v in --stress "$STRESS" --stress-package "$STRESS_PACKAGE" --load "$LOAD" --launch "$LAUNCH" --corpus "$CORPUS_DIR" --corpus-sample "$CORPUS_SAMPLE" \
-             --skins "$SKINS_DIR" --references "$REFS_DIR" --full "$FULL"; do
+             --skins "$SKINS_DIR" --references "$REFS_DIR" --full "$FULL" --ui "$UI"; do
     [[ -n "$v" && "$v" != 0 ]] && { print -r -- "--build-only runs no tests; drop $f" >&2; exit 2 }
   done
 fi
@@ -127,6 +139,7 @@ TIER=fast; slow_env=""; rt_env=""
 (( FULL )) && { TIER=full; slow_env="ROADIE_SLOW_TESTS=1 "; rt_env="AUDIOCORE_REALTIME=1 " }
 (( BUILD_ONLY )) && TIER=build-only
 [[ -n "$REFS_DIR" && -z "$SKINS_DIR" ]] && { print -r -- "--references needs --skins DIR" >&2; exit 2 }
+[[ -n "$UI_FILTER" ]] && (( ! UI )) && { print -r -- "--ui-filter needs --ui" >&2; exit 2 }
 [[ -n "$CORPUS_SAMPLE" && -z "$CORPUS_DIR" ]] && { print -r -- "--corpus-sample needs --corpus DIR" >&2; exit 2 }
 if [[ -n "$CORPUS_DIR" ]]; then
   CORPUS_DIR="$(cd "$CORPUS_DIR" && pwd)"
@@ -273,6 +286,9 @@ if (( UI )); then
   done < <(python3 -I "$REPO/scripts/test_skins.py" parse "$REPO/scripts/test-skins.tsv")
   cp "$REPO/scripts/test-skins.tsv" "$EXPORT/src/TestSkins/test-skins.tsv"
   log "Copied $n test skins from $TEST_SKINS_DIR into the export"
+  # The UI tests' music folder (#0195), laid out on the host from the committed fixtures.
+  "$REPO/scripts/make-test-library.sh" "$EXPORT/src/TestMusic" >/dev/null || fail "make-test-library.sh failed"
+  log "Laid out the test music folder in the export"
 fi
 
 # --- Clone and boot --------------------------------------------------------
@@ -285,6 +301,8 @@ fi
 
 log "Cloning $GOLDEN -> $CLONE"
 tart clone "$GOLDEN" "$CLONE"
+# A display big enough for the three skinned windows and the Library (#0200); the clone only, never the golden.
+(( UI )) && tart set "$CLONE" --display 2560x1300px
 log "Booting headless, no audio device, export mounted read-only"
 # The corpus is a second, named, read-only share; the guest copies it to its own disk before anything is timed.
 tart_dirs=(--dir=run:"$EXPORT":ro)
@@ -351,6 +369,10 @@ run_step skinkit-build   "swift build --build-tests --package-path Packages/Skin
 run_step playerkit-build "swift build --build-tests --package-path Packages/PlayerKit" build
 APP_BUILD="xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData build-for-testing"
 if (( build_failed )); then skip_step app-build; else run_step app-build "$APP_BUILD" build; fi
+UI_XCODEBUILD="xcodebuild -project Roadie.xcodeproj -scheme 'Roadie UI Tests' -configuration Debug -derivedDataPath build/DerivedData"
+if (( UI )); then
+  if (( build_failed )); then skip_step ui-build; else run_step ui-build "$UI_XCODEBUILD build-for-testing" build; fi
+fi
 if (( SPIKE )); then
   if (( build_failed )); then
     skip_step spike-pkg-build; skip_step spike-build
@@ -396,6 +418,22 @@ run_step recorder-tests  "python3 -B -m unittest discover -v -s scripts/tests -p
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app --args -firstRunVersion 1 && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"
+fi
+
+if (( UI )); then
+  # XCUITests, in the guest only (docs/ui-tests-in-vm.md). xcodebuild hands TEST_RUNNER_<name> to the test runner as
+  # <name>. scripts/with-timeout.sh turns a blocked prompt into exit 124 rather than a hang.
+  # ROADIE_UI_GUEST=1 is the harness's guest guard: without it (and the admin user) it won't launch Roadie or run
+  # `defaults delete co.sstools.roadie`.
+  only_testing=""
+  for c in ${(s:,:)UI_FILTER}; do only_testing+=" -only-testing:RoadieUITests/$c"; done
+  ui_env=""
+  for k v in ROADIE_TEST_SKINS $GUEST_SRC/TestSkins ROADIE_TEST_MUSIC $GUEST_SRC/TestMusic \
+             ROADIE_TEST_DATA /Users/admin/roadie-test-data ROADIE_TEST_SKIN_SET $UI_SKINS \
+             ROADIE_UI_GUEST 1; do
+    ui_env+="$k=$v TEST_RUNNER_$k=$v "
+  done
+  run_step ui-tests "mkdir -p $GUEST_RESULTS/ui && ${ui_env}scripts/with-timeout.sh 1200 $UI_XCODEBUILD -resultBundlePath $GUEST_RESULTS/ui/UITests.xcresult -retry-tests-on-failure -test-iterations 2$only_testing test-without-building 2>&1 | grep -vE '^$'"
 fi
 
 if (( SPIKE )); then
@@ -460,6 +498,41 @@ if (( ! guest_lost )); then
     || { guest_alive || { guest_lost=1; lost_step=${lost_step:-results}; log "Guest lost during results"; }; }
 fi
 
+# UI results (#0200): the xcresult's summary and attachments (screenshots, the state probe) on the host.
+UI_LINE=""
+if (( UI )) && [[ -d "$RESULTS_DIR/ui/UITests.xcresult" ]]; then
+  xr="$RESULTS_DIR/ui/UITests.xcresult"
+  xcrun xcresulttool get test-results summary --path "$xr" >"$RESULTS_DIR/ui/summary.json" 2>/dev/null \
+    || xcrun xcresulttool get --legacy --format json --path "$xr" >"$RESULTS_DIR/ui/summary.json" 2>/dev/null || true
+  mkdir -p "$RESULTS_DIR/ui/attachments"
+  xcrun xcresulttool export attachments --path "$xr" --output-path "$RESULTS_DIR/ui/attachments" >/dev/null 2>&1 || true
+  # Group the exported files by test (manifest.json: testIdentifier -> exportedFileName), as attachments/<testName>/.
+  python3 -I - "$RESULTS_DIR/ui/attachments" <<'PY' 2>/dev/null || true
+import json, os, sys
+d = sys.argv[1]
+for entry in json.load(open(os.path.join(d, "manifest.json"))):
+    test = entry.get("testIdentifier", "").split("/")[-1].replace("()", "") or "unknown"
+    os.makedirs(os.path.join(d, test), exist_ok=True)
+    for a in entry.get("attachments", []):
+        f = a.get("exportedFileName")
+        if f and os.path.exists(os.path.join(d, f)):
+            os.replace(os.path.join(d, f), os.path.join(d, test, f))
+PY
+  UI_LINE=$(python3 -I - "$RESULTS_DIR/ui/summary.json" "$UI_SKINS" "${UI_FILTER:-all classes}" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    s = json.load(open(sys.argv[1]))
+    total, failed = int(s.get("totalTestCount", 0)), int(s.get("failedTests", 0))
+except Exception:
+    sys.exit(0)
+if failed:
+    print(f"UI  {failed} of {total} tests failed")
+elif total:
+    print(f"UI  {total} tests passed ({sys.argv[3]}) on {sys.argv[2]}")
+PY
+)
+fi
+
 # --- Host audio check ------------------------------------------------------
 # With --no-audio the guest has no path to the host's speakers; prove it.
 
@@ -512,8 +585,10 @@ else
 fi
 step_logs=("$RESULTS_DIR"/*.log(N))  # none when the guest was lost before the results pull
 if (( ${#step_logs} )); then
-  grep -hE 'Build complete!|Test run with|Executed [1-9][0-9]* tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
+  grep -hE 'Build complete!|Test run with|Executed [1-9][0-9]* tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|Executed .* tests|Test Suite 'RoadieUITests' (passed|failed)|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
 fi
+[[ -n "$UI_LINE" ]] && log "$UI_LINE"
+(( UI )) && [[ "${step_rc[ui-tests]:-}" == 124 ]] && log "UI  ui-tests timed out (a blocked prompt in the guest?)"
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
   (( overall == 3 )) || overall=1

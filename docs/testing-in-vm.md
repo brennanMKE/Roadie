@@ -258,19 +258,44 @@ consolidated on 2026-10-11.
 
 Run it in the foreground of a terminal. A dropped session costs a clone, not a work session.
 
-## UI tests (not built yet)
+## UI tests
 
 Why UI tests may only run in a guest, what the golden image already allows, how to read the permission checks and what a passing UI run must also show: [ui-tests-in-vm.md](ui-tests-in-vm.md).
 
-The XCUITests will run the same way, as a further step in the guest:
+**UI tests never run on the host**, not from Xcode and not with `xcodebuild test`: XCUITest injects into other
+running apps and has crashed them. The `Roadie` scheme's Test action holds unit tests only; the XCUITests
+(`Tests/RoadieUITests`, target `RoadieUITests`) have their own scheme, `Roadie UI Tests`, that only the VM script
+runs. Outside the VM run the tests skip themselves: no `ROADIE_TEST_SKINS`, or no `ROADIE_UI_GUEST=1` and `admin`
+user (the guard that keeps `defaults delete co.sstools.roadie` off a dev Mac; docs/ui-tests-in-vm.md).
 
 ```bash
-xcodebuild -project Roadie.xcodeproj -scheme 'Roadie UI Tests' \
-  -destination 'platform=macOS' -resultBundlePath ~/results/UITests.xcresult test
+scripts/fetch-test-skins.sh                      # once, on the host: the test skins cache (#0198)
+scripts/verify.sh --ui                           # every UI test, in the guest
+scripts/verify.sh --ui --ui-filter SmokeUITests  # some classes only (comma-separated)
+scripts/verify.sh --ui --expect playsTheFixtureLibrary
 ```
 
-The `Roadie` scheme's Test action holds unit tests only. UI tests go in a separate scheme,
-`Roadie UI Tests`, that only the VM script runs. A passing UI run also needs:
+- **Prerequisites:** the test skins cache (`--test-skins DIR`, default
+  `~/Library/Caches/co.sstools.roadie-test-skins`); `--ui` stops before booting if it fails `fetch-test-skins.sh
+  --check`. The skins go into the export's `TestSkins/`, never via `--skins` and never committed. The music folder is
+  laid out on the host by `scripts/make-test-library.sh` into the export's `TestMusic/`.
+- **Flags:** `--ui`, `--ui-filter Class[,Class]` (`-only-testing:RoadieUITests/Class`), `--ui-skins base|all`
+  (`ROADIE_TEST_SKIN_SET`, default `base`). `--build-only` rejects `--ui`.
+- **Steps:** `ui-build` (after `app-build`: `build-for-testing` with the UI scheme) and `ui-tests`
+  (`test-without-building`, `-retry-tests-on-failure -test-iterations 2`, under `scripts/with-timeout.sh 1200`; a
+  timeout exits 124 and the report says "a blocked prompt in the guest?"). The paths reach the test runner as
+  `TEST_RUNNER_ROADIE_TEST_SKINS` / `_MUSIC` / `_DATA` / `_SKIN_SET`, plus `TEST_RUNNER_ROADIE_UI_GUEST=1`.
+- **Display:** the clone (never the golden) gets `tart set --display 2560x1300px` before it boots.
+- **What comes back:** `build/vm-tests/<id>/ui/UITests.xcresult`, `ui/summary.json` (`xcresulttool get test-results
+  summary`) and `ui/attachments/<testName>/` (a screenshot and the state probe's JSON, kept for failed tests). The
+  summary has a `UI` line: `==> UI  N tests passed (…) on base` or `==> UI  M of N tests failed`. On a failure
+  `verify.sh` prints the failing test, its assertion, a `screenshots:` line per failed test and the xcresult path.
+- **Test helper:** `Tests/RoadieUITests/Support/RoadieUIApp.swift` launches Roadie with `-RoadieUITest 1`, a per-test
+  data directory, the fixture library and a test skin, and first runs `defaults delete co.sstools.roadie` in the
+  guest: AppKit's frame autosave and SwiftUI's `@SceneStorage` still write `.standard` (#0194), which is harmless in
+  the throwaway guest.
+
+A passing UI run also needs:
 
 - No prompt appeared in the guest. A blocking prompt shows up as a timeout, not a pass.
 - No new crash reports on the host (`ls -lt ~/Library/Logs/DiagnosticReports | head` before and

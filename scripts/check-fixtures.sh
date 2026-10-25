@@ -2,7 +2,9 @@
 # check-fixtures.sh — the committed audio stays small and in its place (#0195, docs/design/test-automation.md §2.3).
 # Fails if any .mp3/.m4a/.flac/.wav is tracked outside Packages/PlayerKit/Sources/PlayerKitTestFixtures/Audio/ and
 # Packages/*/Tests/**/Fixtures/, if any file in those folders is over 200 KB, or if MANIFEST.txt's md5s don't match.
-# Uses `git ls-files` on the host; the guest has no git, so there it lists the exported tree with find instead.
+# Uses `git ls-files` on the host; the guest has no git, so there it lists the exported tree with find instead. That
+# find skips the top-level TestMusic/ and TestSkins/, which run-tests-vm.sh --ui generates into the export at run time
+# (make-test-library.sh, the skins cache) and which are never committed; on the host, git ls-files still flags them.
 # Usage: scripts/check-fixtures.sh
 set -euo pipefail
 cd "${0:A:h}/.."
@@ -12,7 +14,7 @@ if command -v git >/dev/null && git rev-parse --is-inside-work-tree >/dev/null 2
   files=("${(@f)$(git ls-files)}")
   source_note="git ls-files"
 else
-  files=("${(@f)$(find . \( -name .build -o -name build -o -name .git -o -name References -o -name Skins \) -prune -o -type f -print | sed 's#^\./##')}")
+  files=("${(@f)$(find . \( -path ./TestMusic -o -path ./TestSkins -o -name .build -o -name build -o -name .git -o -name References -o -name Skins \) -prune -o -type f -print | sed 's#^\./##')}")
   source_note="find (no git)"
 fi
 
