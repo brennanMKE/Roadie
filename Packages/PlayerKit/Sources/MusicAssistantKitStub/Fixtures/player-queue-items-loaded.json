@@ -1,0 +1,1990 @@
+{
+  "command": "player_queues/items",
+  "args": {
+    "queue_id": "syncgroup_uckfpbw8",
+    "limit": 50,
+    "offset": 0
+  },
+  "frames": [
+    {
+      "message_id": "6",
+      "result": [
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "a6b8fbb026f5465eb7f64d419cf2ec33",
+          "name": "Soul Coughing - Rolling",
+          "duration": 216,
+          "sort_index": 0,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2156",
+            "provider": "library",
+            "name": "Rolling",
+            "version": "",
+            "sort_name": "rolling",
+            "uri": "library://track/2156",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/01 Rolling.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": " 00001062 0000031C 000106F4 0000C37F 00019500 00033292 000089D0 00008B28 00028DAC 0001D0CB",
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": [
+                {
+                  "type": "thumb",
+                  "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                  "provider": "theaudiodb",
+                  "remotely_accessible": true,
+                  "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+                }
+              ],
+              "grouping": null,
+              "genres": [
+                "Alternative & Punk"
+              ],
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 216,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "provider_mappings": [
+                {
+                  "item_id": "Soul Coughing/08 El Oso",
+                  "provider_domain": "filesystem_smb",
+                  "provider_instance": "filesystem_smb--gPeSLx39",
+                  "available": true,
+                  "in_library": true,
+                  "is_unique": null,
+                  "audio_format": {
+                    "content_type": "?",
+                    "codec_type": "?",
+                    "sample_rate": 44100,
+                    "bit_depth": 16,
+                    "channels": 2,
+                    "output_format_str": "?",
+                    "bit_rate": 0
+                  },
+                  "url": "Soul Coughing/08 El Oso",
+                  "details": null
+                }
+              ],
+              "metadata": {
+                "description": "El Oso (Spanish for The Bear), released in 1998 (see 1998 in music), is the third and final album by the New York City band Soul Coughing. The disc is marked by",
+                "description_language": "en",
+                "life_span": null,
+                "artist_entity_type": null,
+                "review": "",
+                "explicit": null,
+                "images": [
+                  {
+                    "type": "thumb",
+                    "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                    "provider": "theaudiodb",
+                    "remotely_accessible": true,
+                    "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+                  }
+                ],
+                "grouping": null,
+                "genres": [
+                  "Experimental"
+                ],
+                "mood": "",
+                "style": "Jazz",
+                "copyright": null,
+                "lyrics": null,
+                "lrc_lyrics": null,
+                "transcript": null,
+                "transcript_cues": null,
+                "has_transcript": null,
+                "label": "Roundhill Records",
+                "links": [
+                  {
+                    "type": "wikipedia",
+                    "url": "https://wikipedia.org/wiki/El_Oso"
+                  },
+                  {
+                    "type": "allmusic",
+                    "url": "https://www.allmusic.com/album/mw0000043785"
+                  }
+                ],
+                "performers": null,
+                "preview": null,
+                "popularity": null,
+                "release_date": null,
+                "languages": null,
+                "chapters": null,
+                "collections": null,
+                "last_refresh": 1792036039
+              },
+              "favorite": false,
+              "position": null,
+              "date_added": "2026-10-13T02:46:36+00:00",
+              "year": 1998,
+              "artists": [
+                {
+                  "item_id": "474",
+                  "provider": "library",
+                  "name": "Soul Coughing",
+                  "version": "",
+                  "sort_name": "soul coughing",
+                  "uri": "library://artist/474",
+                  "external_ids": [],
+                  "is_playable": true,
+                  "media_type": "artist",
+                  "available": true,
+                  "image": null,
+                  "year": null
+                }
+              ],
+              "album_type": "album"
+            },
+            "disc_number": 0,
+            "track_number": 1,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "8b750b5d140a4733babc6ea6bf948f6d",
+          "name": "Soul Coughing - Misinformed",
+          "duration": 204,
+          "sort_index": 1,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2163",
+            "provider": "library",
+            "name": "Misinformed",
+            "version": "",
+            "sort_name": "misinformed",
+            "uri": "library://track/2163",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/02 Misinformed.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": " 000010AD 0000042C 0000AC39 000047E5 00003B2F 0001AE1A 00008D6F 00008AA0 0001E829 000196D6",
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": [
+                {
+                  "type": "thumb",
+                  "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                  "provider": "theaudiodb",
+                  "remotely_accessible": true,
+                  "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+                }
+              ],
+              "grouping": null,
+              "genres": [
+                "Alternative & Punk"
+              ],
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 204,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "provider_mappings": [
+                {
+                  "item_id": "Soul Coughing/08 El Oso",
+                  "provider_domain": "filesystem_smb",
+                  "provider_instance": "filesystem_smb--gPeSLx39",
+                  "available": true,
+                  "in_library": true,
+                  "is_unique": null,
+                  "audio_format": {
+                    "content_type": "?",
+                    "codec_type": "?",
+                    "sample_rate": 44100,
+                    "bit_depth": 16,
+                    "channels": 2,
+                    "output_format_str": "?",
+                    "bit_rate": 0
+                  },
+                  "url": "Soul Coughing/08 El Oso",
+                  "details": null
+                }
+              ],
+              "metadata": {
+                "description": "El Oso (Spanish for The Bear), released in 1998 (see 1998 in music), is the third and final album by the New York City band Soul Coughing. The disc is marked by",
+                "description_language": "en",
+                "life_span": null,
+                "artist_entity_type": null,
+                "review": "",
+                "explicit": null,
+                "images": [
+                  {
+                    "type": "thumb",
+                    "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                    "provider": "theaudiodb",
+                    "remotely_accessible": true,
+                    "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+                  }
+                ],
+                "grouping": null,
+                "genres": [
+                  "Experimental"
+                ],
+                "mood": "",
+                "style": "Jazz",
+                "copyright": null,
+                "lyrics": null,
+                "lrc_lyrics": null,
+                "transcript": null,
+                "transcript_cues": null,
+                "has_transcript": null,
+                "label": "Roundhill Records",
+                "links": [
+                  {
+                    "type": "wikipedia",
+                    "url": "https://wikipedia.org/wiki/El_Oso"
+                  },
+                  {
+                    "type": "allmusic",
+                    "url": "https://www.allmusic.com/album/mw0000043785"
+                  }
+                ],
+                "performers": null,
+                "preview": null,
+                "popularity": null,
+                "release_date": null,
+                "languages": null,
+                "chapters": null,
+                "collections": null,
+                "last_refresh": 1792036039
+              },
+              "favorite": false,
+              "position": null,
+              "date_added": "2026-10-13T02:46:36+00:00",
+              "year": 1998,
+              "artists": [
+                {
+                  "item_id": "474",
+                  "provider": "library",
+                  "name": "Soul Coughing",
+                  "version": "",
+                  "sort_name": "soul coughing",
+                  "uri": "library://artist/474",
+                  "external_ids": [],
+                  "is_playable": true,
+                  "media_type": "artist",
+                  "available": true,
+                  "image": null,
+                  "year": null
+                }
+              ],
+              "album_type": "album"
+            },
+            "disc_number": 0,
+            "track_number": 2,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "db8279d32a8d46b6b1aa2d34d7001f49",
+          "name": "Soul Coughing - Circles",
+          "duration": 186,
+          "sort_index": 2,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2164",
+            "provider": "library",
+            "name": "Circles",
+            "version": "",
+            "sort_name": "circles",
+            "uri": "library://track/2164",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/03 Circles.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 186,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 3,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "e0f698b027284d1fa42e54af0a78cc3f",
+          "name": "Soul Coughing - Blame",
+          "duration": 300,
+          "sort_index": 3,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2161",
+            "provider": "library",
+            "name": "Blame",
+            "version": "",
+            "sort_name": "blame",
+            "uri": "library://track/2161",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/04 Blame.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 300,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 4,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "1c672a924a0c471aac891e53d02fe6ce",
+          "name": "Soul Coughing - St. Louise Is Listening",
+          "duration": 269,
+          "sort_index": 4,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2158",
+            "provider": "library",
+            "name": "St. Louise Is Listening",
+            "version": "",
+            "sort_name": "st. louise is listening",
+            "uri": "library://track/2158",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/05 St. Louise Is Listening.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 269,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 5,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "35daa73760ac42838e6395fc783e34f3",
+          "name": "Soul Coughing - Maybe I'll Come Down",
+          "duration": 272,
+          "sort_index": 5,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2154",
+            "provider": "library",
+            "name": "Maybe I'll Come Down",
+            "version": "",
+            "sort_name": "maybe i'll come down",
+            "uri": "library://track/2154",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/06 Maybe I'll Come Down.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 272,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 6,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "17d46ed5a90549d6b36da28c097e2db8",
+          "name": "Soul Coughing - Houston",
+          "duration": 243,
+          "sort_index": 6,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2159",
+            "provider": "library",
+            "name": "Houston",
+            "version": "",
+            "sort_name": "houston",
+            "uri": "library://track/2159",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/07 Houston.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 243,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 7,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "bf72fe9ac07442ab9661301c0fc5670c",
+          "name": "Soul Coughing - $300",
+          "duration": 187,
+          "sort_index": 7,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2166",
+            "provider": "library",
+            "name": "$300",
+            "version": "",
+            "sort_name": "$300",
+            "uri": "library://track/2166",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/08 $300.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355803"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 187,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 8,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "37a69eb8fb6a4012b10fbda32e890d1f",
+          "name": "Soul Coughing - Fully Retractable",
+          "duration": 205,
+          "sort_index": 8,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2165",
+            "provider": "library",
+            "name": "Fully Retractable",
+            "version": "",
+            "sort_name": "fully retractable",
+            "uri": "library://track/2165",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/09 Fully Retractable.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355803"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 205,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 9,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "dfd690916852402a8ace63f233ffc3bc",
+          "name": "Soul Coughing - Monster Man",
+          "duration": 256,
+          "sort_index": 9,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2160",
+            "provider": "library",
+            "name": "Monster Man",
+            "version": "",
+            "sort_name": "monster man",
+            "uri": "library://track/2160",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/10 Monster Man.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355803"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 256,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 10,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "a0cf530fcbb4417aa58897f96b4e45d3",
+          "name": "Soul Coughing - Pensacola",
+          "duration": 255,
+          "sort_index": 10,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2157",
+            "provider": "library",
+            "name": "Pensacola",
+            "version": "",
+            "sort_name": "pensacola",
+            "uri": "library://track/2157",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/11 Pensacola.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 255,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 11,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "dcbe1f821b96459e8a2219efd4d03b58",
+          "name": "Soul Coughing - I Miss The Girl",
+          "duration": 243,
+          "sort_index": 11,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2167",
+            "provider": "library",
+            "name": "I Miss The Girl",
+            "version": "",
+            "sort_name": "i miss the girl",
+            "uri": "library://track/2167",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/12 I Miss The Girl.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 243,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 12,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "8d1d8a2154334c1b89da646b42160bed",
+          "name": "Soul Coughing - So Far I Have Not Found The Science",
+          "duration": 173,
+          "sort_index": 12,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2155",
+            "provider": "library",
+            "name": "So Far I Have Not Found The Science",
+            "version": "",
+            "sort_name": "so far i have not found the science",
+            "uri": "library://track/2155",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/13 So Far I Have Not Found The Science.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 173,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 13,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        },
+        {
+          "queue_id": "syncgroup_uckfpbw8",
+          "queue_item_id": "deaa5037039b490785f72ca80bbd633c",
+          "name": "Soul Coughing - The Incumbent",
+          "duration": 406,
+          "sort_index": 13,
+          "streamdetails": null,
+          "media_item": {
+            "item_id": "2162",
+            "provider": "library",
+            "name": "The Incumbent",
+            "version": "",
+            "sort_name": "incumbent, the",
+            "uri": "library://track/2162",
+            "external_ids": [],
+            "is_playable": true,
+            "media_type": "track",
+            "provider_mappings": [
+              {
+                "item_id": "Soul Coughing/08 El Oso/14 The Incumbent.mp3",
+                "provider_domain": "filesystem_smb",
+                "provider_instance": "filesystem_smb--gPeSLx39",
+                "available": true,
+                "in_library": true,
+                "is_unique": null,
+                "audio_format": {
+                  "content_type": "mp3",
+                  "codec_type": "mp3",
+                  "sample_rate": 44100,
+                  "bit_depth": 16,
+                  "channels": 2,
+                  "output_format_str": "mp3",
+                  "bit_rate": 160
+                },
+                "url": null,
+                "details": "1221355802"
+              }
+            ],
+            "metadata": {
+              "description": null,
+              "description_language": null,
+              "life_span": null,
+              "artist_entity_type": null,
+              "review": null,
+              "explicit": null,
+              "images": null,
+              "grouping": null,
+              "genres": null,
+              "mood": null,
+              "style": null,
+              "copyright": null,
+              "lyrics": null,
+              "lrc_lyrics": null,
+              "transcript": null,
+              "transcript_cues": null,
+              "has_transcript": null,
+              "label": null,
+              "links": null,
+              "performers": null,
+              "preview": null,
+              "popularity": null,
+              "release_date": null,
+              "languages": null,
+              "chapters": null,
+              "collections": null,
+              "last_refresh": null
+            },
+            "favorite": false,
+            "position": null,
+            "date_added": "2026-10-13T02:46:36+00:00",
+            "duration": 406,
+            "artists": [
+              {
+                "item_id": "474",
+                "provider": "library",
+                "name": "Soul Coughing",
+                "version": "",
+                "sort_name": "soul coughing",
+                "uri": "library://artist/474",
+                "external_ids": [
+                  [
+                    "musicbrainz_artistid",
+                    "8067c102-4996-42bc-9980-06ce2e644eae"
+                  ]
+                ],
+                "is_playable": true,
+                "media_type": "artist",
+                "available": true,
+                "image": null,
+                "year": null
+              }
+            ],
+            "last_played": 0,
+            "album": {
+              "item_id": "448",
+              "provider": "library",
+              "name": "El Oso",
+              "version": "",
+              "sort_name": "oso, el",
+              "uri": "library://album/448",
+              "external_ids": [],
+              "is_playable": true,
+              "media_type": "album",
+              "available": true,
+              "image": {
+                "type": "thumb",
+                "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+                "provider": "theaudiodb",
+                "remotely_accessible": true,
+                "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+              },
+              "year": 1998
+            },
+            "disc_number": 0,
+            "track_number": 14,
+            "audio_metadata": null
+          },
+          "image": {
+            "type": "thumb",
+            "path": "https://r2.theaudiodb.com/images/media/album/thumb/el-oso-558d5fa3aa587.jpg",
+            "provider": "theaudiodb",
+            "remotely_accessible": true,
+            "proxy_id": "25f9c3fa2242276269fcae3ef86bc6796311b08852d8ee103defeae1adb185a7"
+          },
+          "index": 0,
+          "available": true,
+          "extra_attributes": {}
+        }
+      ],
+      "partial": false
+    }
+  ]
+}
