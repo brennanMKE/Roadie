@@ -1674,6 +1674,13 @@ def main(argv):
     args = {"out": None, "events_seconds": 30, "check": False, "live": False, "probe": False, "write": False,
             "wait": True, "playlist_writes": False, "record_queue": False, "queue_id": None}
     i = 0
+
+    def value(flag):
+        # The argument after `flag`; a usage stop when it is missing (#0196).
+        if i + 1 >= len(argv):
+            die("%s needs a value\n%s" % (flag, __doc__))
+        return argv[i + 1]
+
     while i < len(argv):
         a = argv[i]
         if a == "--check":
@@ -1689,19 +1696,19 @@ def main(argv):
         elif a == "--record-queue":
             args["record_queue"] = True
         elif a == "--queue-id":
+            args["queue_id"] = value(a)
             i += 1
-            args["queue_id"] = argv[i]
         elif a in ("-h", "--help"):
             print(__doc__)
             return
         elif a == "--no-wait":
             args["wait"] = False
         elif a == "--out":
+            args["out"] = value(a)
             i += 1
-            args["out"] = argv[i]
         elif a == "--events-seconds":
+            args["events_seconds"] = int(value(a))
             i += 1
-            args["events_seconds"] = int(argv[i])
         else:
             die("unknown argument " + a)
         i += 1

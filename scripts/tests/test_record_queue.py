@@ -74,6 +74,11 @@ class RecordQueueTests(unittest.TestCase):
             rmf.record_queue_calls(s)
         self.assertNotIn("player_queues/items", [c for c, _ in s.sent])
 
+    def test_queue_id_without_a_value_stops_with_usage(self):
+        with self.assertRaises(SystemExit) as stop:
+            rmf.main(["--record-queue", "--queue-id"])
+        self.assertEqual(stop.exception.code, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

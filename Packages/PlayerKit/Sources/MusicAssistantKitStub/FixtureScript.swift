@@ -76,6 +76,45 @@ public struct FixtureScript: Sendable {
         }
     }
 
+    /// #0196: `player_queues/items` routes for recorded queue pages. The baseline call answers only its own exact
+    /// `queue_id`, `limit` and `offset` (it comes first, so a page of the same queue can't take it). Each page then
+    /// answers any request at its `queue_id` and `offset` whose `limit` is at most the page's own, with the page's
+    /// first `limit` rows: `MAQueueWatch` asks for `min(pageSize, wanted - items.count)`.
+    public static func loadedQueueRoutes(
+        pages: [(args: MAJSON?, frames: [MAJSON])], baseline: (args: MAJSON?, frames: [MAJSON])
+    ) -> [Route] {
+        let command = "player_queues/items"
+        let baselineArgs = baseline.args
+        var routes: [Route] = [
+            Route.frames(
+                command: command,
+                matches: { args in ["queue_id", "limit", "offset"].allSatisfy { args[$0] == baselineArgs?[$0] } },
+                baseline.frames)
+        ]
+        for page in pages {
+            let queue = page.args?["queue_id"], offset = page.args?["offset"]?.intValue ?? 0
+            let rows = page.frames.flatMap { $0["result"]?.arrayValue ?? [] }
+            let recordedLimit = page.args?["limit"]?.intValue ?? rows.count
+            let frames = page.frames
+            routes.append(
+                Route(
+                    command: command,
+                    matches: { args in
+                        guard args["queue_id"] == queue, (args["offset"]?.intValue ?? 0) == offset,
+                            let limit = args["limit"]?.intValue
+                        else { return false }
+                        return limit <= recordedLimit
+                    },
+                    reply: { args, id in
+                        let limit = args["limit"]?.intValue ?? recordedLimit
+                        if limit >= rows.count { return FixtureScript.replay(frames, messageID: id) }
+                        let answer: MAJSON = ["result": .array(Array(rows.prefix(limit))), "partial": false]
+                        return FixtureScript.replay([answer], messageID: id)
+                    }))
+        }
+        return routes
+    }
+
     /// Every recorded call, registered by its recorded command and arguments. `auth` answers `auth-ok` when the
     /// sent token equals `token`, else `error-auth`. Listings match on `offset` and `summary`; later pages answer an
     /// empty array; counts ignore their filters.
@@ -98,15 +137,11 @@ public struct FixtureScript: Sendable {
             return { $0[key] == wanted }
         }
 
-        // #0196: the `--record-queue` pages, by queue, offset and limit, ahead of the empty recorded queue.
-        for fixture in [MAFixture.playerQueueItemsLoaded, .playerQueueItemsPage2] where fixture.isRecorded {
-            let queue = fixture.args?["queue_id"], offset = fixture.args?["offset"]?.intValue ?? 0
-            let limit = fixture.args?["limit"]
-            routes.append(
-                try Route.fixture(fixture, matches: {
-                    $0["queue_id"] == queue && ($0["offset"]?.intValue ?? 0) == offset && $0["limit"] == limit
-                }))
-        }
+        // #0196: the `--record-queue` pages ahead of the empty baseline queue, which keeps its own exact args.
+        routes += loadedQueueRoutes(
+            pages: try [MAFixture.playerQueueItemsLoaded, .playerQueueItemsPage2].filter(\.isRecorded)
+                .map { (args: $0.args, frames: try $0.frames()) },
+            baseline: (args: MAFixture.playerQueueItems.args, frames: try MAFixture.playerQueueItems.frames()))
         for fixture in [MAFixture.time, .infoWS, .authMe, .providers, .playersAll, .playerQueuesAll, .playerQueueActive,
                         .playerQueueItems, .artistsCount, .albumsCount, .tracksCount, .playlistsCount, .artistAlbums,
                         .albumGet, .itemByURI]

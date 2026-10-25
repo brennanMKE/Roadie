@@ -101,7 +101,7 @@ struct MAFixtureTests {
                 #expect(json["args"]?.objectValue != nil, "\(fixture.rawValue): args")
                 #expect(json["frames"]?.arrayValue != nil, "\(fixture.rawValue): frames")
             }
-            #expect(!(try fixture.frames()).contains(where: hasSyntheticKey), "\(fixture.rawValue): synthetic frame")
+            #expect(!hasSyntheticKey(json), "\(fixture.rawValue): synthetic key")
         }
         let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .appendingPathComponent("../../Sources/MusicAssistantKitStub/Fixtures").standardizedFileURL
@@ -109,6 +109,35 @@ struct MAFixtureTests {
             .filter { $0.hasSuffix(".json") }.map { String($0.dropLast(5)) }
             .filter { $0 != "commands-names" && !$0.hasPrefix("recommendations-items-") }
         #expect(Set(names) == Set(MAFixture.recorded.map(\.rawValue)))
+    }
+
+    /// The loaded-queue routes (#0196) over a SYNTHETIC stand-in page of 5 rows recorded at `limit: 50` on the
+    /// baseline's queue id: a shorter `limit` gets that many rows, the recorded `limit` gets the page as recorded, a
+    /// larger `limit` or another offset falls through, and the baseline's own args still get the baseline's `[]`.
+    @Test func loadedQueueRoutesSliceToTheAskedLimitAndSpareTheBaseline() throws {
+        let baselineArgs = try #require(MAFixture.playerQueueItems.args)
+        let queue = try #require(baselineArgs["queue_id"])
+        let rows: [MAJSON] = (0..<5).map { ["queue_item_id": .string("qi\($0)"), "index": 0] }
+        let page: MAJSON = ["queue_id": queue, "limit": 50, "offset": 0]
+        let script = FixtureScript(
+            routes: FixtureScript.loadedQueueRoutes(
+                pages: [(args: page, frames: [["result": .array(rows), "partial": false]])],
+                baseline: (args: baselineArgs, frames: try MAFixture.playerQueueItems.frames())),
+            fallbackFrames: [["result": "fallthrough"]])
+        func ask(limit: Int, offset: Int = 0) throws -> MAJSON? {
+            let replies = script.replies(
+                command: "player_queues/items",
+                args: ["queue_id": queue, "limit": .number(Double(limit)), "offset": .number(Double(offset))],
+                messageID: "7")
+            #expect(replies.count == 1)
+            return try MAJSON.parse(replies[0])["result"]
+        }
+        #expect(try ask(limit: 2)?.arrayValue == Array(rows.prefix(2)))
+        #expect(try ask(limit: 50)?.arrayValue == rows)
+        #expect(try ask(limit: 51) == "fallthrough")
+        #expect(try ask(limit: 2, offset: 50) == "fallthrough")
+        #expect(baselineArgs["limit"]?.intValue == 3 && baselineArgs["offset"]?.intValue == 0)
+        #expect(try ask(limit: 3)?.arrayValue == [])
     }
 
     @Test func authAnswersByToken() throws {
