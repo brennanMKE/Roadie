@@ -16,6 +16,8 @@ let package = Package(
         .library(name: "MusicAssistantKitStub", targets: ["MusicAssistantKitStub"]),
         .library(name: "SendspinKit", targets: ["SendspinKit"]),
         .library(name: "SendspinPlayback", targets: ["SendspinPlayback"]),
+        // Test-only (#0210): the app's RoadieTests bundle links it; the app itself never does.
+        .library(name: "PlayerKitTestFixtures", targets: ["PlayerKitTestFixtures"]),
     ],
     targets: [
         // Tiny local C shim for acquire/release atomics (no third-party dependency).

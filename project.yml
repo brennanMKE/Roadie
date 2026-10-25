@@ -224,6 +224,9 @@ targets:
     sources: [Tests/RoadieTests]
     dependencies:
       - target: Roadie
+      # #0210: the fixture audio library for PlayerModelDropTests. Linked by the test bundle only, never the app.
+      - package: PlayerKit
+        product: PlayerKitTestFixtures
     settings:
       base:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Roadie.app/Contents/MacOS/Roadie

@@ -47,7 +47,7 @@ final class PlaylistListInputView: NSView {
     init(model: PlayerModel) {
         self.model = model
         super.init(frame: .zero)
-        registerForDraggedTypes([.fileURL, Self.mediaIDType])
+        registerForDraggedTypes([.fileURL, LibraryDropDecoder.mediaIDType])
     }
 
     required init?(coder: NSCoder) { nil }
@@ -184,43 +184,14 @@ final class PlaylistListInputView: NSView {
 
     // MARK: File drops (#0183) and Library drops (#0184)
 
-    /// What a Library row's `.draggable(MediaIDTransfer)` puts on the pasteboard (JSON, `CodableRepresentation`).
-    private static let mediaIDType = NSPasteboard.PasteboardType(UTType.roadieMediaID.identifier)
-
-    private static let fileURLOptions: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-
     private static let dropLog = Logger(subsystem: "co.sstools.roadie", category: "LibraryDrop")
-
-    /// The operation to offer: copy if the source allows it, else whatever it allows (a SwiftUI source sets the mask).
-    private static func operation(for mask: NSDragOperation) -> NSDragOperation {
-        for op in [NSDragOperation.copy, .generic, .move] where mask.contains(op) { return op }
-        return []
-    }
-
-    /// The media-id type on the pasteboard or on any of its items (a SwiftUI drag puts each item on its own).
-    private static func hasMediaID(_ pasteboard: NSPasteboard) -> Bool {
-        if pasteboard.types?.contains(mediaIDType) == true { return true }
-        return (pasteboard.pasteboardItems ?? []).contains { $0.types.contains(mediaIDType) }
-    }
-
-    /// Every item's ids in item order, else the pasteboard's own data. nil when nothing decodes.
-    private static func mediaIDs(from pasteboard: NSPasteboard) -> [MediaID]? {
-        var ids: [MediaID] = []
-        var decoded = false
-        for item in pasteboard.pasteboardItems ?? [] {
-            guard let data = item.data(forType: mediaIDType), let transfer = MediaIDTransfer.decode(data) else { continue }
-            decoded = true
-            ids += transfer.ids
-        }
-        if decoded { return ids }
-        guard let data = pasteboard.data(forType: mediaIDType) else { return nil }
-        return MediaIDTransfer.decode(data)?.ids
-    }
 
     private func dragOperation(_ sender: NSDraggingInfo) -> NSDragOperation {
         let pasteboard = sender.draggingPasteboard
-        if Self.hasMediaID(pasteboard) { return Self.operation(for: sender.draggingSourceOperationMask) }
-        return pasteboard.canReadObject(forClasses: [NSURL.self], options: Self.fileURLOptions) ? .copy : []
+        if LibraryDropDecoder.hasMediaID(pasteboard) {
+            return LibraryDropDecoder.operation(for: sender.draggingSourceOperationMask)
+        }
+        return LibraryDropDecoder.hasFileURLs(pasteboard) ? .copy : []
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -237,8 +208,8 @@ final class PlaylistListInputView: NSView {
     /// queue's row means nothing in the local queue, so there the drop appends as before.
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pasteboard = sender.draggingPasteboard
-        if Self.hasMediaID(pasteboard) {
-            guard let ids = Self.mediaIDs(from: pasteboard), !ids.isEmpty else {
+        if LibraryDropDecoder.hasMediaID(pasteboard) {
+            guard let ids = LibraryDropDecoder.mediaIDs(from: pasteboard), !ids.isEmpty else {
                 Self.dropLog.error("drop: media-id type present but no data decoded")
                 MainActor.assumeIsolated { model.post(StatusNotice(text: "Couldn't read the dragged items")) }
                 return false
@@ -252,8 +223,7 @@ final class PlaylistListInputView: NSView {
                 return true
             }
         }
-        let urls = (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: Self.fileURLOptions)
-            as? [URL]) ?? []
+        let urls = LibraryDropDecoder.fileURLs(from: pasteboard)
         guard !urls.isEmpty else { return false }
         return MainActor.assumeIsolated {
             let playlist = model.playlist
