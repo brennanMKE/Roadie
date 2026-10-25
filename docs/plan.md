@@ -181,6 +181,15 @@ Follows `docs/plex-music-library.md`:
      skinned menu, and the Library opens on its search field.
 - Children #0174 to #0185. #0174 checks the Winamp 5.x behaviours the spec leaves open; the user does it.
 
+**M16: Test automation** ([#0192](../issues/0192.md))
+- The tests that would have caught 0.0.4's bugs (#0186–#0191), and the workflow that keeps adding them. Design in
+  [design/test-automation.md](design/test-automation.md): a hosted `RoadieTests` bundle and a test-mode
+  `RoadieConfiguration` for the app; recorded Music Assistant fixtures with their quirks pinned and a scripted,
+  stateful server; tiny committed audio fixtures; an XCUITest target run in the VM over a cached, manifest-driven
+  selection of Museum skins; a `--ui` tier per UI-touching issue and per milestone; coverage floors; and the rules
+  (fast tests before review, regression test first, a UI test per feature) in `issues/Issues.md`.
+- Children #0193 to #0213.
+
 ## Verification
 - `swift test` for SkinKit and PlayerKit: the folder index, queue save and restore, Music Assistant decoding against
   recorded fixtures, and the connection-test error paths.
