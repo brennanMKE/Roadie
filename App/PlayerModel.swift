@@ -13,9 +13,12 @@ import SkinBrowser
 import SkinKit
 import SkinLibrary
 import SkinMuseum
-import SkinMuseumStub
-import MusicAssistantKitStub
 import os
+#if DEBUG
+// #0194: the test configuration's stand-ins. Debug only; Release strips their fixture bundles (project.yml).
+import MusicAssistantKitStub
+import SkinMuseumStub
+#endif
 
 @MainActor
 @Observable
@@ -61,9 +64,15 @@ final class PlayerModel {
     /// The Museum tab of the Skins window (#0126). Lazy, and it makes no request until the tab appears.
     @ObservationIgnored private(set) lazy var museumBrowser: MuseumBrowserModel = {
         self.museumBrowserCreated = true
-        let transport: any MuseumTransport = switch configuration.museum {
-        case .live: URLSessionMuseumTransport()
-        case .fixtures(let skinsFolder): FixtureMuseumTransport(skinsFolder: skinsFolder)
+        let transport: any MuseumTransport
+        switch configuration.museum {
+        case .live: transport = URLSessionMuseumTransport()
+        case .fixtures(let skinsFolder):
+            #if DEBUG
+            transport = FixtureMuseumTransport(skinsFolder: skinsFolder)
+            #else
+            preconditionFailure("The fixture Museum (\(skinsFolder.path)) needs a Debug build")
+            #endif
         }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let userAgent = MuseumUserAgent.make(version: version)
@@ -332,13 +341,16 @@ final class PlayerModel {
 
     /// What this model is wired to (#0194): the real Keychain, network and disk, or a test configuration's stubs.
     @ObservationIgnored let configuration: RoadieConfiguration
-    /// Every defaults read and write of the model goes here (`configuration.defaults`); `@AppStorage` stays on `.standard`.
+    /// Every defaults read and write of the model goes here (`configuration.defaults`). Every scene and hosting root sets
+    /// `.defaultAppStorage(defaults)`, so `@AppStorage` reads and writes the same store (`.standard` on a live launch).
     var defaults: UserDefaults { configuration.defaults }
     /// "keychain" or "memory": where Music Assistant tokens are read from (#0194's tests).
     @ObservationIgnored let tokenStoreKind: String
     /// #0197's server when `musicAssistant` is `.scripted` (#0194's tests, the probe #0199). Report its
     /// `receivedCommands` / `recentCommandSummaries()` only: its transports' `sent` keep the auth token unredacted.
+    #if DEBUG
     @ObservationIgnored let scriptedMusicAssistant: ScriptedMusicAssistant?
+    #endif
     /// The file the queue autosaves to.
     @ObservationIgnored let queueFileURL: URL
     /// The last URL `open(external:)` recorded with `externalOpens == .record`.
@@ -358,7 +370,8 @@ final class PlayerModel {
         folderBackend = FolderBackend(
             settings: FolderBackend.settingsProvider(defaults: defaults), output: stack.output,
             cacheDirectory: configuration.folderIndexDirectory)
-        folderSettings = FolderSettingsModel(backend: folderBackend)
+        folderSettings = FolderSettingsModel(
+            backend: folderBackend, defaults: defaults, cacheDirectory: configuration.folderIndexDirectory)
         // Music Assistant is the default source. Defaults only here: no Keychain, network or prompt at launch.
         let maStore = MusicAssistantServerStore(defaults: defaults)
         // #0075: the selection decides which server; the active box starts empty and follows it. Neither adapter
@@ -379,9 +392,12 @@ final class PlayerModel {
             transports = URLSessionWebSocketTransportFactory()
             http = URLSessionHTTPTransport()
             fetch = MusicAssistantServerSelector.urlSessionFetcher
+            #if DEBUG
             scriptedMusicAssistant = nil
+            #endif
             tokenStoreKind = "keychain"
         case .scripted, .none:
+            #if DEBUG
             let stores = InMemoryMusicAssistantTokenStores()
             tokenStore = { stores.store(for: $0) }
             let stubHTTP: StubHTTPTransport
@@ -409,6 +425,10 @@ final class PlayerModel {
             http = stubHTTP
             fetch = { try await MusicAssistantClient.serverInfo(at: $0, http: stubHTTP, timeout: .seconds(3)) }
             tokenStoreKind = "memory"
+            #else
+            // `fromProcess` never builds a test configuration in Release, and the stubs aren't shipped there.
+            preconditionFailure("A test Music Assistant configuration needs a Debug build")
+            #endif
         }
         let selection = MusicAssistantSelectionController(
             store: maStore, active: maActive, selector: MusicAssistantServerSelector(fetch: fetch),

@@ -131,7 +131,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         super.init()
         shape.cursorController = cursorController
         cursorController.hostWindow = window
-        hosting.rootView = AnyView(rootView.environment(model).environment(\.skinWindow, self))
+        hosting.rootView = AnyView(
+            rootView.environment(model).environment(\.skinWindow, self).defaultAppStorage(model.defaults))
         hosting.sizingOptions = []
         shape.addSubview(hosting)
         if case .playlist = kind {

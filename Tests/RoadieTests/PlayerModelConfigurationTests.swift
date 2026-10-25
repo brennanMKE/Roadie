@@ -1,6 +1,9 @@
+import FolderBackendKit
 import Foundation
+import LibraryBrowser
 import MusicAssistantKit
 import MusicAssistantKitStub
+import MusicBackendKit
 import XCTest
 
 @testable import Roadie
@@ -43,9 +46,18 @@ final class PlayerModelConfigurationTests: XCTestCase {
         return configuration
     }
 
-    /// What the real Application Support folder holds, with modification dates, to prove nothing was written there.
-    private func realSupportListing() -> [String] {
-        let folder = URL.applicationSupportDirectory.appending(path: "co.sstools.roadie", directoryHint: .isDirectory)
+    /// What the real Application Support folder and the app's own real Caches folders (thumbnails, folder index, Museum)
+    /// hold, with modification dates, to prove nothing was written there. The whole Caches folder isn't listed: the
+    /// system keeps files of its own there for any app.
+    private func realStorageListing() -> [String] {
+        let caches = URL.cachesDirectory.appending(path: "co.sstools.roadie", directoryHint: .isDirectory)
+        let folders = [URL.applicationSupportDirectory.appending(path: "co.sstools.roadie", directoryHint: .isDirectory)]
+            + ["SkinThumbnails", "FolderIndex", "Museum"].map { caches.appending(path: $0, directoryHint: .isDirectory) }
+        return folders.flatMap(listing(of:)).sorted()
+    }
+
+    private func listing(of folder: URL) -> [String] {
+        guard FileManager.default.fileExists(atPath: folder.path) else { return ["\(folder.path) missing"] }
         guard let enumerator = FileManager.default.enumerator(
             at: folder, includingPropertiesForKeys: [.contentModificationDateKey])
         else { return [] }
@@ -53,7 +65,20 @@ final class PlayerModelConfigurationTests: XCTestCase {
             guard let url = item as? URL else { return nil }
             let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
             return "\(url.path) \(date?.timeIntervalSince1970 ?? 0)"
-        }.sorted()
+        }
+    }
+
+    /// The real defaults' value for every key a test-mode model or its views write (`@AppStorage` included).
+    private static let watchedKeys = [
+        QuitStop.defaultsKey, SettingsTab.defaultsKey, PlayerModel.museumShowsNSFWKey,
+        "library.playlists.reorderCaptionDismissed", PlaylistsModel.recentTargetsKey, DiscoverModel.showAllKey,
+        FolderBackend.folderDefaultsKey, LibrarySourceController.defaultsKey, SendspinController.enabledKey,
+        PlayerModel.lastSkinKey, PlayerModel.equalizerKey, MusicAssistantServerStore.defaultsKey,
+        FirstRunPolicy.defaultsKey, SkinLibraryModel.folderKey,
+    ]
+
+    private func standardSnapshot() -> [String] {
+        Self.watchedKeys.map { "\($0)=\(String(describing: UserDefaults.standard.object(forKey: $0)))" }
     }
 
     func testModeTouchesNoKeychainOrNetwork() async throws {
@@ -81,7 +106,7 @@ final class PlayerModelConfigurationTests: XCTestCase {
     }
 
     func testDataDirectoryHoldsEveryStore() async throws {
-        let before = realSupportListing()
+        let before = realStorageListing()
         var configuration = try testConfiguration(.none)
         let skins = try makeFolder()
         configuration.defaults.set(skins.path, forKey: SkinLibraryModel.folderKey)
@@ -93,8 +118,72 @@ final class PlayerModelConfigurationTests: XCTestCase {
         _ = try await model.skinLibrary.openStoreIfNeeded()
         XCTAssertTrue(FileManager.default.fileExists(atPath: data.appending(path: "queue.json").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: data.appending(path: "skins.sqlite").path))
-        XCTAssertEqual(realSupportListing(), before)
+        XCTAssertEqual(realStorageListing(), before)
         XCTAssertEqual(model.tokenStoreKind, "memory")
+    }
+
+    /// The review's finding 1: Settings › Library's folder model stores the folder in the configuration's defaults and
+    /// removes index caches from its folder, so the backend (which reads the same suite) sees the choice.
+    func testFolderSettingsUseTheConfiguration() async throws {
+        let key = FolderBackend.folderDefaultsKey
+        let realFolder = UserDefaults.standard.object(forKey: key) as? String
+        let before = realStorageListing()
+        let configuration = try testConfiguration(.none)
+        let model = PlayerModel(configuration: configuration)
+        XCTAssertNil(model.folderSettings.folderURL, "the empty suite has no folder, whatever the real defaults hold")
+
+        let first = try makeFolder()
+        model.folderSettings.choose(first)
+        await model.folderSettings.waitForPending()
+        XCTAssertNil(model.folderSettings.errorMessage)
+        let connected = await model.folderBackend.isConnected
+        XCTAssertTrue(connected, "the backend reads the folder from the same suite")
+        XCTAssertEqual(configuration.defaults.string(forKey: key), first.path)
+
+        // An index cache for the folder in the configuration's cache directory goes away with clear().
+        let second = try makeFolder()
+        model.folderSettings.choose(second)
+        await model.folderSettings.waitForPending()
+        let cache = FolderIndexCache.fileURL(for: second, in: configuration.folderIndexDirectory)
+        try FileManager.default.createDirectory(at: configuration.folderIndexDirectory, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: cache)
+        model.folderSettings.clear()
+        await model.folderSettings.waitForPending()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cache.path))
+        XCTAssertNil(configuration.defaults.string(forKey: key))
+        XCTAssertNil(model.folderSettings.folderURL)
+
+        XCTAssertEqual(UserDefaults.standard.object(forKey: key) as? String, realFolder)
+        XCTAssertEqual(realStorageListing(), before)
+    }
+
+    /// The review's finding 2: a test-mode model's typical writes land in its suite, never in `UserDefaults.standard`.
+    func testModeWritesLeaveStandardDefaultsAlone() async throws {
+        let before = standardSnapshot()
+        let configuration = try testConfiguration(.scripted(scenario: "libraryIdle"))
+        let recent = [MediaID(.playlist, "library://playlist/1")]
+        configuration.defaults.set(try JSONEncoder().encode(recent), forKey: PlaylistsModel.recentTargetsKey)
+        let model = PlayerModel(configuration: configuration)
+        // The Library's playlists model (built by LibraryBrowserModel) reads the suite.
+        XCTAssertEqual(model.library.playlistsModel.recentTargets, recent)
+        XCTAssertTrue(configuration.defaults.object(forKey: MusicAssistantServerStore.defaultsKey) != nil)
+        XCTAssertEqual(configuration.defaults.object(forKey: SendspinController.enabledKey) as? Bool, false)
+
+        model.museumBrowser.showsNSFW = true
+        XCTAssertTrue(configuration.defaults.bool(forKey: PlayerModel.museumShowsNSFWKey))
+        XCTAssertTrue(model.sources.select("folder"))
+        XCTAssertEqual(configuration.defaults.string(forKey: LibrarySourceController.defaultsKey), "folder")
+        XCTAssertEqual(model.library.playlistsModel.recentTargets, recent, "a rebuilt browser reads the suite too")
+        let folder = try makeFolder()
+        model.folderSettings.choose(folder)
+        await model.folderSettings.waitForPending()
+        model.markFirstRunCompleted()
+        XCTAssertNotNil(configuration.defaults.object(forKey: FirstRunPolicy.defaultsKey))
+        // `QuitStop` is read from the suite: turned off there, nothing is stopped on quit.
+        configuration.defaults.set(false, forKey: QuitStop.defaultsKey)
+        XCTAssertNil(model.stopPlaybackForQuit())
+
+        XCTAssertEqual(standardSnapshot(), before)
     }
 
     func testFromProcessReadsLaunchArguments() throws {
@@ -130,6 +219,14 @@ final class PlayerModelConfigurationTests: XCTestCase {
         XCTAssertTrue(standard.defaults === UserDefaults.standard)
         XCTAssertEqual(standard.externalOpens, .workspace)
         XCTAssertFalse(standard.isUITest)
+        XCTAssertFalse(standard.isIsolated)
+        // Isolation follows the Music Assistant mode and the defaults, not only the data directory.
+        var scripted = RoadieConfiguration()
+        scripted.musicAssistant = .scripted(scenario: "libraryIdle")
+        XCTAssertTrue(scripted.isIsolated)
+        var suite = RoadieConfiguration()
+        suite.defaults = makeDefaults()
+        XCTAssertTrue(suite.isIsolated)
     }
 
     /// #0193's review: the app hosting this bundle builds its model from the isolated configuration, not the live one.

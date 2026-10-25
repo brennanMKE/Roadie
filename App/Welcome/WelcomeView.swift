@@ -98,7 +98,7 @@ struct WelcomeView: View {
         Section {
             Text(serverText).foregroundStyle(.secondary)
             Button("Set Up Music Assistant…") {
-                UserDefaults.standard.set(SettingsTab.musicAssistant.rawValue, forKey: SettingsTab.defaultsKey)
+                player.defaults.set(SettingsTab.musicAssistant.rawValue, forKey: SettingsTab.defaultsKey)
                 openSettings()
             }
             .accessibilityIdentifier("welcome.ma.setup")

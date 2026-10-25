@@ -37,7 +37,9 @@ targets:
         product: SkinBrowser
       - package: SkinKit
         product: SkinMuseum
-      # #0194: the test configuration's stand-ins (RoadieConfiguration); unused by a normal launch.
+      # #0194: the test configuration's stand-ins (RoadieConfiguration), used only under `#if DEBUG`. Xcode and XcodeGen
+      # have no per-configuration package dependencies (only platform filters), so they link in every configuration;
+      # the Release build strips their fixture bundles (postBuildScripts below, ROADIE_STRIP_TEST_FIXTURES).
       - package: SkinKit
         product: SkinMuseumStub
       - package: PlayerKit
@@ -104,6 +106,17 @@ targets:
           - UTTypeIdentifier: co.sstools.roadie.media-id
             UTTypeDescription: Roadie Library Item
             UTTypeConformsTo: [public.data]
+    # #0194: the stubs' fixtures hold recordings of the user's real library and device names; a release must not ship
+    # them. Runs before code signing, so the signature seals the stripped bundle. scripts/verify-dmg.sh and the --dmg
+    # step app-release-fixtures check the result.
+    postBuildScripts:
+      - name: Strip test fixtures (Release)
+        basedOnDependencyAnalysis: false
+        script: |
+          [ "${ROADIE_STRIP_TEST_FIXTURES}" = YES ] || exit 0
+          resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          rm -rf "$resources"/*_MusicAssistantKitStub.bundle "$resources"/*_SkinMuseumStub.bundle
+          echo "Stripped the test fixture bundles from $resources"
     # Location Services under the hardened runtime needs this entitlement (#0075). Still unsandboxed.
     entitlements:
       path: App/Roadie.entitlements
@@ -127,9 +140,13 @@ targets:
         Debug:
           ROADIE_FEED_URL: ""
           ROADIE_PUBLIC_ED_KEY: ""
+          ROADIE_STRIP_TEST_FIXTURES: NO
         Release:
           ROADIE_FEED_URL: https://roadie.sstools.co/appcast.xml
           ROADIE_PUBLIC_ED_KEY: 1ahuGzRXzcL46eqj/DaWBeqoYKioAZd5+wAWsY52vgc=
+          # #0194: see postBuildScripts. The script deletes from the built bundle, so it can't run sandboxed.
+          ROADIE_STRIP_TEST_FIXTURES: YES
+          ENABLE_USER_SCRIPT_SANDBOXING: NO
   RoadieThumbnail:
     type: app-extension
     platform: macOS

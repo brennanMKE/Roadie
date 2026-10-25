@@ -51,10 +51,14 @@ struct RoadieConfiguration: @unchecked Sendable {
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
     /// app hosts the unit-test bundle (#0193), so `⌘U` on a dev Mac never touches the real defaults, stores,
-    /// Keychain or network.
+    /// Keychain or network. Debug builds only: a Release build always returns `.standard`, since it doesn't ship the
+    /// stubs' fixtures (project.yml strips them) and must not reach the test paths' `fatalError`s.
     static func fromProcess(
         arguments: UserDefaults = .standard, hostedTestRun: Bool = HostedTestRun.isActive
     ) -> RoadieConfiguration {
+        #if !DEBUG
+        return .standard
+        #else
         guard arguments.bool(forKey: Argument.uiTest) else {
             return hostedTestRun ? .hostedUnitTests() : .standard
         }
@@ -74,6 +78,7 @@ struct RoadieConfiguration: @unchecked Sendable {
         configuration.discovery = !arguments.bool(forKey: Argument.noDiscovery)
         configuration.externalOpens = arguments.string(forKey: Argument.externalOpens) == "record" ? .record : .workspace
         return configuration
+        #endif
     }
 
     /// The hosted unit-test run's host model (#0193 review): a temp data directory, a fresh defaults suite, Music
@@ -90,8 +95,10 @@ struct RoadieConfiguration: @unchecked Sendable {
         return configuration
     }
 
-    /// Whether anything talks to the real Keychain or a real Music Assistant server.
-    var isIsolated: Bool { dataDirectory != nil }
+    /// false only when the model may use the real Keychain and the user's defaults: Music Assistant `.live` (Keychain
+    /// tokens, real servers) with `.standard` defaults. `LegacyDataCleanup` (a Keychain query and `.standard`) runs only
+    /// then; any test configuration (in-memory tokens, or a defaults suite) is isolated.
+    var isIsolated: Bool { musicAssistant != .live || defaults !== UserDefaults.standard }
 
     var queueFileURL: URL {
         dataDirectory.map { $0.appending(path: "queue.json", directoryHint: .notDirectory) } ?? QueueStore.defaultURL()

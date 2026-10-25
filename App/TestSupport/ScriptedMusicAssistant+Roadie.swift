@@ -1,3 +1,5 @@
+// Debug only (#0194): Release builds don't ship `MusicAssistantKitStub`'s fixtures, and never enter test mode.
+#if DEBUG
 import Foundation
 import MusicAssistantKit
 import MusicAssistantKitStub
@@ -30,3 +32,4 @@ extension ScriptedMusicAssistant {
         return scenario
     }
 }
+#endif

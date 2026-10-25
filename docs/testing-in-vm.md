@@ -28,7 +28,7 @@ scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into 
 scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
 scripts/run-tests-vm.sh --skins "untitled folder" --references build/webamp-reference  # also diff each skin's skintool --png render against them
 scripts/run-tests-vm.sh --spike    # also build, test and smoke-launch the AirPlay routing spike harness (#0050); never plays
-scripts/run-tests-vm.sh --dmg      # also a Release build, back in release/: Roadie.app.zip, Roadie.app.dSYM.zip, dsym-uuids.txt (dwarfdump --uuid), build.txt, sparkle-bin/{sign_update,generate_keys}; then steps app-release-plist (check-info-plist.sh --release) and app-sparkle (check-sparkle.sh), see docs/sparkle.md
+scripts/run-tests-vm.sh --dmg      # also a Release build, back in release/: Roadie.app.zip, Roadie.app.dSYM.zip, dsym-uuids.txt (dwarfdump --uuid), build.txt, sparkle-bin/{sign_update,generate_keys}; then steps app-release-plist (check-info-plist.sh --release) app-sparkle (check-sparkle.sh), see docs/sparkle.md, and app-release-fixtures (no test-stub fixture bundles, #0194)
 scripts/run-tests-vm.sh --dmg --build-number 20261023.1200   # set the Release CFBundleVersion (YYYYMMDD.HHMM, UTC; default: now)
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
@@ -278,7 +278,7 @@ Test design for a headless, silent guest:
 
 - **No Music Assistant server.** The guest is on Tart's NAT network and *can* reach the LAN, so isolation has to
   come from the app. `RoadieConfiguration.fromProcess()` (#0194) reads these launch arguments; test mode is on only
-  with `-RoadieUITest 1`:
+  with `-RoadieUITest 1`, and only in Debug builds (Release ignores them and ships no stub fixtures):
   - `-RoadieDataDir <path>`: queue, skin index, thumbnails, folder index and Museum caches go here (default: a new
     temp folder). Defaults go to the emptied `co.sstools.roadie.uitest` suite, which still sees `-key value` arguments.
   - `-RoadieMAScenario <name>`: #0197's scripted Music Assistant (`ScriptedMusicAssistant`; `libraryIdle`, `queueLoaded`,

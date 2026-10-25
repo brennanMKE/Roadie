@@ -101,7 +101,7 @@ extension PlayerModel {
     /// The stop sent on quit: the target speaker and This Mac's Music Assistant player, capped at
     /// `QuitStop.timeout`. nil when there is nothing to stop (turned off, not connected, local playback).
     func stopPlaybackForQuit() -> Task<Void, Never>? {
-        let enabled = UserDefaults.standard.object(forKey: QuitStop.defaultsKey) as? Bool ?? true
+        let enabled = defaults.object(forKey: QuitStop.defaultsKey) as? Bool ?? true
         let targets = QuitStop.targets(
             enabled: enabled, isConnected: musicAssistantIsConnected, selected: selectedOutput,
             members: outputSelection.members, thisMacFeed: thisMacFeed)

@@ -241,8 +241,8 @@ final class WindowDockingCoordinator {
         var found = false
         for (kind, controller) in controllers {
             let key = "NSWindow Frame \(controller.kind.legacyAutosaveName)"
-            guard let text = UserDefaults.standard.string(forKey: key) else { continue }
-            UserDefaults.standard.removeObject(forKey: key)
+            guard let text = model.defaults.string(forKey: key) else { continue }
+            model.defaults.removeObject(forKey: key)
             let numbers = text.split(separator: " ").prefix(4).compactMap { Double($0) }
             guard numbers.count == 4 else { continue }
             let rect = CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
