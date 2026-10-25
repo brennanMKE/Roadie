@@ -260,6 +260,8 @@ Run it in the foreground of a terminal. A dropped session costs a clone, not a w
 
 ## UI tests (not built yet)
 
+Why UI tests may only run in a guest, what the golden image already allows, how to read the permission checks and what a passing UI run must also show: [ui-tests-in-vm.md](ui-tests-in-vm.md).
+
 The XCUITests will run the same way, as a further step in the guest:
 
 ```bash
@@ -277,8 +279,8 @@ The `Roadie` scheme's Test action holds unit tests only. UI tests go in a separa
 Test design for a headless, silent guest:
 
 - **No Music Assistant server.** The guest is on Tart's NAT network and *can* reach the LAN, so isolation has to
-  come from the app. Launch with an argument such as `-UITestStubMusicAssistant YES` (when UI tests exist) that
-  swaps in `MusicAssistantKitStub`'s scripted transports and #0060's fixtures. No token is passed in.
+  come from the app: test mode (`-RoadieUITest 1`, #0194) with `-RoadieMAScenario <name>` swaps in the scripted
+  server (#0197) built from recorded fixtures. No token is passed in.
 - **No user skins or music.** `Skins/`, `*.wsz` and `*.mp3` are gitignored, and third-party skins
   are never committed. Commit a small skin made for the project (or generate one at test time) plus
   a few seconds of generated audio, and pass their paths in through launch arguments.
