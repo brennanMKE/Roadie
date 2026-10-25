@@ -255,6 +255,15 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         #expect(await thrown { try await fixture.backend.tracks(ofPlaylist: MediaID(.playlist, "x")) } == .unsupported(.playlists))
     }
 
+    @Test func playPlaylistIsUnsupported() async throws {
+        let fixture = try BackendFixture(root: makeTempDir())
+        defer { fixture.cleanup() }
+        try await fixture.backend.connect()
+        #expect(await thrown {
+            try await fixture.backend.play([MediaID(.playlist, "x")], on: OutputDevice.thisMacID, mode: .replace())
+        } == .unsupported(.playlists))
+    }
+
     @Test func artworkReturnsTheAlbumImageScaledToMaxPixels() async throws {
         let fixture = try BackendFixture(root: makeTempDir())
         defer { fixture.cleanup() }

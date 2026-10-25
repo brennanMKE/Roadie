@@ -92,10 +92,14 @@ struct PlaylistListView: View {
                     }
                 }
                 .padding(.leading, 8)
-                .contextMenu {
-                    FavoriteMenuItem(items: [playlist.id: playlist.isFavorite])
+                // Play works on read-only and dynamic playlists too: playing doesn't edit them (#0189). No Add to
+                // Playlist: a playlist can't be added into a playlist.
+                .libraryContainerMenu(playlist.id, favorite: playlist.isFavorite, model: player, addsToPlaylists: false) {
+                    Divider()
                     playlistMenu(playlist)
                 }
+                .simultaneousGesture(TapGesture(count: 2).onEnded { player.playFromLibrary(.play(container: playlist.id)) })
+                .libraryDraggable([playlist.id])
                 .addsDroppedItems(to: playlist, model: player)
             }
         }
