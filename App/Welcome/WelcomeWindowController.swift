@@ -48,6 +48,7 @@ final class WelcomeWindowController: NSObject, NSWindowDelegate {
                 .environment(model.folderSettings)
                 .environment(model.sources)
                 .environment(model.fallback)
-                .environment(model.musicAssistantSelection))
+                .environment(model.musicAssistantSelection)
+                .defaultAppStorage(model.defaults))
     }
 }

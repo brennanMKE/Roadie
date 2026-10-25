@@ -64,7 +64,8 @@ public final class LibrarySourceController {
         preferredID = id
         let backend = sources.first { $0.id == id }!.backend
         self.backend = backend
-        library = LibraryBrowserModel(backend: backend, pageSize: pageSize, searchDelay: searchDelay, searchLimit: searchLimit)
+        library = LibraryBrowserModel(
+            backend: backend, pageSize: pageSize, searchDelay: searchDelay, searchLimit: searchLimit, defaults: defaults)
         artwork = ArtworkCache(backend: backend, limitBytes: artworkLimitBytes, limitCount: artworkLimitCount)
         installFailureHook(on: library, id: id)
         Self.log.info("source \(id, privacy: .public)")
@@ -109,7 +110,8 @@ public final class LibrarySourceController {
         library.disappeared()
         backend = source.backend
         library = LibraryBrowserModel(
-            backend: source.backend, pageSize: pageSize, searchDelay: searchDelay, searchLimit: searchLimit)
+            backend: source.backend, pageSize: pageSize, searchDelay: searchDelay, searchLimit: searchLimit,
+            defaults: defaults)
         installFailureHook(on: library, id: source.id)
         artwork = ArtworkCache(backend: source.backend, limitBytes: artworkLimitBytes, limitCount: artworkLimitCount)
         generation += 1

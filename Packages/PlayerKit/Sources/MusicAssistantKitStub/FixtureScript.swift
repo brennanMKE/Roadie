@@ -50,6 +50,8 @@ public struct FixtureScript: Sendable {
     public var handshake: [String]
     public var routes: [Route]
     public var fallbackFrames: [MAJSON]
+    /// Asked before the routes (#0197, `ScriptedMusicAssistant`): non-nil texts answer the request as they are.
+    public var handler: (@Sendable (_ command: String, _ args: MAJSON, _ messageID: String) -> [String]?)?
 
     public init(
         handshake: [String] = [], routes: [Route] = [],
@@ -61,6 +63,7 @@ public struct FixtureScript: Sendable {
     }
 
     public func replies(command: String, args: MAJSON, messageID: String) -> [String] {
+        if let handler, let texts = handler(command, args, messageID) { return texts }
         if let route = routes.first(where: { $0.command == command && $0.matches(args) }) {
             return route.reply(args, messageID)
         }

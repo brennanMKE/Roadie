@@ -5,6 +5,8 @@ import SwiftUI
 struct RoadieApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    /// Every scene and hosting root (`SkinWindowController`, `WelcomeWindowController`) sets
+    /// `.defaultAppStorage(model.defaults)`, so `@AppStorage` uses the configuration's store (#0194).
     var body: some Scene {
         Window("Library", id: "library") {
             LibraryWindowView()
@@ -12,17 +14,20 @@ struct RoadieApp: App {
                 .environment(appDelegate.model.fallback)
                 .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.musicAssistantDiscovery)
+                .defaultAppStorage(appDelegate.model.defaults)
         }
         .defaultSize(width: 960, height: 600)
 
         Window("Skins", id: "skins") {
             SkinBrowserWindowView()
                 .environment(appDelegate.model)
+                .defaultAppStorage(appDelegate.model.defaults)
         }
         .defaultSize(width: 920, height: 640)
 
         Settings {
             SettingsView()
+                .environment(appDelegate.model)
                 .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.musicAssistantSelection)
                 .environment(appDelegate.model.sendspinController)
@@ -32,6 +37,7 @@ struct RoadieApp: App {
                 .environment(appDelegate.model.fallback)
                 .environment(appDelegate.model.skinLibrary)
                 .environment(appDelegate.updater)
+                .defaultAppStorage(appDelegate.model.defaults)
         }
         .commands {
             UpdateCommands(updater: appDelegate.updater)
@@ -50,7 +56,7 @@ struct RoadieApp: App {
             CommandGroup(after: .help) {
                 Button("Welcome to Roadie…") { appDelegate.welcome.show(openMuseum: false) }
                 Button("Playlists and the Queue…") {
-                    NSWorkspace.shared.open(URL(string: "https://roadie.sstools.co/help.html#playlists")!)
+                    appDelegate.model.open(external: URL(string: "https://roadie.sstools.co/help.html#playlists")!)
                 }
             }
             SkinsCommands(model: appDelegate.model)

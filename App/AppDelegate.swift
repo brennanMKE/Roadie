@@ -8,9 +8,17 @@ import SwiftUI
 /// window needs a subclass (`SkinWindow`). One `SkinWindowController` per window, told apart by its `SkinWindowKind`.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Lazy, but a hosted test run (#0193) still builds the live one: the `Window` scenes and `commands` in `RoadieApp` read it
-    /// when SwiftUI sets up the app. #0194 gives it a test configuration.
-    private(set) lazy var model = PlayerModel()
+    /// The app's delegate, so the hosted unit tests can check the host model's configuration (#0194).
+    private(set) static weak var current: AppDelegate?
+
+    override init() {
+        super.init()
+        Self.current = self
+    }
+
+    /// Lazy, but SwiftUI builds it at launch: the `Window` scenes and `commands` in `RoadieApp` read it. In a hosted test
+    /// run (#0193) `fromProcess()` picks the isolated test configuration, so the host touches no real state (#0194).
+    private(set) lazy var model = PlayerModel(configuration: RoadieConfiguration.fromProcess())
     /// Sparkle (#0158). Starts only when the build carries a feed URL and a public key, so Debug builds never check.
     let updater = Updater()
     /// The Welcome window (#0169); Help › Welcome to Roadie… reopens it.

@@ -98,7 +98,7 @@ struct WelcomeView: View {
         Section {
             Text(serverText).foregroundStyle(.secondary)
             Button("Set Up Music Assistant…") {
-                UserDefaults.standard.set(SettingsTab.musicAssistant.rawValue, forKey: SettingsTab.defaultsKey)
+                player.defaults.set(SettingsTab.musicAssistant.rawValue, forKey: SettingsTab.defaultsKey)
                 openSettings()
             }
             .accessibilityIdentifier("welcome.ma.setup")
@@ -113,7 +113,7 @@ struct WelcomeView: View {
     }
 
     private func refreshServer() {
-        hasVerifiedServer = MusicAssistantServerStore.hasVerifiedServer(defaults: .standard)
+        hasVerifiedServer = MusicAssistantServerStore.hasVerifiedServer(defaults: player.defaults)
     }
 
     private func openMuseum() {
@@ -125,6 +125,6 @@ struct WelcomeView: View {
         guard let url = chooseMusicFolder(startingAt: folderSettings.folderURL) else { return }
         folderSettings.choose(url)
         // With no verified server the folder is the only real source: browse it at once.
-        if !MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) { fallback.userSelected("folder") }
+        if !MusicAssistantServerStore.hasVerifiedServer(defaults: player.defaults) { fallback.userSelected("folder") }
     }
 }

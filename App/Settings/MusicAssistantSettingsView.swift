@@ -6,6 +6,7 @@ import SwiftUI
 /// Settings › Music Assistant: the list of servers and the editor for the selected one. All logic is in the model.
 struct MusicAssistantSettingsView: View {
     @Environment(MusicAssistantSettingsModel.self) private var model
+    @Environment(PlayerModel.self) private var player
     /// #0121: stop the targeted Music Assistant player(s) on quit.
     @AppStorage(QuitStop.defaultsKey) private var stopOnQuit = true
     @Environment(MusicAssistantSelectionController.self) private var selection
@@ -165,7 +166,7 @@ struct MusicAssistantSettingsView: View {
                 if message == .needsLocationAccess {
                     Button("Open Location Settings\u{2026}") {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices") {
-                            NSWorkspace.shared.open(url)
+                            player.open(external: url)
                         }
                     }
                 }
