@@ -211,7 +211,7 @@ A subagent starts with fresh context, so its first job is loading the project's 
 
    - **Ask for a run** by ending your turn with exactly one line:
      `VERIFY: scripts/verify.sh [--build-only] [--full] [--launch] [--expect testA,testB]`
-     Use the tier the plan names (`--full` when "Which tier" says so). List every test you added or changed in `--expect`, by function name: the run then fails unless each of them ran and passed. The orchestrator has the runner execute the command and continues you with its report. Don't edit files while a run is pending.
+     Use the tier the plan names (`--full` when "Which tier" says so). List every test you added or changed in `--expect`, by function name: the run then fails unless each of them ran and passed. For a bug fix, the line may instead carry `--expect-fail testA` (run before the fix: passes only if that test fails and nothing else does). The orchestrator has the runner execute the command and continues you with its report. Don't edit files while a run is pending.
    - **Compile first if unsure.** `--build-only` checks only that everything compiles. A compile error shows up in about 1.6 minutes, but a build-only pass is never verification. The run that counts is a complete fast or full run. Skip `--build-only` when you're confident: a complete run reports compile errors too.
    - **On `VERIFY FAIL`**, fix from the report and ask again. The report holds:
      - the failing steps;

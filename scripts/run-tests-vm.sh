@@ -48,6 +48,7 @@
 #      scripts/check-identifiers.sh: no pre-Roadie bundle id outside the legacy allowlist (#0153)
 #      scripts/tests/test_render_changelog.py: render-changelog.py (#0161)
 #      scripts/tests/test_release_tools.py: preflight.sh with stubbed credentials, appcast-item.sh on a fixture DMG
+#      scripts/tests/test_verify_report.py: verify.sh --report --expect-fail (#0201)
 #      scripts/check-website.sh: website/ lint, appcast XML and every local reference resolves (#0163)
 #   7. optional: launch Roadie.app, check it stays up, quit it
 # Exit codes:
@@ -366,7 +367,7 @@ run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build
 run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/Roadie.app $GUEST_RESULTS/ql"
 run_step identifiers     "scripts/check-identifiers.sh"
 run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p 'test_render_changelog.py'"
-run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py'"
+run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_verify_report.py'"
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app --args -firstRunVersion 1 && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"

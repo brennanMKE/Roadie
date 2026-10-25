@@ -62,7 +62,7 @@ It's capped at 60 lines and also saved as `failure.txt`. A failing test reads, f
     ↳   rig.transport.pingCount → 1
 ```
 
-`--expect testA,testB` makes the run fail unless each named test ran and passed. This replaces the rule "find your new test's name in the log", which was itself a reason to read logs.
+`--expect testA,testB` makes the run fail unless each named test ran and passed. This replaces the rule "find your new test's name in the log", which was itself a reason to read logs. `--expect-fail testA` (#0201) is the reverse: the run passes only if those tests failed and nothing else did, which proves a regression test fails before the fix.
 
 ## Expected effect
 
