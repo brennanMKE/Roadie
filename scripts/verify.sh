@@ -156,7 +156,19 @@ if (( RC == 0 )); then
     for f in "${step_logs[@]}"; do strip <"$f" 2>/dev/null | grep -oE 'Executed [0-9]+ tests?, with' | tail -1 | awk '$2 > 0 {print $2}'; done
   } | awk '{s+=$1; n++} END {if (n) print s " tests in " n " test runs"}')
   print "==> VERIFY  PASS (exit 0) ${RESULTS:t}: $(grep -c '^==> PASS' "$SUMMARY" 2>/dev/null) steps passed${total:+, $total}"
-  grep -E '^==> (TIER|UI|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null
+  # #0200: run-tests-vm.sh retries a failed UI test once (-retry-tests-on-failure -test-iterations 2); a test with
+  # both a failed and a passed "Test Case" line passed only on retry, so the UI line says so instead of hiding the flake.
+  retried=()
+  if [[ -f "$RESULTS/ui-tests.log" ]]; then
+    uilog=$(strip <"$RESULTS/ui-tests.log")
+    for t in ${(u)${(f)"$(print -r -- "$uilog" | perl -ne "print \"\$1\\n\" if /Test Case '-\\[\\S+ (\\w+)\\]' failed/")"}}; do
+      print -r -- "$uilog" | grep -qE "Test Case '-\[[^ ]+ ${t}\]' passed" && retried+=("$t")
+    done
+  fi
+  retry_note=""
+  (( ${#retried} )) && retry_note=" (${#retried} passed on retry: ${(j:, :)retried})"
+  grep -E '^==> (TIER|UI|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null \
+    | while IFS= read -r l; do [[ $l == "==> UI  "[0-9]* ]] && l+=$retry_note; print -r -- "$l"; done
   [[ -n "$expect_report" ]] && print -r -- "$expect_report"
   [[ -n "$expect_fail_report" ]] && print -r -- "$expect_fail_report"
   [[ -f "$RESULTS/release/Roadie.app.zip" ]] && print "==> RELEASE  $RESULTS/release/Roadie.app.zip build $(cat "$RESULTS/release/build.txt" 2>/dev/null || print unknown) (scripts/make-dmg.sh packages it)"

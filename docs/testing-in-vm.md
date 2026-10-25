@@ -288,12 +288,15 @@ scripts/verify.sh --ui --expect playsTheFixtureLibrary
 - **Display:** the clone (never the golden) gets `tart set --display 2560x1300px` before it boots.
 - **What comes back:** `build/vm-tests/<id>/ui/UITests.xcresult`, `ui/summary.json` (`xcresulttool get test-results
   summary`) and `ui/attachments/<testName>/` (a screenshot and the state probe's JSON, kept for failed tests). The
-  summary has a `UI` line: `==> UI  N tests passed (…) on base` or `==> UI  M of N tests failed`. On a failure
+  summary has a `UI` line: `==> UI  N tests passed (…) on base` or `==> UI  M of N tests failed`; `verify.sh` appends
+  `(K passed on retry: names)` when a test has both a failed and a passed `Test Case` line in `ui-tests.log`. On a failure
   `verify.sh` prints the failing test, its assertion, a `screenshots:` line per failed test and the xcresult path.
 - **Test helper:** `Tests/RoadieUITests/Support/RoadieUIApp.swift` launches Roadie with `-RoadieUITest 1`, a per-test
   data directory, the fixture library and a test skin, and first runs `defaults delete co.sstools.roadie` in the
   guest: AppKit's frame autosave and SwiftUI's `@SceneStorage` still write `.standard` (#0194), which is harmless in
-  the throwaway guest.
+  the throwaway guest. It also passes `-RoadieWindowLayout column`, `-RoadieVolume N` (default 50) and
+  `-playlistWindowSize` (XML `[0, 3]`), and its `click`/`doubleClick` fall back to a coordinate click only after checking
+  no other window covers the element's centre (bringing the element's window forward once, else failing at the caller).
 
 A passing UI run also needs:
 
@@ -317,6 +320,10 @@ Test design for a headless, silent guest:
     with that md5 from the folder.
   - `-RoadieNoDiscovery 1`: no Bonjour, Wi-Fi name, network events or wake observer.
   - `-RoadieExternalOpens record`: Help links, Open in Skin Museum and the like are recorded, not opened.
+  - `-RoadieWindowLayout column` (#0200): main, equalizer and playlist stacked from the primary screen's top-left,
+    ignoring the saved layout; any other window (Library, Skins, Jump to File, Welcome) that overlaps the column moves
+    right of it when it becomes key.
+  - `-RoadieVolume N` (#0200): the player's launch volume, 0…100 percent.
   The hosted unit-test run (`RoadieTests`) picks an isolated configuration of its own (temp data directory, fresh
   defaults suite, no Music Assistant, no discovery), so `⌘U` on a dev Mac leaves the real state alone.
 - **No user skins or music.** `Skins/`, `*.wsz` and `*.mp3` are gitignored, and third-party skins

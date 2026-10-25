@@ -128,6 +128,31 @@ class UIReportTests(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("==> UI  2 tests passed", r.stdout)
 
+    def passing_ui_run(self, log):
+        d = Path(tempfile.mkdtemp())
+        (d / "summary.txt").write_text("==> PASS  ui-tests\n==> TIER  fast\n==> UI  2 tests passed (all classes) on base\n"
+                                       "==> Cleaning up (exit 0)\n")
+        (d / "ui-tests.log").write_text(log)
+        return d
+
+    def test_a_pass_on_retry_is_named_on_the_ui_line(self):
+        d = self.passing_ui_run(
+            "Test Case '-[RoadieUITests.SmokeUITests testBar]' passed (3.1 seconds).\n"
+            "Test Case '-[RoadieUITests.SmokeUITests testFoo]' failed (4.2 seconds).\n"
+            "Test Case '-[RoadieUITests.SmokeUITests testFoo]' passed (3.9 seconds).\n")
+        r = self.run_verify(d, "--expect", "foo,bar", "--exit", "0")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("==> UI  2 tests passed (all classes) on base (1 passed on retry: testFoo)", r.stdout)
+
+    def test_no_retry_note_when_every_test_passed_first_time(self):
+        d = self.passing_ui_run(
+            "Test Case '-[RoadieUITests.SmokeUITests testBar]' passed (3.1 seconds).\n"
+            "Test Case '-[RoadieUITests.SmokeUITests testFoo]' passed (3.9 seconds).\n")
+        r = self.run_verify(d, "--exit", "0")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("==> UI  2 tests passed (all classes) on base\n", r.stdout)
+        self.assertNotIn("on retry", r.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

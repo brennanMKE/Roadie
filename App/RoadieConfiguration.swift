@@ -34,6 +34,12 @@ struct RoadieConfiguration: @unchecked Sendable {
     var isUITest = false
     /// Reserved; not read yet (design §8).
     var silentOutput = false
+    /// `-RoadieWindowLayout column` (#0200): main, equalizer and playlist stacked top-left in a column, ignoring any
+    /// saved layout, and the Library, Skins and Jump to File windows moved off that column when they come forward, so
+    /// no window covers another's controls in UI tests.
+    var columnWindowLayout = false
+    /// `-RoadieVolume N` (#0200): the player's volume at launch, 0...100 percent, so tests know the slider's value.
+    var launchVolume: Float?
 
     static let standard = RoadieConfiguration()
 
@@ -47,6 +53,8 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let museumSkins = "RoadieMuseumSkins"
         static let noDiscovery = "RoadieNoDiscovery"
         static let externalOpens = "RoadieExternalOpens"
+        static let windowLayout = "RoadieWindowLayout"
+        static let volume = "RoadieVolume"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -77,6 +85,10 @@ struct RoadieConfiguration: @unchecked Sendable {
         }
         configuration.discovery = !arguments.bool(forKey: Argument.noDiscovery)
         configuration.externalOpens = arguments.string(forKey: Argument.externalOpens) == "record" ? .record : .workspace
+        configuration.columnWindowLayout = arguments.string(forKey: Argument.windowLayout) == "column"
+        if arguments.object(forKey: Argument.volume) != nil {
+            configuration.launchVolume = min(max(Float(arguments.integer(forKey: Argument.volume)) / 100, 0), 1)
+        }
         return configuration
         #endif
     }

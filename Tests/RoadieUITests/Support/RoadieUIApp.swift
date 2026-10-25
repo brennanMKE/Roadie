@@ -85,7 +85,8 @@ final class RoadieUIApp {
 
     func launch(
         testName: String, paths: Paths, skin: TestSkin = .base291, library: TestLibrary = .folder,
-        scenario: String? = nil, firstRun: Bool = false, windows: Windows = [.main, .playlist], extra: [String] = []
+        scenario: String? = nil, firstRun: Bool = false, windows: Windows = [.main, .playlist], volume: Int = 50,
+        extra: [String] = []
     ) {
         if let reason = Self.notGuestReason {
             XCTFail(reason)
@@ -115,6 +116,14 @@ final class RoadieUIApp {
             "-skinsFolderPath", paths.skins,
             "-eqWindowOpen", windows.contains(.equalizer) ? "YES" : "NO",
             "-playlistWindowOpen", windows.contains(.playlist) ? "YES" : "NO",
+            // The playlist at its smallest width and three steps taller (`PlaylistModel.sizeKey`, [width, height]
+            // steps). XML, so the elements are numbers: the old-style "(0, 3)" reads back as strings.
+            "-playlistWindowSize", "<array><integer>0</integer><integer>3</integer></array>",
+            // Main, equalizer and playlist in a column at the screen's top-left; the Library and the other windows
+            // move right of it when they come forward, so none covers a skinned control (#0200 review).
+            "-RoadieWindowLayout", "column",
+            // The player's launch volume in percent, so `main.volume`'s value is known (#0200 review).
+            "-RoadieVolume", String(volume),
             "-SUEnableAutomaticChecks", "NO",
         ]
         if case .folder = library {
@@ -165,23 +174,71 @@ final class RoadieUIApp {
 
     var probe: ProbeState? { try? JSONDecoder().decode(ProbeState.self, from: Data(probeJSON.utf8)) }
 
-    func menuItem(_ title: String) -> XCUIElement { app.menuItems[title].firstMatch }
-
-    /// Clicks an element, or its centre when it isn't hittable (`pl.row.N` sits under `PlaylistListInputView`, #0199).
-    func click(_ element: XCUIElement) {
+    /// Clicks an element, or its centre when it isn't hittable (`pl.row.N` sits under `PlaylistListInputView`, #0199),
+    /// but only once no other window covers that centre (`uncoveredCentre`); a failure points at the caller.
+    func click(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         if element.isHittable {
             element.click()
-        } else {
+        } else if uncoveredCentre(element, file: file, line: line) {
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         }
     }
 
-    func doubleClick(_ element: XCUIElement) {
+    func doubleClick(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         if element.isHittable {
             element.doubleClick()
-        } else {
+        } else if uncoveredCentre(element, file: file, line: line) {
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).doubleClick()
         }
+    }
+
+    /// Whether a coordinate click on `element`'s centre reaches the element's own window: a coordinate click lands on
+    /// whatever is on top there (run 20261024-224212-18524's stop click went to the Library window). An overlap inside
+    /// the element's window is fine (`pl.row.N` under `PlaylistListInputView`); another window in front of it at that
+    /// point isn't. Then the element's window comes forward (`bringForward`) and the check runs again; still covered,
+    /// it fails naming the element, the point and the covering window. `app.windows` lists windows front to back (the
+    /// AX window order).
+    private func uncoveredCentre(_ element: XCUIElement, file: StaticString, line: UInt) -> Bool {
+        let id = element.identifier
+        let frame = element.frame
+        let point = CGPoint(x: frame.midX, y: frame.midY)
+        for attempt in 0..<2 {
+            let windows = app.windows.allElementsBoundByIndex
+            guard
+                let own = windows.firstIndex(where: {
+                    !id.isEmpty && $0.descendants(matching: .any).matching(identifier: id).count > 0
+                })
+            else {
+                XCTFail("no window contains \(id.isEmpty ? "<no identifier>" : id): \(describe(element))", file: file, line: line)
+                return false
+            }
+            let front = windows[..<own].filter { $0.exists }.map(\.frame)
+            guard let covering = windows[..<own].first(where: { $0.exists && $0.frame.contains(point) }) else {
+                return true
+            }
+            if attempt == 0, bringForward(windows[own], avoiding: front) { continue }
+            XCTFail(
+                "\(id) at \(point) is covered by window \"\(covering.title)\" (\(covering.identifier)) at \(covering.frame): "
+                    + describe(element), file: file, line: line)
+            return false
+        }
+        return false
+    }
+
+    /// Clicks the first point along the top strip of `window` (its title bar: a drag area in a skinned window, away
+    /// from the options button and the close buttons at its ends) that no window in `front` covers. false when every
+    /// candidate is covered.
+    private func bringForward(_ window: XCUIElement, avoiding front: [CGRect]) -> Bool {
+        let frame = window.frame
+        for dx in [0.5, 0.4, 0.6, 0.3, 0.7] {
+            let point = CGPoint(x: frame.minX + frame.width * dx, y: frame.minY + 6)
+            guard !front.contains(where: { $0.contains(point) }) else { continue }
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: point.x - frame.minX, dy: point.y - frame.minY)).click()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            return true
+        }
+        return false
     }
 
     // MARK: Waiting
@@ -204,15 +261,16 @@ final class RoadieUIApp {
 
     /// An element's accessibility value as text: a display's string (`skinDisplay`/`AXMarker` are static text, whose
     /// `AXValue` is the string), or a slider's number (`SkinSlider` is an `AXSlider`, `AXValue` 0...100) without a
-    /// trailing `.0`. "" when the element is missing or has no value.
+    /// fraction: AXValue is Float precision (60 % reads 60.00000238418579), and every slider steps by whole percent,
+    /// so numbers round to the nearest integer. "" when the element is missing or has no value.
     func value(of element: XCUIElement) -> String {
         guard element.exists else { return "" }
         switch element.value {
         case let text as String:
             return text
         case let number as NSNumber:
-            let d = number.doubleValue
-            return d == d.rounded() && abs(d) < 1e15 ? String(Int(d)) : number.stringValue
+            let d = number.doubleValue.rounded()
+            return abs(d) < 1e15 ? String(Int(d)) : number.stringValue
         default:
             return ""
         }
@@ -259,7 +317,7 @@ final class RoadieUIApp {
                 "⌘L didn't open the Library: no \(AXID.Library.sidebar("albums")); windows: \(app.windows.count)",
                 file: file, line: line)
         }
-        click(albums)
+        click(albums, file: file, line: line)
         let row = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier BEGINSWITH 'library.row.album.' AND identifier CONTAINS 'tone-album'")
         ).firstMatch
@@ -272,7 +330,7 @@ final class RoadieUIApp {
         }
         XCTAssertTrue(
             wait(timeout: 5) { row.isHittable }, "Tone Album row isn't hittable: \(describe(row))", file: file, line: line)
-        doubleClick(row)
+        doubleClick(row, file: file, line: line)
         guard wait(timeout: 10, { !(probe?.queue.isEmpty ?? true) }) else {
             return XCTFail(
                 "double-clicking Tone Album queued nothing: \(describe(row)); probe: \(probeJSON)", file: file, line: line)
@@ -324,7 +382,7 @@ class RoadieUITestCase: XCTestCase {
 
     func launch(
         skin: TestSkin = .base291, library: TestLibrary = .folder, scenario: String? = nil, firstRun: Bool = false,
-        windows: Windows = [.main, .playlist], extra: [String] = []
+        windows: Windows = [.main, .playlist], volume: Int = 50, extra: [String] = []
     ) {
         if roadie == nil {
             let roadie = RoadieUIApp()
@@ -333,6 +391,6 @@ class RoadieUITestCase: XCTestCase {
         }
         roadie.launch(
             testName: testName, paths: paths, skin: skin, library: library, scenario: scenario, firstRun: firstRun,
-            windows: windows, extra: extra)
+            windows: windows, volume: volume, extra: extra)
     }
 }

@@ -15,14 +15,14 @@ final class SmokeUITests: RoadieUITestCase {
     }
 
     func testSkinnedWindowsExposeEveryIdentifier() {
-        launch(windows: [.main, .equalizer, .playlist])
+        // `-RoadieVolume 60`: a launch volume other than the player's default 100 %, so the value proves the argument.
+        let launchVolume = 60
+        launch(windows: [.main, .equalizer, .playlist], volume: launchVolume)
         XCTAssertTrue(roadie.main.play.waitForExistence(timeout: 10), "main.play never appeared")
         XCTAssertTrue(roadie.probeElement.exists, "state.probe missing in UI-test mode")
-        // A fresh launch's volume (nothing persists it; the player starts at 1.0), as MainWindowView writes it.
-        let launchVolume: Float = 1
-        // SkinSlider is an AXSlider whose AXValue is the position in percent, so the volume reads as "100".
+        // SkinSlider is an AXSlider whose AXValue is the position in percent (step 2), so 60 % reads as "60".
         let volume = roadie.main.volume
-        let expected = "\(Int((launchVolume * 100).rounded()))"
+        let expected = "\(launchVolume)"
         XCTAssertTrue(
             roadie.waitForValue(volume) { $0 == expected },
             "main.volume value \"\(roadie.value(of: volume))\", expected \(expected): \(roadie.describe(volume))")
@@ -69,6 +69,8 @@ final class SmokeUITests: RoadieUITestCase {
         let time = roadie.main.time
         XCTAssertTrue(
             roadie.waitForValue(time) { !$0.isEmpty }, "main.time has no value: \(roadie.describe(time))")
+        // A smoke check only: any change passes, including the reset when the 7.5 s album ends and the clock clears,
+        // so this proves the display updates while playing, not that time advances.
         let first = roadie.value(of: time)
         XCTAssertTrue(
             roadie.waitForValue(time, timeout: 3) { $0 != first },

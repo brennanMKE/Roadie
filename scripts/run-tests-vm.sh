@@ -585,7 +585,7 @@ else
 fi
 step_logs=("$RESULTS_DIR"/*.log(N))  # none when the guest was lost before the results pull
 if (( ${#step_logs} )); then
-  grep -hE 'Build complete!|Test run with|Executed [1-9][0-9]* tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|Executed .* tests|Test Suite 'RoadieUITests' (passed|failed)|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
+  grep -hE 'Build complete!|Test run with|Executed [1-9][0-9]* tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|Test Suite .RoadieUITests. (passed|failed)|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
 fi
 [[ -n "$UI_LINE" ]] && log "$UI_LINE"
 (( UI )) && [[ "${step_rc[ui-tests]:-}" == 124 ]] && log "UI  ui-tests timed out (a blocked prompt in the guest?)"

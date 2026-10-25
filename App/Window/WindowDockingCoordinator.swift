@@ -15,6 +15,8 @@ final class WindowDockingCoordinator {
     private let store: WindowLayoutStore
     private var controllers: [WindowKind: SkinWindowController] = [:]
     private var screenObserver: NSObjectProtocol?
+    /// Set by the UI-test column layout (#0200): moves other windows off the skinned column as they become key.
+    private var columnObserver: NSObjectProtocol?
 
     private var session: DragSession?
     /// The dragged window's origin at mouse-down (AppKit space).
@@ -223,7 +225,9 @@ final class WindowDockingCoordinator {
                 forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
             ) { [weak self] _ in MainActor.assumeIsolated { self?.ensureOnScreen() } }
         }
-        if let layout = store.load() {
+        if model.configuration.columnWindowLayout {
+            stackColumn()
+        } else if let layout = store.load() {
             for (kind, entry) in layout.windows { place(kind, Offset(x: entry.left, y: entry.top)) }
         } else if !seedFromLegacyFrames() {
             stackDefaultLayout()
@@ -269,6 +273,39 @@ final class WindowDockingCoordinator {
         for kind in kinds { sizes[kind] = controllers[kind]?.window.frame.size }
         let positions = LayoutRules.stackedAndCentered(sizes: sizes, order: kinds, in: primaryBox)
         for (kind, position) in positions { place(kind, position) }
+    }
+
+    // MARK: UI-test column layout (#0200)
+
+    /// `-RoadieWindowLayout column`, test mode only: main, equalizer and playlist stacked in that order from the primary
+    /// screen's top-left, whether open or not (a window shown later keeps its spot, which covers no other), and every
+    /// other window (Library, Skins, Jump to File, Welcome) moved to the right of the column whenever it becomes key.
+    /// XCUITest's coordinate clicks then land on the window they aim at.
+    private func stackColumn() {
+        var top = primaryBox.y
+        for kind in WindowKind.allCases {
+            guard let controller = controllers[kind] else { continue }
+            place(kind, Offset(x: primaryBox.x, y: top))
+            top += controller.window.frame.height
+        }
+        guard columnObserver == nil else { return }
+        columnObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let window = NSApp.keyWindow else { return }
+                self?.moveOffColumn(window)
+            }
+        }
+    }
+
+    /// Moves a non-skinned window right of the skinned windows' column when it overlaps it.
+    private func moveOffColumn(_ window: NSWindow) {
+        let skinned = controllers.values.map(\.window)
+        guard !skinned.contains(where: { $0 === window }) else { return }
+        let column = skinned.filter(\.isVisible).map(\.frame).reduce(CGRect.null) { $0.union($1) }
+        guard !column.isNull, window.frame.intersects(column) else { return }
+        window.setFrameOrigin(NSPoint(x: column.maxX + 8, y: window.frame.minY))
     }
 
     // MARK: Recovery

@@ -507,6 +507,7 @@ final class PlayerModel {
             guard case .failed(let failure) = event else { return }
             self?.showPlaybackFailure(failure)
         }
+        if let launchVolume = configuration.launchVolume { stack.player.volume = launchVolume }
         volume = stack.player.volume
         balance = stack.player.balance
         // Restore the equalizer before anything plays; the setter reaches the live graph once it exists.
