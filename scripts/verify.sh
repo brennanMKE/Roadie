@@ -94,9 +94,10 @@ fi
 if (( RC == 0 )); then
   # swift-testing's "Test run with N tests" per package, plus XCTest's (RoadieTests, #0193): XCTest prints
   # "Executed N tests, with M failures" per suite and again for the bundle and "All tests", so each log counts only its last.
+  # `swift test` also prints an empty XCTest run ("Executed 0 tests") per package; those aren't test runs.
   total=$( {
     cat "${step_logs[@]}" 2>/dev/null | strip | grep -oE 'Test run with [0-9]+ tests' | awk '{print $4}'
-    for f in "${step_logs[@]}"; do strip <"$f" 2>/dev/null | grep -oE 'Executed [0-9]+ tests?, with' | tail -1 | awk '{print $2}'; done
+    for f in "${step_logs[@]}"; do strip <"$f" 2>/dev/null | grep -oE 'Executed [0-9]+ tests?, with' | tail -1 | awk '$2 > 0 {print $2}'; done
   } | awk '{s+=$1; n++} END {if (n) print s " tests in " n " test runs"}')
   print "==> VERIFY  PASS (exit 0) ${RESULTS:t}: $(grep -c '^==> PASS' "$SUMMARY" 2>/dev/null) steps passed${total:+, $total}"
   grep -E '^==> (TIER|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null

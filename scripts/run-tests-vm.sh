@@ -487,7 +487,7 @@ else
 fi
 step_logs=("$RESULTS_DIR"/*.log(N))  # none when the guest was lost before the results pull
 if (( ${#step_logs} )); then
-  grep -hE 'Build complete!|Test run with|Executed [0-9]+ tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
+  grep -hE 'Build complete!|Test run with|Executed [1-9][0-9]* tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
 fi
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"

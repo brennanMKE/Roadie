@@ -8,7 +8,8 @@ import SwiftUI
 /// window needs a subclass (`SkinWindow`). One `SkinWindowController` per window, told apart by its `SkinWindowKind`.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Lazy so a hosted test run (#0193) never builds one unless a test asks.
+    /// Lazy, but a hosted test run (#0193) still builds the live one: the `Window` scenes and `commands` in `RoadieApp` read it
+    /// when SwiftUI sets up the app. #0194 gives it a test configuration.
     private(set) lazy var model = PlayerModel()
     /// Sparkle (#0158). Starts only when the build carries a feed URL and a public key, so Debug builds never check.
     let updater = Updater()
@@ -29,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // #0193: as a unit-test host, no player model, no skinned windows, no Welcome. SwiftUI still opens the first window
+        // #0193: as a unit-test host, no skinned windows, no Welcome, no default skins folder. SwiftUI still opens the first window
         // scene, so close the Library and Skins windows as a normal launch does.
         if HostedTestRun.isActive {
             DispatchQueue.main.async {
