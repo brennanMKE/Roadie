@@ -1,6 +1,6 @@
 """Tests for scripts/verify.sh --report with --expect-fail (#0201), on fabricated results directories.
 
-Runs in the VM (step release-tools): python3 -m unittest discover -s scripts/tests -p 'test_*.py'. No VM needed:
+Runs in the VM (step release-tools): python3 -m unittest discover -s scripts/tests -p 'test_verify_report.py'. No VM needed:
 --report rebuilds the report from a finished run without running anything.
 """
 import subprocess
@@ -46,6 +46,29 @@ class ExpectFailTests(unittest.TestCase):
         r = self.run_verify(d, "--expect-fail", "rowIndexIsThePosition")
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("other tests failed too: somethingElse", r.stdout)
+
+    def test_expect_fail_fails_when_the_step_also_crashed(self):
+        d = self.results(PASSING + "✘ Test rowIndexIsThePosition() failed after 0.002 seconds with 1 issue.\n"
+                         "PlayerKit/Foo.swift:12: Fatal error: Unexpectedly found nil\n"
+                         "error: Exited with unexpected signal code 4\n")
+        r = self.run_verify(d, "--expect-fail", "rowIndexIsThePosition")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("crash in step playerkit-tests", r.stdout)
+
+    def test_expect_fail_matches_xctest_names_exactly(self):
+        d = self.results("Test Case '-[RoadieTests.FooTests testBar]' failed (0.002 seconds).\n"
+                         "Test Case '-[RoadieTests.FooTests testBarBaz]' passed (0.001 seconds).\n")
+        self.assertEqual(self.run_verify(d, "--expect-fail", "testBar").returncode, 0)
+        r = self.run_verify(d, "--expect-fail", "testBarBaz")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("passed or never ran: testBarBaz", r.stdout)
+
+    def test_build_failure_is_not_an_expected_failure(self):
+        d = self.results("error: compile failed\n")
+        (d / "summary.txt").write_text("==> FAIL  playerkit-build (exit 1)\n==> SKIP  playerkit-tests (build failed)\n"
+                                       "==> BUILD  failed: 1 step(s) skipped\n==> Cleaning up (exit 1)\n")
+        r = self.run_verify(d, "--expect-fail", "rowIndexIsThePosition")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
 
     def test_name_in_both_lists_is_a_usage_error(self):
         d = self.results(PASSING)

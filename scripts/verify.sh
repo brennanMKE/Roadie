@@ -124,6 +124,9 @@ if (( ${#expect_fail} && RC != 2 && RC != 3 )); then
       strip <"$f" | grep -E "^✘ Test ${name}\(|Test Case '.*[ .]${name}\]' failed" >/dev/null && hit=1
     done
     (( hit )) || others+=("step $step")
+    # A crash in the same step can stop other tests after the expected one has already failed.
+    (( hit )) && strip <"$f" | grep -qE 'Fatal error|unexpected signal|Precondition failed|Assertion failed' \
+      && others+=("crash in step $step")
   done
   grep -qE '^==> (BUILD|SKIP|INFRA)  |^==> AUDIO  host' "$SUMMARY" 2>/dev/null && others+=("build/skip/audio in summary")
   if (( ${#wrong} == 0 && ${#others} == 0 && (RC == 0 || RC == 1) )); then
