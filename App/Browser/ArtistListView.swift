@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ArtistListView: View {
     let library: LibraryBrowserModel
+    @Environment(PlayerModel.self) private var player
 
     var body: some View {
         PagedListView(
@@ -20,7 +21,10 @@ struct ArtistListView: View {
                     Spacer(minLength: 0)
                 }
             }
-            .contextMenu { FavoriteMenuItem(items: [artist.id: artist.isFavorite]) }
+            // A name grouped across providers drags (and plays) its first member only: all of them would queue the
+            // same songs once per provider. No double-click: a click opens the artist, and an extra gesture could block the drag.
+            .libraryContainerMenu(artist.id, favorite: artist.isFavorite, model: player, addsToPlaylists: false)
+            .libraryDraggable([artist.id])
         }
         .accessibilityIdentifier("library.artists")
     }

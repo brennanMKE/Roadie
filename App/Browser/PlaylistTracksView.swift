@@ -36,7 +36,7 @@ struct PlaylistTracksView: View {
             List(selection: $selection) {
                 ForEach(tracks) { track in
                     TrackRow(track: track)
-                        .draggable(MediaIDTransfer([track.id]))
+                        .libraryDraggable([track.id])
                 }
                 .onMove(perform: editor.canReorder ? { source, destination in
                     editor.move(from: source, to: destination)

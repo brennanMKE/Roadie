@@ -21,6 +21,19 @@ struct PlayRequestTests {
         #expect(append.mode == .append)
     }
 
+    @Test func containerRequestsUseTheGivenMode() {
+        let artist = MediaID(.artist, "The Beatles")
+        let play = PlayRequest.play(container: artist)
+        #expect(play.items == [artist])
+        #expect(play.mode == .replace())
+        let append = PlayRequest.append(container: artist)
+        #expect(append.items == [artist])
+        #expect(append.mode == .append)
+        let next = PlayRequest.next(container: artist)
+        #expect(next.items == [artist])
+        #expect(next.mode == .next)
+    }
+
     @Test func oneTrackInAnAlbumPlaysTheAlbumFromThatRow() throws {
         let request = try #require(PlayRequest.play(ids("2"), in: rows, album: Self.album))
         #expect(request.items == tracks("1", "2", "3", "4"))

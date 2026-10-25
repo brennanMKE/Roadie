@@ -1,5 +1,7 @@
 import AudioCore
 import LibraryBrowser
+import MusicBackendKit
+import os
 import SkinKit
 import SwiftUI
 
@@ -105,6 +107,7 @@ struct PlaylistWindowView: View {
             PlaylistMenusView(skin: skin)
         }
         .frame(width: layout.size.width, height: layout.size.height, alignment: .topLeading)
+        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.appendDroppedLibraryItems(transfers) }
     }
 }
 
@@ -421,11 +424,26 @@ struct PlaylistShadeView: View {
             button(PlaylistShadeLayout.closeFrame(width: width), pressed: "PLAYLIST_CLOSE_SELECTED") { window?.close() }
         }
         .frame(width: width, height: PlaylistShadeLayout.height, alignment: .topLeading)
+        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.appendDroppedLibraryItems(transfers) }
     }
 
     private func button(_ rect: CGRect, pressed: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { EmptyView() }
             .buttonStyle(TitleBarButtonStyle(skin: skin, name: nil, pressedName: pressed))
             .offset(x: rect.minX, y: rect.minY)
+    }
+}
+
+extension PlayerModel {
+    private static let libraryDropLog = Logger(subsystem: "co.sstools.roadie", category: "LibraryDrop")
+
+    /// The SwiftUI fallback for Library drops outside the AppKit track list (title bar, scroll bar, bottom bar, shade):
+    /// the items are appended (#0188). false when there are no ids.
+    func appendDroppedLibraryItems(_ transfers: [MediaIDTransfer]) -> Bool {
+        let ids = transfers.flatMap(\.ids)
+        guard !ids.isEmpty else { return false }
+        Self.libraryDropLog.info("drop (SwiftUI): \(ids.count) id(s), appended")
+        playFromLibrary(PlayRequest(items: ids, mode: .insert(at: playlist.count)))
+        return true
     }
 }

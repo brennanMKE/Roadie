@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import UniformTypeIdentifiers
 import Testing
 @testable import MusicBackendKit
 
@@ -9,5 +11,16 @@ struct MediaIDTransferTests {
         let data = try JSONEncoder().encode(transfer)
         let decoded = try JSONDecoder().decode(MediaIDTransfer.self, from: data)
         #expect(decoded.ids == transfer.ids)
+    }
+
+    /// The editor reads each pasteboard item, not just the pasteboard's first (#0188).
+    @Test func mediaIDTransferDecodesFromAPasteboardItem() throws {
+        let transfer = MediaIDTransfer([MediaID(.artist, "The Beatles"), MediaID(.album, "library://album/27")])
+        let type = NSPasteboard.PasteboardType(UTType.roadieMediaID.identifier)
+        let item = NSPasteboardItem()
+        #expect(item.setData(try JSONEncoder().encode(transfer), forType: type))
+        let data = try #require(item.data(forType: type))
+        #expect(MediaIDTransfer.decode(data)?.ids == transfer.ids)
+        #expect(MediaIDTransfer.decode(Data("nope".utf8)) == nil)
     }
 }

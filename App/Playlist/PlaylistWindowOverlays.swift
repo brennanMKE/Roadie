@@ -1,5 +1,7 @@
 import AppKit
+import AudioCore
 import MusicBackendKit
+import os
 import SkinKit
 import UniformTypeIdentifiers
 
@@ -184,26 +186,66 @@ final class PlaylistListInputView: NSView {
 
     private static let fileURLOptions: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
 
+    private static let dropLog = Logger(subsystem: "co.sstools.roadie", category: "LibraryDrop")
+
+    /// The operation to offer: copy if the source allows it, else whatever it allows (a SwiftUI source sets the mask).
+    private static func operation(for mask: NSDragOperation) -> NSDragOperation {
+        for op in [NSDragOperation.copy, .generic, .move] where mask.contains(op) { return op }
+        return []
+    }
+
+    /// The media-id type on the pasteboard or on any of its items (a SwiftUI drag puts each item on its own).
+    private static func hasMediaID(_ pasteboard: NSPasteboard) -> Bool {
+        if pasteboard.types?.contains(mediaIDType) == true { return true }
+        return (pasteboard.pasteboardItems ?? []).contains { $0.types.contains(mediaIDType) }
+    }
+
+    /// Every item's ids in item order, else the pasteboard's own data. nil when nothing decodes.
+    private static func mediaIDs(from pasteboard: NSPasteboard) -> [MediaID]? {
+        var ids: [MediaID] = []
+        var decoded = false
+        for item in pasteboard.pasteboardItems ?? [] {
+            guard let data = item.data(forType: mediaIDType), let transfer = MediaIDTransfer.decode(data) else { continue }
+            decoded = true
+            ids += transfer.ids
+        }
+        if decoded { return ids }
+        guard let data = pasteboard.data(forType: mediaIDType) else { return nil }
+        return MediaIDTransfer.decode(data)?.ids
+    }
+
     private func dragOperation(_ sender: NSDraggingInfo) -> NSDragOperation {
         let pasteboard = sender.draggingPasteboard
-        if pasteboard.availableType(from: [Self.mediaIDType]) != nil { return .copy }
+        if Self.hasMediaID(pasteboard) { return Self.operation(for: sender.draggingSourceOperationMask) }
         return pasteboard.canReadObject(forClasses: [NSURL.self], options: Self.fileURLOptions) ? .copy : []
     }
 
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { dragOperation(sender) }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let pasteboard = sender.draggingPasteboard
+        let types = (pasteboard.types?.map(\.rawValue) ?? []).joined(separator: ",")
+        let mask = sender.draggingSourceOperationMask.rawValue
+        let items = pasteboard.pasteboardItems?.count ?? 0
+        Self.dropLog.debug("drag entered: types=\(types, privacy: .public) mask=\(mask) items=\(items)")
+        return dragOperation(sender)
+    }
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { dragOperation(sender) }
 
     /// Files and folders go in before the row under the pointer, or at the end below the last row (Winamp). A remote
     /// queue's row means nothing in the local queue, so there the drop appends as before.
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        if let data = sender.draggingPasteboard.data(forType: Self.mediaIDType) {
-            guard let transfer = try? JSONDecoder().decode(MediaIDTransfer.self, from: data), !transfer.ids.isEmpty
-            else { return false }
+        let pasteboard = sender.draggingPasteboard
+        if Self.hasMediaID(pasteboard) {
+            guard let ids = Self.mediaIDs(from: pasteboard), !ids.isEmpty else {
+                Self.dropLog.error("drop: media-id type present but no data decoded")
+                MainActor.assumeIsolated { model.post(StatusNotice(text: "Couldn't read the dragged items")) }
+                return false
+            }
             return MainActor.assumeIsolated {
                 // Library items go through the selected output's backend and its gates (a folder library on a speaker
                 // is refused with a notice). Music Assistant can't place items, so there they append (#0173 decision 4).
                 let row = row(atY: skinPoint(windowPoint: sender.draggingLocation).y) ?? model.playlist.count
-                model.playFromLibrary(PlayRequest(items: transfer.ids, mode: .insert(at: row)))
+                Self.dropLog.info("drop: \(ids.count) id(s) at row \(row)")
+                model.playFromLibrary(PlayRequest(items: ids, mode: .insert(at: row)))
                 return true
             }
         }

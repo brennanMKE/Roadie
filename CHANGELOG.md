@@ -6,6 +6,14 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+### Added
+
+- Drag an artist from the Library onto the playlist editor; right-click an artist for Play, Play Next and Add to Queue.
+
+### Fixed
+
+- Dragging albums and tracks from the Library onto the playlist editor adds them.
+
 ## [0.0.4] - 2026-10-24
 
 Winamp-style music selection: Jump to File, a play-next queue with [n] markers, and Play Next from the Library.

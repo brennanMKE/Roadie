@@ -46,8 +46,8 @@ struct AlbumListView: View {
             selectedID: library.selectedAlbum?.id, onSelect: { library.select($0) }
         ) { album in
             AlbumRow(album: album, showsArtist: showsArtist)
-                .libraryAlbumActions(album.id, favorite: album.isFavorite, model: player)
-                .draggable(MediaIDTransfer([album.id]))
+                .libraryContainerActions(album.id, favorite: album.isFavorite, model: player)
+                .libraryDraggable([album.id])
         }
         .accessibilityIdentifier(showsArtist ? "library.albums" : "library.artistAlbums")
     }

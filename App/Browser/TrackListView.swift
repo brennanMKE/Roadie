@@ -91,7 +91,7 @@ struct TrackListView: View {
                         } else {
                             List(tracks, selection: $selection) { track in
                                 TrackRow(track: track, albumArtist: albumArtist)
-                                    .draggable(MediaIDTransfer([track.id]))
+                                    .libraryDraggable([track.id])
                             }
                             .libraryTrackActions(rows: tracks, album: library.selectedAlbum?.id, model: player)
                         }

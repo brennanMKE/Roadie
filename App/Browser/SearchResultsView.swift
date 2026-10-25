@@ -47,8 +47,8 @@ struct SearchResultsView: View {
                                         AlbumRow(album: album).frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
-                                    .libraryAlbumMenu(album.id, favorite: album.isFavorite, model: player)
-                                    .draggable(MediaIDTransfer([album.id]))
+                                    .libraryContainerMenu(album.id, favorite: album.isFavorite, model: player)
+                                    .libraryDraggable([album.id])
                                 }
                             }
                         }
@@ -59,7 +59,7 @@ struct SearchResultsView: View {
                                         Text(track.title).lineLimit(1)
                                         Text(ArtistName.display(track.artistName)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                     }
-                                    .draggable(MediaIDTransfer([track.id]))
+                                    .libraryDraggable([track.id])
                                 }
                             }
                         }
