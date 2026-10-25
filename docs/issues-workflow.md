@@ -15,6 +15,8 @@ Every issue goes through three phases, each in a fresh subagent dispatched by an
 
 `model` and `effort` are passed explicitly on every dispatch, and the work log records both. Fable is used only when the user asks. Nobody but the user sets `closed`.
 
+A bug fix writes its regression test first and proves it fails with `verify.sh --expect-fail <test>` before the fix; a user-facing change adds or updates a UI test.
+
 Plans are written close to when the issue is worked, against the code as it stands, and name the tests to add. A low-effort implementer does well with a concrete plan and poorly when it has to explore.
 
 ## Keeping logs out of context
@@ -43,7 +45,9 @@ All builds, tests and app launches run in a fresh, muted Tart VM through `script
 |---|---|---|---|
 | `--build-only` | Implementer's runner, after editing, before a full run | Both packages with their tests, then the app. Stops early and prints `ERRORS` with `file:line:col` lines. Never counts as verification. | 1.6 min |
 | Fast tier (default) | Every implementation and every review | Build stage, unit tests that reuse it (`--skip-build`), the app checks, `--launch` when the plan asks | 2.6 min |
+| UI (`--ui [--ui-filter C,…]`) | Issues that change `App/` UI, filtered to the plan's classes; whole suite at milestone end | Fast tier plus `ui-build` and XCUITests in the guest (base skin) | fast + ≤ 4 min |
 | Full tier (`--full`) | Changes to code a slow test guards (skin-library indexing, AudioCore real-time playback), and each milestone end | Fast tier plus the slow tests: three 100k-row skin-library tests and the real-time audio tests | 3.0 min |
+| Milestone end (`--head --full --ui --ui-skins all --coverage`) | Last child of a milestone resolved; before a release | Everything above, every test skin, coverage floors | ≤ 35 min, background |
 
 Agents run every mode through `scripts/verify.sh` (same options plus `--expect`). How results are read:
 

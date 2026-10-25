@@ -383,6 +383,8 @@ Still capped at 60 lines with the full text in `failure.txt`; never a log. Warni
 
 ## 7. Process changes
 
+**In force since #0213 (2026-10-24)**: the rules below are in `issues/Issues.md`, `AGENTS.md` and `docs/issues-workflow.md`.
+
 In `issues/Issues.md` (#0213):
 
 1. **Fast tests pass before review.** Already the rule; it becomes explicit that `app-unit-tests` is part of the fast tier, and that `DONE` without a quoted `VERIFY PASS` of a complete fast run (plus the UI classes the plan names) is a bail, not a hand-off. The reviewer re-runs the same command with `--head`.

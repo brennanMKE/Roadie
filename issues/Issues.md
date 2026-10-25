@@ -154,7 +154,13 @@ Any additional context, guesses at root cause, related code locations.
 4. Set status to `open`.
 5. Use today's date for First seen.
 6. Phrase the title as a single declarative sentence describing the bug, not a question or a fix description.
-7. **Plan it (phase 1).** Dispatch a fresh subagent on **Opus** (not Fable unless the user asks; see `AGENTS.md`) to read this guide, `CLAUDE.md`, the new issue, and the relevant code, then write a `## Plan` section into `issues/NNNN.md` (after `## Description`). It writes no code and leaves status at `open`. This gives whoever picks the issue up a running start. Record the planner's usage in `## Work log`. Skip if the user is jotting a quick note and doesn't want planning yet.
+7. **Plan it (phase 1).** Dispatch a fresh subagent on **Opus** (not Fable unless the user asks; see `AGENTS.md`) to read this guide, `CLAUDE.md`, the new issue, and the relevant code, then write a `## Plan` section into `issues/NNNN.md` (after `## Description`). It writes no code and leaves status at `open`. This gives whoever picks the issue up a running start. The plan ends with four sections, so the test work is decided before any code:
+   - **`## Tests`**: the unit tests to add or change, by function name (they become the `--expect` list). Fast tests are the default and should be as comprehensive as the change allows: mock Music Assistant with the stub transport and recorded fixtures, and use real mp3/m4a fixture files, not the network or a live server. A bug fix names the **regression test** that must fail on the current code.
+   - **`## UI tests`**: the `RoadieUITests` classes and tests added or changed, or `none (no UI change)`. Everything a user is supposed to be able to do has a UI test, so a feature issue also names the row(s) it adds or changes in the feature inventory, [docs/design/test-automation.md](../docs/design/test-automation.md) §5.
+   - **`## Which tier`**: `fast`, `full` (when AudioCore/SkinLibrary code a slow test guards changes), or `ui` with the `--ui-filter` classes to run.
+   - **`## By hand`**: the host checklist for the user.
+
+   Record the planner's usage in `## Work log`. Skip if the user is jotting a quick note and doesn't want planning yet.
 8. **Put it in a milestone.** Every open issue belongs to one. Add `- Parent: [#M](M.md)` under `## Relation` and a row to the umbrella issue's `## Children` table. A cleanup or follow-up issue found while working a milestone goes under that milestone; work that fits none gets a new umbrella (Module `Milestone`).
 9. **If `issues/` is tracked by git**, commit the new file with message `#NNNN <issue title>` so the issue enters git history with its `open` status — the `## Plan` rides along if it's landed, else commit it separately as `#NNNN Plan`. If ignored, skip.
 
@@ -211,7 +217,13 @@ A subagent starts with fresh context, so its first job is loading the project's 
 
    - **Ask for a run** by ending your turn with exactly one line:
      `VERIFY: scripts/verify.sh [--build-only] [--full] [--launch] [--expect testA,testB]`
-     Use the tier the plan names (`--full` when "Which tier" says so). List every test you added or changed in `--expect`, by function name: the run then fails unless each of them ran and passed. For a bug fix, the line may instead carry `--expect-fail testA` (run before the fix: passes only if that test fails and nothing else does). The orchestrator has the runner execute the command and continues you with its report. Don't edit files while a run is pending.
+     `scripts/verify.sh [--build-only] [--full] [--ui --ui-filter ClassA,ClassB] [--expect-fail testA]`
+     Use the tier the plan names (`--full` when "Which tier" says so, `--ui --ui-filter …` with the plan's classes when it says `ui`). List every test you added or changed in `--expect`, by function name: the run then fails unless each of them ran and passed. For a bug fix, the line may instead carry `--expect-fail testA` (run before the fix: passes only if that test fails and nothing else does). The orchestrator has the runner execute the command and continues you with its report. Don't edit files while a run is pending.
+   - **Fast tests must pass before review.** `DONE` requires a quoted `VERIFY PASS` of a complete fast run (it includes `app-unit-tests`) with every new or changed test in `--expect`, and, when `## Which tier` says `ui`, a `--ui --ui-filter …` run with its `UI` line. A `DONE` without them is a bail, not a hand-off.
+   - **Regression test first, for every bug fix.** Write the test, then ask `VERIFY: scripts/verify.sh --expect-fail <test>` *before* touching the fix (it passes only if that test ran and failed), then fix and ask the normal run with `--expect <test>`. Quote both reports. If the test can't fail on the current code (the fix is already in), say so in `## Verification`.
+   - **Every user-facing change adds or updates a UI test** (the plan's `## UI tests`) and its row in the design doc's §5 inventory. A test must check the outcome the user sees, so it would fail if the change were a no-op.
+   - **UI tests run only in the Tart guest**, through `verify.sh --ui`: never on the host, never ⌘U or `xcodebuild test` with the `Roadie UI Tests` scheme. The UI test skins reach the guest from the host cache by `--ui` itself (default cache, or `--test-skins DIR`); never put the cache in a `VERIFY:` line via `--skins`.
+   - **Test mode and test hooks are Debug-only** (`#if DEBUG`) and never read or write real user state: no `.standard` defaults, the user's library, skins or Application Support outside the per-test data directory.
    - **Compile first if unsure.** `--build-only` checks only that everything compiles. A compile error shows up in about 1.6 minutes, but a build-only pass is never verification. The run that counts is a complete fast or full run. Skip `--build-only` when you're confident: a complete run reports compile errors too.
    - **On `VERIFY FAIL`**, fix from the report and ask again. The report holds:
      - the failing steps;
@@ -228,7 +240,7 @@ A subagent starts with fresh context, so its first job is loading the project's 
    - **Quote the evidence.** In `## Verification`, quote the passing report's lines verbatim:
      - `VERIFY PASS` with its run id, step count and test total;
      - the `TIER` and `AUDIO` lines;
-     - the `EXPECT` line.
+     - the `EXPECT` line, the `EXPECT-FAIL` line of the pre-fix run for a bug fix, and the `UI` line of a UI run.
 
      The run's `summary.txt` has the full step list if a human wants it. Never ask for a run again just to recapture output.
 
@@ -249,7 +261,7 @@ A subagent starts with fresh context, so its first job is loading the project's 
    - Add, all *after* `## Description`:
      - **`## Root cause`** — what was actually wrong.
      - **`## Fix`** — the approach taken; call out any divergence from the plan.
-     - **`## Verification`** — the exact command(s) you ran and what you observed (e.g. "`xcodebuild test -scheme MyAppUITests` — 14 tests passed including the 3 new in `ReplyButtonUITests`"). Name new tests and confirm they ran.
+     - **`## Verification`** — the exact command(s) you ran and what you observed (e.g. "`xcodebuild test -scheme MyAppUITests` — 14 tests passed including the 3 new in `ReplyButtonUITests`"). List the tests by name (the `--expect` and `--expect-fail` tests, the UI classes run) and confirm they ran.
      - **`## Files changed`** — one bullet per file, with a short note on what changed.
      - **`## Gotchas`** *(optional)* — surprises, dead ends, non-obvious behavior. Skip if nothing's notable; be specific when present.
 
@@ -259,7 +271,7 @@ A subagent starts with fresh context, so its first job is loading the project's 
 
 A mechanical step, so it runs on the cheapest model. The orchestrator gives it one command line from the implementer's `VERIFY:` request.
 
-1. Run exactly that command from the repo root with the Bash tool. Use a timeout of 600000 ms; a `--stress` or `--corpus` run that may take longer goes in the background, and you wait for its completion notification. UI (`--ui`) and coverage runs always go in the background (#0200).
+1. Run exactly that command from the repo root with the Bash tool. Use a timeout of 600000 ms; a `--stress` or `--corpus` run that may take longer goes in the background, and you wait for its completion notification. UI (`--ui`, including `--ui-skins all`) and coverage (`--coverage`) runs always go in the background, and you wait for the completion notification (#0200). The output you return is still the command's stdout, verbatim.
 2. Return the command's complete stdout **verbatim**, followed by `exit <code>`. It is short by design (5–10 lines on a pass, at most about 60 on a failure).
 3. Never read the logs under `build/vm-tests/`, run any other command, edit files, re-run on failure (`verify.sh` already retries INFRA once), or interpret the result. Diagnosis is the implementer's job.
 
@@ -269,9 +281,9 @@ An independent reviewer is the gate between "code landed" and "issue resolved". 
 
 1. **Orient** the same way (this file, `CLAUDE.md`, `issues/NNNN.md` including the `## Plan` and the drafted resolution sections).
 2. **Inspect the code commit** — read its diff (`git show <hash>`). Does it actually address the reported bug? Right scope? Any correctness, security, or regression risk?
-3. **Re-run the verification yourself**; don't trust the drafted `## Verification`. Run `scripts/verify.sh --head` with the same tier and `--expect` list as the implementer's passing run. Use the quiet wrapper, not `run-tests-vm.sh`, so the full logs stay out of your context. `--head` tests the committed code, not whatever else is in the working tree (the orchestrator may have the next issue's implementation running). Hold it to the same standard as phase 2, step 4, and quote the same lines. This independent run is the core of the review. If it fails and the report isn't enough to judge, you may read the named step's log under the results directory, since a review needs the diagnosis.
+3. **Re-run the verification yourself**; don't trust the drafted `## Verification`. Run `scripts/verify.sh --head` with the same tier and `--expect` list as the implementer's passing run. Use the quiet wrapper, not `run-tests-vm.sh`, so the full logs stay out of your context. `--head` tests the committed code, not whatever else is in the working tree (the orchestrator may have the next issue's implementation running). Hold it to the same standard as phase 2, step 4, and quote the same lines. This independent run is the core of the review. Re-run every command the implementer's evidence rests on: the same `--ui --ui-filter …` run when there was one. **Bounce** when a bug fix has no regression test (or no `EXPECT-FAIL` run, without a reason it couldn't fail), when a user-facing change has no UI test, when a test could pass on a no-op (it asserts nothing the change affects), when test hooks aren't Debug-only or touch real user state, or when a `VERIFY` line passed the test-skin cache via `--skins`. If it fails and the report isn't enough to judge, you may read the named step's log under the results directory, since a review needs the diagnosis.
 4. **Decide:**
-   - **Approve** (fix is correct, verification passed): change **Status** to `resolved`; add a `**Closed**` row with today's date; ensure the `**Commit**` row is present; add a top-of-resolution `## Resolution notes` blockquote (`> 🟢 Resolved YYYY-MM-DD — <one sentence>.`). **If `issues/` is tracked**, make the resolution commit — stage `issues/NNNN.md`, message `#NNNN Resolve: <title>`, body noting the code commit hash. If ignored, skip; the markdown is the record.
+   - **Approve** (fix is correct, verification passed): change **Status** to `resolved`; add a `**Closed**` row with today's date; ensure the `**Commit**` row is present; add a top-of-resolution `## Resolution notes` blockquote (`> 🟢 Resolved YYYY-MM-DD — <one sentence>.`), followed by a line naming the tests that prove the fix (the `--expect`/`--expect-fail` tests and UI classes) and the run ids of the passing runs. **If `issues/` is tracked**, make the resolution commit — stage `issues/NNNN.md`, message `#NNNN Resolve: <title>`, body noting the code commit hash. If ignored, skip; the markdown is the record.
    - **Bounce** (verification failed, fix wrong, scope off): revert **Status** to `open`; add a `## Review notes` section stating exactly what failed and what the next implementation pass must fix. Leave the code commit in place unless you say otherwise in the notes. **If tracked**, commit the markdown with `#NNNN Review: <reason>`. Return to the orchestrator, which re-dispatches phase 2.
 
 Status flow: `open` (with `## Plan`) → `in-progress` → review → `resolved`, or bounced back to `open`. **Never set `closed`** — the user does that after verifying the fix.
@@ -281,13 +293,23 @@ Status flow: `open` (with `## Plan`) → `in-progress` → review → `resolved`
 **Verify in the Tart VM, never on the host.** See [docs/testing-in-vm.md](../docs/testing-in-vm.md).
 
 - Verification command: `scripts/run-tests-vm.sh`, which runs the **fast tier** (add `--launch` to also start the app in the guest). It exports the working tree, generates the project, and runs in a fresh, muted guest with no audio path to the host: `swift test` for SkinKit, `swift test` for PlayerKit (AudioCore, the backends, Music Assistant and the browser), the Debug app build (`build-for-testing`), the app's hosted unit tests (step `app-unit-tests`, `RoadieTests`), and a check of the built app's Info.plist. The fast tier skips the slow tests: the three 100k SkinLibrary tests (`SkinIndexScaleTests`, `SkinSearchBudgetTests`) (gate `ROADIE_SLOW_TESTS=1`) and the real-time AudioCore tests (gate `AUDIOCORE_REALTIME=1`). `scripts/run-tests-vm.sh --full` is the **full tier**: everything above plus those slow tests. It passes only if every step passes and the host logged no audio. Logs are in `build/vm-tests/<run-id>/`, and the summary, with the exit code, is in `summary.txt` there; quote its lines in `## Verification`. Quote the `TIER` line too. The run starts with a build stage (`swift build --build-tests` for each package, then the app's `xcodebuild`), and the test steps reuse it (`swift test --skip-build`). If anything fails to compile, that build step shows `FAIL`, the steps that depend on it show `SKIP` (the other package still builds, so one run reports errors from both), and the compiler errors are printed under `ERRORS`. Exit codes: 0 passed, 1 a step or the audio check failed, 2 bad arguments, 3 infrastructure (`INFRA`: the guest was lost or didn't boot; rerun). A run with `SKIP` lines is a failed run. `scripts/run-tests-vm.sh --build-only` stops after the build stage; use it as a compile check before a complete run (phase 2, step 4), never as verification.
+- **Tiers** (design: [docs/design/test-automation.md](../docs/design/test-automation.md) §1):
+
+  | Tier | Command | When |
+  |---|---|---|
+  | Fast | `scripts/verify.sh [--expect …]` | Every issue and every review; must pass before review. Includes `app-unit-tests` (`RoadieTests`). |
+  | UI | `scripts/verify.sh --ui [--ui-filter Class,…]` | Per issue when the change touches `App/` UI (filtered to the plan's classes, base skin); the whole suite at milestone end. |
+  | Slow | `scripts/verify.sh --full` | Changes to code a slow test guards, and once per milestone: tests that can't be fast but still guard against regressions. |
+  | Milestone end | `scripts/verify.sh --head --full --ui --ui-skins all --coverage` | When a milestone's last child resolves, and before a release. |
+
+  Flags: `--ui`, `--ui-filter Class[,Class]`, `--ui-skins base|all`, `--test-skins DIR` (default `~/Library/Caches/co.sstools.roadie-test-skins`), `--coverage` (available once #0212 is merged), `--expect`, `--expect-fail`. Prerequisite for `--ui`: run `scripts/fetch-test-skins.sh` once on the host to fill the test skins cache. Details: [docs/testing-in-vm.md](../docs/testing-in-vm.md), [docs/ui-tests-in-vm.md](../docs/ui-tests-in-vm.md).
 - **Agents call `scripts/verify.sh`, not `run-tests-vm.sh`.** `verify.sh` takes the same options plus `--expect NAMES`. It sends the run's full output to `build/vm-tests/<run-id>/run.out` and prints only a short report:
   - **On a pass:** `==> VERIFY  PASS (exit 0) <run-id>: N steps passed, T tests in R test runs`, then the `TIER`/`AUDIO` lines and the `EXPECT` result.
   - **On a failure:** `==> VERIFY  FAIL (exit N)`, then the `FAIL`/`BUILD`/`ERRORS`/`INFRA`/`AUDIO` lines from `summary.txt` and, from each failed test step's log, the `✘` lines, the `↳` lines with their values, crashes and fatal errors. It stops at 60 lines and keeps the full report in `failure.txt`.
 
   The exit code is the run's. A missing or failed `--expect` test makes it 1. Exit 3 is retried once automatically. People can still call `run-tests-vm.sh` directly to watch a run.
 - **Which tier.** Phases 2 and 3 run the fast tier. They also run the full tier (`--full`), and quote both summaries, when the change touches code a slow test guards. That means anything under `Packages/SkinKit/Sources/SkinLibrary/` (indexer, store, SQLite/FTS, folder scanner), or anything under `Packages/PlayerKit/Sources/AudioCore/` that affects real-time playback: `Player`, `GaplessScheduler`, `AudioGraph`, `Progressive/`, `Output/`, `NowPlaying/`. When unsure, run `--full`. The plan should say which tier the issue needs.
-- **Milestone end.** When the review of a milestone's last open child resolves it (every issue with `Parent: #M` is `resolved`, `closed` or `wontfix`), the orchestrator runs `scripts/verify.sh --full --head` once (directly, or through a Haiku runner) and records the run id and the `PASS`/`FAIL`/`TIER` lines in the umbrella issue's `## Notes` (commit `#M Notes: full tier <passed|failed>`). If anything fails, file a new cleanup issue with `Parent: #M` for each distinct failure, through the normal filing and planning steps. Never reopen a resolved child for it. The milestone is not done until a full-tier run passes.
+- **Milestone end.** When the review of a milestone's last open child resolves it (every issue with `Parent: #M` is `resolved`, `closed` or `wontfix`), the orchestrator runs `scripts/verify.sh --head --full --ui --ui-skins all --coverage` once (through a Haiku runner, in the background) and records the run id and the `PASS`/`FAIL`, `TIER`, `UI`, `AUDIO` and `COVERAGE` lines in the umbrella issue's `## Notes` (commit `#M Notes: full tier <passed|failed>`). If anything fails, file a new cleanup issue with `Parent: #M` for each distinct failure, through the normal filing and planning steps; a coverage floor breach files a backfill issue the same way. Never reopen a resolved child for it. The milestone is not done until this run passes.
 - Don't run `swift test`, `xcodebuild` or the app on the host to verify a change. `xcodegen generate` on the host is fine (the script runs it into the export itself).
 - **Tests must be silent.** Nothing may play through the host's speakers. Most of the suite renders offline (manual rendering mode, see `renderSilently` in `TestSupport.swift`); real-time tests are opt-in with `AUDIOCORE_REALTIME=1`, mute the main mixer, and are only turned on in the VM's full tier (`--full`). Scratch harnesses and review experiments follow the same rule: run them in a VM clone, or render offline. The script checks the host with `/usr/bin/log show --predicate 'process == "coreaudiod" AND eventMessage CONTAINS "Starting IO"'` (in zsh a bare `log` is a shell builtin).
 - Skin report: `swift run --package-path Packages/SkinKit skintool Skins/`
@@ -413,6 +435,7 @@ The `*` matches the U+202F. Substitute the actual timestamp; if you don't know w
 - `SkinKit`: skin parsing, sprites, `skintool` (`Packages/SkinKit`)
 - `AudioCore`: AVAudioEngine playback, EQ, analyzer, queue (`Packages/PlayerKit`)
 - `MusicAssistantKit`: Music Assistant WebSocket client and models (`Packages/PlayerKit`)
-- `App`: SwiftUI/AppKit app (`App/`)
+- `App`: SwiftUI/AppKit app (`App/`), with its unit tests (`RoadieTests`) and UI tests (`RoadieUITests`)
+- `Tooling`: scripts, the VM runner, CI and docs about them (`scripts/`)
 - `QuickLook`: Quick Look thumbnail and preview extensions for `.wsz` (new targets in `project.yml`)
 - `Milestone`: umbrella issues only
