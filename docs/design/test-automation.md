@@ -52,20 +52,22 @@ Rule for new code: logic goes in a package when it can; otherwise it is reachabl
 
 ```swift
 struct RoadieConfiguration {
-    var dataDirectory: URL?                      // queue.json, skin index, thumbnails, folder index, Museum caches
-    var musicAssistant: MusicAssistantMode       // .live | .scripted(ScriptedMusicAssistant.Scenario)
-    var museum: MuseumMode                       // .live | .fixtures (SkinMuseumTests' JSON, no network)
-    var discovery: Bool                          // Bonjour, Wi-Fi name, network events
+    var dataDirectory: URL?                      // queue.json, skins.sqlite, thumbnails, folder index, Museum caches
+    var defaults: UserDefaults                   // .standard, or a suite in test mode
+    var musicAssistant: MusicAssistantMode       // .live | .scripted(scenario: String) | .none
+    var museum: MuseumMode                       // .live | .fixtures(skinsFolder:) (SkinMuseumStub, no network)
+    var discovery: Bool                          // Bonjour, Wi-Fi name, network events, wake notifications
     var externalOpens: ExternalOpenMode          // .workspace | .record (Help links, Open in Skin Museum)
+    var isUITest: Bool                           // -RoadieUITest 1
     var silentOutput: Bool                       // reserved: manual rendering (see Risks)
-    static func fromProcess() -> RoadieConfiguration   // launch arguments -RoadieDataDir, -RoadieMAScenario, …
+    static func fromProcess(arguments:hostedTestRun:) -> RoadieConfiguration   // -RoadieUITest 1 -RoadieDataDir …, or the hosted unit-test run
 }
 ```
 
 - **Music Assistant**: `MusicAssistantBackend(transports:)` takes `StubWebSocketTransport` from `MusicAssistantKitStub`, scripted by a `ScriptedMusicAssistant` (#0197): a small stateful server built on `FixtureScript.recorded(token:)` that holds players, queues and library items from the recorded fixtures, answers `player_queues/items`, `players/all`, `music/*` from them, and **applies** `player_queues/play_index`, `play_media`, `move_item`, `delete_item`, `clear`, `players/cmd/*`, favorites and playlist writes to its state, pushing `player_updated` / `queue_updated` / `queue_items_updated` events with the recorded envelope. Scenarios: `libraryIdle` (recorded, nothing playing), `queueLoaded` (the recorded loaded queue, `index: 0` on every row), `playingOnSpeaker` (`SyntheticPlayback`), `unreachable`, `badToken`. The token is a fixed fake (`InMemoryMusicAssistantTokenStore`), the server store is seeded with one verified server at `http://ma.example:8095` (the recordings' scrubbed host), and `hasVerifiedServer` is true, so the app connects at launch as it does for a real user.
 - **Folder library**: the real `FolderBackend`, pointed at a fixture music folder (§2.3) through the existing `LibraryFolderPath` default.
-- **Storage**: `QueueStore`, `SkinIndexStore`, `SkinThumbnailCache`, `FolderIndex` and the Museum caches take their root from `dataDirectory`; `UserDefaults.standard` stays (tests pass defaults as `-key value` launch arguments, which land in `NSArgumentDomain` and win over the persisted domain; the UI test harness also runs `defaults delete co.sstools.roadie` before each launch). Unit tests pass a `UserDefaults(suiteName:)` instead.
-- **Network off**: `discovery == false` swaps `SystemServiceBrowser`, `SystemWiFiNetwork` and `SystemNetworkEvents` for inert stubs; the Museum uses `StubMuseumTransport` from `SkinMuseumTests` (moved to a `SkinMuseumStub` product) with the committed GraphQL fixtures and a downloader that copies from the test skins folder instead of fetching. Sparkle is already off in Debug (empty feed URL).
+- **Storage**: `QueueStore`, `SkinIndexStore`, `SkinThumbnailCache`, `FolderIndex` and the Museum caches take their root from `dataDirectory`; the model's defaults are `configuration.defaults`: in UI test mode the emptied `co.sstools.roadie.uitest` suite, which still reads `-key value` launch arguments from `NSArgumentDomain` (every scene and hosting root sets `.defaultAppStorage(model.defaults)`, so the views' `@AppStorage` uses the same suite). Unit tests pass a `UserDefaults(suiteName:)`. The hosted unit-test run's own host model uses an isolated configuration too (temp data directory, fresh suite, Music Assistant `.none`, no discovery).
+- **Network off**: `discovery == false` swaps `SystemServiceBrowser`, `SystemWiFiNetwork` and `SystemNetworkEvents` for inert stubs; the Museum uses `FixtureMuseumTransport` from the `SkinMuseumStub` product (which also holds the committed GraphQL fixtures `SkinMuseumTests` reads), answering pages from the fixtures and downloads from the test skins folder instead of fetching. Sparkle is already off in Debug (empty feed URL). Test mode is Debug only: in Release `fromProcess` always returns `.standard`, and the post-build phase strips the `MusicAssistantKitStub` / `SkinMuseumStub` fixture bundles, which hold recordings of a real library (checked by the `--dmg` step `app-release-fixtures` and `scripts/verify-dmg.sh`).
 - **Audio**: see Risks. In v1 the app plays through the guest's muted virtual device, which has no path to the host (`tart run --no-audio`); the `AUDIO` host check stays the proof.
 
 `RoadieTests` builds `PlayerModel(configuration:)` directly; the UI tests pass `-RoadieUITest 1 -RoadieDataDir … -RoadieMAScenario queueLoaded …` as launch arguments. One mechanism, two consumers.

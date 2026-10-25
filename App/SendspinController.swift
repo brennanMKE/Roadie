@@ -20,12 +20,13 @@ final class SendspinController {
     var isEnabled: Bool {
         didSet {
             guard isEnabled != oldValue else { return }
-            UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey)
+            defaults.set(isEnabled, forKey: Self.enabledKey)
             reevaluate()
         }
     }
 
     @ObservationIgnored private let musicAssistant: MusicAssistantBackend
+    @ObservationIgnored private let defaults: UserDefaults
     /// The base URL of the running session; nil when none runs.
     @ObservationIgnored private var runningURL: URL?
     /// Decisions run one after another so a fast connect / disconnect never interleaves a start and a stop.
@@ -36,6 +37,7 @@ final class SendspinController {
     init(sendspin: SendspinPlayer, musicAssistant: MusicAssistantBackend, defaults: UserDefaults = .standard) {
         self.sendspin = sendspin
         self.musicAssistant = musicAssistant
+        self.defaults = defaults
         identity = SendspinIdentity.load(defaults: defaults, hostName: Host.current().localizedName ?? "Mac")
         isEnabled = defaults.object(forKey: Self.enabledKey) as? Bool ?? true
     }

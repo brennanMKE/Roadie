@@ -28,7 +28,7 @@ scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into 
 scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
 scripts/run-tests-vm.sh --skins "untitled folder" --references build/webamp-reference  # also diff each skin's skintool --png render against them
 scripts/run-tests-vm.sh --spike    # also build, test and smoke-launch the AirPlay routing spike harness (#0050); never plays
-scripts/run-tests-vm.sh --dmg      # also a Release build, back in release/: Roadie.app.zip, Roadie.app.dSYM.zip, dsym-uuids.txt (dwarfdump --uuid), build.txt, sparkle-bin/{sign_update,generate_keys}; then steps app-release-plist (check-info-plist.sh --release) and app-sparkle (check-sparkle.sh), see docs/sparkle.md
+scripts/run-tests-vm.sh --dmg      # also a Release build, back in release/: Roadie.app.zip, Roadie.app.dSYM.zip, dsym-uuids.txt (dwarfdump --uuid), build.txt, sparkle-bin/{sign_update,generate_keys}; then steps app-release-plist (check-info-plist.sh --release) app-sparkle (check-sparkle.sh), see docs/sparkle.md, and app-release-fixtures (no test-stub fixture bundles, #0194)
 scripts/run-tests-vm.sh --dmg --build-number 20261023.1200   # set the Release CFBundleVersion (YYYYMMDD.HHMM, UTC; default: now)
 scripts/run-tests-vm.sh --head     # test the last commit instead of the working tree
 scripts/run-tests-vm.sh --stress 30         # also loop the real-time gapless test 30 times in the guest (#0055)
@@ -279,8 +279,21 @@ The `Roadie` scheme's Test action holds unit tests only. UI tests go in a separa
 Test design for a headless, silent guest:
 
 - **No Music Assistant server.** The guest is on Tart's NAT network and *can* reach the LAN, so isolation has to
-  come from the app: test mode (`-RoadieUITest 1`, #0194) with `-RoadieMAScenario <name>` swaps in the scripted
-  server (#0197) built from recorded fixtures. No token is passed in.
+  come from the app. `RoadieConfiguration.fromProcess()` (#0194) reads these launch arguments; test mode is on only
+  with `-RoadieUITest 1`, and only in Debug builds (Release ignores them and ships no stub fixtures):
+  - `-RoadieDataDir <path>`: queue, skin index, thumbnails, folder index and Museum caches go here (default: a new
+    temp folder). Defaults go to the emptied `co.sstools.roadie.uitest` suite, which still sees `-key value` arguments.
+  - `-RoadieMAScenario <name>`: #0197's scripted Music Assistant (`ScriptedMusicAssistant`; `libraryIdle`, `queueLoaded`,
+    `playingOnSpeaker`, `thisMacIsASendspinPlayer`, `unreachable`, `badToken`) with one verified server at
+    `http://ma.example:8095` and an in-memory token. An unknown name stops the app. Without it, Music Assistant is
+    unconfigured.
+    Neither path touches the Keychain or the network.
+  - `-RoadieMuseum fixtures` (with `-RoadieMuseumSkins <folder>`): the recorded Museum pages; downloads copy the file
+    with that md5 from the folder.
+  - `-RoadieNoDiscovery 1`: no Bonjour, Wi-Fi name, network events or wake observer.
+  - `-RoadieExternalOpens record`: Help links, Open in Skin Museum and the like are recorded, not opened.
+  The hosted unit-test run (`RoadieTests`) picks an isolated configuration of its own (temp data directory, fresh
+  defaults suite, no Music Assistant, no discovery), so `⌘U` on a dev Mac leaves the real state alone.
 - **No user skins or music.** `Skins/`, `*.wsz` and `*.mp3` are gitignored, and third-party skins
   are never committed. Commit a small skin made for the project (or generate one at test time) plus
   a few seconds of generated audio, and pass their paths in through launch arguments.

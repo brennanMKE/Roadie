@@ -33,7 +33,8 @@
 #            build/vm-tests/<run-id>/release/Roadie.app.zip; scripts/make-dmg.sh signs it on the host and makes the DMG;
 #            also release/Roadie.app.dSYM.zip and release/dsym-uuids.txt (dwarfdump --uuid, run in the guest), and
 #            release/sparkle-bin/{sign_update,generate_keys} (#0158); then checks the Release bundle: steps
-#            app-release-plist (check-info-plist.sh --release) and app-sparkle (check-sparkle.sh)
+#            app-release-plist (check-info-plist.sh --release), app-sparkle (check-sparkle.sh) and
+#            app-release-fixtures (no MusicAssistantKitStub / SkinMuseumStub bundle, #0194)
 #   --build-number N  the Release build's CFBundleVersion, YYYYMMDD.HHMM (#0157); default: now, in UTC
 #
 # In the guest, in order:
@@ -447,6 +448,8 @@ if (( DMG )); then
   # #0158: the Release bundle's Sparkle keys (exact feed URL; SUPublicEDKey only warns until W15) and its embedding.
   run_step app-release-plist "scripts/check-info-plist.sh --release $REL/Roadie.app/Contents/Info.plist"
   run_step app-sparkle "scripts/check-sparkle.sh $REL/Roadie.app"
+  # #0194: the test stubs' fixtures (the user's recorded library and device names) must not ship; project.yml strips them.
+  run_step app-release-fixtures "test -d $REL/Roadie.app && found=\$(find $REL/Roadie.app -name '*MusicAssistantKitStub*' -o -name '*SkinMuseumStub*') && { [ -z \"\$found\" ] || { print -r -- \"test fixtures in the Release app: \$found\"; false; } }"
 fi
 
 # --- Results back ----------------------------------------------------------

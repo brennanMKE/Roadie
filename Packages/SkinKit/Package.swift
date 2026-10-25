@@ -11,6 +11,7 @@ let package = Package(
         .executable(name: "skintool", targets: ["skintool"]),
         .library(name: "WindowDocking", targets: ["WindowDocking"]),
         .library(name: "SkinMuseum", targets: ["SkinMuseum"]),
+        .library(name: "SkinMuseumStub", targets: ["SkinMuseumStub"]),
     ],
     dependencies: [
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19"),
@@ -35,7 +36,9 @@ let package = Package(
         ),
         // Winamp Skin Museum GraphQL client (#0126). Foundation + CryptoKit only; the network sits behind MuseumTransport.
         .target(name: "SkinMuseum"),
-        .testTarget(name: "SkinMuseumTests", dependencies: ["SkinMuseum"], resources: [.copy("Fixtures")]),
+        // #0194: the recorded Museum replies and a fixture transport, for the tests and the app's test configuration.
+        .target(name: "SkinMuseumStub", dependencies: ["SkinMuseum"], resources: [.copy("Fixtures")]),
+        .testTarget(name: "SkinMuseumTests", dependencies: ["SkinMuseum", "SkinMuseumStub"]),
         .target(name: "WindowDocking"),
         .testTarget(name: "WindowDockingTests", dependencies: ["WindowDocking"]),
     ]

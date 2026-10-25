@@ -59,6 +59,9 @@ APP="$MNT/Roadie.app"
 check "Roadie.app and Applications link on the volume" 0 test -d "$APP" -a -L "$MNT/Applications"
 check "codesign --verify --deep --strict Roadie.app" 0 codesign --verify --deep --strict "$APP"
 check "spctl exec Roadie.app" 1 spctl -a -t exec "$APP"
+# #0194: the test stubs' fixture bundles (recordings of the user's library) are Debug only.
+check "no test fixture bundles (MusicAssistantKitStub, SkinMuseumStub)" 0 zsh -c \
+  'found=$(find "$1" -name "*MusicAssistantKitStub*" -o -name "*SkinMuseumStub*"); [[ -z $found ]] || { print -r -- "$found"; exit 1 }' _ "$APP"
 
 machos=0 bad=()
 while IFS= read -r -d '' f; do

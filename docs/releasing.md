@@ -44,7 +44,8 @@ fails. It never prints a secret: only identity and profile names and whether the
 3. **Rehearse:** `scripts/release.sh X.Y.Z` (agents may run this).
    - Preflight runs non-strict; its failures (credentials, branch, changelog) are listed at the end under "Fix
      before --publish" but don't stop the rehearsal.
-   - Builds and tests in the VM (`scripts/verify.sh --head --full --launch --dmg --build-number <UTC build>`), reads
+   - Builds and tests in the VM (`scripts/verify.sh --head --full --launch --dmg --build-number <UTC build>`;
+     its step `app-release-fixtures` fails if the Release app still holds a test-stub fixture bundle), reads
      the zip from the `RELEASE` line, signs and packages with `make-dmg.sh --release`, and checks the DMG with
      `verify-dmg.sh --allow-unnotarized`.
    - Writes only under `build/release/X.Y.Z/`: the DMG, `.sha256`, dSYM zip and UUIDs, `appcast-item.xml` (stub
@@ -108,11 +109,18 @@ fails. It never prints a secret: only identity and profile names and whether the
     `build/dist/Roadie-<version>-<build>-<commit>.dmg`.
 - `scripts/verify-dmg.sh <dmg> [--expect-team ID] [--allow-unnotarized]` prints one `PASS`/`FAIL` line per check:
   DMG signature and team, `stapler validate`, `spctl -t open`, the mounted app's deep verify and `spctl -t exec`,
-  every Mach-O's authority, team, runtime and timestamp, and a Safari-quarantine simulation. With
+  every Mach-O's authority, team, runtime and timestamp, that the app holds no `MusicAssistantKitStub` /
+  `SkinMuseumStub` bundle (#0194), and a Safari-quarantine simulation. With
   `--allow-unnotarized`, the four notarization checks are reported as expected failures and don't fail the exit code.
 
 ## If something fails
 
+- **Test fixtures in the Release app** (`app-release-fixtures` or verify-dmg's "no test fixture bundles"). The app links
+  `MusicAssistantKitStub` and `SkinMuseumStub` in every configuration (Xcode has no per-configuration package
+  dependencies). Their fixture bundles hold recordings of a real Music Assistant library and device names, so the
+  Release build's "Strip test fixtures (Release)" phase (`project.yml`, `ROADIE_STRIP_TEST_FIXTURES`) deletes them
+  before signing. Check that phase still runs and matches the bundle names (`*_MusicAssistantKitStub.bundle`,
+  `*_SkinMuseumStub.bundle`). Never ship around it.
 - **Notarization `Invalid`.** The log is in `build/release/X.Y.Z/notary-log.json`. Usual causes: a nested binary
   without the hardened runtime or a timestamp, or one left ad-hoc signed. Fix it, then re-run from the start. Nothing
   was published.

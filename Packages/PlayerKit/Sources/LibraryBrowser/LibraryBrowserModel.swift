@@ -150,9 +150,10 @@ public final class LibraryBrowserModel {
     @ObservationIgnored public var onLibraryChange: (@MainActor (LibraryChange) -> Void)?
     private static let log = Logger(subsystem: "co.sstools.roadie", category: "LibraryBrowser")
 
+    /// `defaults` holds Discover's "show all" and the playlists' recent targets (#0194: the app passes its configured store).
     public init(
         backend: any MusicBackend, pageSize: Int = 100,
-        searchDelay: Duration = .milliseconds(300), searchLimit: Int = 50
+        searchDelay: Duration = .milliseconds(300), searchLimit: Int = 50, defaults: UserDefaults = .standard
     ) {
         self.backend = backend
         self.searchDelay = searchDelay
@@ -167,9 +168,9 @@ public final class LibraryBrowserModel {
         allAlbums = PagedList(pageSize: pageSize)
         playlists = PagedList(pageSize: pageSize)
         artistAlbums = PagedList(pageSize: pageSize)
-        discover = backend.capabilities.contains(.recommendations) ? DiscoverModel(backend: backend) : nil
+        discover = backend.capabilities.contains(.recommendations) ? DiscoverModel(backend: backend, defaults: defaults) : nil
         favorites = FavoritesModel(backend: backend, pageSize: pageSize)
-        playlistsModel = PlaylistsModel(backend: backend, list: playlists)
+        playlistsModel = PlaylistsModel(backend: backend, list: playlists, defaults: defaults)
         playlistEditor = PlaylistEditor(backend: backend)
         playlistsModel.browser = self
         playlistEditor.onRows = { [weak self] rows in self?.tracks = .loaded(rows) }
