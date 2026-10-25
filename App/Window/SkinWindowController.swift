@@ -144,7 +144,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         }
         dragView.delegate = self
         shape.addSubview(dragView)
-        if case .main = kind, UITestMode.isActive {
+        if case .main = kind, model.configuration.isUITest {
             shape.addSubview(probeView)
         }
         window.contentView = shape

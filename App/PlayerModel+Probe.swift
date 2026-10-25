@@ -48,8 +48,9 @@ struct TestProbe: Codable, Equatable {
 }
 
 extension PlayerModel {
-    /// The state probe's value. `lastExternalOpen` and `tokenStore` come from `RoadieConfiguration` (#0194) and
-    /// `maRequests` from the scripted Music Assistant (#0197); until those land they read nil, "keychain" and [].
+    /// The state probe's value. `tokenStore` and `lastExternalOpen` come from the model's configuration (#0194), and
+    /// `maRequests` only from the scripted server's redacted summaries (#0197), never its transports' raw `sent`
+    /// (they hold the unredacted token).
     func testProbe() -> TestProbe {
         let tracks = playlist.tracks
         let current = playlist.currentIndex
@@ -67,9 +68,17 @@ extension PlayerModel {
                     current: index == current)
             },
             notice: notice?.text,
-            lastExternalOpen: nil,
-            tokenStore: "keychain",
-            maRequests: [])
+            lastExternalOpen: lastExternalOpen?.absoluteString,
+            tokenStore: tokenStoreKind,
+            maRequests: scriptedRequestSummaries)
+    }
+
+    private var scriptedRequestSummaries: [String] {
+        #if DEBUG
+        scriptedMusicAssistant?.recentCommandSummaries() ?? []
+        #else
+        []
+        #endif
     }
 
     /// The position slider's value: `mm:ss / mm:ss`.
