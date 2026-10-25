@@ -98,6 +98,15 @@ public struct FixtureScript: Sendable {
             return { $0[key] == wanted }
         }
 
+        // #0196: the `--record-queue` pages, by queue, offset and limit, ahead of the empty recorded queue.
+        for fixture in [MAFixture.playerQueueItemsLoaded, .playerQueueItemsPage2] where fixture.isRecorded {
+            let queue = fixture.args?["queue_id"], offset = fixture.args?["offset"]?.intValue ?? 0
+            let limit = fixture.args?["limit"]
+            routes.append(
+                try Route.fixture(fixture, matches: {
+                    $0["queue_id"] == queue && ($0["offset"]?.intValue ?? 0) == offset && $0["limit"] == limit
+                }))
+        }
         for fixture in [MAFixture.time, .infoWS, .authMe, .providers, .playersAll, .playerQueuesAll, .playerQueueActive,
                         .playerQueueItems, .artistsCount, .albumsCount, .tracksCount, .playlistsCount, .artistAlbums,
                         .albumGet, .itemByURI]

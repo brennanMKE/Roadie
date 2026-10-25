@@ -6,6 +6,7 @@ Check: /usr/bin/python3 -I scripts/record-ma-fixtures.py --check
 Live:  /usr/bin/python3 -I scripts/record-ma-fixtures.py --check-live   (read-only drift check, #0061)
 Audio: /usr/bin/python3 -I scripts/record-ma-fixtures.py --probe-audio [--write] [--no-wait]   (per-track audio over HTTP, #0089)
 Writes: /usr/bin/python3 -I scripts/record-ma-fixtures.py --record-playlist-writes [--out DIR]   (opt-in, #0133)
+Queue: /usr/bin/python3 -I scripts/record-ma-fixtures.py --record-queue [--queue-id ID] [--events-seconds N]   (read-only, a loaded and playing queue, #0196)
 
 Reads MUSIC_ASSISTANT_URL and MUSIC_ASSISTANT_TOKEN from .env itself. The token lives in one
 variable, goes only into the `auth` frame and into Authorization headers of artwork probes, and is
@@ -67,8 +68,14 @@ WRITE_FIXTURES = frozenset([
     "playlist-tracks-after-remove", "playlist-update", "favorite-add", "favorite-remove",
     "error-unknown-command-move", "playlist-delete", "events-playlists",
 ])
+# Fixtures only the --record-queue run produces (#0196); the default run leaves them in place.
+QUEUE_FIXTURES = frozenset([
+    "players-all-playing", "player-queue-get-loaded", "player-queue-items-loaded",
+    "player-queue-items-page2", "events-queue",
+])
+QUEUE_PAGE = 50
 # Items kept per result frame (the real counts go to original_item_counts).
-TRUNCATE = {"playlist-tracks": 5, "player-queue-items-loaded": 5,
+TRUNCATE = {"playlist-tracks": 5, "player-queue-items-loaded": 50, "player-queue-items-page2": 50,
             "playlist-tracks-after-add": 5, "playlist-tracks-after-remove": 5}
 # Error-envelope probes. Harmless: an unknown command, never the real token on a failing path.
 PROBES = frozenset(["roadie/no_such_command"])
@@ -881,7 +888,8 @@ def record(args):
         R("playlist-export", "music/playlists/export_playlist", {"db_playlist_id": editable["item_id"]}, timeout=30)
     loaded = next((q for q in queues if isinstance(q, dict) and isinstance(q.get("items"), int) and q["items"] > 0), None) \
         if isinstance(queues, list) else None
-    if loaded:
+    # A --record-queue recording (#0196) of this fixture is fuller; keep it.
+    if loaded and not os.path.exists(os.path.join(fix_dir, "player-queue-items-loaded.json")):
         R("player-queue-items-loaded", "player_queues/items", {"queue_id": loaded["queue_id"], "limit": 5, "offset": 0})
 
     trk = first.get("tracks")
@@ -961,7 +969,7 @@ def record(args):
     # The writes run's fixtures (#0133) survive a default run; everything else is rewritten.
     if os.path.isdir(fix_dir):
         for fn in os.listdir(fix_dir):
-            if fn.endswith(".json") and fn[:-5] not in WRITE_FIXTURES:
+            if fn.endswith(".json") and fn[:-5] not in WRITE_FIXTURES | QUEUE_FIXTURES:
                 os.remove(os.path.join(fix_dir, fn))
     os.makedirs(fix_dir, exist_ok=True)
     os.makedirs(docs_dir, exist_ok=True)
@@ -985,6 +993,103 @@ def record(args):
         summary.append((name, 1, len(data)))
     for name, frames, size in summary:
         print("%-34s frames=%-3d bytes=%d" % (name, frames, size))
+    problems = gate(written, targets, [fix_dir])
+    if problems:
+        for p in written:
+            os.remove(p)
+        print("SECRET GATE FAILED; written files deleted:")
+        for path, rule in problems:
+            print("  %s: %s" % (os.path.relpath(path, ROOT), rule))
+        sys.exit(2)
+    print("secret gate: passed (%d files)" % len(written))
+    print("run id: %s ; transcript: %s" % (run_id, os.path.relpath(tr_dir, ROOT)))
+
+
+def pick_loaded_queue(queues, queue_id=None):
+    """The named queue, else the playing one with items; None when no queue has items (#0196)."""
+    qs = [q for q in (queues if isinstance(queues, list) else []) if isinstance(q, dict)]
+    if queue_id:
+        qs = [q for q in qs if q.get("queue_id") == queue_id]
+    loaded = [q for q in qs if isinstance(q.get("items"), int) and q["items"] > 0]
+    return next((q for q in loaded if q.get("state") == "playing"), loaded[0] if loaded else None)
+
+
+def record_queue_calls(s, queue_id=None):
+    """#0196: the read-only calls of --record-queue on session `s`; returns the fixtures (unscrubbed). Dies when
+    no queue has items."""
+    fixtures = {}
+
+    def R(name, command, a=None, timeout=10):
+        rc = s.call(command, a, timeout=timeout)
+        if name:
+            fixtures[name] = rc
+        return result_of(rc)
+
+    R("players-all-playing", "players/all")
+    queues = R(None, "player_queues/all") or []
+    q = pick_loaded_queue(queues, queue_id)
+    if q is None:
+        die("no queue has items; load and play a queue first")
+    qid = q["queue_id"]
+    R(None, "player_queues/get_active_queue", {"player_id": qid})
+    R("player-queue-get-loaded", "player_queues/get", {"queue_id": qid})
+    R("player-queue-items-loaded", "player_queues/items", {"queue_id": qid, "limit": QUEUE_PAGE, "offset": 0}, timeout=30)
+    R("player-queue-items-page2", "player_queues/items",
+      {"queue_id": qid, "limit": QUEUE_PAGE, "offset": QUEUE_PAGE}, timeout=30)
+    return fixtures
+
+
+def record_queue(args):
+    """#0196: records a loaded, playing queue. Read-only (ALLOWED); writes only QUEUE_FIXTURES."""
+    base, token = read_env()
+    out_root = os.path.abspath(args["out"]) if args["out"] else None
+    run_id = time.strftime("%Y%m%d-%H%M%S")
+    fix_dir = os.path.join(out_root, "Fixtures") if out_root else os.path.join(ROOT, FIXTURE_REL)
+    tr_dir = os.path.join(out_root, "transcript") if out_root else os.path.join(ROOT, "build", "ma-recorder", run_id + "-queue")
+    os.makedirs(tr_dir, exist_ok=True)
+    os.makedirs(fix_dir, exist_ok=True)
+    transcript = open(os.path.join(tr_dir, "transcript.jsonl"), "w", encoding="utf-8")
+    st, _, body = http_get(base, "/info")
+    if st != 200:
+        die("GET /info returned %d" % st)
+    targets = Targets(base, token, json.loads(body))
+    s = Session(base, transcript, token, allowed=ALLOWED)
+    s.first_frame()
+    res = result_of(s.call("auth", {"token": token}))
+    if not (isinstance(res, dict) and res.get("authenticated")):
+        s.ws.close()
+        die("authentication did not succeed; stopping before sending anything else")
+    user = res.get("user") or {}
+    if isinstance(user.get("username"), str):
+        targets.username = user["username"]
+    try:
+        fixtures = record_queue_calls(s, args.get("queue_id"))
+        secs = args["events_seconds"]
+        print("Recording queue events while the queue plays (%ds); the recorder sends no transport command." % secs)
+        sys.stdout.flush()
+        start = time.time()
+        s.events = []
+        events = []
+        closed = None
+        while time.time() < start + secs and len(events) < 80:
+            try:
+                t = s.ws.recv(min(1.0, start + secs - time.time()))
+            except Closed as e:
+                closed = str(e)
+                break
+            if t:
+                f = json.loads(t)
+                if isinstance(f, dict) and f.get("event") in ("queue_updated", "queue_items_updated", "player_updated"):
+                    events.append({"after_ms": int((time.time() - start) * 1000), "frame": f})
+        fixtures["events-queue"] = {"events": events, "capped": len(events) >= 80,
+                                    "server_pings_seen": s.ws.pings, "closed_by_server": closed}
+    finally:
+        s.ws.close()
+        transcript.close()
+    summary = []
+    written = write_fixtures(fixtures, targets, fix_dir, summary)
+    for fname, frames, size in summary:
+        print("%-34s frames=%-3d bytes=%d" % (fname, frames, size))
     problems = gate(written, targets, [fix_dir])
     if problems:
         for p in written:
@@ -1022,6 +1127,11 @@ def shape_problems(root):
                 pid = o["args"].get("db_playlist_id", o["args"].get("item_id", o["args"].get("library_item_id")))
                 if pid is None:
                     problems.append((path, "writes fixture without a playlist id"))
+        if stem in QUEUE_FIXTURES and stem != "events-queue":
+            if not (isinstance(o, dict) and o.get("command") in ALLOWED and "args" in o and "frames" in o):
+                problems.append((path, "queue fixture without an allowlisted command, args and frames"))
+        if stem == "events-queue" and not (isinstance(o, dict) and isinstance(o.get("events"), list)):
+            problems.append((path, "events fixture without events"))
         if stem == "events-playlists" and not (isinstance(o, dict) and isinstance(o.get("events"), list)):
             problems.append((path, "events fixture without events"))
     return problems
@@ -1562,7 +1672,7 @@ def probe_audio(write, wait):
 
 def main(argv):
     args = {"out": None, "events_seconds": 30, "check": False, "live": False, "probe": False, "write": False,
-            "wait": True, "playlist_writes": False}
+            "wait": True, "playlist_writes": False, "record_queue": False, "queue_id": None}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -1576,6 +1686,11 @@ def main(argv):
             args["write"] = True
         elif a == "--record-playlist-writes":
             args["playlist_writes"] = True
+        elif a == "--record-queue":
+            args["record_queue"] = True
+        elif a == "--queue-id":
+            i += 1
+            args["queue_id"] = argv[i]
         elif a in ("-h", "--help"):
             print(__doc__)
             return
@@ -1592,6 +1707,9 @@ def main(argv):
         i += 1
     if args["playlist_writes"]:
         record_playlist_writes(args)
+        return
+    if args["record_queue"]:
+        record_queue(args)
         return
     if args["probe"]:
         probe_audio(args["write"], args["wait"])

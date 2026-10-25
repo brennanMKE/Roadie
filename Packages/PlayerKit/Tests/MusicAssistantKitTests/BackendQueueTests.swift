@@ -4,8 +4,10 @@ import MusicBackendKit
 import Testing
 @testable import MusicAssistantKit
 
-/// `queue(on:)` over the stub socket and a `ManualClock` (#0144). The queue items are SYNTHETIC (the recorded
-/// `player-queue-items.json` is empty), shaped after the `QueueItem` schema in `docs/ma-protocol/openapi.json`.
+/// `queue(on:)` over the stub socket and a `ManualClock` (#0144). Most queue items are SYNTHETIC (the baseline
+/// `player-queue-items.json` is empty), shaped after the `QueueItem` schema in `docs/ma-protocol/openapi.json`, and
+/// carry the real server's `"index": 0` by default (#0187). The `--record-queue` recording (#0196) drives
+/// `queueRowsFromTheRecordedLoadedQueueAreNumberedByPosition` once it exists.
 struct BackendQueueTests {
     let output = OutputDevice.ID(rawValue: SyntheticPlayback.playerID)
     static let queueID = SyntheticPlayback.playerID
@@ -22,8 +24,9 @@ struct BackendQueueTests {
         return .object(track)
     }
 
-    /// `serverIndex` is the item's `index` field; Music Assistant often sends its default, 0, on every item (#0187).
-    static func itemJSON(_ n: Int, artist: String? = "Artist", serverIndex: Int? = nil) -> MAJSON {
+    /// `serverIndex` is the item's `index` field; Music Assistant sends its default, 0, on every item (#0187), so that
+    /// is the default here. nil numbers the item by its position.
+    static func itemJSON(_ n: Int, artist: String? = "Artist", serverIndex: Int? = 0) -> MAJSON {
         [
             "queue_id": .string(queueID), "queue_item_id": .string("qi\(n)"),
             "name": .string(artist.map { "\($0) - Song \(n)" } ?? "Song \(n)"), "duration": 100,
@@ -36,7 +39,7 @@ struct BackendQueueTests {
     }
 
     /// A connected backend whose queue has `count` items, answered `pageSize` at a time by offset.
-    private func rig(count: Int, pageSize: Int, serverIndex: Int? = nil) async throws -> BackendRig {
+    private func rig(count: Int, pageSize: Int, serverIndex: Int? = 0) async throws -> BackendRig {
         let rig = try await connectedBackend(
             script: controlScript { script in
                 script.override("player_queues/get_active_queue", result: Self.queueJSON(items: count, current: 1))
@@ -88,6 +91,46 @@ struct BackendQueueTests {
         await rig.backend.disconnect()
     }
 
+    /// The recorded loaded queue (#0196), routed by `FixtureScript.recorded` at 50 rows a page. Skipped until recorded.
+    @Test(.enabled(if: MAFixture.playerQueueItemsLoaded.isRecorded && MAFixture.playerQueueGetLoaded.isRecorded))
+    func queueRowsFromTheRecordedLoadedQueueAreNumberedByPosition() async throws {
+        let queue = try recordedResult(.playerQueueGetLoaded)
+        let queueID = try #require(queue["queue_id"]?.stringValue)
+        let current = try #require(queue["current_index"]?.intValue)
+        var rows = try MAFixture.playerQueueItemsLoaded.frames().flatMap { $0["result"]?.arrayValue ?? [] }
+        if MAFixture.playerQueueItemsPage2.isRecorded {
+            rows += try MAFixture.playerQueueItemsPage2.frames().flatMap { $0["result"]?.arrayValue ?? [] }
+        }
+        // As `MAQueueWatch.item`: the track's name when it has an artist, else the row's own name.
+        let titles = rows.map { row -> String in
+            let track = row["media_item"]
+            let hasArtist = !(track?["artists"]?.arrayValue?.first?["name"]?.stringValue ?? "").isEmpty
+            let trackName = track?["name"]?.stringValue
+            return (hasArtist ? trackName : row["name"]?.stringValue ?? trackName) ?? ""
+        }
+        let count = rows.count
+        var answered = queue
+        if case .object(var object) = answered {
+            object["items"] = .number(Double(count))
+            answered = .object(object)
+        }
+        let queueAnswer = answered
+        let rig = try await connectedBackend(
+            script: controlScript { script in
+                script.override("player_queues/get_active_queue", result: queueAnswer)
+                script.override("player_queues/get", result: queueAnswer)
+            })
+        await rig.backend.setQueuePolicy(MAQueuePolicy(pageSize: 50))
+        let collector = Collector(await rig.backend.queue(on: OutputDevice.ID(rawValue: queueID)))
+        #expect(await waitFor { collector.items.last?.isComplete == true && collector.items.last?.items.count == count })
+        let last = try #require(collector.items.last)
+        #expect(last.items.map(\.index) == Array(0..<count))
+        #expect(last.currentIndex == current)
+        #expect(last.items.map(\.title) == titles)
+        collector.stop()
+        await rig.backend.disconnect()
+    }
+
     @Test func queueRefetchesOnItsOwnQueueEventsOnly() async throws {
         let rig = try await rig(count: 1, pageSize: 500)
         let collector = Collector(await rig.backend.queue(on: output))
@@ -122,7 +165,7 @@ struct BackendQueueTests {
 
 extension ModelDecodingTests {
     @Test func queueItemDecodesItsTrack() throws {
-        let item = try BackendQueueTests.itemJSON(4).decode(as: MAQueueItem.self)
+        let item = try BackendQueueTests.itemJSON(4, serverIndex: 4).decode(as: MAQueueItem.self)
         let track = try #require(item.track)
         #expect(track.name == "Song 4")
         #expect(track.artists?.first?.name == "Artist")
