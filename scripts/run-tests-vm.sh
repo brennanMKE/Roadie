@@ -17,6 +17,8 @@
 #   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds steps skintool and skintool-png, runs sampleSkinsAreOk
 #   --references DIR  with --skins: copy DIR/*.png (scripts/fetch-webamp-references.sh output) into Skins/reference/
 #                     and diff each render against them in skintool-png (numbers only, never gated)
+#   --test-skins DIR  UI-test skins cache (default ~/Library/Caches/co.sstools.roadie-test-skins, from
+#                     scripts/fetch-test-skins.sh). Only --ui (#0200) uses it: checks it, copies it to TestSkins/ (#0198)
 #   --stress N  also repeat the real-time gapless test N times in the guest (step playerkit-stress)
 #   --stress-filter F  with --stress: loop the `swift test --filter` F instead (default: the gapless test)
 #   --stress-package P  with --stress: SkinKit or PlayerKit (default PlayerKit); the step is <p>-stress (#0094)
@@ -47,7 +49,7 @@
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
 #      scripts/check-identifiers.sh: no pre-Roadie bundle id outside the legacy allowlist (#0153)
 #      scripts/tests/test_render_changelog.py: render-changelog.py (#0161)
-#      scripts/tests/test_release_tools.py: preflight.sh with stubbed credentials, appcast-item.sh on a fixture DMG
+#      scripts/tests/test_*.py: preflight.sh with stubbed credentials, appcast-item.sh on a fixture DMG, test_skins.py
 #      scripts/check-website.sh: website/ lint, appcast XML and every local reference resolves (#0163)
 #   7. optional: launch Roadie.app, check it stays up, quit it
 # Exit codes:
@@ -78,6 +80,8 @@ SKINS_DIR=""
 REFS_DIR=""
 CORPUS_DIR=""
 CORPUS_SAMPLE=""
+TEST_SKINS_DIR="$HOME/Library/Caches/co.sstools.roadie-test-skins"
+UI=0  # set by --ui (#0200)
 args=("$@")
 while (( $#args )); do
   arg=$args[1]; shift args
@@ -97,6 +101,7 @@ while (( $#args )); do
     --skins) SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$SKINS_DIR" && -d "$SKINS_DIR" ]] || { print -r -- "--skins needs a directory of .wsz files" >&2; exit 2 } ;;
     --references) REFS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$REFS_DIR" && -d "$REFS_DIR" ]] || { print -r -- "--references needs a directory of reference PNGs" >&2; exit 2 } ;;
     --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
+    --test-skins) TEST_SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$TEST_SKINS_DIR" ]] || { print -r -- "--test-skins needs a directory" >&2; exit 2 } ;;
     --corpus-sample) CORPUS_SAMPLE=${args[1]:-}; shift args 2>/dev/null; [[ "$CORPUS_SAMPLE" == <1-> ]] || { print -r -- "--corpus-sample needs a positive count" >&2; exit 2 } ;;
     -h|--help) awk 'NR > 1 { if (!/^#/) exit; print }' "$0"; exit 0 ;;
     *) print -r -- "unknown option: $arg" >&2; exit 2 ;;
@@ -252,6 +257,18 @@ if [[ -n "$SKINS_DIR" ]]; then
     log "Copied $(ls "$EXPORT/src/Skins/reference"/*.png 2>/dev/null | wc -l | tr -d ' ') reference PNGs from $REFS_DIR into the export"
   fi
 fi
+# UI-test skins (#0198): fetched on the host into a cache, never committed; only --ui (#0200) carries them in.
+if (( UI )); then
+  "$REPO/scripts/fetch-test-skins.sh" --check --cache "$TEST_SKINS_DIR" >/dev/null \
+    || fail "test skins missing: run scripts/fetch-test-skins.sh"
+  mkdir -p "$EXPORT/src/TestSkins"
+  n=0
+  while IFS=$'\t' read -r name _ _; do
+    cp "$TEST_SKINS_DIR/$name.wsz" "$EXPORT/src/TestSkins/"; (( n++ )) || true
+  done < <(python3 -I "$REPO/scripts/test_skins.py" parse "$REPO/scripts/test-skins.tsv")
+  cp "$REPO/scripts/test-skins.tsv" "$EXPORT/src/TestSkins/test-skins.tsv"
+  log "Copied $n test skins from $TEST_SKINS_DIR into the export"
+fi
 
 # --- Clone and boot --------------------------------------------------------
 
@@ -366,7 +383,7 @@ run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build
 run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/Roadie.app $GUEST_RESULTS/ql"
 run_step identifiers     "scripts/check-identifiers.sh"
 run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p 'test_render_changelog.py'"
-run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py'"
+run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_*.py'"
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app --args -firstRunVersion 1 && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"

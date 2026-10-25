@@ -1,0 +1,9 @@
+# Test skins for the UI tests (#0198). Fetched on the host by scripts/fetch-test-skins.sh into a cache; never committed.
+# Columns (tab-separated): name  museum_id  md5  why. Cached as <cache>/<name>.wsz. See docs/design/test-automation.md §4.
+base-2.91	S119636	5e4f10275dcb1fb211d4a8b4f1bda236	Winamp 2.91 base skin: every sheet, region.txt, cursors; the default for UI tests
+Expensive_HI_FI_Sony_2005	S118715	6a2843f40058f86406630671b454d66b	region.txt with 2324 transparent px; nested folder, stray DLL/TTF in the zip
+base	S190947	76f97817eeaa4dcae165c1162c7c5abd	main-window sheets only: no eqmain, no pledit.bmp/.txt, region.txt; GeneratedBaseSkin fallbacks
+Windows_Classic	S210427	15bd4305c66d69b6d2ef39a3d92ff352	white playlist, orange text, yellow selection, Times New Roman; case-duplicate zip entries
+Pika_Amp	S152414	061589029dde4c811f5c8013aae603d7	small region (78 px); pledit font Tempus Sans ITC (missing on macOS); no cursors
+Windows_98_Amp	S140245	09309bea91c2634f5f8935a919862e46	complete windowshade cursor set; nums_ex only; mixed-case names
+internet-archive-winamp-skin-by-luigihann	S149125	f86f47ed539e393678f805fe776e4d30	nums_ex only, GEN/VIDEO sheets, dark playlist; known to render in Roadie
