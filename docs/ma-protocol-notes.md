@@ -87,6 +87,8 @@ There is **no subscribe command**; authenticated sockets receive pushed events. 
 
 The `time` command returns server UTC seconds as a float (`time.json`); `elapsed_time` plus `elapsed_time_last_updated` on `Player` and `PlayerQueue` are the basis for extrapolating position (#0064, #0069); correct for clock skew with `time`.
 
+**Scripted server (#0197).** `ScriptedMusicAssistant` in `MusicAssistantKitStub` is an in-memory server for tests and UI tests: the library answers from the recorded fixtures, and players, queues, favorites and playlists change as commands arrive, each change followed by `player_updated`, `queue_updated` and `queue_items_updated` frames in the envelope above (`object_id` = the player or queue id, `data` = the whole object). Scenarios: `libraryIdle`, `queueLoaded` (the recorded loaded queue on `ap223aed81fe30`, current index 2), `playingOnSpeaker`, `thisMacIsASendspinPlayer`, `unreachable`, `badToken`. Rule: its replies are recorded shapes with state applied, never new shapes; rows keep `index: 0` as the real server sends it.
+
 ## 9. Artwork
 
 `MediaItemImage` is `{type, path, provider, remotely_accessible, proxy_id}` (`artwork-probe.json`, `image_fields`). `Player.current_media.image_url` is an absolute URL (it uses the server's own base URL, so rewrite the host to the configured one): `/imageproxy/<proxy_id>?size=512&fmt=jpg`.
