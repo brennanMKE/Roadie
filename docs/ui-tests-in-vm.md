@@ -107,6 +107,17 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
 - `IDELaunchParametersSnapshot: no debugger version`
 - Build-log lines mentioning `XCUIAutomation` / "automation" are framework paths, not prompts.
 
+## Gotchas when writing UI tests
+
+- **Coordinate clicks land on whatever is on top.** `RoadieUIApp.click`/`doubleClick` fall back to a coordinate
+  click when an element isn't hittable; before it, they check that no other window covers the element, bring its
+  window forward once, else fail at the caller. That check hasn't yet run on a covered element (#0200 `## Gotchas`),
+  so prefer menu commands and shortcuts (Playback › Stop is ⌃⌘V) to clicking skinned controls.
+- **Windows overlap.** `-RoadieWindowLayout column` stacks main, equalizer and playlist and moves any other key
+  window right of them when it becomes key. A window that isn't key can still cover the column (the Library covered
+  `main.stop` in #0200). Launch arguments: [testing-in-vm.md](testing-in-vm.md#ui-tests).
+- **Fixture tracks are 2.5 s and auto-advance**, so don't assume the current row: read it from the state probe.
+
 ## Gotchas carried over from the cameron setup
 
 - **Always `--no-audio`.** Without it Tart passes guest audio to the host. Don't use `--suspendable` instead: it
