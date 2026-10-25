@@ -63,11 +63,15 @@ final class PlayerModelOutputTests: PlayerModelTestCase {
         let server = try XCTUnwrap(model.scriptedMusicAssistant)
         let speaker = try await selectSpeakerWithQueue(model)
         let others = model.outputPicker.devices.filter { $0.kind == .remote && $0.id != speaker && !$0.isGroup }
-        guard let other = others.first else {
-            throw XCTSkip("the recording has one speaker; no group to build")
-        }
+        // players-all.json has several available speakers (Living Room, Kitchen, Living Room Display).
+        let other = try XCTUnwrap(others.first, "no second speaker in the recording: \(model.outputPicker.devices)")
         model.toggleOutput(other.id)
         try await waitUntil("set_members") { self.commands(server).contains("players/cmd/set_members") }
+        let sent = try XCTUnwrap(server.receivedCommands.last { $0.command == "players/cmd/set_members" })
+        XCTAssertEqual(sent.args["target_player"]?.stringValue, speaker.rawValue, "the selected speaker leads")
+        XCTAssertEqual(
+            (sent.args["player_ids_to_add"]?.arrayValue ?? []).compactMap(\.stringValue), [other.id.rawValue])
+        XCTAssertNil(sent.args["player_ids_to_remove"], "nothing to ungroup")
     }
 
     func testFeedFollowsStreamEvents() throws {
@@ -87,9 +91,15 @@ final class PlayerModelOutputTests: PlayerModelTestCase {
         let model = try makeModel(scenario: .queueLoaded)
         try await selectSpeakerWithQueue(model)
         model.clearNotice()
+        let server = try XCTUnwrap(model.scriptedMusicAssistant)
+        let count = server.receivedCommands.count
         model.setBalance(-0.8)
-        model.setVolume(0.5)  // queued after the balance: once it lands, the balance's refusal has been handled
-        try await Task.sleep(for: .milliseconds(300))
+        // Queued after the balance on the one command stream: once the volume reaches the server, the balance's
+        // refusal has been handled, so the check is ordered by the stream rather than by a sleep.
+        model.setVolume(0.5)
+        try await waitUntil("volume_set") {
+            server.receivedCommands.dropFirst(count).contains { $0.command == "players/cmd/volume_set" }
+        }
         XCTAssertNil(model.notice, "\(String(describing: model.notice))")
     }
 }

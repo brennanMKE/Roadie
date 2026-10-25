@@ -80,6 +80,11 @@ final class PlayerModelQueueTests: PlayerModelTestCase {
         let albums = try await folderAlbums(model)
         let album = try XCTUnwrap(albums.first { $0.title == "Tone Album" })
         let two = try XCTUnwrap(albums.first { $0.title == "Singles" })
+        // Silent: a hosted ⌘U on a dev Mac would otherwise play the fixture sines aloud (`silentOutput` isn't read
+        // yet). The player's volume is set directly, so it is 0 before the play rather than once the stream lands.
+        model.setVolume(0)
+        model.player.volume = 0
+        XCTAssertEqual(model.player.volume, 0)
         model.playFromLibrary(.play(container: album.id))
         try await waitUntil("the album in the local queue") { model.player.queue.tracks.count == 3 }
         XCTAssertEqual(model.player.queue.tracks.map(\.title), ["Tone A", "Tone B", "Tone C"])

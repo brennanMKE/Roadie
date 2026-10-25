@@ -355,19 +355,26 @@ final class PlayerModel {
     @ObservationIgnored let queueFileURL: URL
     /// The last URL `open(external:)` recorded with `externalOpens == .record`.
     @ObservationIgnored private(set) var lastExternalOpen: URL?
+    #if DEBUG
     /// Unit tests only (#0211): when set, the open panels, the About panel, Quit, Jump to File and the Library window
     /// are reported here instead of shown, so a hosted test never blocks on a panel or writes a frame to `.standard`.
+    /// Debug only, like #0194's stubs: Release has no hook.
     @ObservationIgnored var systemRequestOverride: ((SystemRequest) -> Void)?
+    #endif
 
     enum SystemRequest: Equatable {
         case openFiles(replace: Bool), openFolder, openSkin, openPlaylistFile, about, quit, jumpToFile, library
     }
 
-    /// true when `systemRequestOverride` took `request`.
+    /// true when `systemRequestOverride` took `request`; always false in Release.
     func intercepted(_ request: SystemRequest) -> Bool {
+        #if DEBUG
         guard let override = systemRequestOverride else { return false }
         override(request)
         return true
+        #else
+        return false
+        #endif
     }
 
     init(configuration: RoadieConfiguration = .standard) {
