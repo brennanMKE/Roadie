@@ -355,6 +355,27 @@ final class PlayerModel {
     @ObservationIgnored let queueFileURL: URL
     /// The last URL `open(external:)` recorded with `externalOpens == .record`.
     @ObservationIgnored private(set) var lastExternalOpen: URL?
+    #if DEBUG
+    /// Unit tests only (#0211): when set, the open panels, the About panel, Quit, Jump to File and the Library window
+    /// are reported here instead of shown, so a hosted test never blocks on a panel or writes a frame to `.standard`.
+    /// Debug only, like #0194's stubs: Release has no hook.
+    @ObservationIgnored var systemRequestOverride: ((SystemRequest) -> Void)?
+    #endif
+
+    enum SystemRequest: Equatable {
+        case openFiles(replace: Bool), openFolder, openSkin, openPlaylistFile, about, quit, jumpToFile, library
+    }
+
+    /// true when `systemRequestOverride` took `request`; always false in Release.
+    func intercepted(_ request: SystemRequest) -> Bool {
+        #if DEBUG
+        guard let override = systemRequestOverride else { return false }
+        override(request)
+        return true
+        #else
+        return false
+        #endif
+    }
 
     init(configuration: RoadieConfiguration = .standard) {
         self.configuration = configuration
@@ -1061,7 +1082,10 @@ final class PlayerModel {
     }
 
     /// Opens or brings forward the Jump to File panel (J, ⌘J, #0176).
-    func showJumpToFile() { JumpToFilePanel.shared.show(model: self) }
+    func showJumpToFile() {
+        if intercepted(.jumpToFile) { return }
+        JumpToFilePanel.shared.show(model: self)
+    }
 
     /// Collapses the main window to its shade strip or restores it (the shade button, a title-bar double-click and
     /// Window > Windowshade all come here). `SkinWindowController` follows the flag.
@@ -1167,6 +1191,7 @@ final class PlayerModel {
     /// URLs are directly readable. Unlike Add Dir and Load List, the panel still shows while a speaker is
     /// selected, because it also picks skins; `importLocalFiles` refuses only the audio part (#0084).
     func openFiles(replace: Bool) {
+        if intercepted(.openFiles(replace: replace)) { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -1186,6 +1211,7 @@ final class PlayerModel {
             post(StatusNotice(text: text))
             return
         }
+        if intercepted(.openFolder) { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -1219,6 +1245,7 @@ final class PlayerModel {
 
     /// Shows the open panel for skins only.
     func openSkin() {
+        if intercepted(.openSkin) { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.allowedContentTypes = [.wsz, .zip]

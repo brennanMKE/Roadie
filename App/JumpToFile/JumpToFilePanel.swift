@@ -28,20 +28,21 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     private let emptyLabel = NSTextField(labelWithString: "")
     private let queueButton = NSButton(title: "Queue", target: nil, action: nil)
 
-    /// The rows `index` was built from.
-    private var indexedTracks: [Track] = []
-    private var index = JumpToFileIndex([])
-    /// The rows the table shows: `results` are indices into `shownTracks`, the full queue.
-    private var shownTracks: [Track] = []
-    private var results: [Int] = []
-    private var indexTask: Task<Void, Never>?
-    private var filterTask: Task<Void, Never>?
+    /// The query, results, selection and actions (#0210).
+    private var controller: JumpToFileController?
     /// Bumped on each show and close, so a stale observation doesn't re-arm itself.
     private var observationID = 0
     private var isObserving = false
 
     func show(model: PlayerModel) {
         self.model = model
+        if controller?.model !== model {
+            controller?.cancel()
+            let controller = JumpToFileController(model: model)
+            controller.onResultsChanged = { [weak self] in self?.resultsChanged() }
+            controller.onClose = { [weak self] in self?.panel?.performClose(nil) }
+            self.controller = controller
+        }
         let panel = self.panel ?? makePanel()
         if self.panel == nil {
             self.panel = panel
@@ -105,99 +106,35 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         updateQueueButton()
     }
 
-    private func rebuild() {
-        guard let model else { return }
-        let tracks = model.playlist.tracks
-        let entries = tracks.map(Self.entry)
-        indexTask?.cancel()
-        indexTask = Task { [weak self] in
-            let built = await Task.detached(priority: .userInitiated) { JumpToFileIndex(entries) }.value
-            guard !Task.isCancelled, let self else { return }
-            self.indexedTracks = tracks
-            self.index = built
-            self.filter()
-        }
-    }
+    private func rebuild() { controller?.rebuild() }
 
-    private static func entry(_ track: Track) -> JumpToFileEntry {
-        var fileName = ""
-        if case .file(let url) = track.source, url.isFileURL { fileName = url.lastPathComponent }
-        return JumpToFileEntry(artist: track.artist, title: track.title, album: track.album ?? "", fileName: fileName)
-    }
-
-    private func filter() {
-        filterTask?.cancel()
-        let query = searchField.stringValue
-        let index = self.index
-        let tracks = indexedTracks
-        filterTask = Task { [weak self] in
-            let work = Task.detached(priority: .userInitiated) {
-                index.matches(query, isCancelled: { Task.isCancelled })
-            }
-            let found = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
-            guard let found, !Task.isCancelled, let self, self.searchField.stringValue == query else { return }
-            self.apply(found, tracks: tracks)
-        }
-    }
-
-    private func apply(_ found: [Int], tracks: [Track]) {
-        let selectedID = table.selectedRowIndexes.first.flatMap { row in
-            results.indices.contains(row) ? shownTracks[results[row]].id : nil
-        }
-        shownTracks = tracks
-        results = found
+    private func resultsChanged() {
+        guard let controller else { return }
         table.reloadData()
-        if found.isEmpty {
-            table.deselectAll(nil)
-        } else {
-            let row = selectedID.flatMap { id in found.firstIndex { tracks[$0].id == id } } ?? 0
-            select(row)
-        }
+        if let row = controller.selectedRows.first { select(row) } else { table.deselectAll(nil) }
         updateEmptyState()
         updateQueueButton()
     }
 
-    /// Queue works on any listed queue; on a Music Assistant queue it moves the rows after the current item (#0182).
-    private var canQueue: Bool {
-        guard let model else { return false }
-        return model.queueRowsSource != QueueRowsSource.none
-    }
-
-    /// The selected results' queue indices in result (playlist) order, else the first result.
-    private var selectedIndices: [Int] {
-        let rows = table.selectedRowIndexes.filter { results.indices.contains($0) }
-        if rows.isEmpty { return results.first.map { [$0] } ?? [] }
-        return rows.map { results[$0] }
-    }
-
-    /// "Dequeue" when every selected result is already queued, like the playlist menu's `selectionIsQueued`.
     private func updateQueueButton() {
-        queueButton.isEnabled = !results.isEmpty && canQueue
-        guard let model, model.playlist.remote == nil else {
-            queueButton.title = "Queue"
-            return
-        }
-        let queue = model.player.queue
-        let indices = selectedIndices.filter { shownTracks.indices.contains($0) }
-        let allQueued = !indices.isEmpty && indices.allSatisfy { queue.upNextPosition(of: shownTracks[$0].id) != nil }
-        queueButton.title = allQueued ? "Dequeue" : "Queue"
+        queueButton.isEnabled = controller?.isQueueEnabled ?? false
+        queueButton.title = controller?.queueButtonTitle ?? "Queue"
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) { updateQueueButton() }
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        controller?.selectedRows = table.selectedRowIndexes
+        updateQueueButton()
+    }
 
     private func updateEmptyState() {
-        let text: String? =
-            if model?.queueRowsSource == QueueRowsSource.none { "This speaker\u{2019}s queue can\u{2019}t be listed" }
-            else if shownTracks.isEmpty { "The playlist is empty. Add music from the Library (\u{2318}L) or File \u{203A} Open." }
-            else if results.isEmpty { "No matches" }
-            else { nil }
+        let text = controller?.emptyStateText
         emptyLabel.stringValue = text ?? ""
         emptyLabel.isHidden = text == nil
     }
 
     // MARK: Table
 
-    func numberOfRows(in tableView: NSTableView) -> Int { results.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { controller?.results.count ?? 0 }
 
     /// Each row carries `jump.row.N` (N: the table row) for XCUITest (#0199).
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
@@ -207,18 +144,15 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard let id = tableColumn?.identifier, results.indices.contains(row) else { return nil }
-        let index = results[row]
-        let track = shownTracks[index]
+        guard let id = tableColumn?.identifier, let controller, controller.results.indices.contains(row) else { return nil }
+        let index = controller.results[row].index
+        let track = controller.shownTracks[index]
         let field = tableView.makeView(withIdentifier: id, owner: self) as? NSTextField ?? makeCell(id)
         switch id {
         case .number: field.stringValue = "\(index + 1)"
         case .time: field.stringValue = PlaylistText.time(track.duration > 0 ? track.duration : nil)
-        case .marker:
-            field.stringValue =
-                model?.playlist.remote == nil
-                ? PlaylistText.queueMarker(model?.player.queue.upNextPosition(of: track.id)) : ""
-        default: field.stringValue = PlaylistModel.displayName(track)
+        case .marker: field.stringValue = controller.marker(for: index)
+        default: field.stringValue = controller.results[row].name
         }
         return field
     }
@@ -240,9 +174,7 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     }
 
     private func move(by delta: Int) {
-        guard !results.isEmpty else { return }
-        let current = table.selectedRowIndexes.first ?? (delta > 0 ? -1 : results.count)
-        select(min(max(current + delta, 0), results.count - 1))
+        if let row = controller?.row(movingBy: delta) { select(row) }
     }
 
     private var pageRows: Int {
@@ -252,7 +184,7 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
 
     // MARK: Actions
 
-    func controlTextDidChange(_ obj: Notification) { filter() }
+    func controlTextDidChange(_ obj: Notification) { controller?.query = searchField.stringValue }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         switch commandSelector {
@@ -270,25 +202,15 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
 
     /// Plays the first selected match, else the first match. Uses the playlist's own play path (local or remote).
     @objc private func playSelected() {
-        let row = table.selectedRowIndexes.first ?? 0
-        guard results.indices.contains(row), let model else {
-            NSSound.beep()
-            return
-        }
-        let index = results[row]
-        model.playlist.playRow(index)
-        model.playlist.reveal(index)
-        panel?.performClose(nil)
+        if controller?.playSelected() != true { NSSound.beep() }
     }
 
     /// Toggles the selected results in the play-next list (like the playlist's Q), leaving the panel open.
     @objc private func queueSelected() {
-        let indices = selectedIndices
-        guard canQueue, !indices.isEmpty, let model else {
+        guard controller?.toggleQueueSelected() == true else {
             NSSound.beep()
             return
         }
-        model.playlist.toggleQueue(indices)
         updateQueueButton()
         if panel?.firstResponder !== searchField.currentEditor() { panel?.makeFirstResponder(searchField) }
     }
@@ -296,8 +218,7 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     func windowWillClose(_ notification: Notification) {
         isObserving = false
         observationID += 1
-        indexTask?.cancel()
-        filterTask?.cancel()
+        controller?.cancel()
     }
 
     // MARK: Panel
