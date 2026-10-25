@@ -11,7 +11,7 @@
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --build-only  stop after the build stage (both packages with their tests, the app; with --spike the spike too):
 #                 a quick compile check before a full run, never verification
-#   --full    also run the slow tier: the 100k SkinLibrary scale tests (ROADIE_SLOW_TESTS=1) and the
+#   --full    also run the slow tier: the 100k SkinLibrary scale tests and fixture-corpus decode (ROADIE_SLOW_TESTS=1) and the
 #             real-time AudioCore tests (AUDIOCORE_REALTIME=1); default is the fast tier
 #   --launch  also launch the built app in the guest for a few seconds (smoke test)
 #   --skins DIR  copy DIR/*.wsz into the guest's Skins/; adds steps skintool and skintool-png, runs sampleSkinsAreOk
@@ -43,12 +43,13 @@
 #   Tests and checks, reusing those builds:
 #   3. swift test --skip-build --package-path Packages/SkinKit  (SKIN_SAMPLES_DIR=Skins with --skins; ROADIE_SLOW_TESTS=1 with --full)
 #      skintool Skins/ (only with --skins; fails unless every skin is ok), then skintool --png into results/png/
-#   4. swift test --skip-build --package-path Packages/PlayerKit  (with --full: AUDIOCORE_REALTIME=1, muted)
+#   4. swift test --skip-build --package-path Packages/PlayerKit  (with --full: ROADIE_SLOW_TESTS=1 and AUDIOCORE_REALTIME=1, muted)
 #   4b. xcodebuild ... test-without-building -only-testing:RoadieTests  (the app's hosted unit tests, #0193)
 #   5. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
 #      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
 #      scripts/check-identifiers.sh: no pre-Roadie bundle id outside the legacy allowlist (#0153)
+#      scripts/check-fixtures.sh: audio only in the fixture folders, under 200 KB, MANIFEST md5s match (#0195)
 #      scripts/tests/test_render_changelog.py: render-changelog.py (#0161)
 #      scripts/tests/test_release_tools.py: preflight.sh with stubbed credentials, appcast-item.sh on a fixture DMG
 #      scripts/tests/test_fetch_test_skins.py: test_skins.py, the manifest reader behind fetch-test-skins.sh (#0198)
@@ -375,7 +376,7 @@ else
 fi
 # With --full the real-time tests run here too: the guest's virtual output device has no path to
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
-run_step playerkit-tests "${rt_env}swift test --skip-build --package-path Packages/PlayerKit"
+run_step playerkit-tests "${slow_env}${rt_env}swift test --skip-build --package-path Packages/PlayerKit"
 # The app's hosted unit tests (RoadieTests, #0193). Raw xcodebuild output: verify.sh reads the `Test Case` lines.
 run_step app-unit-tests "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData test-without-building -only-testing:RoadieTests 2>&1 | grep -vE '^$'"
 if (( STRESS )); then
@@ -387,6 +388,7 @@ run_step app-plist       "scripts/check-info-plist.sh build/DerivedData/Build/Pr
 run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build/Products/Debug/Roadie.app"
 run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/Roadie.app $GUEST_RESULTS/ql"
 run_step identifiers     "scripts/check-identifiers.sh"
+run_step fixtures        "scripts/check-fixtures.sh"
 run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p 'test_render_changelog.py'"
 run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_fetch_test_skins.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_verify_report.py'"
 run_step recorder-tests  "python3 -B -m unittest discover -v -s scripts/tests -p 'test_record_*.py'"

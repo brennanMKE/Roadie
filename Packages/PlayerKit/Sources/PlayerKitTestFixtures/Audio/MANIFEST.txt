@@ -1,0 +1,10 @@
+# Audio fixtures for #0195. Regenerate with scripts/make-test-audio.sh [--force]; checked by scripts/check-fixtures.sh.
+# macOS 27.0; Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1); LAME 64bits version 4.0 (https://lame.sourceforge.io)
+# name	md5	seconds	format
+01 Tone A.mp3	70e41a6b641ce6d163f4cb48e3ec2051	2.5	mp3 64 kbps 440 Hz
+02 Tone B.mp3	a288688daac0a794265fd881140bc34f	2.5	mp3 64 kbps 660 Hz
+03 Tone C.m4a	6f388fab55ab06463ef4663e43de6d6f	2.0	aac 96 kbps 880 Hz
+04 Tone D.m4a	37d1c8159373b7c4f0ad285e062ab3f1	0.75	alac 1100 Hz
+05 Tone E.flac	c4f86005d29c6b61304ab1d75a794221	0.75	flac 1320 Hz
+06 Tone F.wav	0db36fa2ddfb7d449941dbc59aadcfe5	0.5	pcm 16-bit 1760 Hz
+cover.jpg	7cf5af63c340acce0bbbcb78676ead64	0	jpeg 64 px
