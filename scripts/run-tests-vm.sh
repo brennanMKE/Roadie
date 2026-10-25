@@ -49,7 +49,8 @@
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
 #      scripts/check-identifiers.sh: no pre-Roadie bundle id outside the legacy allowlist (#0153)
 #      scripts/tests/test_render_changelog.py: render-changelog.py (#0161)
-#      scripts/tests/test_*.py: preflight.sh with stubbed credentials, appcast-item.sh on a fixture DMG, test_skins.py
+#      scripts/tests/test_release_tools.py: preflight.sh with stubbed credentials, appcast-item.sh on a fixture DMG
+#      scripts/tests/test_fetch_test_skins.py: test_skins.py, the manifest reader behind fetch-test-skins.sh (#0198)
 #      scripts/check-website.sh: website/ lint, appcast XML and every local reference resolves (#0163)
 #   7. optional: launch Roadie.app, check it stays up, quit it
 # Exit codes:
@@ -383,7 +384,7 @@ run_step app-entitlements "scripts/check-entitlements.sh build/DerivedData/Build
 run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Products/Debug/Roadie.app $GUEST_RESULTS/ql"
 run_step identifiers     "scripts/check-identifiers.sh"
 run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p 'test_render_changelog.py'"
-run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_*.py'"
+run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_fetch_test_skins.py'"
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app --args -firstRunVersion 1 && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"
