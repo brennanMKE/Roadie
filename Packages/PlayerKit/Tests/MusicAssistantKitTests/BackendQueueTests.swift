@@ -92,7 +92,10 @@ struct BackendQueueTests {
     }
 
     /// The recorded loaded queue (#0196), routed by `FixtureScript.recorded` at 50 rows a page. Skipped until recorded.
-    @Test(.enabled(if: MAFixture.playerQueueItemsLoaded.isRecorded && MAFixture.playerQueueGetLoaded.isRecorded))
+    @Test(
+        .enabled(
+            if: MAFixture.playerQueueItemsLoaded.isRecorded && MAFixture.playerQueueGetLoaded.isRecorded
+                && MAFixture.playersAllPlaying.isRecorded))
     func queueRowsFromTheRecordedLoadedQueueAreNumberedByPosition() async throws {
         let queue = try recordedResult(.playerQueueGetLoaded)
         let queueID = try #require(queue["queue_id"]?.stringValue)
@@ -115,12 +118,20 @@ struct BackendQueueTests {
             answered = .object(object)
         }
         let queueAnswer = answered
+        // The recorded queue belongs to a player (a sync group, `syncgroup_…`) that only the same run's `players/all`
+        // lists; the baseline `players-all` predates it, and `players/get` answers only the baseline player. So the
+        // rig answers `players/all` with `players-all-playing` and lists outputs first, as the app does before the
+        // user picks one: the queue's player resolves from that list.
+        let playersRoute = try FixtureScript.Route.fixture(.playersAllPlaying)
         let rig = try await connectedBackend(
             script: controlScript { script in
+                script.routes.insert(playersRoute, at: 0)
                 script.override("player_queues/get_active_queue", result: queueAnswer)
                 script.override("player_queues/get", result: queueAnswer)
             })
         await rig.backend.setQueuePolicy(MAQueuePolicy(pageSize: 50))
+        let outputs = try await rig.backend.outputs()
+        #expect(outputs.contains { $0.id.rawValue == queueID })
         let collector = Collector(await rig.backend.queue(on: OutputDevice.ID(rawValue: queueID)))
         #expect(await waitFor { collector.items.last?.isComplete == true && collector.items.last?.items.count == count })
         let last = try #require(collector.items.last)
