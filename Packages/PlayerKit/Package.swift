@@ -16,7 +16,8 @@ let package = Package(
         .library(name: "MusicAssistantKitStub", targets: ["MusicAssistantKitStub"]),
         .library(name: "SendspinKit", targets: ["SendspinKit"]),
         .library(name: "SendspinPlayback", targets: ["SendspinPlayback"]),
-        // The fixture audio and music folder (#0195), for the app's RoadieTests (#0211). Never linked by the app.
+        // The fixture audio and music folder (#0195), test-only: the app's RoadieTests bundle links it (#0210, #0211);
+        // the app itself never does.
         .library(name: "PlayerKitTestFixtures", targets: ["PlayerKitTestFixtures"]),
     ],
     targets: [

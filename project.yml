@@ -224,6 +224,7 @@ targets:
     sources: [Tests/RoadieTests]
     dependencies:
       - target: Roadie
+      # #0210, #0211: the fixture audio library for the model tests. Linked by the test bundle only, never the app.
       - package: PlayerKit
         product: PlayerKitTestFixtures
     settings:
