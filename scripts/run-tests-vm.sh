@@ -386,6 +386,7 @@ run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Pro
 run_step identifiers     "scripts/check-identifiers.sh"
 run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p 'test_render_changelog.py'"
 run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_fetch_test_skins.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_verify_report.py'"
+run_step recorder-tests  "python3 -B -m unittest discover -v -s scripts/tests -p 'test_record_*.py'"
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
   run_step app-launch "open build/DerivedData/Build/Products/Debug/Roadie.app --args -firstRunVersion 1 && sleep 5 && pgrep -x Roadie && osascript -e 'quit app \"Roadie\"' && sleep 1 && ! pgrep -x Roadie"

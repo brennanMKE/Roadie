@@ -71,6 +71,11 @@ public enum MAFixture: String, CaseIterable, Sendable {
     case errorUnknownCommandMove = "error-unknown-command-move"
     case playlistDelete = "playlist-delete"
     case eventsPlaylists = "events-playlists"
+    // #0196: `--record-queue`, a loaded and playing queue. Pending until the user records it.
+    case playersAllPlaying = "players-all-playing"
+    case playerQueueGetLoaded = "player-queue-get-loaded"
+    case playerQueueItemsPage2 = "player-queue-items-page2"
+    case eventsQueue = "events-queue"
 
     /// The fixtures recorded before #0133; the original 42.
     public static let baseline: [MAFixture] = Array(allCases.prefix(42))
@@ -110,7 +115,7 @@ public enum MAFixture: String, CaseIterable, Sendable {
         get throws { try MAJSON.parse(data) }
     }
 
-    /// nil for the handshake, `info-http`, `artwork-probe`, `events` and `events-playlists`.
+    /// nil for the handshake, `info-http`, `artwork-probe`, `events`, `events-playlists` and `events-queue`.
     public var command: String? { (try? json)?["command"]?.stringValue }
 
     public var args: MAJSON? { (try? json)?["args"] }
