@@ -224,6 +224,8 @@ targets:
     sources: [Tests/RoadieTests]
     dependencies:
       - target: Roadie
+      - package: PlayerKit
+        product: PlayerKitTestFixtures
     settings:
       base:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Roadie.app/Contents/MacOS/Roadie

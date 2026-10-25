@@ -15,7 +15,7 @@ extension PlayerModel {
 
     func perform(_ command: MainMenuCommand) {
         switch command {
-        case .about: NSApp.orderFrontStandardAboutPanel(nil)
+        case .about: if !intercepted(.about) { NSApp.orderFrontStandardAboutPanel(nil) }
         case .checkForUpdates: updateActions?.check()
         case .openFiles: openFiles(replace: true)
         case .addFiles: openFiles(replace: false)
@@ -41,7 +41,7 @@ extension PlayerModel {
         case .stop: stop()
         case .next: next()
         case .jumpToFile: showJumpToFile()
-        case .quit: NSApp.terminate(nil)
+        case .quit: if !intercepted(.quit) { NSApp.terminate(nil) }
         }
     }
 }
@@ -56,6 +56,7 @@ extension PlayerModel {
 
     /// Opens or brings forward the Library and puts the cursor in its search field (#0185).
     func showLibrary(focusSearch: Bool = true) {
+        if intercepted(.library) { return }
         if let window = libraryWindow, window.isVisible {
             window.makeKeyAndOrderFront(nil)
         } else {

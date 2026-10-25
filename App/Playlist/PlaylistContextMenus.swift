@@ -19,8 +19,17 @@ final class ActionMenuItem: NSMenuItem {
 /// The native menus the playlist's MISC entries pop up at the pointer (Winamp and Webamp do the same).
 @MainActor
 enum PlaylistContextMenus {
+    typealias Item = (title: String, action: () -> Void)
+
+    /// Unit tests only (#0211): when set, receives the items and their enabled state instead of a menu popping up.
+    static var popUpOverride: ((_ items: [Item?], _ enabled: Bool) -> Void)?
+
     /// `nil` titles are separators.
     static func popUp(_ items: [(title: String, action: () -> Void)?], enabled: Bool = true) {
+        if let popUpOverride {
+            popUpOverride(items, enabled)
+            return
+        }
         let menu = NSMenu()
         menu.autoenablesItems = false
         for item in items {

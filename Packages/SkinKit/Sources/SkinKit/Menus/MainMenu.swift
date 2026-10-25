@@ -1,6 +1,6 @@
 /// The main window's options menu (Winamp's main menu, Webamp `MainContextMenu`), as plain data. The app builds the
 /// `NSMenu` from these entries in one place; features Roadie does not have yet are left out rather than disabled.
-public enum MainMenuCommand: Hashable, Sendable {
+public enum MainMenuCommand: Hashable, Sendable, CaseIterable {
     case about, checkForUpdates, openFiles, addFiles, toggleEQWindow, togglePlaylistWindow, toggleLibraryWindow
     case openSkin, nextSkin, previousSkin, randomSkin
     case timeElapsed, timeRemaining, toggleAlwaysOnTop, toggleDoubleSize, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle

@@ -48,6 +48,7 @@ extension PlayerModel {
             post(StatusNotice(text: text))
             return
         }
+        if intercepted(.openPlaylistFile) { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
