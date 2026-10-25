@@ -140,7 +140,7 @@ actor MAQueueWatch {
                     .decode(as: [MAQueueItem].self)
                 guard mine == generation, !Task.isCancelled else { return }
                 let offset = items.count
-                items += page.enumerated().map { Self.item($0.element, fallbackIndex: offset + $0.offset) }
+                items += page.enumerated().map { Self.item($0.element, position: offset + $0.offset) }
                 let done = page.isEmpty || items.count >= wanted
                 emit(
                     RemoteQueueSnapshot(
@@ -162,12 +162,14 @@ actor MAQueueWatch {
     }
 
     /// The row for one `player_queues/items` entry: title, artist and album from its track when it decodes.
-    static func item(_ item: MAQueueItem, fallbackIndex: Int) -> RemoteQueueItem {
+    /// `index` is the item's position in the queue (paging offset + place in the page). Music Assistant's own
+    /// `QueueItem.index` defaults to 0 and isn't reliable (#0187).
+    static func item(_ item: MAQueueItem, position: Int) -> RemoteQueueItem {
         let track = item.track
         let artist = track?.artists?.first.map(\.name).flatMap { $0.isEmpty ? nil : $0 }
         let title = track?.name ?? item.name ?? ""
         return RemoteQueueItem(
-            id: item.queueItemID, index: item.index ?? fallbackIndex,
+            id: item.queueItemID, index: position,
             title: artist == nil ? (item.name ?? title) : title,
             artist: artist, album: track?.album?.name,
             duration: item.duration ?? track?.duration,

@@ -22,11 +22,12 @@ struct BackendQueueTests {
         return .object(track)
     }
 
-    static func itemJSON(_ n: Int, artist: String? = "Artist") -> MAJSON {
+    /// `serverIndex` is the item's `index` field; Music Assistant often sends its default, 0, on every item (#0187).
+    static func itemJSON(_ n: Int, artist: String? = "Artist", serverIndex: Int? = nil) -> MAJSON {
         [
             "queue_id": .string(queueID), "queue_item_id": .string("qi\(n)"),
             "name": .string(artist.map { "\($0) - Song \(n)" } ?? "Song \(n)"), "duration": 100,
-            "index": .number(Double(n)), "available": true, "media_item": trackJSON(n, artist: artist),
+            "index": .number(Double(serverIndex ?? n)), "available": true, "media_item": trackJSON(n, artist: artist),
         ]
     }
 
@@ -35,13 +36,13 @@ struct BackendQueueTests {
     }
 
     /// A connected backend whose queue has `count` items, answered `pageSize` at a time by offset.
-    private func rig(count: Int, pageSize: Int) async throws -> BackendRig {
+    private func rig(count: Int, pageSize: Int, serverIndex: Int? = nil) async throws -> BackendRig {
         let rig = try await connectedBackend(
             script: controlScript { script in
                 script.override("player_queues/get_active_queue", result: Self.queueJSON(items: count, current: 1))
                 script.override("player_queues/get", result: Self.queueJSON(items: count, current: 1))
                 for offset in stride(from: 0, to: count, by: pageSize) {
-                    let page = MAJSON.array((offset..<min(offset + pageSize, count)).map { Self.itemJSON($0) })
+                    let page = MAJSON.array((offset..<min(offset + pageSize, count)).map { Self.itemJSON($0, serverIndex: serverIndex) })
                     script.routes.insert(
                         .result(command: "player_queues/items", matches: { $0["offset"]?.intValue == offset }, page),
                         at: 0)
@@ -72,6 +73,17 @@ struct BackendQueueTests {
         let offsets = rig.transport.sentRequests.filter { $0.command == "player_queues/items" }
             .compactMap { $0.args["offset"]?.intValue }
         #expect(offsets == [0, 2])
+        collector.stop()
+        await rig.backend.disconnect()
+    }
+
+    @Test func queueRowsUsePositionWhenTheServerSendsIndexZero() async throws {
+        let rig = try await rig(count: 5, pageSize: 2, serverIndex: 0)
+        let collector = Collector(await rig.backend.queue(on: output))
+        #expect(await waitFor { collector.items.last?.isComplete == true && collector.items.last?.items.count == 5 })
+        let last = try #require(collector.items.last)
+        #expect(last.items.map(\.index) == [0, 1, 2, 3, 4])
+        #expect(last.items.map(\.id) == ["qi0", "qi1", "qi2", "qi3", "qi4"])
         collector.stop()
         await rig.backend.disconnect()
     }
@@ -114,17 +126,19 @@ extension ModelDecodingTests {
         let track = try #require(item.track)
         #expect(track.name == "Song 4")
         #expect(track.artists?.first?.name == "Artist")
-        let row = MAQueueWatch.item(item, fallbackIndex: 0)
+        let row = MAQueueWatch.item(item, position: 4)
         #expect(row.id == "qi4")
         #expect(row.index == 4)
+        // The item's JSON says 4; the position wins (#0187).
+        #expect(MAQueueWatch.item(item, position: 2).index == 2)
         #expect(row.artist == "Artist")
         #expect(row.duration == 100)
         // A media item that isn't a track (no uri) leaves the row on the queue item's own name.
         let radio = try (["queue_item_id": "r", "name": "Radio One", "media_item": ["name": "Radio One"]] as MAJSON)
             .decode(as: MAQueueItem.self)
         #expect(radio.track == nil)
-        #expect(MAQueueWatch.item(radio, fallbackIndex: 7).title == "Radio One")
-        #expect(MAQueueWatch.item(radio, fallbackIndex: 7).index == 7)
+        #expect(MAQueueWatch.item(radio, position: 7).title == "Radio One")
+        #expect(MAQueueWatch.item(radio, position: 7).index == 7)
     }
 }
 
@@ -135,7 +149,10 @@ extension BackendQueueTests {
             script: controlScript { script in
                 script.override("player_queues/get_active_queue", result: Self.queueJSON(items: 5, current: 0))
                 script.override("player_queues/get", result: Self.queueJSON(items: 5, current: 0))
-                for command in ["player_queues/delete_item", "player_queues/move_item", "player_queues/clear"] {
+                for command in [
+                    "player_queues/delete_item", "player_queues/move_item", "player_queues/clear",
+                    "player_queues/play_index",
+                ] {
                     script.routes.insert(.result(command: command, .null), at: 0)
                 }
                 for route in extra { script.routes.insert(route, at: 0) }
@@ -153,6 +170,16 @@ extension BackendQueueTests {
         let deletes = sent(rig, "player_queues/delete_item")
         #expect(deletes.compactMap { $0.args["item_id_or_index"]?.stringValue } == ["qi4", "qi2", "qi1"])
         #expect(deletes.allSatisfy { $0.args["queue_id"]?.stringValue == Self.queueID })
+        await rig.backend.disconnect()
+    }
+
+    @Test func playIndexSendsTheRowPosition() async throws {
+        let rig = try await editRig()
+        try await rig.backend.edit(.play(index: 3), on: output)
+        let plays = sent(rig, "player_queues/play_index")
+        #expect(plays.count == 1)
+        #expect(plays.first?.args["index"]?.intValue == 3)
+        #expect(plays.first?.args["queue_id"]?.stringValue == Self.queueID)
         await rig.backend.disconnect()
     }
 

@@ -7,19 +7,34 @@ import UniformTypeIdentifiers
 
 /// The playlist window's LIST › Save List / Load List and the File menu's playlist items (#0082).
 extension PlayerModel {
-    /// LIST › Load (#0146): the shown queue decides, like Save (`QueueSaveTarget`). The local queue opens a playlist
-    /// file; a Music Assistant queue picks one of its playlists.
+    /// LIST › Load (#0146, #0190): the shown queue decides, like Save (`QueueSaveTarget`). The local queue opens a
+    /// playlist file, or a Library playlist when the Library's source has them; a Music Assistant queue picks one of
+    /// its playlists.
     func loadList() {
         let output = selectedOutput
-        switch QueueSaveTarget.load(
-            output: output, feed: thisMacFeed, capabilities: router.backend(for: output).capabilities)
-        {
-        case .file: loadPlaylistFile()
-        case .refused: post(StatusNotice(text: "Can't load a playlist", detail: "This music source has no playlists"))
-        case .remote:
-            library.loadPlaylistsIfNeeded()
-            isPickingPlaylist = true
+        let choices = QueueSaveTarget.loadChoices(
+            output: output, feed: thisMacFeed, capabilities: router.backend(for: output).capabilities,
+            libraryHasPlaylists: canLoadLibraryPlaylist)
+        switch choices {
+        case []: post(StatusNotice(text: "Can't load a playlist", detail: "This music source has no playlists"))
+        case [.file]: loadPlaylistFile()
+        case [.libraryPlaylist]: pickLibraryPlaylist()
+        default:
+            PlaylistContextMenus.popUp([
+                ("Library Playlist\u{2026}", { [weak self] in self?.pickLibraryPlaylist() }),
+                ("Playlist File\u{2026}", { [weak self] in self?.loadPlaylistFile() }),
+            ])
         }
+    }
+
+    /// The Library's selected source has playlists (#0190).
+    var canLoadLibraryPlaylist: Bool { backend.capabilities.contains(.playlists) }
+
+    /// Opens the playlist picker; it's attached to the playlist editor, so that opens first.
+    func pickLibraryPlaylist() {
+        library.loadPlaylistsIfNeeded()
+        if !isPlaylistWindowOpen { setPlaylistWindowOpen(true) }
+        isPickingPlaylist = true
     }
 
     /// Plays a Music Assistant playlist, replacing the shown queue.

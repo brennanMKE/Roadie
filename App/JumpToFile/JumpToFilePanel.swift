@@ -188,7 +188,7 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
     private func updateEmptyState() {
         let text: String? =
             if model?.queueRowsSource == QueueRowsSource.none { "This speaker\u{2019}s queue can\u{2019}t be listed" }
-            else if shownTracks.isEmpty { "The playlist is empty" }
+            else if shownTracks.isEmpty { "The playlist is empty. Add music from the Library (\u{2318}L) or File \u{203A} Open." }
             else if results.isEmpty { "No matches" }
             else { nil }
         emptyLabel.stringValue = text ?? ""
@@ -333,6 +333,8 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
 
         emptyLabel.textColor = .secondaryLabelColor
+        emptyLabel.maximumNumberOfLines = 2
+        emptyLabel.lineBreakMode = .byWordWrapping
         emptyLabel.isHidden = true
 
         let play = NSButton(title: "Play", target: self, action: #selector(playSelected))

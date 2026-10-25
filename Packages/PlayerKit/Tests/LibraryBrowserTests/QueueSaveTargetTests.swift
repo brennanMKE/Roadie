@@ -38,4 +38,31 @@ struct QueueSaveTargetTests {
         }
         #expect(QueueSaveTarget.load(output: speaker, feed: .local, capabilities: ma) == .remote(speaker))
     }
+
+    @Test func loadChoicesOnTheLocalQueueOfferTheLibraryWhenItHasPlaylists() {
+        #expect(QueueSaveTarget.loadChoices(
+            output: OutputDevice.thisMacID, feed: .local, capabilities: ma, libraryHasPlaylists: true)
+            == [.libraryPlaylist, .file])
+    }
+
+    @Test func loadChoicesOnTheLocalQueueWithoutLibraryPlaylistsAreFileOnly() {
+        #expect(QueueSaveTarget.loadChoices(
+            output: OutputDevice.thisMacID, feed: .local, capabilities: folder, libraryHasPlaylists: false)
+            == [.file])
+    }
+
+    @Test func loadChoicesOnAMusicAssistantQueueAreItsPlaylists() {
+        for has in [true, false] {
+            #expect(QueueSaveTarget.loadChoices(
+                output: OutputDevice.thisMacID, feed: .musicAssistant, capabilities: ma, libraryHasPlaylists: has)
+                == [.libraryPlaylist])
+            #expect(QueueSaveTarget.loadChoices(output: speaker, feed: .local, capabilities: ma, libraryHasPlaylists: has)
+                == [.libraryPlaylist])
+        }
+    }
+
+    @Test func loadChoicesOnAnUnlistableSpeakerAreEmpty() {
+        #expect(QueueSaveTarget.loadChoices(output: speaker, feed: .local, capabilities: folder, libraryHasPlaylists: true)
+            == [])
+    }
 }

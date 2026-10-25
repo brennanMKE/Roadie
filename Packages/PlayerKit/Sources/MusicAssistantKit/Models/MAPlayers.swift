@@ -141,6 +141,8 @@ public struct MAQueueItem: Codable, Hashable, Sendable {
     public var duration: Double?
     public var mediaItem: MAJSON?
     public var image: MAMediaItemImage?
+    /// The server's `index`, which defaults to 0 on every item. Not used for queue positions; `MAQueueWatch`
+    /// uses the paging position instead (#0187).
     public var index: Int?
     public var available: Bool?
 
