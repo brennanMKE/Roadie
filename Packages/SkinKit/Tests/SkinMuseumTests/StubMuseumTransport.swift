@@ -1,4 +1,5 @@
 import Foundation
+import SkinMuseumStub
 
 @testable import SkinMuseum
 
@@ -38,10 +39,7 @@ final class StubMuseumTransport: MuseumTransport, @unchecked Sendable {
     }
 
     static func fixture(_ name: String) throws -> Data {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures") else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        return try Data(contentsOf: url)
+        try MuseumFixtures.data(name)
     }
 
     /// The decoded JSON body of request `index`.

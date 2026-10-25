@@ -37,6 +37,7 @@ final class VisualizerModel {
     private(set) var pointScale = 1
 
     @ObservationIgnored private let player: Player
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var renderer: VisRenderer
     @ObservationIgnored private var bars = VisBars()
     @ObservationIgnored private var colors: [SkinKit.RGBColor]
@@ -54,11 +55,12 @@ final class VisualizerModel {
 
     private static let silence = [Float](repeating: 0, count: VisBars.columnCount)
 
-    init(player: Player, colors: [SkinKit.RGBColor]) {
+    init(player: Player, colors: [SkinKit.RGBColor], defaults: UserDefaults = .standard) {
         self.player = player
+        self.defaults = defaults
         self.colors = colors
         renderer = VisRenderer(colors: colors)
-        mode = UserDefaults.standard.object(forKey: Self.modeKey)
+        mode = defaults.object(forKey: Self.modeKey)
             .flatMap { $0 as? Int }.flatMap(Mode.init(rawValue:)) ?? .spectrum
     }
 
@@ -69,7 +71,7 @@ final class VisualizerModel {
 
     func setMode(_ mode: Mode) {
         self.mode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
+        defaults.set(mode.rawValue, forKey: Self.modeKey)
         // Off skips the analysis, so the cursor stood still; re-lag it rather than replay old audio.
         if mode == .spectrum { player.analyzer.resetCursor() }
         // Paused and stopped players do not tick, so repaint the frozen state in the new mode.

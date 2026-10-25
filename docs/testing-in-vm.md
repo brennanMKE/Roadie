@@ -277,8 +277,21 @@ The `Roadie` scheme's Test action holds unit tests only. UI tests go in a separa
 Test design for a headless, silent guest:
 
 - **No Music Assistant server.** The guest is on Tart's NAT network and *can* reach the LAN, so isolation has to
-  come from the app. Launch with an argument such as `-UITestStubMusicAssistant YES` (when UI tests exist) that
-  swaps in `MusicAssistantKitStub`'s scripted transports and #0060's fixtures. No token is passed in.
+  come from the app. `RoadieConfiguration.fromProcess()` (#0194) reads these launch arguments; test mode is on only
+  with `-RoadieUITest 1`:
+  - `-RoadieDataDir <path>`: queue, skin index, thumbnails, folder index and Museum caches go here (default: a new
+    temp folder). Defaults go to the emptied `co.sstools.roadie.uitest` suite, which still sees `-key value` arguments.
+  - `-RoadieMAScenario <name>`: #0197's scripted Music Assistant (`ScriptedMusicAssistant`; `libraryIdle`, `queueLoaded`,
+    `playingOnSpeaker`, `thisMacIsASendspinPlayer`, `unreachable`, `badToken`) with one verified server at
+    `http://ma.example:8095` and an in-memory token. An unknown name stops the app. Without it, Music Assistant is
+    unconfigured.
+    Neither path touches the Keychain or the network.
+  - `-RoadieMuseum fixtures` (with `-RoadieMuseumSkins <folder>`): the recorded Museum pages; downloads copy the file
+    with that md5 from the folder.
+  - `-RoadieNoDiscovery 1`: no Bonjour, Wi-Fi name, network events or wake observer.
+  - `-RoadieExternalOpens record`: Help links, Open in Skin Museum and the like are recorded, not opened.
+  The hosted unit-test run (`RoadieTests`) picks an isolated configuration of its own (temp data directory, fresh
+  defaults suite, no Music Assistant, no discovery), so `⌘U` on a dev Mac leaves the real state alone.
 - **No user skins or music.** `Skins/`, `*.wsz` and `*.mp3` are gitignored, and third-party skins
   are never committed. Commit a small skin made for the project (or generate one at test time) plus
   a few seconds of generated audio, and pass their paths in through launch arguments.

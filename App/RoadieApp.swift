@@ -23,6 +23,7 @@ struct RoadieApp: App {
 
         Settings {
             SettingsView()
+                .environment(appDelegate.model)
                 .environment(appDelegate.model.musicAssistantSettings)
                 .environment(appDelegate.model.musicAssistantSelection)
                 .environment(appDelegate.model.sendspinController)
@@ -50,7 +51,7 @@ struct RoadieApp: App {
             CommandGroup(after: .help) {
                 Button("Welcome to Roadie…") { appDelegate.welcome.show(openMuseum: false) }
                 Button("Playlists and the Queue…") {
-                    NSWorkspace.shared.open(URL(string: "https://roadie.sstools.co/help.html#playlists")!)
+                    appDelegate.model.open(external: URL(string: "https://roadie.sstools.co/help.html#playlists")!)
                 }
             }
             SkinsCommands(model: appDelegate.model)

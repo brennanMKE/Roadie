@@ -13,6 +13,8 @@ import SkinBrowser
 import SkinKit
 import SkinLibrary
 import SkinMuseum
+import SkinMuseumStub
+import MusicAssistantKitStub
 import os
 
 @MainActor
@@ -45,11 +47,11 @@ final class PlayerModel {
     /// back when it returns. Playback is never touched.
     let fallback: LibraryFallbackController
     /// The skins folder and its SQLite index (Settings › Skins). Opens nothing until a folder is chosen.
-    let skinLibrary = SkinLibraryModel()
+    let skinLibrary: SkinLibraryModel
     /// The tab the Skins window shows the next time it appears or is brought forward (#0169); consumed by the window.
     var pendingSkinsSource: SkinsSource?
     /// Main-window thumbnails keyed by content hash, rendered lazily on request (#0034). Does no I/O until the first request.
-    let skinThumbnails = SkinThumbnailCache(directory: SkinThumbnailCache.defaultDirectory())
+    let skinThumbnails: SkinThumbnailCache
     /// The Skins window and menu (#0035). Lazy because its closures name `self`; it does no I/O until used.
     @ObservationIgnored private(set) lazy var skinBrowser = SkinBrowserModel(
         index: { [skinLibrary] in try await skinLibrary.openStoreIfNeeded() },
@@ -59,12 +61,13 @@ final class PlayerModel {
     /// The Museum tab of the Skins window (#0126). Lazy, and it makes no request until the tab appears.
     @ObservationIgnored private(set) lazy var museumBrowser: MuseumBrowserModel = {
         self.museumBrowserCreated = true
-        let transport = URLSessionMuseumTransport()
+        let transport: any MuseumTransport = switch configuration.museum {
+        case .live: URLSessionMuseumTransport()
+        case .fixtures(let skinsFolder): FixtureMuseumTransport(skinsFolder: skinsFolder)
+        }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let userAgent = MuseumUserAgent.make(version: version)
-        let caches = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory)
-            .appending(path: "co.sstools.roadie/Museum", directoryHint: .isDirectory)
+        let caches = configuration.museumCachesDirectory
         let results = MuseumResultCache(directory: caches.appending(path: "Results", directoryHint: .isDirectory))
         return MuseumBrowserModel(
             client: MuseumClient(transport: transport, userAgent: userAgent, resultCache: results),
@@ -80,8 +83,8 @@ final class PlayerModel {
                 skinBrowser.indexDidChange()
             },
             applySkin: { [weak self] in self?.loadSkin(from: $0) },
-            showsNSFW: { UserDefaults.standard.bool(forKey: Self.museumShowsNSFWKey) },
-            setShowsNSFW: { UserDefaults.standard.set($0, forKey: Self.museumShowsNSFWKey) })
+            showsNSFW: { [defaults] in defaults.bool(forKey: Self.museumShowsNSFWKey) },
+            setShowsNSFW: { [defaults] in defaults.set($0, forKey: Self.museumShowsNSFWKey) })
     }()
     @ObservationIgnored private var museumBrowserCreated = false
     static let museumShowsNSFWKey = "museumShowsNSFW"
@@ -152,20 +155,20 @@ final class PlayerModel {
     var playbackState: NowPlaying.State { nowPlaying.state }
     var isLoading: Bool { nowPlaying.state == .loading }
     /// Skin points per skin pixel: `baseScale`, or twice that in double size.
-    var scale: CGFloat = PlayerModel.baseScale * (UserDefaults.standard.bool(forKey: PlayerModel.doubleSizeKey) ? 2 : 1) {
+    var scale: CGFloat = PlayerModel.baseScale {
         didSet { visualizer.setScale(scale) }
     }
     /// Whether the skinned windows float above other apps' windows (the clutter bar's A). Persisted.
-    private(set) var isAlwaysOnTop = UserDefaults.standard.bool(forKey: PlayerModel.alwaysOnTopKey)
+    private(set) var isAlwaysOnTop = false
     /// Whether the skinned windows are drawn at twice the normal size (the clutter bar's D). Persisted.
-    private(set) var isDoubleSize = UserDefaults.standard.bool(forKey: PlayerModel.doubleSizeKey)
+    private(set) var isDoubleSize = false
     /// Whether the main window is collapsed to its 14 px shade strip. Persisted, so the window comes back as it was left.
-    private(set) var isMainWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.mainWindowShadeKey)
+    private(set) var isMainWindowShaded = false
     /// Whether the equalizer and playlist windows are collapsed to their shade strips; persisted like the main window's.
-    private(set) var isEQWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.eqWindowShadeKey)
+    private(set) var isEQWindowShaded = false
     /// LIST › Load on a Music Assistant queue shows the playlist picker sheet (#0146).
     var isPickingPlaylist = false
-    private(set) var isPlaylistWindowShaded = UserDefaults.standard.bool(forKey: PlayerModel.playlistWindowShadeKey)
+    private(set) var isPlaylistWindowShaded = false
     /// The main window's size in skin pixels in its current mode.
     var mainWindowSkinSize: CGSize { isMainWindowShaded ? MainWindowLayout.shadeSize : MainWindowLayout.size }
     /// The main-window spectrum / oscilloscope; ticks only while audio plays.
@@ -183,9 +186,9 @@ final class PlayerModel {
     private(set) var balance: Float = 0
     /// Whether the equalizer window is open: the source of truth for the main window's EQ button, the Window menu and the
     /// window itself (`AppDelegate` follows it). Persisted so the window comes back after a relaunch, like Winamp.
-    private(set) var isEQWindowOpen = UserDefaults.standard.bool(forKey: PlayerModel.eqWindowOpenKey)
+    private(set) var isEQWindowOpen = false
     /// Whether the playlist editor is open; persisted like the equalizer's (Winamp reopens it at launch).
-    private(set) var isPlaylistWindowOpen = UserDefaults.standard.bool(forKey: PlayerModel.playlistWindowOpenKey)
+    private(set) var isPlaylistWindowOpen = false
     /// The playlist window's selection, scroll position and size; a view of `player.queue`.
     let playlist: PlaylistModel
     /// Shuffle and repeat live in the local player's queue, so they read as off for other outputs.
@@ -240,12 +243,12 @@ final class PlayerModel {
 
     func toggleAlwaysOnTop() {
         isAlwaysOnTop.toggle()
-        UserDefaults.standard.set(isAlwaysOnTop, forKey: Self.alwaysOnTopKey)
+        defaults.set(isAlwaysOnTop, forKey: Self.alwaysOnTopKey)
     }
 
     func toggleDoubleSize() {
         isDoubleSize.toggle()
-        UserDefaults.standard.set(isDoubleSize, forKey: Self.doubleSizeKey)
+        defaults.set(isDoubleSize, forKey: Self.doubleSizeKey)
         scale = Self.baseScale * (isDoubleSize ? 2 : 1)
     }
 
@@ -280,7 +283,7 @@ final class PlayerModel {
         do {
             try PlaylistHTML.document(entries: playlist.htmlEntries)
                 .write(to: url, atomically: true, encoding: .utf8)
-            NSWorkspace.shared.open(url)
+            open(external: url)
         } catch {
             Self.log.error("HTML playlist write failed: \(error.localizedDescription, privacy: .public)")
             post(StatusNotice(text: "Couldn't write the HTML playlist", detail: error.localizedDescription))
@@ -288,18 +291,17 @@ final class PlayerModel {
     }
 
     /// Elapsed or remaining time in the main window; Winamp keeps it in winamp.ini.
-    var timeMode: TimeMode = UserDefaults.standard.string(forKey: PlayerModel.timeModeKey)
-        .flatMap(TimeMode.init(rawValue:)) ?? .elapsed
+    var timeMode: TimeMode = .elapsed
 
     func toggleTimeMode() {
         timeMode = timeMode == .elapsed ? .remaining : .elapsed
-        UserDefaults.standard.set(timeMode.rawValue, forKey: Self.timeModeKey)
+        defaults.set(timeMode.rawValue, forKey: Self.timeModeKey)
     }
 
     func setTimeMode(_ mode: TimeMode) {
         guard mode != timeMode else { return }
         timeMode = mode
-        UserDefaults.standard.set(timeMode.rawValue, forKey: Self.timeModeKey)
+        defaults.set(timeMode.rawValue, forKey: Self.timeModeKey)
     }
 
     /// What the main window's time, kbps/kHz and mono/stereo area shows. On This Mac the position, track
@@ -328,40 +330,107 @@ final class PlayerModel {
             channels: (isThisMac ? player.currentFormat?.channels : nil) ?? track?.channels)
     }
 
-    init() {
-        LegacyDataCleanup.run()
+    /// What this model is wired to (#0194): the real Keychain, network and disk, or a test configuration's stubs.
+    @ObservationIgnored let configuration: RoadieConfiguration
+    /// Every defaults read and write of the model goes here (`configuration.defaults`); `@AppStorage` stays on `.standard`.
+    var defaults: UserDefaults { configuration.defaults }
+    /// "keychain" or "memory": where Music Assistant tokens are read from (#0194's tests).
+    @ObservationIgnored let tokenStoreKind: String
+    /// #0197's server when `musicAssistant` is `.scripted` (#0194's tests, the probe #0199). Report its
+    /// `receivedCommands` / `recentCommandSummaries()` only: its transports' `sent` keep the auth token unredacted.
+    @ObservationIgnored let scriptedMusicAssistant: ScriptedMusicAssistant?
+    /// The file the queue autosaves to.
+    @ObservationIgnored let queueFileURL: URL
+    /// The last URL `open(external:)` recorded with `externalOpens == .record`.
+    @ObservationIgnored private(set) var lastExternalOpen: URL?
+
+    init(configuration: RoadieConfiguration = .standard) {
+        self.configuration = configuration
+        let defaults = configuration.defaults
+        // Plex's leftovers live in the real defaults and Keychain only; a test configuration has neither.
+        if !configuration.isIsolated { LegacyDataCleanup.run() }
+        skinLibrary = SkinLibraryModel(defaults: defaults, databaseURL: configuration.skinsDatabaseURL)
+        skinThumbnails = SkinThumbnailCache(directory: configuration.thumbnailsDirectory)
         let stack = LocalPlaybackStack.standard()
         player = stack.player
-        playlist = PlaylistModel(player: stack.player)
-        visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors)
-        folderBackend = FolderBackend(settings: FolderBackend.settingsProvider(), output: stack.output)
+        playlist = PlaylistModel(player: stack.player, defaults: defaults)
+        visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors, defaults: defaults)
+        folderBackend = FolderBackend(
+            settings: FolderBackend.settingsProvider(defaults: defaults), output: stack.output,
+            cacheDirectory: configuration.folderIndexDirectory)
         folderSettings = FolderSettingsModel(backend: folderBackend)
         // Music Assistant is the default source. Defaults only here: no Keychain, network or prompt at launch.
-        let maStore = MusicAssistantServerStore()
+        let maStore = MusicAssistantServerStore(defaults: defaults)
         // #0075: the selection decides which server; the active box starts empty and follows it. Neither adapter
         // does I/O when constructed, and nothing probes until the Library or #0067 asks for the server.
         let maActive = MusicAssistantActiveServer()
-        let wifi = SystemWiFiNetwork()
+        let wifi: any WiFiNetworkProvider = configuration.discovery ? SystemWiFiNetwork() : InertWiFiNetwork()
+        let network: any NetworkChangeSource = configuration.discovery ? SystemNetworkEvents() : InertNetworkEvents()
+        let browser: any MusicAssistantServiceBrowser = configuration.discovery ? SystemServiceBrowser() : InertServiceBrowser()
+        // Live: the Keychain, URLSession and the real sockets. Otherwise in-memory tokens, the recorded `/info` and
+        // scripted sockets, so nothing leaves the process.
+        let tokenStore: @Sendable (String) -> any MusicAssistantTokenStore
+        let transports: any MAWebSocketTransportFactory
+        let http: any MAHTTPTransport
+        let fetch: MusicAssistantServerSelector.InfoFetcher
+        switch configuration.musicAssistant {
+        case .live:
+            tokenStore = { KeychainMusicAssistantTokenStore(account: $0) }
+            transports = URLSessionWebSocketTransportFactory()
+            http = URLSessionHTTPTransport()
+            fetch = MusicAssistantServerSelector.urlSessionFetcher
+            scriptedMusicAssistant = nil
+            tokenStoreKind = "keychain"
+        case .scripted, .none:
+            let stores = InMemoryMusicAssistantTokenStores()
+            tokenStore = { stores.store(for: $0) }
+            let stubHTTP: StubHTTPTransport
+            if case .scripted(let name) = configuration.musicAssistant {
+                let scenario = ScriptedMusicAssistant.scenario(named: name)
+                let factory: ScriptedTransportFactory
+                do {
+                    factory = try ScriptedMusicAssistant.transportFactory(scenario: scenario)
+                } catch {
+                    fatalError("The scripted Music Assistant (\(name)) could not load its fixtures: \(error)")
+                }
+                let server = ScriptedMusicAssistant.verifiedServer()
+                maStore.save([server])
+                try? stores.store(for: server.keychainAccount).save(ScriptedMusicAssistant.token)
+                // Sendspin would open its own socket to the scripted host: keep it off.
+                defaults.set(false, forKey: SendspinController.enabledKey)
+                scriptedMusicAssistant = factory.server
+                transports = factory
+                stubHTTP = factory.http
+            } else {
+                scriptedMusicAssistant = nil
+                transports = StubTransportFactory()
+                stubHTTP = StubHTTPTransport()
+            }
+            http = stubHTTP
+            fetch = { try await MusicAssistantClient.serverInfo(at: $0, http: stubHTTP, timeout: .seconds(3)) }
+            tokenStoreKind = "memory"
+        }
         let selection = MusicAssistantSelectionController(
-            store: maStore, active: maActive, selector: MusicAssistantServerSelector(fetch: MusicAssistantServerSelector.urlSessionFetcher),
-            wifi: wifi, network: SystemNetworkEvents(), clock: ContinuousClock())
+            store: maStore, active: maActive, selector: MusicAssistantServerSelector(fetch: fetch),
+            wifi: wifi, network: network, clock: ContinuousClock())
+        nonisolated(unsafe) let verifiedDefaults = defaults
         let ma = MusicAssistantBackend(
             server: { await selection.currentOrResolve() },
-            token: { try KeychainMusicAssistantTokenStore(account: $0.keychainAccount).load() },
-            hasVerifiedServer: { MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) })
+            token: { try tokenStore($0.keychainAccount).load() },
+            hasVerifiedServer: { MusicAssistantServerStore.hasVerifiedServer(defaults: verifiedDefaults) },
+            transports: transports, http: http)
         musicAssistant = ma
         musicAssistantActive = maActive
         musicAssistantSelection = selection
         musicAssistantSettings = MusicAssistantSettingsModel(
-            store: maStore, tokenStore: { KeychainMusicAssistantTokenStore(account: $0) }, test: MusicAssistantConnectionTest(),
+            store: maStore, tokenStore: tokenStore, test: MusicAssistantConnectionTest(http: http, transports: transports),
             active: maActive, wifi: wifi)
         musicAssistantDiscovery = MusicAssistantDiscoveryModel(
-            store: maStore, browser: SystemServiceBrowser(), fetch: MusicAssistantServerSelector.urlSessionFetcher,
-            clock: ContinuousClock())
+            store: maStore, browser: browser, fetch: fetch, clock: ContinuousClock())
         sources = LibrarySourceController(
             sources: [
                 LibrarySource(
-                    backend: ma, isConfigured: { MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) },
+                    backend: ma, isConfigured: { MusicAssistantServerStore.hasVerifiedServer(defaults: verifiedDefaults) },
                     probe: SourceProbes.checking {
                         guard await selection.resolveNow() != nil else {
                             throw MusicBackendError.unreachable(MusicAssistantServerRanking.noneReachableText)
@@ -369,21 +438,22 @@ final class PlayerModel {
                         try await ma.probe()
                     }),
                 LibrarySource(
-                    backend: folderBackend, isConfigured: { FolderBackend.storedFolder() != nil },
-                    probe: SourceProbes.checking { try FolderBackend.checkReachable() }),
+                    backend: folderBackend, isConfigured: { FolderBackend.storedFolder(in: verifiedDefaults) != nil },
+                    probe: SourceProbes.checking { try FolderBackend.checkReachable(in: verifiedDefaults) }),
             ],
-            defaultSourceID: ma.sourceID)
+            defaultSourceID: ma.sourceID, defaults: defaults)
         fallback = LibraryFallbackController(sources: sources)
         // This Mac is the folder backend's output (`LocalPlaybackStack`; no connection needed).
         let feedState = ThisMacFeedState()
         self.feedState = feedState
         router = PlaybackRouter(local: folderBackend, remote: ma, feed: feedState)
-        sendspinController = SendspinController(sendspin: stack.sendspin, musicAssistant: ma)
+        sendspinController = SendspinController(sendspin: stack.sendspin, musicAssistant: ma, defaults: defaults)
         outputPicker = OutputPickerModel(remote: ma, isConnected: { await ma.isConnected })
         let (commands, continuation) = AsyncStream.makeStream(of: (TransportCommand, OutputDevice.ID).self)
         commandStream = continuation
         // Restore the queue stopped at the saved track (nothing plays, no audio device opens), then start saving changes.
-        let queueStore = QueueStore(fileURL: QueueStore.defaultURL())
+        queueFileURL = configuration.queueFileURL
+        let queueStore = QueueStore(fileURL: configuration.queueFileURL)
         let loaded = queueStore.loadQueue()
         if let loaded { stack.output.restore(loaded.snapshot) }
         queueAutosaver = QueueAutosaver(output: stack.output, store: queueStore)
@@ -399,7 +469,7 @@ final class PlayerModel {
         volume = stack.player.volume
         balance = stack.player.balance
         // Restore the equalizer before anything plays; the setter reaches the live graph once it exists.
-        if let data = UserDefaults.standard.data(forKey: Self.equalizerKey),
+        if let data = defaults.data(forKey: Self.equalizerKey),
             let saved = try? JSONDecoder().decode(EQState.self, from: data)
         {
             stack.player.eq = saved
@@ -445,10 +515,11 @@ final class PlayerModel {
         let routing = NowPlayingRouting(player: stack.player, model: self)
         nowPlayingRouting = routing
         nowPlayingBridge.setCommandTarget(routing)
+        restoreWindowState()
         visualizer.setLayout(shaded: isMainWindowShaded, scale: scale)
         visualizer.start()
         observeNowPlaying()
-        if let path = UserDefaults.standard.string(forKey: Self.lastSkinKey) {
+        if let path = defaults.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
         }
         skinLibrary.passFinished = { [weak self] in
@@ -472,7 +543,7 @@ final class PlayerModel {
         fallback.start()
         selection.start()
         // #0121: connect at launch when a verified server exists, so Roadie follows what Music Assistant plays.
-        if MusicAssistantServerStore.hasVerifiedServer(defaults: .standard) {
+        if MusicAssistantServerStore.hasVerifiedServer(defaults: defaults) {
             Task { [weak self] in
                 _ = await selection.resolveNow()
                 do { try await ma.connect() } catch { return }
@@ -493,8 +564,9 @@ final class PlayerModel {
         watchMusicAssistantConnection()
         // The model lives as long as the app, so these observers are never removed.
         NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: .main
+            forName: UserDefaults.didChangeNotification, object: defaults, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.fallback.settingsChanged() } }
+        guard configuration.discovery else { return }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -800,6 +872,31 @@ final class PlayerModel {
     /// Writes the queue now; called on quit so the last second of changes is not lost.
     func flushQueue() { queueAutosaver.flush() }
 
+    /// Writes the queue now, changed or not (#0194's tests).
+    func saveQueueNow() { queueAutosaver.saveNow() }
+
+    /// Every link Roadie opens outside itself (Help, the Museum, System Settings, the HTML playlist) comes here, so a
+    /// UI test can record it instead (#0194).
+    func open(external url: URL) {
+        switch configuration.externalOpens {
+        case .record: lastExternalOpen = url
+        case .workspace: NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// The persisted window flags and time mode, read from `defaults` once at launch.
+    private func restoreWindowState() {
+        isAlwaysOnTop = defaults.bool(forKey: Self.alwaysOnTopKey)
+        isDoubleSize = defaults.bool(forKey: Self.doubleSizeKey)
+        isMainWindowShaded = defaults.bool(forKey: Self.mainWindowShadeKey)
+        isEQWindowShaded = defaults.bool(forKey: Self.eqWindowShadeKey)
+        isPlaylistWindowShaded = defaults.bool(forKey: Self.playlistWindowShadeKey)
+        isEQWindowOpen = defaults.bool(forKey: Self.eqWindowOpenKey)
+        isPlaylistWindowOpen = defaults.bool(forKey: Self.playlistWindowOpenKey)
+        timeMode = defaults.string(forKey: Self.timeModeKey).flatMap(TimeMode.init(rawValue:)) ?? .elapsed
+        scale = Self.baseScale * (isDoubleSize ? 2 : 1)
+    }
+
     /// Museum › Move to Trash for a downloaded skin (#0131): the same path as the Library's, keyed by the file.
     func trashDownloadedMuseumSkin(at url: URL) {
         guard let root = skinLibrary.folderURL, let path = SkinBrowserFormat.relativePath(of: url, in: root) else {
@@ -828,7 +925,7 @@ final class PlayerModel {
                 visualizer.setColors(skin.visColors)
                 skinName = url.deletingPathExtension().lastPathComponent
                 errorMessage = nil
-                UserDefaults.standard.set(url.path, forKey: Self.lastSkinKey)
+                defaults.set(url.path, forKey: Self.lastSkinKey)
                 for warning in skin.warnings { print("[\(url.lastPathComponent)] \(warning)") }
                 skinBrowser.skinDidLoad(from: url)
             case .failure(let error):
@@ -950,18 +1047,18 @@ final class PlayerModel {
     /// Window > Windowshade all come here). `SkinWindowController` follows the flag.
     func toggleMainWindowShade() {
         isMainWindowShaded.toggle()
-        UserDefaults.standard.set(isMainWindowShaded, forKey: Self.mainWindowShadeKey)
+        defaults.set(isMainWindowShaded, forKey: Self.mainWindowShadeKey)
         visualizer.setLayout(shaded: isMainWindowShaded, scale: scale)
     }
 
     func toggleEQWindowShade() {
         isEQWindowShaded.toggle()
-        UserDefaults.standard.set(isEQWindowShaded, forKey: Self.eqWindowShadeKey)
+        defaults.set(isEQWindowShaded, forKey: Self.eqWindowShadeKey)
     }
 
     func togglePlaylistWindowShade() {
         isPlaylistWindowShaded.toggle()
-        UserDefaults.standard.set(isPlaylistWindowShaded, forKey: Self.playlistWindowShadeKey)
+        defaults.set(isPlaylistWindowShaded, forKey: Self.playlistWindowShadeKey)
     }
 
     func toggleShuffle() { send(.setShuffle(!isShuffled)) }
@@ -972,7 +1069,7 @@ final class PlayerModel {
     func setEQWindowOpen(_ open: Bool) {
         guard open != isEQWindowOpen else { return }
         isEQWindowOpen = open
-        UserDefaults.standard.set(open, forKey: Self.eqWindowOpenKey)
+        defaults.set(open, forKey: Self.eqWindowOpenKey)
     }
 
     func togglePlaylistWindow() { setPlaylistWindowOpen(!isPlaylistWindowOpen) }
@@ -981,7 +1078,7 @@ final class PlayerModel {
     func setPlaylistWindowOpen(_ open: Bool) {
         guard open != isPlaylistWindowOpen else { return }
         isPlaylistWindowOpen = open
-        UserDefaults.standard.set(open, forKey: Self.playlistWindowOpenKey)
+        defaults.set(open, forKey: Self.playlistWindowOpenKey)
     }
 
     private static let log = Logger(subsystem: "co.sstools.roadie", category: "Playback")
@@ -1082,7 +1179,7 @@ final class PlayerModel {
     }
 
     /// #0169: what earlier launches left in the defaults. Read before the default skins folder is applied.
-    func firstRunState(defaults: UserDefaults = .standard) -> FirstRunState {
+    func firstRunState() -> FirstRunState {
         Self.firstRunState(defaults: defaults)
     }
 
@@ -1096,7 +1193,7 @@ final class PlayerModel {
             hasVerifiedServer: MusicAssistantServerStore.hasVerifiedServer(defaults: defaults))
     }
 
-    func markFirstRunCompleted(defaults: UserDefaults = .standard) {
+    func markFirstRunCompleted() {
         defaults.set(FirstRunPolicy.currentVersion, forKey: FirstRunPolicy.defaultsKey)
     }
 

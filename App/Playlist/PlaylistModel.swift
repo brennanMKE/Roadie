@@ -32,6 +32,7 @@ final class PlaylistModel {
     }
 
     private let player: Player
+    @ObservationIgnored private let defaults: UserDefaults
     /// Whether the selected output is This Mac, the only output whose queue the window can show. Set by `PlayerModel`.
     @ObservationIgnored var isLocal: @MainActor () -> Bool = { true }
     /// Whether This Mac plays its local queue (not Music Assistant); only then is a row current. Set by `PlayerModel`.
@@ -71,9 +72,10 @@ final class PlaylistModel {
     var isDraggingScroll = false
     private(set) var steps: PlaylistLayout.Steps
 
-    init(player: Player) {
+    init(player: Player, defaults: UserDefaults = .standard) {
         self.player = player
-        if let saved = UserDefaults.standard.array(forKey: Self.sizeKey) as? [Int], saved.count == 2 {
+        self.defaults = defaults
+        if let saved = defaults.array(forKey: Self.sizeKey) as? [Int], saved.count == 2 {
             steps = PlaylistLayout.Steps(width: saved[0], height: saved[1])
         } else {
             steps = .zero
@@ -88,7 +90,7 @@ final class PlaylistModel {
     func setSteps(_ new: PlaylistLayout.Steps) {
         guard new != steps else { return }
         steps = new
-        UserDefaults.standard.set([new.width, new.height], forKey: Self.sizeKey)
+        defaults.set([new.width, new.height], forKey: Self.sizeKey)
     }
 
     // MARK: Queue

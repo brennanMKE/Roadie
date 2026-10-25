@@ -37,6 +37,11 @@ targets:
         product: SkinBrowser
       - package: SkinKit
         product: SkinMuseum
+      # #0194: the test configuration's stand-ins (RoadieConfiguration); unused by a normal launch.
+      - package: SkinKit
+        product: SkinMuseumStub
+      - package: PlayerKit
+        product: MusicAssistantKitStub
       - package: PlayerKit
         product: AudioCore
       - package: PlayerKit

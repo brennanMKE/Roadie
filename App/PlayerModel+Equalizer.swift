@@ -51,7 +51,7 @@ extension PlayerModel {
 
     private func persistEQ() {
         guard let data = try? JSONEncoder().encode(player.eq) else { return }
-        UserDefaults.standard.set(data, forKey: Self.equalizerKey)
+        defaults.set(data, forKey: Self.equalizerKey)
     }
 
     // MARK: Preset files

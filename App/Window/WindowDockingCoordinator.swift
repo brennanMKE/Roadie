@@ -20,9 +20,9 @@ final class WindowDockingCoordinator {
     /// The dragged window's origin at mouse-down (AppKit space).
     private var dragStartOrigin = NSPoint.zero
 
-    init(model: PlayerModel, store: WindowLayoutStore = WindowLayoutStore(defaults: .standard)) {
+    init(model: PlayerModel, store: WindowLayoutStore? = nil) {
         self.model = model
-        self.store = store
+        self.store = store ?? WindowLayoutStore(defaults: model.defaults)
     }
 
     /// The skinned windows register once; the coordinator then receives their title-bar drags and size changes.
