@@ -195,6 +195,21 @@ targets:
         ENABLE_APP_SANDBOX: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
+
+  RoadieTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [Tests/RoadieTests]
+    dependencies:
+      - target: Roadie
+    settings:
+      base:
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Roadie.app/Contents/MacOS/Roadie
+        BUNDLE_LOADER: $(TEST_HOST)
+        PRODUCT_BUNDLE_IDENTIFIER: co.sstools.roadie.tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+
 schemes:
   Roadie:
     build:
@@ -202,6 +217,7 @@ schemes:
         Roadie: all
     test:
       targets:
+        - RoadieTests
         - package: SkinKit/SkinKitTests
         - package: SkinKit/WindowDockingTests
         - package: SkinKit/SkinLibraryTests

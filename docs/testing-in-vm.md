@@ -20,7 +20,7 @@ passes only if those tests ran and failed and nothing else did. Recipe: write th
 ```bash
 scripts/verify.sh --expect newTestName       # what agents run: the fast tier, reported in a few lines
 scripts/verify.sh --expect-fail newTestName  # bug fix, before the fix: passes only if that test (and nothing else) fails
-scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, Info.plist check (slow tests skipped)
+scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, app unit tests (RoadieTests), Info.plist check (slow tests skipped)
 scripts/run-tests-vm.sh --build-only   # compile check only: both packages with their tests, then the app; no tests run, not verification
 scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s (with -firstRunVersion 1, so no Welcome window), then quit it
@@ -48,6 +48,7 @@ clone starts cold. The summary at the end looks like this:
 ==> PASS  app-build
 ==> PASS  skinkit-tests
 ==> PASS  playerkit-tests
+==> PASS  app-unit-tests
 ==> PASS  app-plist
 ==> PASS  app-entitlements
 ==> PASS  app-quicklook
@@ -55,11 +56,12 @@ clone starts cold. The summary at the end looks like this:
 ==> TIER  fast: 100k scale and real-time audio tests skipped (scripts/run-tests-vm.sh --full runs them)
     Build complete! (15.35 sec)
     Build complete! (23.01 sec)
-    ** BUILD SUCCEEDED **
+    ** TEST BUILD SUCCEEDED **
     ✔ Test run with 50 tests in 6 suites passed after 0.558 seconds.
     ✔ Test run with 94 tests in 12 suites passed after 1.514 seconds.
     ✔ Test run with 100 tests in 24 suites passed after 4.267 seconds.
     ✔ Test run with 5 tests in 1 suite passed after 0.001 seconds.
+    Executed 8 tests, with 0 failures (0 unexpected) in 0.052 (0.060) seconds
 ==> AUDIO  silent: no host 'Starting IO' events during the run
 ==> Logs: build/vm-tests/<run-id>
 ==> Cleaning up (exit 0)
@@ -74,10 +76,11 @@ When something does not compile, the run stops after the build stage and prints 
 ==> SKIP  app-build (build failed)
 ==> SKIP  skinkit-tests (build failed)
 ==> SKIP  playerkit-tests (build failed)
+==> SKIP  app-unit-tests (build failed)
 ==> SKIP  app-plist (build failed)
 ==> SKIP  app-entitlements (build failed)
 ==> SKIP  app-quicklook (build failed)
-==> BUILD  failed: 6 step(s) skipped; fix the errors below and rerun
+==> BUILD  failed: 7 step(s) skipped; fix the errors below and rerun
 ==> ERRORS  1 compiler error(s) (first 30; full logs: playerkit-build.log)
     Packages/PlayerKit/Sources/MusicBackendKit/Example.swift:12:9: error: cannot find 'foo' in scope
 ```

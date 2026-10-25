@@ -1083,6 +1083,11 @@ final class PlayerModel {
 
     /// #0169: what earlier launches left in the defaults. Read before the default skins folder is applied.
     func firstRunState(defaults: UserDefaults = .standard) -> FirstRunState {
+        Self.firstRunState(defaults: defaults)
+    }
+
+    /// Static so it needs no model (#0193).
+    static func firstRunState(defaults: UserDefaults) -> FirstRunState {
         FirstRunState(
             completedVersion: defaults.integer(forKey: FirstRunPolicy.defaultsKey),
             hasSkinsFolder: defaults.string(forKey: SkinLibraryModel.folderKey) != nil,
