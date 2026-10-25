@@ -282,6 +282,12 @@ Test design for a headless, silent guest:
 - **No sound.** Even muted, the app shouldn't drive a real output device under UI tests. Add a
   launch argument that runs the engine in manual rendering mode, and assert on player state (time
   display, play indicator, analyzer data) rather than on sound.
+- **Test skins** (#0198). The UI tests use seven real Museum skins listed in `scripts/test-skins.tsv`
+  (name, Museum id, md5, why). Fetch them once on the host with `scripts/fetch-test-skins.sh` into
+  `~/Library/Caches/co.sstools.roadie-test-skins` (`--cache DIR` to change it); later runs say `ok (cached)` and
+  download nothing. `scripts/fetch-test-skins.sh --check` reports `ok|missing|bad-md5` per skin without downloading.
+  `run-tests-vm.sh --ui --test-skins DIR` checks the cache and copies it into the export's `TestSkins/`; the skins
+  are never committed.
 - **Skinned windows are borderless.** XCUITest finds them through accessibility, so give every
   sprite button, slider and display an `accessibilityIdentifier`. Don't rely on coordinates.
 - **Screenshots** from `XCTAttachment` land in the result bundle, which is the main way to see the
