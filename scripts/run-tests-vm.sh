@@ -37,11 +37,12 @@
 # In the guest, in order:
 #   Build stage (a failure here skips everything below and prints the compiler errors):
 #   1. swift build --build-tests --package-path Packages/SkinKit, then Packages/PlayerKit
-#   2. xcodebuild ... build                             (project generated on the host; only if both packages built)
+#   2. xcodebuild ... build-for-testing                 (the app and RoadieTests; project generated on the host; only if both packages built)
 #   Tests and checks, reusing those builds:
 #   3. swift test --skip-build --package-path Packages/SkinKit  (SKIN_SAMPLES_DIR=Skins with --skins; ROADIE_SLOW_TESTS=1 with --full)
 #      skintool Skins/ (only with --skins; fails unless every skin is ok), then skintool --png into results/png/
 #   4. swift test --skip-build --package-path Packages/PlayerKit  (with --full: AUDIOCORE_REALTIME=1, muted)
+#   4b. xcodebuild ... test-without-building -only-testing:RoadieTests  (the app's hosted unit tests, #0193)
 #   5. scripts/check-info-plist.sh on the built app's Info.plist (networking keys, .wsz type)
 #      scripts/check-entitlements.sh on the built app (Location entitlement, #0075)
 #   6. scripts/check-quicklook.sh: register the Quick Look extensions, qlmanage -t / -p a generated skin (#0043)
@@ -327,7 +328,7 @@ skip_step() {
 # Build everything once; the tests below reuse it. Both packages always build so one run reports both.
 run_step skinkit-build   "swift build --build-tests --package-path Packages/SkinKit" build
 run_step playerkit-build "swift build --build-tests --package-path Packages/PlayerKit" build
-APP_BUILD="xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData build"
+APP_BUILD="xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData build-for-testing"
 if (( build_failed )); then skip_step app-build; else run_step app-build "$APP_BUILD" build; fi
 if (( SPIKE )); then
   if (( build_failed )); then
@@ -356,6 +357,8 @@ fi
 # With --full the real-time tests run here too: the guest's virtual output device has no path to
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
 run_step playerkit-tests "${rt_env}swift test --skip-build --package-path Packages/PlayerKit"
+# The app's hosted unit tests (RoadieTests, #0193). Raw xcodebuild output: verify.sh reads the `Test Case` lines.
+run_step app-unit-tests "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData test-without-building -only-testing:RoadieTests 2>&1 | grep -vE '^$'"
 if (( STRESS )); then
   STRESS_PACKAGE=${STRESS_PACKAGE:-PlayerKit}
   stress_filter_arg="''"; [[ -n "$STRESS_FILTER" ]] && stress_filter_arg=${(q)STRESS_FILTER}
@@ -484,7 +487,7 @@ else
 fi
 step_logs=("$RESULTS_DIR"/*.log(N))  # none when the guest was lost before the results pull
 if (( ${#step_logs} )); then
-  grep -hE 'Build complete!|Test run with|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
+  grep -hE 'Build complete!|Test run with|Executed [0-9]+ tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
 fi
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"

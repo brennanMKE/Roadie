@@ -77,7 +77,9 @@ if (( ${#expect} && RC != 2 )); then
   missing=()
   for name in $expect; do
     name=${name%%\(*}
-    if ! cat "${step_logs[@]}" 2>/dev/null | strip | grep -E "^✔ Test ${name}\(.*passed|Test Case '.*[ .]${name}\]' passed" >/dev/null; then
+    # XCTest methods carry a `test` prefix: `freshDefaults` also matches `testFreshDefaults` (#0193).
+    xc_name="test${(U)name[1]}${name[2,-1]}"
+    if ! cat "${step_logs[@]}" 2>/dev/null | strip | grep -E "^✔ Test ${name}\(.*passed|Test Case '.*[ .](${name}|${xc_name})\]' passed" >/dev/null; then
       missing+=("$name")
     fi
   done
@@ -90,7 +92,12 @@ if (( ${#expect} && RC != 2 )); then
 fi
 
 if (( RC == 0 )); then
-  total=$(cat "${step_logs[@]}" 2>/dev/null | strip | grep -oE 'Test run with [0-9]+ tests' | awk '{s+=$4; n++} END {if (n) print s " tests in " n " test runs"}')
+  # swift-testing's "Test run with N tests" per package, plus XCTest's (RoadieTests, #0193): XCTest prints
+  # "Executed N tests, with M failures" per suite and again for the bundle and "All tests", so each log counts only its last.
+  total=$( {
+    cat "${step_logs[@]}" 2>/dev/null | strip | grep -oE 'Test run with [0-9]+ tests' | awk '{print $4}'
+    for f in "${step_logs[@]}"; do strip <"$f" 2>/dev/null | grep -oE 'Executed [0-9]+ tests?, with' | tail -1 | awk '{print $2}'; done
+  } | awk '{s+=$1; n++} END {if (n) print s " tests in " n " test runs"}')
   print "==> VERIFY  PASS (exit 0) ${RESULTS:t}: $(grep -c '^==> PASS' "$SUMMARY" 2>/dev/null) steps passed${total:+, $total}"
   grep -E '^==> (TIER|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null
   [[ -n "$expect_report" ]] && print -r -- "$expect_report"
