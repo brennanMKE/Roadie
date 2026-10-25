@@ -49,6 +49,9 @@ struct RoadieApp: App {
             }
             CommandGroup(after: .help) {
                 Button("Welcome to Roadie…") { appDelegate.welcome.show(openMuseum: false) }
+                Button("Playlists and the Queue…") {
+                    NSWorkspace.shared.open(URL(string: "https://roadie.sstools.co/help.html#playlists")!)
+                }
             }
             SkinsCommands(model: appDelegate.model)
             PlaybackCommands(model: appDelegate.model)

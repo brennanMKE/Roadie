@@ -9,6 +9,7 @@ contract is [docs/website-hosting.md](../docs/website-hosting.md); the content p
 | `index.html` | Landing page: hero, download block, screenshot, features, requirements |
 | `changelog.html` | Release notes, one `<article id="vX-Y-Z">` per release, newest first |
 | `privacy.html` | Privacy statement |
+| `help.html` | How playlists, the queue and Jump to File work |
 | `appcast.xml` | Sparkle feed (`SUFeedURL`); empty `<channel>` until 0.0.1 |
 | `site.webmanifest`, `favicon.svg`, `favicon.ico` | Icons; the favicon is an original bolt mark, not Winamp artwork |
 | `css/style.css` | All styling; the one external reference is the Google Fonts import at its top |
