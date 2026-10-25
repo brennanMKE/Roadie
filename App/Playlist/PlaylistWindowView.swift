@@ -140,9 +140,11 @@ struct PlaylistTitleButtons: View {
             // Like Webamp, the sprite shows only while the button is pressed.
             Button { model.togglePlaylistWindowShade() } label: { EmptyView() }
                 .buttonStyle(TitleBarButtonStyle(skin: skin, name: nil, pressedName: "PLAYLIST_COLLAPSE_SELECTED"))
+                .skinControl(AXID.PL.titleShade, label: "Shade")
                 .offset(x: layout.shadeButton.minX, y: layout.shadeButton.minY)
             Button { window?.close() } label: { EmptyView() }
                 .buttonStyle(TitleBarButtonStyle(skin: skin, name: nil, pressedName: "PLAYLIST_CLOSE_SELECTED"))
+                .skinControl(AXID.PL.titleClose, label: "Close")
                 .offset(x: layout.closeButton.minX, y: layout.closeButton.minY)
         }
     }
@@ -178,6 +180,11 @@ struct PlaylistTrackListView: View {
                 .foregroundStyle(Color(row.isCurrent ? style.current : style.normal))
                 .frame(width: area.width, height: PlaylistLayout.rowHeight, alignment: .leading)
                 .background(row.isSelected ? Color(style.selectedBackground) : Color.clear)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(AXID.PL.row(row.index))
+                .accessibilityLabel(row.number + row.name)
+                .accessibilityValue(row.accessibilityValue)
+                .accessibilityAddTraits(row.isSelected ? .isSelected : [])
                 .offset(y: CGFloat(row.position) * PlaylistLayout.rowHeight)
             }
         }
@@ -205,6 +212,7 @@ struct PlaylistScrollBarView: View {
             Color.clear
                 .frame(width: track.width, height: track.height)
                 .contentShape(Rectangle())
+                .skinDisplay(AXID.PL.scrollbar, label: "Scroll bar", value: String(format: "%.2f", playlist.handleValue))
                 .gesture(
                     DragGesture(minimumDistance: 0, coordinateSpace: .local)
                         .onChanged { value in
@@ -242,25 +250,30 @@ struct PlaylistBottomView: View {
                 Image(decorative: image, scale: 1).interpolation(.none)
                     .offset(x: layout.runningTimeOrigin.x, y: layout.runningTimeOrigin.y)
             }
+            AXMarker(
+                id: AXID.PL.runningTime, label: "Running time", value: playlist.runningTimeText.trimmingCharacters(in: .whitespaces),
+                frame: CGRect(origin: layout.runningTimeOrigin, size: CGSize(width: 90, height: 6)))
             PlaylistMiniTimeView(skin: skin)
 
             // Previous, play, pause, stop, next, eject: invisible, the corner bitmap paints them.
             let actions: [() -> Void] = [
                 { model.previous() }, { model.play() }, { model.pause() }, { model.stop() }, { model.next() }, { model.eject() },
             ]
-            ForEach(Array(zip(layout.actionButtons, actions).enumerated()), id: \.offset) { _, pair in
-                invisibleButton(pair.0, action: pair.1)
+            let labels = ["Previous", "Play", "Pause", "Stop", "Next", "Eject"]
+            ForEach(Array(zip(layout.actionButtons, actions).enumerated()), id: \.offset) { index, pair in
+                invisibleButton(pair.0, AXID.PL.Transport.all[index], labels[index], action: pair.1)
             }
-            invisibleButton(layout.scrollUpButton) { playlist.scroll(by: -4) }
-            invisibleButton(layout.scrollDownButton) { playlist.scroll(by: 4) }
+            invisibleButton(layout.scrollUpButton, AXID.PL.scrollUp, "Scroll Up") { playlist.scroll(by: -4) }
+            invisibleButton(layout.scrollDownButton, AXID.PL.scrollDown, "Scroll Down") { playlist.scroll(by: 4) }
         }
     }
 
-    private func invisibleButton(_ rect: CGRect, action: @escaping () -> Void) -> some View {
+    private func invisibleButton(_ rect: CGRect, _ id: String, _ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Color.clear.frame(width: rect.width, height: rect.height).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .skinControl(id, label: label)
         .offset(x: rect.minX, y: rect.minY)
     }
 }
@@ -295,6 +308,8 @@ struct PlaylistMiniTimeView: View {
                 .frame(width: layout.miniTimeHitArea.width, height: layout.miniTimeHitArea.height)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: model.toggleTimeMode)
+                .skinDisplay(AXID.PL.miniTime, label: "Time", value: status.accessibility.time)
+                .accessibilityAddTraits(.isButton)
                 .offset(x: layout.miniTimeHitArea.minX, y: layout.miniTimeHitArea.minY)
         }
     }
@@ -338,9 +353,13 @@ struct PlaylistMenusView: View {
                     let bar = layout.menuBar(menu)
                     SpriteImage(skin: skin, name: bar.sprite).offset(x: bar.rect.minX, y: bar.rect.minY)
                     ForEach(layout.menuEntries(menu), id: \.sprite) { entry in
+                        let ax = AXID.PL.Menu.entries[entry.sprite] ?? (id: "pl.menu.unknown", label: entry.sprite)
                         SpriteImage(skin: skin, name: hovered == entry.sprite ? entry.sprite + "_SELECTED" : entry.sprite)
                             .frame(width: entry.rect.width, height: entry.rect.height, alignment: .topLeading)
                             .contentShape(Rectangle())
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityAddTraits(.isButton)
+                            .skinControl(ax.id, label: ax.label)
                             .onHover { inside in
                                 if inside { hovered = entry.sprite } else if hovered == entry.sprite { hovered = nil }
                             }
@@ -351,6 +370,9 @@ struct PlaylistMenusView: View {
                     Color.clear
                         .frame(width: button.width, height: button.height)
                         .contentShape(Rectangle())
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityAddTraits(.isButton)
+                        .skinControl(menu.accessibilityID, label: menu.accessibilityLabel)
                         .onTapGesture { playlist.openMenu = menu }
                         .offset(x: button.minX, y: button.minY)
                 }
@@ -414,22 +436,28 @@ struct PlaylistShadeView: View {
                 Image(decorative: image, scale: 1).interpolation(.none)
                     .offset(x: PlaylistShadeLayout.titleOrigin.x, y: PlaylistShadeLayout.titleOrigin.y)
             }
+            AXMarker(
+                id: AXID.Shade.PL.title, label: "Current track", value: [playlist.shadeTrackName ?? "", time].joined(separator: " "),
+                frame: CGRect(origin: PlaylistShadeLayout.titleOrigin, size: CGSize(width: 100, height: 6)))
             if let image = skin.textImage(time) {
                 Image(decorative: image, scale: 1).interpolation(.none)
                     .offset(x: PlaylistShadeLayout.timeRightEdge(width: width) - CGFloat(image.width), y: PlaylistShadeLayout.timeY)
             }
-            button(PlaylistShadeLayout.shadeFrame(width: width), pressed: "PLAYLIST_EXPAND_SELECTED") {
+            button(PlaylistShadeLayout.shadeFrame(width: width), AXID.Shade.PL.shade, "Unshade", pressed: "PLAYLIST_EXPAND_SELECTED") {
                 model.togglePlaylistWindowShade()
             }
-            button(PlaylistShadeLayout.closeFrame(width: width), pressed: "PLAYLIST_CLOSE_SELECTED") { window?.close() }
+            button(PlaylistShadeLayout.closeFrame(width: width), AXID.Shade.PL.close, "Close", pressed: "PLAYLIST_CLOSE_SELECTED") {
+                window?.close()
+            }
         }
         .frame(width: width, height: PlaylistShadeLayout.height, alignment: .topLeading)
         .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.appendDroppedLibraryItems(transfers) }
     }
 
-    private func button(_ rect: CGRect, pressed: String, action: @escaping () -> Void) -> some View {
+    private func button(_ rect: CGRect, _ id: String, _ label: String, pressed: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { EmptyView() }
             .buttonStyle(TitleBarButtonStyle(skin: skin, name: nil, pressedName: pressed))
+            .skinControl(id, label: label)
             .offset(x: rect.minX, y: rect.minY)
     }
 }

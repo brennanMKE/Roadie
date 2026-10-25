@@ -14,19 +14,22 @@ struct MainShadeView: View {
             TitleBarView(skin: skin, shaded: true)
 
             RemoteClock(anchor: model.remoteClockAnchor) { now in
-                MiniTimeView(skin: skin, status: model.mainWindowStatus(at: now), toggleTimeMode: model.toggleTimeMode)
+                let status = model.mainWindowStatus(at: now)
+                MiniTimeView(skin: skin, status: status, toggleTimeMode: model.toggleTimeMode)
+                    .skinDisplay(AXID.Shade.Main.time, label: "Time", value: status.accessibility.time)
+                    .accessibilityAddTraits(.isButton)
             }
             .offset(x: MainShadeLayout.miniTimeOrigin.x, y: MainShadeLayout.miniTimeOrigin.y)
 
-            VisualizerView(model: model.visualizer, size: MainShadeLayout.visualizerFrame.size)
+            VisualizerView(model: model.visualizer, size: MainShadeLayout.visualizerFrame.size, axID: AXID.Shade.Main.visualizer)
                 .offset(x: MainShadeLayout.visualizerFrame.minX, y: MainShadeLayout.visualizerFrame.minY)
 
-            transportButton(.previous, action: model.previous)
-            transportButton(.play, action: model.play)
-            transportButton(.pause, action: model.pause)
-            transportButton(.stop, action: model.stop)
-            transportButton(.next, action: model.next)
-            transportButton(.eject, action: model.eject)
+            transportButton(.previous, AXID.Shade.Main.previous, "Previous", action: model.previous)
+            transportButton(.play, AXID.Shade.Main.play, "Play", action: model.play)
+            transportButton(.pause, AXID.Shade.Main.pause, "Pause", action: model.pause)
+            transportButton(.stop, AXID.Shade.Main.stop, "Stop", action: model.stop)
+            transportButton(.next, AXID.Shade.Main.next, "Next", action: model.next)
+            transportButton(.eject, AXID.Shade.Main.eject, "Eject", action: model.eject)
 
             RemoteClock(anchor: model.remoteClockAnchor) { positionSlider(at: $0) }
         }
@@ -42,14 +45,18 @@ struct MainShadeView: View {
             thumbPressedName: MainSliders.shadePositionThumbName(fraction: fraction ?? 0),
             frame: nil, fraction: fraction,
             onChange: { model.scrub(toFraction: $0) }, onCommit: { model.seek(toFraction: $0) })
+            .skinSlider(AXID.Shade.Main.position, label: "Position", value: model.positionAccessibilityValue(at: now))
     }
 
-    private func transportButton(_ control: MainShadeLayout.Transport, action: @escaping () -> Void) -> some View {
+    private func transportButton(
+        _ control: MainShadeLayout.Transport, _ id: String, _ label: String, action: @escaping () -> Void
+    ) -> some View {
         let rect = MainShadeLayout.frame(of: control)
         return Button(action: action) {
             Color.clear.frame(width: rect.width, height: rect.height).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .skinControl(id, label: label)
         .offset(x: rect.minX, y: rect.minY)
     }
 }

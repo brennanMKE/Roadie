@@ -50,7 +50,7 @@ struct SkinBrowserWindowView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .accessibilityIdentifier("skins.source")
+        .accessibilityIdentifier(AXID.Skins.source)
     }
 
     private var libraryBody: some View {
@@ -69,16 +69,16 @@ struct SkinBrowserWindowView: View {
                     ForEach(SkinStatusFilter.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.menu)
-                .accessibilityIdentifier("skins.filter")
+                .accessibilityIdentifier(AXID.Skins.filter)
             }
             ToolbarItem {
                 Button("Random", systemImage: "dice") { browser.random() }
                     .disabled(!browser.canNavigate)
-                    .accessibilityIdentifier("skins.random")
+                    .accessibilityIdentifier(AXID.Skins.random)
             }
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { browser.indexDidChange() }
-                    .accessibilityIdentifier("skins.refresh")
+                    .accessibilityIdentifier(AXID.Skins.refresh)
             }
         }
         .task { browser.appeared() }

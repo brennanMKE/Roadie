@@ -118,6 +118,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     private var hasBeenShown = false
     /// The playlist's track-list and resize-corner input views; nil for the other windows.
     private var playlistOverlays: PlaylistWindowOverlays?
+    /// The `state.probe` element (#0199); added to the main window in UI-test mode only.
+    private lazy var probeView = StateProbeView { [weak model = self.model] in model?.testProbe().json ?? "{}" }
 
     /// `rootView` is drawn in skin pixels scaled by the view itself; the controller adds the model and itself to its
     /// environment.
@@ -141,6 +143,9 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         }
         dragView.delegate = self
         shape.addSubview(dragView)
+        if case .main = kind, UITestMode.isActive {
+            shape.addSubview(probeView)
+        }
         window.contentView = shape
         window.delegate = self
         window.onLeftMouseDown = { [weak self] in
@@ -284,6 +289,8 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
             mask: polygons.flatMap { SkinRegion.maskImage($0, size: skinSize, scale: scale) })
 
         hosting.frame = shape.bounds
+        // Top-left in the unflipped container.
+        probeView.frame = NSRect(x: 0, y: pixelSize.height - 1, width: 1, height: 1)
         if case .playlist(let steps) = kind {
             playlistOverlays?.layout(PlaylistLayout(steps: steps), scale: scale, height: pixelSize.height, shaded: mode == .shade)
         }

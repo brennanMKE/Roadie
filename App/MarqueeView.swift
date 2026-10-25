@@ -26,6 +26,7 @@ struct MarqueeView: View {
         // The 154x12 hit target Webamp gets from `padding: 3px 0`.
         .padding(.vertical, (MainWindowLayout.marqueeHitArea.height - MainWindowLayout.marquee.height) / 2)
         .contentShape(Rectangle())
+        .skinDisplay(AXID.Main.marquee, label: "Song title", value: text)
         .gesture(
             DragGesture(minimumDistance: 0, coordinateSpace: .local)
                 .onChanged { value in

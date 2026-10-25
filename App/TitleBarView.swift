@@ -16,11 +16,11 @@ struct TitleBarView: View {
         let isKey = activeState == .key
         ZStack(alignment: .topLeading) {
             if isKey {
-                button("MAIN_OPTIONS_BUTTON", .options) {
+                button("MAIN_OPTIONS_BUTTON", .options, AXID.Main.Title.menu, "Main Menu") {
                     let rect = MainWindowLayout.rect(.options)
                     window?.popUpMainMenu(atSkinPoint: CGPoint(x: rect.minX, y: rect.maxY))
                 }
-                button("MAIN_MINIMIZE_BUTTON", .minimize) { window?.minimize() }
+                button("MAIN_MINIMIZE_BUTTON", .minimize, AXID.Main.Title.minimize, "Minimize") { window?.minimize() }
             }
             if shaded {
                 shadeButton(name: isKey ? "MAIN_SHADE_BUTTON_SELECTED" : nil)
@@ -28,16 +28,19 @@ struct TitleBarView: View {
                 shadeButton(name: "MAIN_SHADE_BUTTON")
             }
             if isKey {
-                button("MAIN_CLOSE_BUTTON", .close) { window?.close() }
+                button("MAIN_CLOSE_BUTTON", .close, AXID.Main.Title.close, "Close") { window?.close() }
             }
         }
         .frame(width: MainWindowLayout.titleBar.width, height: MainWindowLayout.titleBar.height, alignment: .topLeading)
     }
 
-    private func button(_ name: String, _ which: MainWindowLayout.TitleButton, action: @escaping () -> Void) -> some View {
+    private func button(
+        _ name: String, _ which: MainWindowLayout.TitleButton, _ id: String, _ label: String, action: @escaping () -> Void
+    ) -> some View {
         let rect = MainWindowLayout.rect(which)
         return Button(action: action) { EmptyView() }
             .buttonStyle(TitleBarButtonStyle(skin: skin, name: name))
+            .skinControl(id, label: label)
             .offset(x: rect.minX, y: rect.minY)
     }
 
@@ -48,6 +51,7 @@ struct TitleBarView: View {
                 TitleBarButtonStyle(
                     skin: skin, name: name, pressedName: shaded ? "MAIN_SHADE_BUTTON_SELECTED_DEPRESSED" : nil,
                     showsBeforeClick: shaded))
+            .skinControl(AXID.Main.Title.shade, label: shaded ? "Unshade" : "Shade")
             .offset(x: rect.minX, y: rect.minY)
     }
 }

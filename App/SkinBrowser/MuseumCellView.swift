@@ -68,8 +68,8 @@ struct MuseumCellView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(skin.displayName)
-        .accessibilityValue(museum.isDownloaded(skin) ? "Downloaded" : "")
-        .accessibilityIdentifier("skins.museum.cell.\(skin.md5)")
+        .accessibilityValue(museum.isDownloaded(skin) ? "downloaded" : "available")
+        .accessibilityIdentifier("\(AXID.Skins.museumCell).\(skin.md5)")
     }
 
     private func actionButton(_ museum: MuseumBrowserModel) -> some View {

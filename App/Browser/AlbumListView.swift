@@ -48,6 +48,7 @@ struct AlbumListView: View {
             AlbumRow(album: album, showsArtist: showsArtist)
                 .libraryContainerActions(album.id, favorite: album.isFavorite, model: player)
                 .libraryDraggable([album.id])
+                .accessibilityIdentifier(AXID.Library.row("album", album.id.rawValue))
         }
         .accessibilityIdentifier(showsArtist ? "library.albums" : "library.artistAlbums")
     }

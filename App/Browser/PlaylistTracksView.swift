@@ -37,6 +37,7 @@ struct PlaylistTracksView: View {
                 ForEach(tracks) { track in
                     TrackRow(track: track)
                         .libraryDraggable([track.id])
+                        .accessibilityIdentifier(AXID.Library.row("track", track.id.rawValue))
                 }
                 .onMove(perform: editor.canReorder ? { source, destination in
                     editor.move(from: source, to: destination)

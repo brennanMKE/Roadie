@@ -54,6 +54,9 @@ final class PlaylistListInputView: NSView {
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+    /// Not an accessibility element, so the SwiftUI rows under it are the ones XCUITest finds; a click on a row's centre
+    /// still lands here (#0199).
+    override func isAccessibilityElement() -> Bool { false }
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -279,6 +282,10 @@ final class PlaylistResizeView: NSView {
     init(model: PlayerModel) {
         self.model = model
         super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.handle)
+        setAccessibilityLabel("Resize")
+        setAccessibilityIdentifier(AXID.PL.resize)
     }
 
     required init?(coder: NSCoder) { nil }

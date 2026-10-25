@@ -43,36 +43,41 @@ struct EqualizerWindowView: View {
             SpriteImage(skin: skin, name: "EQ_WINDOW_BACKGROUND")
             EQTitleBarView(skin: skin)
 
-            toggleButton(EQLayout.onButton, base: "EQ_ON_BUTTON", selected: eq.isEnabled, action: model.toggleEQEnabled)
+            toggleButton(EQLayout.onButton, base: "EQ_ON_BUTTON", AXID.EQ.on, "Equalizer On", selected: eq.isEnabled, action: model.toggleEQEnabled)
             // Webamp does not support AUTO (toggleEqAuto always dispatches false): it depresses while held, never selects.
-            toggleButton(EQLayout.autoButton, base: "EQ_AUTO_BUTTON", selected: false) {}
+            toggleButton(EQLayout.autoButton, base: "EQ_AUTO_BUTTON", AXID.EQ.auto, "Auto", selected: false) {}
             EQPresetsMenu(skin: skin)
                 .offset(x: EQLayout.presetsButton.minX, y: EQLayout.presetsButton.minY)
 
             EQGraphView(skin: skin, eq: eq)
+                .skinDisplay(AXID.EQ.graph, label: "Response curve", value: eq.gains.map(EQLayout.accessibilityValue).joined(separator: " "))
                 .offset(x: EQLayout.graph.minX, y: EQLayout.graph.minY)
 
             EQPreampView(skin: skin, gain: eq.preamp)
-            levelLabel(EQLayout.plus12, value: 100)
-            levelLabel(EQLayout.zero, value: EQLayout.midValue)
-            levelLabel(EQLayout.minus12, value: 0)
+            levelLabel(EQLayout.plus12, value: 100, AXID.EQ.levelPlus, "Set all bands to +12 dB")
+            levelLabel(EQLayout.zero, value: EQLayout.midValue, AXID.EQ.levelZero, "Set all bands to 0 dB")
+            levelLabel(EQLayout.minus12, value: 0, AXID.EQ.levelMinus, "Set all bands to -12 dB")
             EQBandStripView(skin: skin, gains: eq.gains)
         }
         .frame(width: EQLayout.windowSize.width, height: EQLayout.windowSize.height, alignment: .topLeading)
     }
 
-    private func toggleButton(_ rect: CGRect, base: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func toggleButton(
+        _ rect: CGRect, base: String, _ id: String, _ label: String, selected: Bool, action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) { EmptyView() }
             .buttonStyle(EQToggleButtonStyle(skin: skin, base: base, selected: selected, size: rect.size))
+            .skinControl(id, label: label, selected: selected)
             .offset(x: rect.minX, y: rect.minY)
     }
 
     /// The invisible +12 / 0 / -12 dB click targets set every band at once.
-    private func levelLabel(_ rect: CGRect, value: Double) -> some View {
+    private func levelLabel(_ rect: CGRect, value: Double, _ id: String, _ label: String) -> some View {
         Button { model.setAllEQBands(value: value) } label: {
             Color.clear.frame(width: rect.width, height: rect.height).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .skinControl(id, label: label)
         .offset(x: rect.minX, y: rect.minY)
     }
 }
@@ -94,11 +99,11 @@ struct EQTitleBarView: View {
             SpriteImage(skin: skin, name: strip(isKey: isKey))
             if isKey {
                 button(
-                    EQLayout.shadeButton, name: nil,
+                    EQLayout.shadeButton, AXID.EQ.titleShade, shaded ? "Unshade" : "Shade", name: nil,
                     pressedName: shaded ? "EQ_MINIMIZE_BUTTON_ACTIVE" : "EQ_MAXIMIZE_BUTTON_ACTIVE"
                 ) { model.toggleEQWindowShade() }
                 button(
-                    EQLayout.closeButton, name: shaded ? "EQ_SHADE_CLOSE_BUTTON" : "EQ_CLOSE_BUTTON",
+                    EQLayout.closeButton, AXID.EQ.titleClose, "Close", name: shaded ? "EQ_SHADE_CLOSE_BUTTON" : "EQ_CLOSE_BUTTON",
                     pressedName: shaded ? "EQ_SHADE_CLOSE_BUTTON_ACTIVE" : "EQ_CLOSE_BUTTON_ACTIVE"
                 ) { window?.close() }
             }
@@ -112,9 +117,12 @@ struct EQTitleBarView: View {
         return isKey ? "EQ_TITLE_BAR_SELECTED" : "EQ_TITLE_BAR"
     }
 
-    private func button(_ rect: CGRect, name: String?, pressedName: String, action: @escaping () -> Void) -> some View {
+    private func button(
+        _ rect: CGRect, _ id: String, _ label: String, name: String?, pressedName: String, action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) { EmptyView() }
             .buttonStyle(TitleBarButtonStyle(skin: skin, name: name, pressedName: pressedName, group: $clicked))
+            .skinControl(id, label: label)
             .offset(x: rect.minX, y: rect.minY)
     }
 }
@@ -131,14 +139,16 @@ struct EQShadeView: View {
             slider(
                 MainSliders.eqShadeVolume, prefix: "EQ_SHADE_VOLUME_SLIDER", fraction: Double(model.volume),
                 onChange: { model.setVolume(Float($0)) })
+            .skinSlider(AXID.Shade.EQ.volume, label: "Volume", value: "\(Int((model.volume * 100).rounded()))")
             slider(
                 MainSliders.eqShadeBalance, prefix: "EQ_SHADE_BALANCE_SLIDER", fraction: MainSliders.fraction(forBalance: model.balance),
                 onChange: { model.setBalance(MainSliders.balance(forFraction: $0)) })
+            .skinSlider(AXID.Shade.EQ.balance, label: "Balance", value: "\(Int((model.balance * 100).rounded()))")
         }
         .frame(width: EQLayout.shadeSize.width, height: EQLayout.shadeSize.height, alignment: .topLeading)
     }
 
-    private func slider(_ slider: MainSliders.Slider, prefix: String, fraction: Double, onChange: @escaping (Double) -> Void) -> some View {
+    private func slider(_ slider: MainSliders.Slider, prefix: String, fraction: Double, onChange: @escaping (Double) -> Void) -> SkinSlider {
         let name: String =
             switch MainSliders.shadeSegment(fraction: fraction) {
             case .left: prefix + "_LEFT"

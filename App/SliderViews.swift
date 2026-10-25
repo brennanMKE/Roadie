@@ -19,9 +19,43 @@ struct SkinSlider: View {
     /// Called once on release with the final fraction.
     let onCommit: (Double) -> Void
 
+    /// Identifier, label and value for accessibility (#0199); set with `skinSlider(_:label:value:)`.
+    var accessibility: (id: String, label: String, value: String)?
+
     @GestureState private var isPressed = false
 
+    /// This slider exposed as one adjustable accessibility element. `adjust` moves it 2 % and commits.
+    func skinSlider(_ id: String, label: String, value: String) -> SkinSlider {
+        var copy = self
+        copy.accessibility = (id, label, value)
+        return copy
+    }
+
     var body: some View {
+        if let accessibility {
+            content
+                .accessibilityElement()
+                .accessibilityIdentifier(accessibility.id)
+                .accessibilityLabel(accessibility.label)
+                .accessibilityValue(accessibility.value)
+                .accessibilityAdjustableAction { direction in
+                    guard let fraction else { return }
+                    let step: Double =
+                        switch direction {
+                        case .increment: 0.02
+                        case .decrement: -0.02
+                        @unknown default: 0
+                        }
+                    let target = min(max(fraction + step, 0), 1)
+                    onChange(target)
+                    onCommit(target)
+                }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         ZStack(alignment: .topLeading) {
             background
             if let fraction {

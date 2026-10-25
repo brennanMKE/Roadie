@@ -32,7 +32,23 @@ struct MainWindowStatusLayer: View {
                 }
             }
             mediaInfo
+            accessibilityMarkers
         }
+    }
+
+    /// The displays as accessibility elements, there whether or not their sprites draw (#0199).
+    @ViewBuilder private var accessibilityMarkers: some View {
+        let ax = status.accessibility
+        AXMarker(id: AXID.Main.state, label: "Play state", value: ax.state, frame: CGRect(
+            origin: MainWindowLayout.playIndicator, size: CGSize(width: 9, height: 9)))
+        AXMarker(id: AXID.Main.time, label: "Time", value: ax.time, frame: MainWindowLayout.timeHitArea)
+        AXMarker(id: AXID.Main.kbps, label: "kbps", value: ax.kbps, frame: CGRect(
+            origin: MainWindowLayout.kbps, size: CGSize(width: 15, height: 6)))
+        AXMarker(id: AXID.Main.khz, label: "kHz", value: ax.khz, frame: CGRect(
+            origin: MainWindowLayout.khz, size: CGSize(width: 10, height: 6)))
+        AXMarker(id: AXID.Main.stereo, label: "Channels", value: ax.stereo, frame: CGRect(
+            x: MainWindowLayout.mono.x, y: MainWindowLayout.mono.y,
+            width: max(MainWindowLayout.stereo.x + 29 - MainWindowLayout.mono.x, 1), height: 12))
     }
 
     private var time: some View {

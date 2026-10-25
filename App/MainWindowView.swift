@@ -27,23 +27,23 @@ struct MainWindowView: View {
                 MainWindowStatusLayer(skin: skin, status: model.mainWindowStatus(at: now), toggleTimeMode: model.toggleTimeMode)
             }
 
-            transportButton(.previous, action: model.previous)
-            transportButton(.play, action: model.play)
-            transportButton(.pause, action: model.pause)
-            transportButton(.stop, action: model.stop)
-            transportButton(.next, action: model.next)
-            transportButton(.eject, action: model.eject)
+            transportButton(.previous, AXID.Main.previous, "Previous", action: model.previous)
+            transportButton(.play, AXID.Main.play, "Play", action: model.play)
+            transportButton(.pause, AXID.Main.pause, "Pause", action: model.pause)
+            transportButton(.stop, AXID.Main.stop, "Stop", action: model.stop)
+            transportButton(.next, AXID.Main.next, "Next", action: model.next)
+            transportButton(.eject, AXID.Main.eject, "Eject", action: model.eject)
 
             volumeSlider
             balanceSlider
             RemoteClock(anchor: model.remoteClockAnchor) { positionSlider(at: $0) }
 
-            toggleButton(.shuffle, selected: model.isShuffled, action: model.toggleShuffle)
-            toggleButton(.repeatAll, selected: model.isRepeating, action: model.toggleRepeat)
-            toggleButton(.equalizer, selected: model.isEQWindowOpen, action: model.toggleEQWindow)
-            toggleButton(.playlist, selected: model.isPlaylistWindowOpen, action: model.togglePlaylistWindow)
+            toggleButton(.shuffle, AXID.Main.shuffle, "Shuffle", selected: model.isShuffled, action: model.toggleShuffle)
+            toggleButton(.repeatAll, AXID.Main.repeatAll, "Repeat", selected: model.isRepeating, action: model.toggleRepeat)
+            toggleButton(.equalizer, AXID.Main.eq, "Equalizer", selected: model.isEQWindowOpen, action: model.toggleEQWindow)
+            toggleButton(.playlist, AXID.Main.playlist, "Playlist", selected: model.isPlaylistWindowOpen, action: model.togglePlaylistWindow)
 
-            VisualizerView(model: model.visualizer)
+            VisualizerView(model: model.visualizer, axID: AXID.Main.visualizer)
                 .offset(x: MainWindowLayout.visualizer.minX, y: MainWindowLayout.visualizer.minY)
 
             MarqueeView(skin: skin, text: model.marqueeText)
@@ -68,6 +68,7 @@ struct MainWindowView: View {
             thumbName: "MAIN_VOLUME_THUMB", thumbPressedName: "MAIN_VOLUME_THUMB_SELECTED",
             frame: MainSliders.volumeFrame(model.volume), fraction: Double(model.volume),
             onChange: { model.setVolume(Float($0)) }, onCommit: { _ in model.endSliderDrag() })
+            .skinSlider(AXID.Main.volume, label: "Volume", value: "\(Int((model.volume * 100).rounded()))")
     }
 
     private var balanceSlider: some View {
@@ -76,6 +77,7 @@ struct MainWindowView: View {
             thumbName: "MAIN_BALANCE_THUMB", thumbPressedName: "MAIN_BALANCE_THUMB_ACTIVE",
             frame: MainSliders.balanceFrame(model.balance), fraction: MainSliders.fraction(forBalance: model.balance),
             onChange: { model.setBalance(MainSliders.balance(forFraction: $0)) }, onCommit: { _ in model.endSliderDrag() })
+            .skinSlider(AXID.Main.balance, label: "Balance", value: "\(Int((model.balance * 100).rounded()))")
     }
 
     private func positionSlider(at now: Date) -> some View {
@@ -85,19 +87,26 @@ struct MainWindowView: View {
             thumbName: "MAIN_POSITION_SLIDER_THUMB", thumbPressedName: "MAIN_POSITION_SLIDER_THUMB_SELECTED",
             frame: nil, fraction: scrub ?? model.positionFraction(at: now),
             onChange: { model.scrub(toFraction: $0) }, onCommit: { model.seek(toFraction: $0) })
+            .skinSlider(AXID.Main.position, label: "Position", value: model.positionAccessibilityValue(at: now))
     }
 
-    private func toggleButton(_ toggle: MainSliders.Toggle, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func toggleButton(
+        _ toggle: MainSliders.Toggle, _ id: String, _ label: String, selected: Bool, action: @escaping () -> Void
+    ) -> some View {
         let frame = MainSliders.frame(of: toggle)
         return Button(action: action) { EmptyView() }
             .buttonStyle(ToggleSpriteButtonStyle(skin: skin, toggle: toggle, selected: selected))
+            .skinControl(id, label: label, selected: selected)
             .offset(x: frame.origin.x, y: frame.origin.y)
     }
 
-    private func transportButton(_ control: MainWindowLayout.Transport, action: @escaping () -> Void) -> some View {
+    private func transportButton(
+        _ control: MainWindowLayout.Transport, _ id: String, _ label: String, action: @escaping () -> Void
+    ) -> some View {
         let rect = MainWindowLayout.rect(control)
         return Button(action: action) { EmptyView() }
             .buttonStyle(SpriteButtonStyle(skin: skin, control: control))
+            .skinControl(id, label: label)
             .offset(x: rect.minX, y: rect.minY)
     }
 }

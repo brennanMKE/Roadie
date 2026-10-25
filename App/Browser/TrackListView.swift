@@ -92,6 +92,7 @@ struct TrackListView: View {
                             List(tracks, selection: $selection) { track in
                                 TrackRow(track: track, albumArtist: albumArtist)
                                     .libraryDraggable([track.id])
+                                    .accessibilityIdentifier(AXID.Library.row("track", track.id.rawValue))
                             }
                             .libraryTrackActions(rows: tracks, album: library.selectedAlbum?.id, model: player)
                         }

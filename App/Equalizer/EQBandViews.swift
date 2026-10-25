@@ -33,8 +33,12 @@ struct EQBandStripView: View {
         ZStack(alignment: .topLeading) {
             ForEach(0..<EQLayout.bandCount, id: \.self) { i in
                 let origin = EQLayout.bandOrigin(i)
-                EQBandView(
-                    skin: skin, value: EQLayout.value(forGain: gains[i]), isHeld: model.sliderFocus == .equalizer(band: i))
+                let value = EQLayout.value(forGain: gains[i])
+                EQBandView(skin: skin, value: value, isHeld: model.sliderFocus == .equalizer(band: i))
+                    .eqSlider(AXID.EQ.band(i), label: "Band \(i + 1)", gain: gains[i], value: value) {
+                        model.setEQBand(i, value: $0)
+                        model.endEQDrag()
+                    }
                     .offset(x: origin.x - EQLayout.bandStrip.minX, y: 0)
             }
             Color.clear
@@ -59,8 +63,13 @@ struct EQPreampView: View {
     let gain: Float
 
     var body: some View {
-        EQBandView(skin: skin, value: EQLayout.value(forGain: gain), isHeld: model.sliderFocus == .equalizer(band: nil))
+        let value = EQLayout.value(forGain: gain)
+        EQBandView(skin: skin, value: value, isHeld: model.sliderFocus == .equalizer(band: nil))
             .contentShape(Rectangle())
+            .eqSlider(AXID.EQ.preamp, label: "Preamp", gain: gain, value: value) {
+                model.setEQPreamp(value: $0)
+                model.endEQDrag()
+            }
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { drag in model.setEQPreamp(value: EQLayout.value(forPointerY: drag.location.y)) }
@@ -81,5 +90,27 @@ struct EQGraphView: View {
         } else {
             Color.clear.frame(width: EQGraph.size.width, height: EQGraph.size.height)
         }
+    }
+}
+
+extension EQLayout {
+    /// A gain in dB with one decimal, as the accessibility value of a band, the preamp and the graph (#0199).
+    static func accessibilityValue(_ gain: Float) -> String { String(format: "%.1f", Double(gain)) }
+}
+
+extension View {
+    /// An EQ slider as one adjustable accessibility element; `set` takes Webamp's 0...100 value (`adjust` moves 2).
+    func eqSlider(_ id: String, label: String, gain: Float, value: Double, set: @escaping (Double) -> Void) -> some View {
+        accessibilityElement(children: .ignore)
+            .accessibilityIdentifier(id)
+            .accessibilityLabel(label)
+            .accessibilityValue(EQLayout.accessibilityValue(gain))
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: set(min(value + 2, 100))
+                case .decrement: set(max(value - 2, 0))
+                @unknown default: break
+                }
+            }
     }
 }

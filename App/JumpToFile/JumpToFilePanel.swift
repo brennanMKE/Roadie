@@ -199,6 +199,13 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
 
     func numberOfRows(in tableView: NSTableView) -> Int { results.count }
 
+    /// Each row carries `jump.row.N` (N: the table row) for XCUITest (#0199).
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        let rowView = NSTableRowView()
+        rowView.setAccessibilityIdentifier(AXID.Jump.row(row))
+        return rowView
+    }
+
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let id = tableColumn?.identifier, results.indices.contains(row) else { return nil }
         let index = results[row]
@@ -336,6 +343,10 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         emptyLabel.maximumNumberOfLines = 2
         emptyLabel.lineBreakMode = .byWordWrapping
         emptyLabel.isHidden = true
+        searchField.setAccessibilityIdentifier(AXID.Jump.search)
+        table.setAccessibilityIdentifier(AXID.Jump.table)
+        emptyLabel.setAccessibilityIdentifier(AXID.Jump.empty)
+        queueButton.setAccessibilityIdentifier(AXID.Jump.queue)
 
         let play = NSButton(title: "Play", target: self, action: #selector(playSelected))
         let queue = queueButton

@@ -7,6 +7,7 @@ import SwiftUI
 struct VisualizerView: View {
     let model: VisualizerModel
     var size = MainWindowLayout.visualizer.size
+    var axID = AXID.Main.visualizer
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -18,5 +19,7 @@ struct VisualizerView: View {
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .contentShape(Rectangle())   // clickable even when nothing is drawn (Winamp cycles while stopped)
         .onTapGesture { model.cycleMode() }
+        .skinDisplay(axID, label: "Visualizer", value: model.mode.accessibilityValue)
+        .accessibilityAddTraits(.isButton)
     }
 }

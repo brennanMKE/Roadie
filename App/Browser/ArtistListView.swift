@@ -25,6 +25,7 @@ struct ArtistListView: View {
             // same songs once per provider. No double-click: a click opens the artist, and an extra gesture could block the drag.
             .libraryContainerMenu(artist.id, favorite: artist.isFavorite, model: player, addsToPlaylists: false)
             .libraryDraggable([artist.id])
+            .accessibilityIdentifier(AXID.Library.row("artist", artist.id.rawValue))
         }
         .accessibilityIdentifier("library.artists")
     }
@@ -92,6 +93,7 @@ struct PlaylistListView: View {
                     }
                 }
                 .padding(.leading, 8)
+                .accessibilityIdentifier(AXID.Library.row("playlist", playlist.id.rawValue))
                 // Play works on read-only and dynamic playlists too: playing doesn't edit them (#0189). No Add to
                 // Playlist: a playlist can't be added into a playlist.
                 .libraryContainerMenu(playlist.id, favorite: playlist.isFavorite, model: player, addsToPlaylists: false) {

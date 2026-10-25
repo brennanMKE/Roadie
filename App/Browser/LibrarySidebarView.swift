@@ -28,6 +28,7 @@ struct LibrarySidebarView: View {
         List(selection: selection) {
             ForEach(library.sections, id: \.self) { section in
                 row(for: section).tag(Item.section(section))
+                    .accessibilityIdentifier(AXID.Library.sidebar(section.rawValue))
             }
             if let discover = library.discover {
                 DiscoverSidebarSection(discover: discover) { row in

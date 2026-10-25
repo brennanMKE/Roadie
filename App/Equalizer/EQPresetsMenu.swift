@@ -25,5 +25,6 @@ struct EQPresetsMenu: View {
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .frame(width: EQLayout.presetsButton.width, height: EQLayout.presetsButton.height)
+        .skinControl(AXID.EQ.presets, label: "Presets")
     }
 }

@@ -33,6 +33,7 @@ struct LibraryWindowView: View {
         .toolbar {
             ToolbarItem {
                 OutputPickerView()
+                    .accessibilityIdentifier(AXID.Library.output)
             }
             if library.playlistsModel.canEdit {
                 ToolbarItem {

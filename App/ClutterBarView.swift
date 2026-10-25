@@ -12,11 +12,11 @@ struct ClutterBarView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            button(.mainMenu) { window?.popUpMainMenu(atSkinPoint: Self.below(.mainMenu)) }
-            button(.alwaysOnTop, selected: model.isAlwaysOnTop, action: model.toggleAlwaysOnTop)
-            button(.fileInfo, action: model.showFileInfo)
-            button(.doubleSize, selected: model.isDoubleSize, action: model.toggleDoubleSize)
-            button(.visualizer) { window?.popUp(visualizerMenu(), atSkinPoint: Self.below(.visualizer)) }
+            button(.mainMenu, AXID.Main.Clutter.o, "Options") { window?.popUpMainMenu(atSkinPoint: Self.below(.mainMenu)) }
+            button(.alwaysOnTop, AXID.Main.Clutter.a, "Always on Top", selected: model.isAlwaysOnTop, action: model.toggleAlwaysOnTop)
+            button(.fileInfo, AXID.Main.Clutter.i, "File Info", action: model.showFileInfo)
+            button(.doubleSize, AXID.Main.Clutter.d, "Double Size", selected: model.isDoubleSize, action: model.toggleDoubleSize)
+            button(.visualizer, AXID.Main.Clutter.v, "Visualizer Menu") { window?.popUp(visualizerMenu(), atSkinPoint: Self.below(.visualizer)) }
         }
     }
 
@@ -39,11 +39,13 @@ struct ClutterBarView: View {
     }
 
     private func button(
-        _ button: MainWindowLayout.ClutterButton, selected: Bool = false, action: @escaping () -> Void
+        _ button: MainWindowLayout.ClutterButton, _ id: String, _ label: String, selected: Bool = false,
+        action: @escaping () -> Void
     ) -> some View {
         let origin = MainWindowLayout.rect(button).origin
         return Button(action: action) { EmptyView() }
             .buttonStyle(ClutterButtonStyle(skin: skin, button: button, selected: selected))
+            .skinControl(id, label: label, selected: selected)
             .offset(x: origin.x, y: origin.y)
     }
 }
