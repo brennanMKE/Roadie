@@ -117,6 +117,17 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   window right of them when it becomes key. A window that isn't key can still cover the column (the Library covered
   `main.stop` in #0200). Launch arguments: [testing-in-vm.md](testing-in-vm.md#ui-tests).
 - **Fixture tracks are 2.5 s and auto-advance**, so don't assume the current row: read it from the state probe.
+- **The test runner is sandboxed.** XCUITest's runner has `app-sandbox` with a read-only exception for `/`, so it
+  can't write outside its container: not `ROADIE_TEST_DATA`, not a copy of `TestSkins`, not `defaults delete`
+  (#0202, #0208). File setup belongs in the app under test mode (a Debug launch argument such as
+  `-RoadieVanishingFile`), and on-disk state is read back through the state probe, not `FileManager`.
+- **Sliders:** `adjust(toNormalizedSliderPosition:)` fails on the skinned sliders ("Unable to get expected orientation
+  attribute"), because their `accessibilityRepresentation` slider exposes no orientation. Drive them by a pointer
+  press at the thumb position for the target fraction, and allow a step or two of tolerance.
+- **Toggle and check-mark state:** XCUITest doesn't read `isSelected` from skinned toggle buttons or from menu check
+  marks. Read the model state from the probe (`shuffle`, `repeatAll`, `timeMode`, `alwaysOnTop`, `doubleSize`);
+  the toggles also carry an `on`/`off` value.
+- **The About panel isn't in `app.windows`**; find it as a dialog by its text.
 
 ## Gotchas carried over from the cameron setup
 
