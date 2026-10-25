@@ -16,9 +16,12 @@ struct ScriptedMusicAssistantTests {
     }
 
     /// A backend over the scripted server's transports, both on one `ManualClock`.
-    private func scripted(_ scenario: ScriptedMusicAssistant.Scenario, connect: Bool = true) async throws -> Rig {
+    private func scripted(
+        _ scenario: ScriptedMusicAssistant.Scenario, connect: Bool = true,
+        eventOrder: ScriptedMusicAssistant.EventOrder = .afterReply
+    ) async throws -> Rig {
         let clock = ManualClock()
-        let server = try ScriptedMusicAssistant(scenario: scenario, clock: clock)
+        let server = try ScriptedMusicAssistant(scenario: scenario, clock: clock, eventOrder: eventOrder)
         let factory = ScriptedTransportFactory(server: server)
         let backend = MusicAssistantBackend(
             address: { testAddress }, token: { _ in testToken }, transports: factory, http: factory.http, clock: clock)
@@ -49,8 +52,12 @@ struct ScriptedMusicAssistantTests {
         await rig.backend.disconnect()
     }
 
-    @Test func playIndexMovesTheCurrentRowAndPushesAnEvent() async throws {
-        let rig = try await scripted(.queueLoaded)
+    /// Under both reply/event orders (the real one is unverified): the server's own `queue_updated` reaches the client.
+    @Test(arguments: ScriptedMusicAssistant.EventOrder.allCases)
+    func playIndexMovesTheCurrentRowAndPushesAnEvent(order: ScriptedMusicAssistant.EventOrder) async throws {
+        let rig = try await scripted(.queueLoaded, eventOrder: order)
+        let client = try #require(await rig.backend.client)
+        let events = Collector(await client.events())
         try await rig.backend.edit(.play(index: 3), on: speaker)
         #expect(rig.server.queue(for: queueID)?.currentIndex == 3)
         #expect(rig.server.queue(for: queueID)?.state == "playing")
@@ -61,12 +68,38 @@ struct ScriptedMusicAssistantTests {
         #expect(sent.command == "player_queues/play_index")
         #expect(sent.args["index"]?.intValue == 3)
         #expect(rig.server.recentCommandSummaries().contains("play_index index=3"))
-        // The client got the event too.
-        let client = try #require(await rig.backend.client)
-        let events = Collector(await client.events())
-        rig.server.push(MAServerEvent(event: "queue_updated", objectID: queueID, data: ["current_index": 3]))
-        #expect(await waitFor { events.items.contains { $0.event == "queue_updated" } })
+        // The client got the server's own event, not a hand-built one.
+        #expect(await waitFor {
+            events.items.contains {
+                $0.event == "queue_updated" && $0.objectID == queueID && $0.data["current_index"]?.intValue == 3
+            }
+        })
         events.stop()
+        await rig.backend.disconnect()
+    }
+
+    /// The SYNTHETIC out-of-range error is a plain server error, not the buffered-track refusal.
+    @Test func playIndexOutOfRangeIsAServerErrorNotTheBufferedRefusal() async throws {
+        let rig = try await scripted(.queueLoaded)
+        let client = try #require(await rig.backend.client)
+        do {
+            _ = try await client.call(.queuePlayIndex(queueID: queueID, index: 99))
+            Issue.record("expected a server error")
+        } catch MusicAssistantError.server(let code, let details) {
+            #expect(code == 999)
+            #expect(!MusicAssistantBackend.isBufferedRefusal(details))
+        }
+        do {
+            try await rig.backend.edit(.play(index: 99), on: speaker)
+            Issue.record("expected an error")
+        } catch {
+            #expect(!(error is QueueEditError), "\(error)")
+            guard case MusicBackendError.backend = error else {
+                Issue.record("wrong error \(error)")
+                return
+            }
+        }
+        #expect(rig.server.queue(for: queueID)?.currentIndex == 2)
         await rig.backend.disconnect()
     }
 

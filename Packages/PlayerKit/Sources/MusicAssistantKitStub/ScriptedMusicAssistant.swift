@@ -10,7 +10,14 @@ import os
 /// Its replies are recorded shapes with state applied, never new shapes: a queue is `player-queue-get.json`'s
 /// object, a row is a recorded `player-queue-items-loaded.json` row (the synthetic shape of `BackendQueueTests` when
 /// that is not recorded), a player is its `players-all.json` entry. `index` is always 0 on a row, as the real server
-/// sends it (#0187). `current_media` while playing follows `SyntheticPlayback` (unrecorded).
+/// sends it (#0187). Exceptions, none of them recorded:
+/// - event payloads (`data` = the whole player or queue object) are unrecorded (`events-queue.json` caught none);
+/// - `current_media` while playing is SYNTHETIC (follows `SyntheticPlayback`);
+/// - the speaker is marked available in `queueLoaded` / `playingOnSpeaker`;
+/// - an out-of-range `play_index` / `delete_item` answers a SYNTHETIC error, code 999 assumed (MA's code for an
+///   unhandled exception), with details that don't read as the buffered-track refusal;
+/// - the order of a command's reply and its events is unverified, so it is a setting (`eventOrder`);
+/// - every queue keeps `player-queue-get.json`'s `display_name` ("user").
 public final class ScriptedMusicAssistant: @unchecked Sendable {
     public enum Scenario: String, CaseIterable, Sendable {
         /// The recording as it is: nothing playing, every queue empty.
@@ -25,6 +32,13 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         case unreachable
         /// `auth` always answers the recorded `error-auth`.
         case badToken
+    }
+
+    /// Whether a command's events go out after or before its reply. SYNTHETIC: the real order is unverified
+    /// (`events-queue.json` recorded no events); MA signals events while the command runs, so they may well win.
+    public enum EventOrder: String, CaseIterable, Sendable {
+        case afterReply
+        case beforeReply
     }
 
     /// The speaker the playing scenarios use (the recorded `players/get` player).
@@ -80,6 +94,7 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         var received: [SentRequest] = []
         var events: [MAServerEvent] = []
         var transports: [StubWebSocketTransport] = []
+        var eventOrder: EventOrder = .afterReply
     }
 
     private enum Reply: Sendable {
@@ -100,7 +115,8 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
     }
 
     /// `clock` advances elapsed time while a queue plays (a manual clock in tests).
-    public init<C: Clock>(scenario: Scenario, clock: C) throws where C.Duration == Duration {
+    public init<C: Clock>(scenario: Scenario, clock: C, eventOrder: EventOrder = .afterReply) throws
+    where C.Duration == Duration {
         let start = clock.now
         uptime = { start.duration(to: clock.now) }
         let library = try Self.loadLibrary()
@@ -108,13 +124,17 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         // Auth is answered by `handle`; the token here only fills `recorded`'s own auth route.
         base = try FixtureScript.recorded(token: MusicAssistantToken("scripted"))
         var initial = State(scenario: scenario)
+        initial.eventOrder = eventOrder
         Self.build(&initial, scenario: scenario, library: library)
         state = OSAllocatedUnfairLock(initialState: initial)
     }
 
     /// A transport factory whose every transport talks to one new server: reconnects keep its state.
-    public static func transportFactory(scenario: Scenario) throws -> ScriptedTransportFactory {
-        ScriptedTransportFactory(server: try ScriptedMusicAssistant(scenario: scenario))
+    public static func transportFactory(
+        scenario: Scenario, eventOrder: EventOrder = .afterReply
+    ) throws -> ScriptedTransportFactory {
+        ScriptedTransportFactory(
+            server: try ScriptedMusicAssistant(scenario: scenario, clock: ContinuousClock(), eventOrder: eventOrder))
     }
 
     // MARK: Introspection
@@ -125,6 +145,11 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
     /// Every event pushed, in order.
     public var pushedEvents: [MAServerEvent] { state.withLock { $0.events } }
     public var transports: [StubWebSocketTransport] { state.withLock { $0.transports } }
+    /// The order of a command's reply and its events (SYNTHETIC, see `EventOrder`); kept across `reset(to:)`.
+    public var eventOrder: EventOrder {
+        get { state.withLock { $0.eventOrder } }
+        set { state.withLock { $0.eventOrder = newValue } }
+    }
 
     public func queue(for queueID: String) -> Queue? { state.withLock { $0.queues[queueID] } }
 
@@ -139,8 +164,10 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         let library = library
         state.withLock { s in
             let transports = s.transports
+            let order = s.eventOrder
             s = State(scenario: scenario)
             s.transports = transports
+            s.eventOrder = order
             Self.build(&s, scenario: scenario, library: library)
         }
     }
@@ -199,11 +226,11 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         return MAJSON.object(object).encodedString()
     }
 
-    /// The reply texts, then the events the change caused; nil hands the request to the recorded routes.
+    /// The reply texts and the events the change caused, in `eventOrder`; nil hands the request to the recorded routes.
     private func handle(command: String, args: MAJSON, messageID: String) -> [String]? {
         let now = uptime()
         let library = library
-        let outcome = state.withLock { s -> (texts: [String]?, events: [MAServerEvent]) in
+        let outcome = state.withLock { s -> (texts: [String]?, events: [MAServerEvent], order: EventOrder) in
             var logged = args
             if command == "auth", case .object(var object) = args {
                 object["token"] = "redacted"
@@ -212,11 +239,11 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
             s.received.append(SentRequest(command: command, args: logged, messageID: messageID))
             if command == "auth" {
                 let frames = s.scenario == .badToken ? library.authBad : library.authOK
-                return (FixtureScript.replay(frames, messageID: messageID), [])
+                return (FixtureScript.replay(frames, messageID: messageID), [], s.eventOrder)
             }
             var events: [MAServerEvent] = []
             guard let reply = Self.apply(&s, command: command, args: args, now: now, library: library, events: &events)
-            else { return (nil, []) }
+            else { return (nil, [], s.eventOrder) }
             s.events += events
             let frame: MAJSON
             switch reply {
@@ -224,10 +251,14 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
             case .error(let code, let details):
                 frame = ["error_code": .number(Double(code)), "details": .string(details)]
             }
-            return (FixtureScript.replay([frame], messageID: messageID), events)
+            return (FixtureScript.replay([frame], messageID: messageID), events, s.eventOrder)
         }
         guard let texts = outcome.texts else { return nil }
-        return texts + outcome.events.map(Self.eventText)
+        let events = outcome.events.map(Self.eventText)
+        switch outcome.order {
+        case .afterReply: return texts + events
+        case .beforeReply: return events + texts
+        }
     }
 
     // MARK: Loading
@@ -353,6 +384,12 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
 
     private static func elapsed(_ queue: Queue, now: Duration) -> Double {
         queue.elapsed + (queue.resumedAt.map { seconds(now - $0) } ?? 0)
+    }
+
+    /// SYNTHETIC details for an out-of-range `play_index` / `delete_item` (see the type's doc comment).
+    static func outOfRangeDetails(_ target: MAJSON?) -> String {
+        let text = target.map { $0.stringValue ?? $0.intValue.map(String.init) ?? $0.encodedString() } ?? "nil"
+        return "SYNTHETIC: no queue item at index \(text)"
     }
 
     private static func row(_ row: MAJSON) -> MAJSON { set(row, ["index": 0]) }
@@ -549,7 +586,8 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
                 index = nil
             }
             guard let index, queue.items.indices.contains(index) else {
-                return .error(code: 999, details: "IndexError: list index out of range")
+                // SYNTHETIC: unrecorded; 999 assumed. Not "IndexError"/"buffer", which the app reads as the buffered refusal.
+                return .error(code: 999, details: Self.outOfRangeDetails(args["index"]))
             }
             play(&queue, at: index, now: now)
             s.queues[id] = queue
@@ -606,7 +644,10 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
             let target = args["item_id_or_index"]
             guard let index = target?.intValue ?? target?.stringValue.flatMap({ queue.itemIDs.firstIndex(of: $0) }),
                 queue.items.indices.contains(index)
-            else { return .error(code: 999, details: "IndexError: list index out of range") }
+            else {
+                // SYNTHETIC: unrecorded; 999 assumed. Not "IndexError"/"buffer", which the app reads as the buffered refusal.
+                return .error(code: 999, details: Self.outOfRangeDetails(target))
+            }
             queue.items.remove(at: index)
             if let current = queue.currentIndex {
                 if queue.items.isEmpty {
