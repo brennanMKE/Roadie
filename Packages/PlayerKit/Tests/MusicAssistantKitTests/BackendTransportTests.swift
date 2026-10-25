@@ -68,6 +68,25 @@ struct BackendTransportTests {
         await rig.backend.disconnect()
     }
 
+    @Test func playPlaylistSendsPlayMediaReplace() async throws {
+        let rig = try await connectedBackend(script: controlScript())
+        try await rig.backend.play([MediaID(.playlist, "library://playlist/2")], on: player, mode: .replace())
+        let request = try #require(sent(rig, "player_queues/play_media").first)
+        #expect(request.args["media"] == ["library://playlist/2"])
+        #expect(request.args["option"] == "replace")
+        #expect(request.args["start_item"] == nil)
+        await rig.backend.disconnect()
+    }
+
+    @Test func playNextPlaylistSendsOptionNext() async throws {
+        let rig = try await connectedBackend(script: controlScript())
+        try await rig.backend.play([MediaID(.playlist, "library://playlist/2")], on: player, mode: .next)
+        let request = try #require(sent(rig, "player_queues/play_media").first)
+        #expect(request.args["media"] == ["library://playlist/2"])
+        #expect(request.args["option"] == "next")
+        await rig.backend.disconnect()
+    }
+
     @Test func playTracksFromIndexSendsStartItem() async throws {
         let rig = try await connectedBackend(script: controlScript())
         let tracks = (1...4).map { MediaID(.track, "library://track/\($0)") }

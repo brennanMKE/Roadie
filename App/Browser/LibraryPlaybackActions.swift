@@ -58,11 +58,13 @@ extension View {
     }
 
     /// Context menu only, for container rows (albums, artists, playlists): Play, Play Next, Add to Queue, then Add to
-    /// Playlist when `addsToPlaylists`, then the favourite.
-    func libraryContainerMenu(
-        _ id: MediaID, favorite: Bool? = nil, model: PlayerModel, addsToPlaylists: Bool = true
+    /// Playlist when `addsToPlaylists`, then the favourite, then `extra` (a Library playlist's edit items, #0189).
+    func libraryContainerMenu<Extra: View>(
+        _ id: MediaID, favorite: Bool? = nil, model: PlayerModel, addsToPlaylists: Bool = true,
+        @ViewBuilder extra: () -> Extra = { EmptyView() }
     ) -> some View {
-        contextMenu {
+        let extra = extra()
+        return contextMenu {
             Button("Play") { model.playFromLibrary(.play(container: id)) }
             Button("Play Next") { model.playFromLibrary(.next(container: id)) }
             Button("Add to Queue") { model.playFromLibrary(.append(container: id)) }
@@ -71,6 +73,7 @@ extension View {
                 AddToPlaylistMenu(items: [id], model: model)
             }
             FavoriteMenuItem(items: [id: favorite])
+            extra
         }
     }
 }
