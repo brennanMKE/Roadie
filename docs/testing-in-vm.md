@@ -13,10 +13,13 @@ Agents call `scripts/verify.sh` with the same options instead. It keeps the run'
 their context: it goes to `build/vm-tests/<run-id>/run.out`, and the agent sees a five-line pass report or
 the filtered failure lines (failing steps, compiler errors, failing tests with their `↳` values, crashes).
 `--expect testA,testB` fails the run unless those tests ran and passed. Exit codes are the run's; INFRA (3)
-is retried once.
+is retried once. `--expect-fail testA` is the reverse, for a bug fix's regression test: the run
+passes only if those tests ran and failed and nothing else did. Recipe: write the test, run
+`--expect-fail` it (proves it fails before the fix), fix the code, run `--expect` it; quote both reports.
 
 ```bash
 scripts/verify.sh --expect newTestName       # what agents run: the fast tier, reported in a few lines
+scripts/verify.sh --expect-fail newTestName  # bug fix, before the fix: passes only if that test (and nothing else) fails
 scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, app unit tests (RoadieTests), Info.plist check (slow tests skipped)
 scripts/run-tests-vm.sh --build-only   # compile check only: both packages with their tests, then the app; no tests run, not verification
 scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)
@@ -282,6 +285,12 @@ Test design for a headless, silent guest:
 - **No sound.** Even muted, the app shouldn't drive a real output device under UI tests. Add a
   launch argument that runs the engine in manual rendering mode, and assert on player state (time
   display, play indicator, analyzer data) rather than on sound.
+- **Test skins** (#0198). The UI tests use seven real Museum skins listed in `scripts/test-skins.tsv`
+  (name, Museum id, md5, why). Fetch them once on the host with `scripts/fetch-test-skins.sh` into
+  `~/Library/Caches/co.sstools.roadie-test-skins` (`--cache DIR` to change it); later runs say `ok (cached)` and
+  download nothing. `scripts/fetch-test-skins.sh --check` reports `ok|missing|bad-md5` per skin without downloading.
+  `run-tests-vm.sh --ui --test-skins DIR` checks the cache and copies it into the export's `TestSkins/`; the skins
+  are never committed.
 - **Skinned windows are borderless.** XCUITest finds them through accessibility, so give every
   sprite button, slider and display an `accessibilityIdentifier`. Don't rely on coordinates.
 - **Screenshots** from `XCTAttachment` land in the result bundle, which is the main way to see the
