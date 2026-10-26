@@ -93,6 +93,9 @@ public final class SkinBrowserModel {
     @ObservationIgnored private var loadedQuery: SkinQuery?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var applySerial = 0
+    /// The folder-relative path of the skin the player last loaded, kept so a step can find its row once the index
+    /// has it: a skin loaded at launch can come before the scan that adds its row (#0208).
+    @ObservationIgnored private var loadedPath: String?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var moreTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
@@ -289,11 +292,19 @@ public final class SkinBrowserModel {
 
     private func step(_ direction: SkinNeighborDirection) {
         enqueue { model, reader in
-            let from = model.currentSkinID ?? -1
+            let from = try await model.resolvedCurrentSkinID(reader) ?? -1
             if let record = try await reader.neighbor(of: from, direction: direction, statuses: SkinQuery.loadable) {
                 model.apply(record)
             }
         }
+    }
+
+    /// `currentSkinID`, or, when the load came before the index had its row, the row at `loadedPath` now.
+    private func resolvedCurrentSkinID(_ reader: any SkinIndexReading) async throws -> Int64? {
+        if let currentSkinID { return currentSkinID }
+        guard let path = loadedPath, let id = try await reader.skin(atPath: path)?.id else { return nil }
+        currentSkinID = id
+        return id
     }
 
     /// Steps run one after another, each reading `currentSkinID` after the previous one applied, so rapid presses chain.
@@ -312,8 +323,10 @@ public final class SkinBrowserModel {
     public func skinDidLoad(from url: URL) {
         guard let root = folder(), let path = SkinBrowserFormat.relativePath(of: url, in: root) else {
             currentSkinID = nil
+            loadedPath = nil
             return
         }
+        loadedPath = path
         let serial = applySerial
         Task { [weak self] in
             guard let self, let reader = await resolveReader() else { return }

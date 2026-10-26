@@ -317,7 +317,11 @@ Test design for a headless, silent guest:
     unconfigured.
     Neither path touches the Keychain or the network.
   - `-RoadieMuseum fixtures` (with `-RoadieMuseumSkins <folder>`): the recorded Museum pages; downloads copy the file
-    with that md5 from the folder.
+    with that md5 from the folder. `-RoadieMuseumFeatured <name>` (#0208) rewrites the browse page's first row to
+    `<name>.wsz` in that folder, so a download gets real bytes.
+  - `-RoadieSeedSkins <folder>` with `-skinsFolderPath <copy>` (#0208): the app empties `<copy>` and copies the
+    folder's top-level `.wsz` files into it, less the names in `-RoadieSeedSkinsOmit a,b`. The XCUITest runner is
+    sandboxed and can't write the copy itself; the state probe's `skinFiles` lists what the skins folder holds.
   - `-RoadieNoDiscovery 1`: no Bonjour, Wi-Fi name, network events or wake observer.
   - `-RoadieExternalOpens record`: Help links, Open in Skin Museum and the like are recorded, not opened.
   - `-RoadieWindowLayout column` (#0200): main, equalizer and playlist stacked from the primary screen's top-left,
