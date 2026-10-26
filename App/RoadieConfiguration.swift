@@ -40,6 +40,9 @@ struct RoadieConfiguration: @unchecked Sendable {
     var columnWindowLayout = false
     /// `-RoadieVolume N` (#0200): the player's volume at launch, 0...100 percent, so tests know the slider's value.
     var launchVolume: Float?
+    /// `-RoadieMuseumFeatured <name>` (#0208): the fixture Museum's browse page leads with `<name>.wsz` from its skins
+    /// folder (`FixtureMuseumTransport.featuredSkin`).
+    var museumFeaturedSkin: String?
 
     static let standard = RoadieConfiguration()
 
@@ -55,6 +58,9 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let externalOpens = "RoadieExternalOpens"
         static let windowLayout = "RoadieWindowLayout"
         static let volume = "RoadieVolume"
+        static let museumFeatured = "RoadieMuseumFeatured"
+        static let seedSkins = "RoadieSeedSkins"
+        static let seedSkinsOmit = "RoadieSeedSkinsOmit"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -72,6 +78,9 @@ struct RoadieConfiguration: @unchecked Sendable {
         }
         let data = arguments.string(forKey: Argument.dataDir).map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? Self.temporaryDirectory("RoadieUITest")
+        // The XCUITest runner is sandboxed (read-only outside its container), so the app makes its own directories.
+        try? FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
+        seedSkinsFolder(arguments: arguments)
         var configuration = RoadieConfiguration()
         configuration.isUITest = true
         configuration.dataDirectory = data
@@ -82,6 +91,7 @@ struct RoadieConfiguration: @unchecked Sendable {
             let skins = arguments.string(forKey: Argument.museumSkins).map { URL(fileURLWithPath: $0, isDirectory: true) }
                 ?? data.appending(path: "MuseumSkins", directoryHint: .isDirectory)
             configuration.museum = .fixtures(skinsFolder: skins)
+            configuration.museumFeaturedSkin = arguments.string(forKey: Argument.museumFeatured)
         }
         configuration.discovery = !arguments.bool(forKey: Argument.noDiscovery)
         configuration.externalOpens = arguments.string(forKey: Argument.externalOpens) == "record" ? .record : .workspace
@@ -91,6 +101,29 @@ struct RoadieConfiguration: @unchecked Sendable {
         }
         return configuration
         #endif
+    }
+
+    /// `-RoadieSeedSkins <folder>` with `-skinsFolderPath <copy>` (#0208): the copy is emptied and gets the folder's
+    /// top-level `.wsz` files, except the names (without `.wsz`) listed comma-separated in `-RoadieSeedSkinsOmit`, so a
+    /// UI test can trash or download skins. The app does it because the sandboxed test runner can't write there.
+    private static func seedSkinsFolder(arguments: UserDefaults) {
+        guard let source = arguments.string(forKey: Argument.seedSkins),
+            let copy = arguments.string(forKey: "skinsFolderPath")  // SkinLibraryModel.folderKey (main-actor)
+        else { return }
+        let omit = Set((arguments.string(forKey: Argument.seedSkinsOmit) ?? "").split(separator: ",").map { "\($0).wsz" })
+        let fm = FileManager.default
+        try? fm.removeItem(atPath: copy)
+        do {
+            try fm.createDirectory(atPath: copy, withIntermediateDirectories: true)
+            for name in try fm.contentsOfDirectory(atPath: source)
+            where name.lowercased().hasSuffix(".wsz") && !omit.contains(name) {
+                let target = (copy as NSString).appendingPathComponent(name)
+                try fm.copyItem(atPath: (source as NSString).appendingPathComponent(name), toPath: target)
+                try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: target)
+            }
+        } catch {
+            print("[RoadieSeedSkins] couldn't copy \(source) to \(copy): \(error)")
+        }
     }
 
     /// The hosted unit-test run's host model (#0193 review): a temp data directory, a fresh defaults suite, Music

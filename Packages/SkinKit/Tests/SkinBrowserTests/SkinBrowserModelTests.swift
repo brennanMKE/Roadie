@@ -266,6 +266,26 @@ import Testing
         #expect(model.currentSkinID == nil)
     }
 
+    /// #0208: a skin loaded at launch, before the scan adds its row, still anchors Next and Previous once the row is in.
+    @Test func stepsFromASkinLoadedBeforeItsRowWasIndexed() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "skinbrowser-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for file in ["Alpha.wsz", "beta.wsz", "Gamma.wsz"] { FileManager.default.createFile(atPath: root.appending(path: file).path, contents: Data()) }
+
+        let (stub, applier, model, _) = makeModel([], folder: root)
+        model.skinDidLoad(from: root.appending(path: "beta.wsz"))
+        #expect(await waitFor { await stub.calls.contains(.skinAtPath("beta.wsz")) })
+        #expect(model.currentSkinID == nil)
+        await stub.setRecords([record(1, "Alpha", path: "Alpha.wsz"), record(2, "beta", path: "beta.wsz"), record(3, "Gamma", path: "Gamma.wsz")])
+        model.next()
+        #expect(await waitFor { applier.applied.count == 1 })
+        #expect(applier.applied.last?.lastPathComponent == "Gamma.wsz")
+        model.previous()
+        #expect(await waitFor { applier.applied.count == 2 })
+        #expect(applier.applied.last?.lastPathComponent == "beta.wsz")
+    }
+
     @Test func indexDidChangeReloadsCountsAndKeepsTheQuery() async {
         let records = [record(1, "dragon", status: .partial), record(2, "matrix")]
         let (stub, _, model, _) = makeModel(records, delay: .milliseconds(5))

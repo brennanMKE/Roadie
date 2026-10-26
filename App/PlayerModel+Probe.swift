@@ -21,9 +21,14 @@ struct TestProbe: Codable, Equatable {
     var lastExternalOpen: String?
     var tokenStore: String
     var maRequests: [String]
+    /// The applied skin's file name without `.wsz` (#0208), nil with no skin loaded.
+    var skin: String? = nil
+    /// The skins folder's `.wsz` files, folder-relative and sorted (#0208): the sandboxed test runner checks a trash
+    /// or a download here rather than on disk. nil with no skins folder, and outside UI-test mode.
+    var skinFiles: [String]? = nil
 
     private enum CodingKeys: String, CodingKey {
-        case output, feed, state, currentIndex, queue, notice, lastExternalOpen, tokenStore, maRequests
+        case output, feed, state, currentIndex, queue, notice, lastExternalOpen, tokenStore, maRequests, skin, skinFiles
     }
 
     /// Writes `null` for the absent optionals, so every key is always in the JSON.
@@ -38,6 +43,8 @@ struct TestProbe: Codable, Equatable {
         try c.encode(lastExternalOpen, forKey: .lastExternalOpen)
         try c.encode(tokenStore, forKey: .tokenStore)
         try c.encode(maRequests, forKey: .maRequests)
+        try c.encode(skin, forKey: .skin)
+        try c.encode(skinFiles, forKey: .skinFiles)
     }
 
     var json: String {
@@ -70,7 +77,16 @@ extension PlayerModel {
             notice: notice?.text,
             lastExternalOpen: lastExternalOpen?.absoluteString,
             tokenStore: tokenStoreKind,
-            maRequests: scriptedRequestSummaries)
+            maRequests: scriptedRequestSummaries,
+            skin: self.skin == nil ? nil : skinName,
+            skinFiles: configuration.isUITest ? skinLibrary.folderURL.map { Self.wszFiles(in: $0) } : nil)
+    }
+
+    /// `.wsz` files under `folder`, as sorted folder-relative paths.
+    private static func wszFiles(in folder: URL) -> [String] {
+        let root = folder.standardizedFileURL.path
+        guard let walk = FileManager.default.enumerator(atPath: root) else { return [] }
+        return walk.compactMap { $0 as? String }.filter { $0.lowercased().hasSuffix(".wsz") }.sorted()
     }
 
     private var scriptedRequestSummaries: [String] {

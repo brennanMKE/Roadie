@@ -44,6 +44,20 @@ struct ProbeState: Decodable {
     var lastExternalOpen: String?
     var tokenStore: String
     var maRequests: [String]
+    /// The applied skin's name (#0208), nil with none.
+    var skin: String?
+    /// The skins folder's `.wsz` files, folder-relative (#0208): the runner is sandboxed, so file checks read this.
+    var skinFiles: [String]?
+}
+
+/// The skins folder a launch indexes (#0208).
+enum SkinsFolder {
+    /// `ROADIE_TEST_SKINS` itself (read-only use).
+    case testSkins
+    /// Another folder, e.g. the test's own copy (`RoadieUITestCase.launch(mutatesSkins:)`).
+    case path(String)
+    /// No `-skinsFolderPath` at all: no library, the Skins menu's navigation disabled.
+    case none
 }
 
 /// Wraps `XCUIApplication` for Roadie in test mode (#0194). UI tests run only in the Tart guest
@@ -86,14 +100,16 @@ final class RoadieUIApp {
     func launch(
         testName: String, paths: Paths, skin: TestSkin = .base291, library: TestLibrary = .folder,
         scenario: String? = nil, firstRun: Bool = false, windows: Windows = [.main, .playlist], volume: Int = 50,
-        extra: [String] = []
+        skinsFolder: SkinsFolder = .testSkins, loadsSkin: Bool = true, seedOmitting: [TestSkin]? = nil,
+        museumFeatured: TestSkin? = nil, extra: [String] = []
     ) {
         if let reason = Self.notGuestReason {
             XCTFail(reason)
             return
         }
-        // A fresh install each launch. Test mode empties the app's own suite; this clears the `.standard` domain that
-        // AppKit's frame autosave and SwiftUI's scene storage still write (#0194; harmless in the throwaway guest).
+        // A fresh install each launch. Test mode empties the app's own suite; this was meant to clear the `.standard`
+        // domain that AppKit's frame autosave and SwiftUI's scene storage write (#0194), but the runner is sandboxed, so
+        // it is a no-op there (#0202): `-RoadieWindowLayout column` is what keeps the layout known.
         let defaults = Process()
         defaults.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
         defaults.arguments = ["delete", "co.sstools.roadie"]
@@ -101,9 +117,8 @@ final class RoadieUIApp {
         defaults.standardError = FileHandle.nullDevice
         if (try? defaults.run()) != nil { defaults.waitUntilExit() }
 
+        // The app creates it: the sandboxed runner can't write outside its container (#0202, #0208).
         let dataDir = (paths.data as NSString).appendingPathComponent(testName)
-        try? FileManager.default.removeItem(atPath: dataDir)
-        try? FileManager.default.createDirectory(atPath: dataDir, withIntermediateDirectories: true)
 
         var args = [
             "-RoadieUITest", "1",
@@ -112,8 +127,6 @@ final class RoadieUIApp {
             "-RoadieMuseum", "fixtures",
             "-RoadieExternalOpens", "record",
             "-firstRunVersion", firstRun ? "0" : "1",
-            "-lastSkinPath", (paths.skins as NSString).appendingPathComponent("\(skin.rawValue).wsz"),
-            "-skinsFolderPath", paths.skins,
             "-eqWindowOpen", windows.contains(.equalizer) ? "YES" : "NO",
             "-playlistWindowOpen", windows.contains(.playlist) ? "YES" : "NO",
             // The playlist at its smallest width and three steps taller (`PlaylistModel.sizeKey`, [width, height]
@@ -125,7 +138,27 @@ final class RoadieUIApp {
             // The player's launch volume in percent, so `main.volume`'s value is known (#0200 review).
             "-RoadieVolume", String(volume),
             "-SUEnableAutomaticChecks", "NO",
+            // No window restoration: SwiftUI's scene storage (the Skins window's tab) outlived the test that set it (#0208).
+            "-ApplePersistenceIgnoreState", "YES",
         ]
+        let folder: String?
+        switch skinsFolder {
+        case .testSkins: folder = paths.skins
+        case .path(let path): folder = path
+        case .none: folder = nil
+        }
+        if loadsSkin {
+            args += ["-lastSkinPath", ((folder ?? paths.skins) as NSString).appendingPathComponent("\(skin.rawValue).wsz")]
+        }
+        if let folder { args += ["-skinsFolderPath", folder] }
+        // The app empties `folder` and copies TestSkins' `.wsz` files into it, less `seedOmitting` (#0208).
+        if let seedOmitting, folder != nil {
+            args += ["-RoadieSeedSkins", paths.skins, "-RoadieSeedSkinsOmit", seedOmitting.map(\.rawValue).joined(separator: ",")]
+        }
+        // The fixture Museum serves TestSkins' files (read only) and leads its browse page with `museumFeatured`.
+        if let museumFeatured {
+            args += ["-RoadieMuseumSkins", paths.skins, "-RoadieMuseumFeatured", museumFeatured.rawValue]
+        }
         if case .folder = library {
             args += ["-LibraryFolderPath", paths.music, "-LibrarySource", "folder"]
         }
@@ -157,6 +190,12 @@ final class RoadieUIApp {
         var marquee: XCUIElement { ui.element(AXID.Main.marquee) }
         var time: XCUIElement { ui.element(AXID.Main.time) }
         var volume: XCUIElement { ui.element(AXID.Main.volume) }
+        /// The options pop-up (`main.title.menu`) while it is open. `NSMenu.popUp(positioning:at:in:)` puts it under the
+        /// main window in the accessibility tree, not under the application (#0208).
+        var popUpMenu: XCUIElement {
+            ui.app.windows.containing(NSPredicate(format: "identifier == %@", AXID.Main.play))
+                .descendants(matching: .menu).firstMatch
+        }
     }
 
     @MainActor
@@ -380,10 +419,29 @@ class RoadieUITestCase: XCTestCase {
         name.split(separator: " ").last.map { String($0.dropLast()) } ?? "test"
     }
 
+    /// The folder the last `launch(mutatesSkins: true)` indexes: this test's own copy of `TestSkins/`.
+    var skinsCopy: String?
+
+    /// `mutatesSkins`: index a fresh copy of `TestSkins/` (`<ROADIE_TEST_DATA>/<testName>-skins`, only the `.wsz`
+    /// files) instead of the shared folder, so a test can add or trash skins (#0208). The app makes the copy on the
+    /// first such launch (`-RoadieSeedSkins`; the sandboxed runner can't write it); it survives relaunches.
+    /// `withoutSkins` leaves those manifest skins out of the copy (a Museum download then adds one back).
+    /// `museumFeatured`: the fixture Museum's browse page leads with that skin (`-RoadieMuseumFeatured`).
     func launch(
         skin: TestSkin = .base291, library: TestLibrary = .folder, scenario: String? = nil, firstRun: Bool = false,
-        windows: Windows = [.main, .playlist], volume: Int = 50, extra: [String] = []
+        windows: Windows = [.main, .playlist], volume: Int = 50, skinsFolder: SkinsFolder = .testSkins,
+        mutatesSkins: Bool = false, withoutSkins: [TestSkin] = [], loadsSkin: Bool = true,
+        museumFeatured: TestSkin? = nil, extra: [String] = []
     ) {
+        var skinsFolder = skinsFolder
+        var seedOmitting: [TestSkin]?
+        if mutatesSkins {
+            if skinsCopy == nil {
+                skinsCopy = (paths.data as NSString).appendingPathComponent("\(testName)-skins")
+                seedOmitting = withoutSkins
+            }
+            if let skinsCopy { skinsFolder = .path(skinsCopy) }
+        }
         if roadie == nil {
             let roadie = RoadieUIApp()
             self.roadie = roadie
@@ -391,6 +449,7 @@ class RoadieUITestCase: XCTestCase {
         }
         roadie.launch(
             testName: testName, paths: paths, skin: skin, library: library, scenario: scenario, firstRun: firstRun,
-            windows: windows, volume: volume, extra: extra)
+            windows: windows, volume: volume, skinsFolder: skinsFolder, loadsSkin: loadsSkin,
+            seedOmitting: seedOmitting, museumFeatured: museumFeatured, extra: extra)
     }
 }

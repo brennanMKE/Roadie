@@ -69,7 +69,7 @@ final class PlayerModel {
         case .live: transport = URLSessionMuseumTransport()
         case .fixtures(let skinsFolder):
             #if DEBUG
-            transport = FixtureMuseumTransport(skinsFolder: skinsFolder)
+            transport = FixtureMuseumTransport(skinsFolder: skinsFolder, featuredSkin: configuration.museumFeaturedSkin)
             #else
             preconditionFailure("The fixture Museum (\(skinsFolder.path)) needs a Debug build")
             #endif
@@ -923,6 +923,14 @@ final class PlayerModel {
         switch configuration.externalOpens {
         case .record: lastExternalOpen = url
         case .workspace: NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Show in Finder for a file, recorded like `open(external:)` (as its file URL) under `.record` (#0208).
+    func revealInFinder(_ url: URL) {
+        switch configuration.externalOpens {
+        case .record: lastExternalOpen = url
+        case .workspace: NSWorkspace.shared.activateFileViewerSelecting([url])
         }
     }
 
