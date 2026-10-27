@@ -250,13 +250,13 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Delete removes selected; REM › crop / all | UI `PlaylistUITests.removeCropClear`; Unit `PlayQueueTests` |
 | Drag rows to reorder | UI `PlaylistUITests.dragReordersRows` |
 | Scroll wheel, scrollbar, arrow buttons; resize corner; shade mode | UI `PlaylistUITests.scrollResizeShade`; Unit `PlaylistScrollTests`, `PlaylistLayoutTests` (exist) |
-| ADD › file / dir / URL (panels: unit; URL sheet: UI) | UI `PlaylistUITests.addURL`; Unit `RoadieTests.PlayerModelFilesTests` |
+| ADD › file / dir / URL (panels: unit; URL sheet: UI) | UI `PlaylistUITests.addURL` (folder library: Add URL adds nothing, the URL sheet needs a radio source, #0147), `.scrollResizeShade` (ADD › dir via `-RoadieAddFolder`); Unit `RoadieTests.PlayerModelFilesTests` |
 | SEL › invert / zero / all | UI `PlaylistUITests.selectMenu` |
-| MISC › file info, sort (title / file name / path, reverse, randomize), options › Generate HTML Playlist | UI `PlaylistUITests.sortMenu`, `.fileInfoPanel`; Unit `PlaylistSortKeyTests`, `PlaylistHTMLTests` (exist) |
-| LIST › new, save (M3U/PLS or a server playlist), load (file / Library playlist, #0190) | UI `PlaylistUITests.listMenuLocal`, `MusicAssistantUITests.listLoadOffersLibraryPlaylist`; Unit `QueueSaveTargetTests` (exists) |
+| MISC › file info, sort (title / file name / path, reverse, randomize), options › Generate HTML Playlist | UI `PlaylistUITests.sortMenu` (entries picked by keyboard: the sort pop-up isn't in the accessibility tree, #0230), `.fileInfoPanel`; Unit `PlaylistSortKeyTests`, `PlaylistHTMLTests` (exist) |
+| LIST › new, save (M3U/PLS or a server playlist), load (file / Library playlist, #0190) | UI `PlaylistUITests.listMenuLocal` (save via `-RoadieSaveTo`, load via `-RoadieLoadList`), `MusicAssistantUITests.listLoadOffersLibraryPlaylist`; Unit `QueueSaveTargetTests` (exists) |
 | Bottom transport buttons, running time, mini time | UI `PlaylistUITests.bottomBar` |
 | Right-click row menu: Play, Queue/Dequeue, Clear Queue, Remove, File Info… | UI `PlaylistUITests.rowMenu`; Unit `RoadieTests.PlaylistMenusTests` |
-| `Q` queues the selection, `[n]` markers, playback order honours up-next | UI `PlaylistUITests.queueMarkers`; Unit `UpNextTests`, `RemoteUpNextTests` (exist) |
+| `Q` queues the selection, `[n]` markers, playback order honours up-next | UI `PlaylistUITests.queueMarkers` (unshuffled, the list carries on after the queued row that played); Unit `UpNextTests`, `RemoteUpNextTests` (exist) |
 | Finder files dropped at a row (inserted there), on the bottom bar (appended) | Unit `RoadieTests.DropDecoderTests`, `FolderBackendTests.playInsert…` (exist); *by hand* for the real Finder drag |
 | **Library rows dropped at a row / bottom bar (#0188)** | UI `LibraryUITests.dragAlbumOntoPlaylistRow`, `.dragTrackOntoBottomBar`, `.dragArtistOntoPlaylist`; Unit `RoadieTests.DropDecoderTests.readsEveryPasteboardItem` |
 | Remote queue: edits go to the server, refusals show "Not for Music Assistant queues" | UI `MusicAssistantUITests.sortIsRefusedOnARemoteQueue`; Unit `QueueEditPlanTests`, `BackendQueueTests` (exist) |

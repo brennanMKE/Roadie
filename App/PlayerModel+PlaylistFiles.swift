@@ -49,6 +49,10 @@ extension PlayerModel {
             return
         }
         if intercepted(.openPlaylistFile) { return }
+        if let urls = panelStandIn(.loadList) {
+            importLocalFiles(urls, replace: true)
+            return
+        }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
@@ -69,6 +73,10 @@ extension PlayerModel {
             post(StatusNotice(text: "Nothing to save"))
             return
         }
+        if let url = panelStandIn(.saveTo)?.first {
+            writePlaylistFile(tracks, to: url)
+            return
+        }
         let panel = NSSavePanel()
         let chooser = PlaylistFormatChooser(panel: panel)
         panel.accessoryView = chooser.view
@@ -79,25 +87,29 @@ extension PlayerModel {
             let response = await panel.begin()
             withExtendedLifetime(chooser) {}
             guard response == .OK, let url = panel.url else { return }
-            let format: PlaylistFile.Format = url.pathExtension.lowercased() == "pls" ? .pls : .m3u
-            let out = PlaylistFile.serialize(tracks, format: format, playlistURL: url)
-            guard out.written > 0 else {
-                post(StatusNotice(text: "Nothing to save", detail: "The playlist has no local files"))
-                return
-            }
-            do {
-                try out.data.write(to: url, options: .atomic)
-            } catch {
-                post(StatusNotice(text: "Could not save \(url.lastPathComponent)", detail: error.localizedDescription))
-                return
-            }
-            if out.skipped > 0 {
-                post(StatusNotice(
-                    text: "Saved \(out.written), skipped \(out.skipped) server tracks",
-                    detail: "Server tracks have no local file"))
-            } else {
-                post(StatusNotice(text: "Saved \(out.written) track\(out.written == 1 ? "" : "s")"))
-            }
+            writePlaylistFile(tracks, to: url)
+        }
+    }
+
+    private func writePlaylistFile(_ tracks: [Track], to url: URL) {
+        let format: PlaylistFile.Format = url.pathExtension.lowercased() == "pls" ? .pls : .m3u
+        let out = PlaylistFile.serialize(tracks, format: format, playlistURL: url)
+        guard out.written > 0 else {
+            post(StatusNotice(text: "Nothing to save", detail: "The playlist has no local files"))
+            return
+        }
+        do {
+            try out.data.write(to: url, options: .atomic)
+        } catch {
+            post(StatusNotice(text: "Could not save \(url.lastPathComponent)", detail: error.localizedDescription))
+            return
+        }
+        if out.skipped > 0 {
+            post(StatusNotice(
+                text: "Saved \(out.written), skipped \(out.skipped) server tracks",
+                detail: "Server tracks have no local file"))
+        } else {
+            post(StatusNotice(text: "Saved \(out.written) track\(out.written == 1 ? "" : "s")"))
         }
     }
 }

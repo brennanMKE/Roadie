@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeEQWindow()
         observePlaylistWindow()
         docking.ensureOnScreen()
+        model.openLaunchFilesForUITest()
         // The Library and Skins are the only SwiftUI window scenes, so SwiftUI opens the first at launch; they are
         // meant to open from ⌘L and ⌘K. (`defaultLaunchBehavior(.suppressed)` needs macOS 15, the target is 14.)
         DispatchQueue.main.async { [player, equalizer, playlist, model, welcome] in

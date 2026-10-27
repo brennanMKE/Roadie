@@ -169,6 +169,11 @@ final class RoadieUIApp {
 
     func terminate() { app.terminate() }
 
+    /// This test's data directory (what `-RoadieDataDir` gets), for files a test writes or reads.
+    static func dataDirectory(testName: String, paths: Paths) -> String {
+        (paths.data as NSString).appendingPathComponent(testName)
+    }
+
     // MARK: Elements
 
     /// Any element with this identifier (skinned controls aren't all buttons).
@@ -202,6 +207,14 @@ final class RoadieUIApp {
     struct Playlist {
         let ui: RoadieUIApp
         func row(_ i: Int) -> XCUIElement { ui.element(AXID.PL.row(i)) }
+
+        /// Opens a skinned pop-up menu (`AXID.PL.Menu.add` …) and clicks one of its entries (`pl.menu.add.dir` …).
+        func menu(_ button: String, _ entry: String, file: StaticString = #filePath, line: UInt = #line) {
+            ui.click(ui.element(button), file: file, line: line)
+            let item = ui.element(entry)
+            XCTAssertTrue(item.waitForExistence(timeout: 3), "\(button) didn't show \(entry)", file: file, line: line)
+            ui.click(item, file: file, line: line)
+        }
     }
 
     var main: Main { Main(ui: self) }
