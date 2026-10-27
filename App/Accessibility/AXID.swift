@@ -155,6 +155,8 @@ enum AXID {
         /// `kind` is artist, album, track or playlist; `id` a `MediaID` raw value, sanitised to [a-z0-9].
         static func row(_ kind: String, _ id: String) -> String { "library.row.\(kind).\(sanitised(id))" }
         static let output = "library.output"
+        /// A Playlists group header (#0221): `kind` is mine, builtIn or the provider's name, sanitised.
+        static func playlistGroup(_ kind: String) -> String { "library.playlists.group.\(kind == "builtIn" ? kind : sanitised(kind))" }
         // No `library.search`: SwiftUI's `.searchable` toolbar field takes no identifier; UI tests find it by role
         // (`app.searchFields.firstMatch`).
         static let all = [output]

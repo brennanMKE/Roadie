@@ -17,7 +17,9 @@ import os
 /// - an out-of-range `play_index` / `delete_item` answers a SYNTHETIC error, code 999 assumed (MA's code for an
 ///   unhandled exception), with details that don't read as the buffered-track refusal;
 /// - the order of a command's reply and its events is unverified, so it is a setting (`eventOrder`);
-/// - every queue keeps `player-queue-get.json`'s `display_name` ("user").
+/// - every queue keeps `player-queue-get.json`'s `display_name` ("user");
+/// - user playlists' `owner` ("Music Assistant") is the live server's value, 2026-10-27 (#0221); the recorded
+///   `owner` is scrubbed.
 public final class ScriptedMusicAssistant: @unchecked Sendable {
     public enum Scenario: String, CaseIterable, Sendable {
         /// The recording as it is: nothing playing, every queue empty.
@@ -846,7 +848,8 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         tracks.enumerated().map { set($0.element, ["position": .number(Double($0.offset + 1))]) }
     }
 
-    /// A user playlist on the builtin provider, in the recorded playlist shape.
+    /// A user playlist on the builtin provider, shaped as the real server sends it: `owner: "Music Assistant"`,
+    /// `is_editable: true`, a builtin mapping whose `item_id` is the playlist's own id (#0221).
     private static func createPlaylist(_ s: inout State, name: String, library: Library) -> MAJSON {
         let id = String(9000 + s.nextID)
         s.nextID += 1
@@ -859,7 +862,8 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
             template,
             [
                 "item_id": .string(id), "provider": "library", "name": .string(name), "sort_name": .string(name.lowercased()),
-                "uri": .string("library://playlist/\(id)"), "owner": "user", "is_editable": true, "is_dynamic": false,
+                "uri": .string("library://playlist/\(id)"), "owner": "Music Assistant", "is_editable": true,
+                "is_dynamic": false,
                 "favorite": false, "provider_mappings": .array(mappings),
             ])
         s.playlists.append(playlist)

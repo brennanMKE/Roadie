@@ -81,6 +81,12 @@ struct MAFixtureTests {
         #expect(unknown.count == 1)
         #expect(unknown.first?["result"] == .null)
         #expect(unknown.first?["error_code"] == nil)
+        // (d) Builtin playlists all carry owner "Music Assistant" (#0221). Skipped while `playlists-page.json` still has
+        // the owners scrubbed to "user" by the recorder before #0221.
+        let playlists = try recordedResult(.playlistsPage).arrayValue ?? []
+        if !playlists.contains(where: { $0["owner"]?.stringValue == "user" }) {
+            #expect(playlists.allSatisfy { $0["owner"]?.stringValue == "Music Assistant" })
+        }
     }
 
     /// Fixtures are verbatim recordings: each call has `command`, `args` and `frames`, nothing is marked synthetic,

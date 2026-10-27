@@ -419,7 +419,8 @@ class Targets:
                         out[k] = None
                         continue
                     if k == "owner" and isinstance(v, str):
-                        out[k] = "user"
+                        # "Music Assistant" is the server's own owner, not personal data (#0221).
+                        out[k] = v if v == "Music Assistant" else "user"
                         continue
                     if k == "device_name" and isinstance(v, str):
                         out[k] = "Roadie"

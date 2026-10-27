@@ -285,7 +285,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Drag album / track / artist / playlist to the playlist editor | UI `LibraryUITests.dragAlbumOntoPlaylistRow`…, `MusicAssistantUITests.dragPlaylistAppendsToQueue` |
 | Drag tracks/albums onto a playlist row (adds to that playlist) | UI `MusicAssistantUITests.dropOntoPlaylistAdds`; Unit `PlaylistEditorTests` (exist) |
 | Toolbar: New Playlist, Import Playlist…, Refresh, Add Radio URL…, output picker | UI `MusicAssistantUITests.toolbar`, `LibraryUITests.addRadioURL` |
-| Playlists: create, rename, delete (confirmation), export/import, reorder tracks, remove track, edit bar errors | UI `MusicAssistantUITests.playlistCRUD`; Unit `PlaylistsModelTests`, `PlaylistWriteTests`, `PlaylistEditorTests` (exist) |
+| Playlists: create, rename, delete (confirmation), export/import, reorder tracks, remove track, edit bar errors | UI `MusicAssistantUITests.playlistCRUD`, `PlaylistGroupsUITests.testCreatedPlaylistIsUnderMyPlaylists` (exists, #0221); Unit `PlaylistsModelTests`, `PlaylistMappingTests`, `PlaylistWriteTests`, `PlaylistEditorTests` (exist) |
 | Favorites section, favorite button and menu | UI `MusicAssistantUITests.favorites`; Unit `FavoritesModelTests` (exists) |
 | Discover rows, Play All, Refresh, Show all rows | UI `MusicAssistantUITests.discover`; Unit `DiscoverTests`, `RecommendationDecodingTests` (exist) |
 | Radio list, play a station | UI `MusicAssistantUITests.radio`; Unit `RadioTests`, `RadioSectionTests` (exist) |
