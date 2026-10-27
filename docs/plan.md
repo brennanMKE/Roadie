@@ -190,6 +190,11 @@ Follows `docs/plex-music-library.md`:
   (fast tests before review, regression test first, a UI test per feature) in `issues/Issues.md`.
 - Children #0193 to #0213.
 
+**M17: Genres** ([#0220](../issues/0220.md))
+- Browse by genre, as the Music Assistant web app does: a Genres section in the Library listing the genres that
+  have music, each opening its albums, artists and tracks, with play and shuffle for the whole genre. Also #0221
+  (a user-created playlist filed under "Built-in").
+
 ## Verification
 - `swift test` for SkinKit and PlayerKit: the folder index, queue save and restore, Music Assistant decoding against
   recorded fixtures, and the connection-test error paths.
