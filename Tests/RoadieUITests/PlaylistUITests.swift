@@ -54,11 +54,6 @@ final class PlaylistUITests: RoadieUITestCase {
 
     private func menuItem(_ title: String) -> XCUIElement { roadie.app.menuItems[title].firstMatch }
 
-    /// A pop-up menu's entry under any window: `NSMenu.popUp(positioning:at:in:)` puts its menu there (#0208).
-    private func windowMenuItem(_ title: String) -> XCUIElement {
-        roadie.app.windows.descendants(matching: .menuItem).matching(NSPredicate(format: "title == %@", title)).firstMatch
-    }
-
     private func rowValue(_ i: Int) -> String { roadie.value(of: row(i)) }
 
     private func visibleRows() -> [Int] {
@@ -241,28 +236,13 @@ final class PlaylistUITests: RoadieUITestCase {
     func testSortMenu() {
         launchQueue()
         let original = titles
-        // `PlaylistContextMenus.sort` pops an NSMenu at the pointer with no view (`popUp(positioning:at:in: nil)`). It
-        // shows on screen but isn't in the app's accessibility tree, at the app root or under any window (runs
-        // 20261024-233202-39035 and 20261027-163806-30550, #0230), so its entries can't be clicked. The menu is tracking and takes the keyboard:
-        // Down arrows walk its items (the separator is skipped) and Return picks one. Items: Sort by Title, by File
-        // Name, by Path and File Name, —, Reverse List, Randomize List.
-        let order = ["Sort by Title", "Sort by File Name", "Sort by Path and File Name", "Reverse List",
-                     "Randomize List"]
+        // SORT LIST pops at the pointer in the playlist window's view, so its entries are under the window (#0230).
+        // The lookup is scoped there: the menu bar's Playlist menu has the same titles.
         func sort(_ item: String) {
-            guard let index = order.firstIndex(of: item) else { return XCTFail("no sort entry \(item)") }
             roadie.playlist.menu(AXID.PL.Menu.misc, "pl.menu.misc.sort")
-            let entry = menuItem(item)
-            let inWindow = windowMenuItem(item)
-            if entry.waitForExistence(timeout: 1.5) {
-                entry.click()
-                return
-            }
-            if inWindow.exists {
-                inWindow.click()
-                return
-            }
-            for _ in 0...index { roadie.app.typeKey(.downArrow, modifierFlags: []) }
-            roadie.app.typeKey(.return, modifierFlags: [])
+            let entry = roadie.playlist.popUpMenuItem(item)
+            guard entry.waitForExistence(timeout: 3) else { return XCTFail("SORT LIST has no \(item) menu item (#0230)") }
+            entry.click()
         }
         sort("Reverse List")
         XCTAssertTrue(roadie.wait { titles == Array(original.reversed()) }, "reversed: \(titles)")
@@ -274,6 +254,18 @@ final class PlaylistUITests: RoadieUITestCase {
         if !roadie.wait(timeout: 2, { titles != sorted }) { sort("Randomize List") }
         XCTAssertTrue(roadie.wait { titles != sorted }, "randomize kept the order twice")
         XCTAssertEqual(titles.sorted(), sorted.sorted())
+    }
+
+    func testMiscOptionsMenu() {
+        launchQueue()
+        roadie.playlist.menu(AXID.PL.Menu.misc, "pl.menu.misc.options")
+        let entry = roadie.playlist.popUpMenuItem("Generate HTML Playlist")
+        guard entry.waitForExistence(timeout: 3) else {
+            return XCTFail("MISC OPTIONS has no Generate HTML Playlist menu item (#0230)")
+        }
+        entry.click()
+        XCTAssertTrue(roadie.wait { self.roadie.probe?.lastExternalOpen?.hasSuffix("Roadie%20Playlist.html") == true },
+                      "Generate HTML Playlist opened \(roadie.probe?.lastExternalOpen ?? "nothing")")
     }
 
     func testFileInfoPanel() {
@@ -584,5 +576,23 @@ final class PlaylistUITests: RoadieUITestCase {
         roadie.app.typeKey("l", modifierFlags: [.command, .option])
         waitForRows(Self.fixtureCount)
         roadie.stopPlayback()
+    }
+
+    // MARK: Tooltips (#0227)
+
+    /// Hovering ADD shows a help tag beside it. One hover only: in the guest the tag's text isn't readable (the
+    /// HelpTag element has no label, value or children) and a second hover in the same launch races AppKit's tooltip
+    /// timer (the first tag lingers or the next is late), so the five strings are `PlaylistTooltipTests`.
+    func testMenuButtonsHaveTooltips() {
+        launch(windows: [.main, .playlist])
+        let button = roadie.element(AXID.PL.Menu.add)
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "no \(AXID.PL.Menu.add)")
+        XCTAssertFalse(roadie.app.helpTags.firstMatch.exists, "a help tag before hovering")
+        button.hover()
+        let tag = roadie.app.helpTags.firstMatch
+        XCTAssertTrue(tag.waitForExistence(timeout: 5), "no help tag over ADD")
+        let frame = tag.frame, b = button.frame
+        XCTAssertLessThan(abs(frame.minY - b.midY), 100, "tag \(frame) far from ADD \(b)")
+        XCTAssertLessThan(abs(frame.minX - b.midX), 150, "tag \(frame) far from ADD \(b)")
     }
 }

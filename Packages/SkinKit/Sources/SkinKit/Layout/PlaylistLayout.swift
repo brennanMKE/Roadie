@@ -185,7 +185,8 @@ public struct PlaylistLayout: Sendable, Equatable {
         return CGRect(x: x, y: height - 30, width: 22, height: 18)
     }
 
-    private static func spriteNames(_ menu: Menu) -> [String] {
+    /// The entries' sprite names, top to bottom (the last sits on the button); no geometry needed (#0227).
+    public static func entrySprites(_ menu: Menu) -> [String] {
         switch menu {
         case .add: ["PLAYLIST_ADD_URL", "PLAYLIST_ADD_DIR", "PLAYLIST_ADD_FILE"]
         case .remove: ["PLAYLIST_REMOVE_MISC", "PLAYLIST_REMOVE_ALL", "PLAYLIST_CROP", "PLAYLIST_REMOVE_SELECTED"]
@@ -197,7 +198,7 @@ public struct PlaylistLayout: Sendable, Equatable {
 
     /// Entries stacked upward from the button (css `ul { bottom: 0 }`): the last one sits on the button.
     public func menuEntries(_ menu: Menu) -> [MenuEntry] {
-        let names = Self.spriteNames(menu)
+        let names = Self.entrySprites(menu)
         let button = menuButton(menu)
         return names.enumerated().map { index, name in
             MenuEntry(

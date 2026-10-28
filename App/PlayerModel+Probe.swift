@@ -169,4 +169,25 @@ extension PlaylistLayout.Menu {
         case .list: "List"
         }
     }
+
+    /// The button's name as Winamp skins draw it.
+    var buttonName: String {
+        switch self {
+        case .add: "ADD"
+        case .remove: "REM"
+        case .selection: "SEL"
+        case .misc: "MISC"
+        case .list: "LIST"
+        }
+    }
+
+    /// "LIST: Load List, Save List, New List": the button, then its entries nearest first (bottom up), with the
+    /// labels VoiceOver reads for them. REMOVE MISC does nothing (`PlaylistMenu.command(forSprite:)` is nil and it
+    /// pops up nothing), so it's left out (#0227).
+    var tooltip: String {
+        let labels = PlaylistLayout.entrySprites(self).reversed()
+            .filter { $0 != "PLAYLIST_REMOVE_MISC" }
+            .map { AXID.PL.Menu.entries[$0]?.label ?? $0 }
+        return "\(buttonName): " + labels.joined(separator: ", ")
+    }
 }

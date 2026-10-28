@@ -135,6 +135,11 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   `sources.select(…)` starts a second connection, and a play sent while it authenticates fails with "Can't reach
   the Music Assistant server" (run 20261027-173236-61397). `PlayerModelDropTests.connectMusicAssistant` does it in
   order and waits for `isConnected`.
+- **A menu popped with no view isn't in the accessibility tree.** `NSMenu.popUp(positioning:at:in: nil)` opens in
+  a window of its own that neither XCUITest nor VoiceOver reaches; pop in a view (`in: hosting`, #0208, #0230) and
+  the menu is under that window. Look pop-up items up under `app.windows`, not `app.menuItems[title]`: the latter
+  also matches a menu-bar item with the same title, and clicking that while the pop-up is open costs a 10 s
+  "open menu during menu traversal" failure and a retry through the menu bar, and passes on the wrong menu (#0230).
 - **A right-click menu sits under its window (#0229).** `NSMenu.popUpContextMenu(_:with:for:)` puts the menu as a
   direct child of the window it was popped for, so `app.children(matching: .menu)` never finds it. Look items up with
   `app.windows.descendants(matching: .menuItem)` by title, which also keeps the menu bar's same-titled items out.
@@ -142,6 +147,10 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   "pl.row.0")` fails once the rows are gone ("No matches found … Elements containing elements"). Anchor a coordinate
   on an element that outlives the change, such as `pl.title.close`.
 - **The About panel isn't in `app.windows`**; find it as a dialog by its text.
+- **Tooltips (`.help`):** hovering does show a tag in the guest (`app.helpTags.firstMatch`, with a frame), but the
+  HelpTag element has no label, value or children, so its text can't be read. Test the strings in unit tests. Hovering
+  several controls in a row in one launch is flaky: AppKit's tooltip timer leaves the first tag up or shows the next
+  one late (#0227). Hover one control per launch.
 
 ## Gotchas carried over from the cameron setup
 
