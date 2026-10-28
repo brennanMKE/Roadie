@@ -372,6 +372,7 @@ struct PlaylistMenusView: View {
                         .accessibilityElement(children: .ignore)
                         .accessibilityAddTraits(.isButton)
                         .skinControl(menu.accessibilityID, label: menu.accessibilityLabel)
+                        .help(menu.tooltip)
                         .onTapGesture { playlist.openMenu = menu }
                         .offset(x: button.minX, y: button.minY)
                 }
