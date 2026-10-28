@@ -138,6 +138,7 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         hosting.sizingOptions = []
         shape.addSubview(hosting)
         if case .playlist = kind {
+            PlaylistContextMenus.host = hosting   // SORT / MISC pop up in this view (#0230)
             let overlays = PlaylistWindowOverlays(model: model)
             overlays.install(in: shape)
             playlistOverlays = overlays

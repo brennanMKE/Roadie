@@ -45,6 +45,33 @@ final class PlaylistMenusTests: PlayerModelTestCase {
         PlaylistContextMenus.miscOptions(model)
         XCTAssertEqual(popUps.last?.titles, ["Generate HTML Playlist"])
     }
+
+    /// #0230: the pop-ups open in the playlist window's view while it's visible, else the key window's.
+    func testPopUpViewPrefersTheVisiblePlaylistWindow() {
+        let playlist = NSView()
+        let key = NSView()
+        XCTAssertIdentical(PlaylistContextMenus.popUpView(playlist: playlist, playlistVisible: true, key: key), playlist)
+        XCTAssertIdentical(PlaylistContextMenus.popUpView(playlist: playlist, playlistVisible: false, key: key), key)
+        XCTAssertIdentical(PlaylistContextMenus.popUpView(playlist: nil, playlistVisible: true, key: key), key)
+        XCTAssertNil(PlaylistContextMenus.popUpView(playlist: nil, playlistVisible: false, key: nil))
+        XCTAssertNil(PlaylistContextMenus.popUpView(playlist: playlist, playlistVisible: false, key: nil))
+    }
+
+    /// #0230: the pointer maps into the (flipped) hosting view, so the menu opens at the pointer, not a window
+    /// height away.
+    func testPopUpPointIsThePointerInTheHostView() {
+        final class FlippedView: NSView { override var isFlipped: Bool { true } }
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 200, width: 300, height: 400), styleMask: .borderless,
+                              backing: .buffered, defer: true)
+        let view = FlippedView(frame: NSRect(x: 0, y: 0, width: 300, height: 400))
+        window.contentView = view
+        // 10 pt in from the window's left and 10 pt down from its top (screen y grows upward).
+        XCTAssertEqual(PlaylistContextMenus.point(NSPoint(x: 110, y: 590), in: view), NSPoint(x: 10, y: 10))
+        XCTAssertEqual(PlaylistContextMenus.point(NSPoint(x: 400, y: 200), in: view), NSPoint(x: 300, y: 400))
+        let unflipped = NSView(frame: view.bounds)
+        window.contentView = unflipped
+        XCTAssertEqual(PlaylistContextMenus.point(NSPoint(x: 110, y: 590), in: unflipped), NSPoint(x: 10, y: 390))
+    }
 }
 
 /// The skins folder setting (#0211). The real default folder (`applyDefaultFolderIfNeeded`) is under the user's home,
