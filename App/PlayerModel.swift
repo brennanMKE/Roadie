@@ -1201,6 +1201,10 @@ final class PlayerModel {
     /// selected, because it also picks skins; `importLocalFiles` refuses only the audio part (#0084).
     func openFiles(replace: Bool) {
         if intercepted(.openFiles(replace: replace)) { return }
+        if let urls = panelStandIn(replace ? .openFiles : .addFiles) {
+            open(urls, replace: replace)
+            return
+        }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -1221,6 +1225,10 @@ final class PlayerModel {
             return
         }
         if intercepted(.openFolder) { return }
+        if let urls = panelStandIn(.addFolder) {
+            importLocalFiles(urls, replace: false)
+            return
+        }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
