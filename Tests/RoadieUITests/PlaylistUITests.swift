@@ -369,7 +369,7 @@ final class PlaylistUITests: RoadieUITestCase {
             .containing(NSPredicate(format: "title == %@", "Load Playlist…")).firstMatch
     }
 
-    private func contextMenuItem(_ title: String) -> XCUIElement { windowMenuItem(title) }
+    private func contextMenuItem(_ title: String) -> XCUIElement { roadie.playlist.popUpMenuItem(title) }
 
     private func contextMenuTitles() -> [String] {
         contextMenu.menuItems.allElementsBoundByIndex.map(\.title).filter { !$0.isEmpty }
