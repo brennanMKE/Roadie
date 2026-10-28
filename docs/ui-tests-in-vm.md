@@ -136,6 +136,10 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   the Music Assistant server" (run 20261027-173236-61397). `PlayerModelDropTests.connectMusicAssistant` does it in
   order and waits for `isConnected`.
 - **The About panel isn't in `app.windows`**; find it as a dialog by its text.
+- **Tooltips (`.help`):** hovering does show a tag in the guest (`app.helpTags.firstMatch`, with a frame), but the
+  HelpTag element has no label, value or children, so its text can't be read. Test the strings in unit tests. Hovering
+  several controls in a row in one launch is flaky: AppKit's tooltip timer leaves the first tag up or shows the next
+  one late (#0227). Hover one control per launch.
 
 ## Gotchas carried over from the cameron setup
 

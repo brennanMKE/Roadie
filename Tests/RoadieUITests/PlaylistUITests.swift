@@ -504,4 +504,22 @@ final class PlaylistUITests: RoadieUITestCase {
         waitForRows(Self.fixtureCount)
         roadie.stopPlayback()
     }
+
+    // MARK: Tooltips (#0227)
+
+    /// Hovering ADD shows a help tag beside it. One hover only: in the guest the tag's text isn't readable (the
+    /// HelpTag element has no label, value or children) and a second hover in the same launch races AppKit's tooltip
+    /// timer (the first tag lingers or the next is late), so the five strings are `PlaylistTooltipTests`.
+    func testMenuButtonsHaveTooltips() {
+        launch(windows: [.main, .playlist])
+        let button = roadie.element(AXID.PL.Menu.add)
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "no \(AXID.PL.Menu.add)")
+        XCTAssertFalse(roadie.app.helpTags.firstMatch.exists, "a help tag before hovering")
+        button.hover()
+        let tag = roadie.app.helpTags.firstMatch
+        XCTAssertTrue(tag.waitForExistence(timeout: 5), "no help tag over ADD")
+        let frame = tag.frame, b = button.frame
+        XCTAssertLessThan(abs(frame.minY - b.midY), 100, "tag \(frame) far from ADD \(b)")
+        XCTAssertLessThan(abs(frame.minX - b.midX), 150, "tag \(frame) far from ADD \(b)")
+    }
 }

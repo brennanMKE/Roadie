@@ -116,6 +116,13 @@ import Testing
         }
     }
 
+    @Test func entrySpritesMatchMenuEntries() {
+        let l = layout(3, 2)
+        for menu in PlaylistLayout.Menu.allCases {
+            #expect(PlaylistLayout.entrySprites(menu) == l.menuEntries(menu).map(\.sprite))
+        }
+    }
+
     @Test func resizeRoundsLikeJavaScript() {
         let start = PlaylistLayout.Steps(width: 1, height: 1)
         #expect(PlaylistLayout.steps(from: start, draggedBy: CGSize(width: 12, height: 14)) == start)
