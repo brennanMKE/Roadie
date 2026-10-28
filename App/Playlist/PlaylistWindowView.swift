@@ -108,7 +108,9 @@ struct PlaylistWindowView: View {
             PlaylistMenusView(skin: skin)
         }
         .frame(width: layout.size.width, height: layout.size.height, alignment: .topLeading)
-        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.dropLibraryItems(transfers, replacing: NSEvent.modifierFlags.contains(.option)) }
+        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in
+            model.dropLibraryItems(transfers, replacing: NSEvent.modifierFlags.contains(.option))
+        }
     }
 }
 
@@ -432,7 +434,9 @@ struct PlaylistShadeView: View {
             }
         }
         .frame(width: width, height: PlaylistShadeLayout.height, alignment: .topLeading)
-        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.dropLibraryItems(transfers, replacing: NSEvent.modifierFlags.contains(.option)) }
+        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in
+            model.dropLibraryItems(transfers, replacing: NSEvent.modifierFlags.contains(.option))
+        }
     }
 
     private func button(_ rect: CGRect, _ id: String, _ label: String, pressed: String, action: @escaping () -> Void) -> some View {
@@ -483,5 +487,5 @@ struct PlaylistDropCueView: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
-}
+    }
 }
