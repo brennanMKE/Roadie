@@ -127,6 +127,11 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
 - **Toggle and check-mark state:** XCUITest doesn't read `isSelected` from skinned toggle buttons or from menu check
   marks. Read the model state from the probe (`shuffle`, `repeatAll`, `timeMode`, `alwaysOnTop`, `doubleSize`);
   the toggles also carry an `on`/`off` value.
+- **A menu popped with no view isn't in the accessibility tree.** `NSMenu.popUp(positioning:at:in: nil)` opens in
+  a window of its own that neither XCUITest nor VoiceOver reaches; pop in a view (`in: hosting`, #0208, #0230) and
+  the menu is under that window. Look pop-up items up under `app.windows`, not `app.menuItems[title]`: the latter
+  also matches a menu-bar item with the same title, and clicking that while the pop-up is open costs a 10 s
+  "open menu during menu traversal" failure and a retry through the menu bar, and passes on the wrong menu (#0230).
 - **The About panel isn't in `app.windows`**; find it as a dialog by its text.
 
 ## Gotchas carried over from the cameron setup
