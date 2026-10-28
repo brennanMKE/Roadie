@@ -1,4 +1,5 @@
 import AppKit
+import SkinKit
 
 /// A menu item that is its own target and runs a closure (used by the clutter bar and the playlist's pop-up menus).
 final class ActionMenuItem: NSMenuItem {
@@ -52,18 +53,29 @@ enum PlaylistContextMenus {
         }
     }
 
+    /// Pops `PlaylistMenu` entries at the pointer through `PlaylistMenuBuilder` (#0226). The test seam sees their
+    /// titles, and enabled when every item is.
+    static func popUp(_ entries: [PlaylistMenuEntry], perform: @escaping (PlaylistCommand) -> Void) {
+        #if DEBUG
+        if let popUpOverride {
+            let items: [Item?] = entries.map { entry in
+                if case .item(let item) = entry { (item.title, { perform(item.command) }) } else { nil }
+            }
+            let enabled = entries.allSatisfy { if case .item(let item) = $0 { item.isEnabled } else { true } }
+            popUpOverride(items, enabled)
+            return
+        }
+        #endif
+        let menu = PlaylistMenuBuilder.menu(entries, perform: perform)
+        Task { @MainActor in
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
+    }
+
     /// Disabled on a Music Assistant queue, which can't be sorted (#0145); the marquee says so.
-    static func sort(_ playlist: PlaylistModel) {
-        let enabled = playlist.remote == nil
-        if !enabled { playlist.onRemoteRefused() }
-        popUp([
-            ("Sort List by Title", { playlist.sortByTitle() }),
-            ("Sort List by File Name", { playlist.sortByFileName() }),
-            ("Sort List by Path and File Name", { playlist.sortByPath() }),
-            nil,
-            ("Reverse List", { playlist.reverse() }),
-            ("Randomize List", { playlist.randomize() }),
-        ], enabled: enabled)
+    static func sort(_ model: PlayerModel) {
+        if model.playlist.remote != nil { model.playlist.onRemoteRefused() }
+        popUp(PlaylistMenu.sortEntries(model.playlistMenuState)) { model.perform($0) }
     }
 
     /// The track list's right-click menu (#0179). Runs synchronously from the event; no skinned menu is open.
@@ -88,6 +100,6 @@ enum PlaylistContextMenus {
     }
 
     static func miscOptions(_ model: PlayerModel) {
-        popUp([("Generate HTML Playlist", { model.generateHTMLPlaylist() })])
+        popUp(PlaylistMenu.miscOptionsEntries(model.playlistMenuState)) { model.perform($0) }
     }
 }

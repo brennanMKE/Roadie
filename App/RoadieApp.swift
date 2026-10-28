@@ -61,6 +61,7 @@ struct RoadieApp: App {
             }
             SkinsCommands(model: appDelegate.model)
             PlaybackCommands(model: appDelegate.model)
+            PlaylistCommands(model: appDelegate.model)
             CommandGroup(after: .windowArrangement) {
                 OpenLibraryWindowButton(showsShortcut: false)
                 Divider()

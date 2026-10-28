@@ -244,9 +244,9 @@ final class PlaylistUITests: RoadieUITestCase {
         // `PlaylistContextMenus.sort` pops an NSMenu at the pointer with no view (`popUp(positioning:at:in: nil)`). It
         // shows on screen but isn't in the app's accessibility tree, at the app root or under any window (runs
         // 20261024-233202-39035 and 20261027-163806-30550, #0230), so its entries can't be clicked. The menu is tracking and takes the keyboard:
-        // Down arrows walk its items (the separator is skipped) and Return picks one. Items: Sort List by Title, by File
+        // Down arrows walk its items (the separator is skipped) and Return picks one. Items: Sort by Title, by File
         // Name, by Path and File Name, —, Reverse List, Randomize List.
-        let order = ["Sort List by Title", "Sort List by File Name", "Sort List by Path and File Name", "Reverse List",
+        let order = ["Sort by Title", "Sort by File Name", "Sort by Path and File Name", "Reverse List",
                      "Randomize List"]
         func sort(_ item: String) {
             guard let index = order.firstIndex(of: item) else { return XCTFail("no sort entry \(item)") }
@@ -266,7 +266,7 @@ final class PlaylistUITests: RoadieUITestCase {
         }
         sort("Reverse List")
         XCTAssertTrue(roadie.wait { titles == Array(original.reversed()) }, "reversed: \(titles)")
-        sort("Sort List by Title")
+        sort("Sort by Title")
         XCTAssertTrue(roadie.wait { titles == titles.sorted { $0.localizedStandardCompare($1) == .orderedAscending } },
                       "by title: \(titles)")
         let sorted = titles
@@ -418,5 +418,90 @@ final class PlaylistUITests: RoadieUITestCase {
         waitForRows(2)
         roadie.app.typeKey("o", modifierFlags: [.command, .option])
         waitForRows(3)
+    }
+
+    // MARK: The menu bar's Playlist menu (#0226)
+
+    static let playlistMenuTitles = [
+        "Add File…", "Add Folder…", "Add URL…", "Remove Selected", "Crop", "Clear Playlist", "Select All", "Select None",
+        "Invert Selection", "Sort by Title", "Sort by File Name", "Sort by Path and File Name", "Reverse List",
+        "Randomize List", "File Info…", "Generate HTML Playlist", "Load Playlist…", "Save Playlist…",
+    ]
+
+    private var playlistMenuBarItem: XCUIElement { roadie.app.menuBars.menuBarItems["Playlist"] }
+
+    /// Opens the Playlist menu and returns its item `title` (the menu stays open).
+    private func openPlaylistMenu(_ title: String, file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
+        let bar = playlistMenuBarItem
+        XCTAssertTrue(bar.waitForExistence(timeout: 5), "no Playlist menu in the menu bar", file: file, line: line)
+        bar.click()
+        let item = bar.menuItems[title]
+        XCTAssertTrue(item.waitForExistence(timeout: 3), "Playlist menu has no \(title)", file: file, line: line)
+        return item
+    }
+
+    private func playlistMenu(_ title: String, file: StaticString = #filePath, line: UInt = #line) {
+        openPlaylistMenu(title, file: file, line: line).click()
+    }
+
+    /// Whether Playlist › `title` is enabled; closes the menu again.
+    private func playlistMenuIsEnabled(_ title: String) -> Bool {
+        let enabled = openPlaylistMenu(title).isEnabled
+        roadie.app.typeKey(.escape, modifierFlags: [])
+        return enabled
+    }
+
+    func testPlaylistMenuBarHasEveryCommand() {
+        launchQueue()
+        let bar = playlistMenuBarItem
+        _ = openPlaylistMenu("Add File…")
+        let titles = bar.menus.firstMatch.menuItems.allElementsBoundByIndex.map(\.title).filter { !$0.isEmpty }
+        roadie.app.typeKey(.escape, modifierFlags: [])
+        XCTAssertEqual(titles, Self.playlistMenuTitles)
+        expectSelection([])
+        XCTAssertFalse(playlistMenuIsEnabled("Remove Selected"), "Remove Selected with nothing selected")
+        XCTAssertFalse(playlistMenuIsEnabled("Crop"), "Crop with nothing selected")
+        XCTAssertTrue(playlistMenuIsEnabled("Clear Playlist"))
+        XCTAssertTrue(playlistMenuIsEnabled("Sort by Title"))
+    }
+
+    func testPlaylistMenuBarEditsTheQueue() {
+        launchQueue()
+        let original = titles
+        playlistMenu("Reverse List")
+        XCTAssertTrue(roadie.wait { titles == Array(original.reversed()) }, "reversed: \(titles)")
+        roadie.app.typeKey("1", modifierFlags: [.command, .option])
+        XCTAssertTrue(roadie.wait { titles == titles.sorted { $0.localizedStandardCompare($1) == .orderedAscending } },
+                      "⌥⌘1 by title: \(titles)")
+        let sorted = titles
+        click(0)
+        click(1, .shift)
+        expectSelection([0, 1])
+        playlistMenu("Crop")
+        waitForRows(2)
+        XCTAssertEqual(titles, Array(sorted.prefix(2)))
+        expectSelection([0, 1])
+        playlistMenu("Invert Selection")
+        expectSelection([])
+        playlistMenu("Clear Playlist")
+        waitForRows(0)
+        for title in ["Remove Selected", "Crop", "Clear Playlist"] {
+            XCTAssertFalse(playlistMenuIsEnabled(title), "\(title) on an empty queue")
+        }
+    }
+
+    func testPlaylistMenuBarLoadsAndSaves() throws {
+        let saved = (dataDir as NSString).appendingPathComponent("MenuBar.m3u")
+        launchQueue(extra: ["-RoadieSaveTo", saved, "-RoadieLoadList", saved])
+        roadie.app.typeKey("s", modifierFlags: [.command, .option])
+        XCTAssertTrue(roadie.wait { FileManager.default.fileExists(atPath: saved) }, "⌥⌘S wrote no \(saved)")
+        let text = try String(contentsOfFile: saved, encoding: .utf8)
+        let entries = text.split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        XCTAssertEqual(entries.count, Self.fixtureCount, text)
+        playlistMenu("Clear Playlist")
+        waitForRows(0)
+        roadie.app.typeKey("l", modifierFlags: [.command, .option])
+        waitForRows(Self.fixtureCount)
+        roadie.stopPlayback()
     }
 }

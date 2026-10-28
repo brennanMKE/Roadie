@@ -190,6 +190,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Playback › Shuffle ⌃⌘S, Repeat ⌃⌘R (check marks) | UI `MainWindowUITests.shuffleRepeatToggles` |
 | Playback › Save Queue as Playlist…, Load Playlist from Library… (#0190) | UI `MusicAssistantUITests.saveQueueAsPlaylist`, `.loadPlaylistFromLibraryMenuItem`; Unit `QueueSaveTargetTests` |
 | Playback › Favorite Current Track ⌃⌘L | UI `MusicAssistantUITests.favoriteCurrentTrack`; Unit `BackendFavoritesTests` |
+| Playlist › Add File… / Add Folder… / Add URL…, Remove Selected, Crop, Clear Playlist, Select All / None / Invert, Sort by Title / File Name / Path ⌥⌘1–3, Reverse List, Randomize List, File Info…, Generate HTML Playlist, Load Playlist… ⌥⌘L, Save Playlist… ⌥⌘S; enabled as the shown queue allows (#0226) | UI `PlaylistUITests.testPlaylistMenuBarHasEveryCommand`, `.testPlaylistMenuBarEditsTheQueue`, `.testPlaylistMenuBarLoadsAndSaves`; Unit SkinKit `PlaylistMenuTests`, `RoadieTests.PlaylistCommandTests`, `.PlaylistMenuBuilderTests` |
 | Window › Library, Player ⌘1, Windowshade ⌃⌘W, Equalizer ⌘2, EQ Windowshade ⌃⌘E, Playlist Windowshade ⌃⌘P, Playlist Editor ⌘3, Always on Top, Double Size | UI `MainWindowUITests.windowMenu` |
 | Help › Welcome to Roadie…, Playlists and the Queue… (opens the help URL) | UI `FirstLaunchUITests.helpMenu` (URL recorded by `-RoadieExternalOpens record`) |
 
@@ -252,7 +253,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Scroll wheel, scrollbar, arrow buttons; resize corner; shade mode | UI `PlaylistUITests.scrollResizeShade`; Unit `PlaylistScrollTests`, `PlaylistLayoutTests` (exist) |
 | ADD › file / dir / URL (panels: unit; URL sheet: UI) | UI `PlaylistUITests.addURL` (folder library: Add URL adds nothing, the URL sheet needs a radio source, #0147), `.scrollResizeShade` (ADD › dir via `-RoadieAddFolder`); Unit `RoadieTests.PlayerModelFilesTests` |
 | SEL › invert / zero / all | UI `PlaylistUITests.selectMenu` |
-| MISC › file info, sort (title / file name / path, reverse, randomize), options › Generate HTML Playlist | UI `PlaylistUITests.sortMenu` (entries picked by keyboard: the sort pop-up isn't in the accessibility tree, #0230), `.fileInfoPanel`; Unit `PlaylistSortKeyTests`, `PlaylistHTMLTests` (exist) |
+| MISC › file info, sort (Sort by Title / File Name / Path and File Name, Reverse List, Randomize List; titles shared with the Playlist menu, #0226), options › Generate HTML Playlist | UI `PlaylistUITests.sortMenu` (entries picked by keyboard: the sort pop-up isn't in the accessibility tree, #0230), `.fileInfoPanel`; Unit `PlaylistSortKeyTests`, `PlaylistHTMLTests` (exist) |
 | LIST › new, save (M3U/PLS or a server playlist), load (file / Library playlist, #0190) | UI `PlaylistUITests.listMenuLocal` (save via `-RoadieSaveTo`, load via `-RoadieLoadList`), `MusicAssistantUITests.listLoadOffersLibraryPlaylist`; Unit `QueueSaveTargetTests` (exists) |
 | Bottom transport buttons, running time, mini time | UI `PlaylistUITests.bottomBar` |
 | Right-click row menu: Play, Queue/Dequeue, Clear Queue, Remove, File Info… | UI `PlaylistUITests.rowMenu`; Unit `RoadieTests.PlaylistMenusTests` |

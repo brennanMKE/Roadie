@@ -335,7 +335,6 @@ struct PlaylistMiniTimeView: View {
 struct PlaylistMenusView: View {
     let skin: Skin
     @Environment(PlayerModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     @State private var hovered: String?
 
     var body: some View {
@@ -381,33 +380,14 @@ struct PlaylistMenusView: View {
         }
     }
 
-    /// Runs a skinned menu entry. Sort List and Misc Options pop native menus at the pointer.
+    /// Runs a skinned menu entry through `PlaylistMenu` (#0226). Sort List and Misc Options pop native menus at the
+    /// pointer. A sprite can't be drawn disabled, so a disabled command does what it always did: nothing, or its notice.
     private func run(_ sprite: String) {
         let playlist = model.playlist
         switch sprite {
-        case "PLAYLIST_ADD_FILE": model.openFiles(replace: false)
-        case "PLAYLIST_ADD_DIR": model.openFolder()
-        // With a radio-capable source (Music Assistant), Add URL adds a radio station (#0147); otherwise nothing.
-        case "PLAYLIST_ADD_URL":
-            let library = model.library
-            if library.sections.contains(.radio) {
-                library.section = .radio
-                library.isAddingRadio = true
-                openWindow(id: "library")
-            }
-        case "PLAYLIST_REMOVE_SELECTED": playlist.removeSelected()
-        case "PLAYLIST_CROP": playlist.crop()
-        case "PLAYLIST_REMOVE_ALL", "PLAYLIST_NEW_LIST": playlist.removeAll()
-        case "PLAYLIST_SAVE_LIST": model.saveQueue()
-        case "PLAYLIST_LOAD_LIST": model.loadList()
-        case "PLAYLIST_INVERT_SELECTION": playlist.invertSelection()
-        case "PLAYLIST_SELECT_ZERO": playlist.selectNone()
-        case "PLAYLIST_SELECT_ALL": playlist.selectAll()
-        case "PLAYLIST_SORT_LIST": PlaylistContextMenus.sort(playlist)
-        case "PLAYLIST_FILE_INFO":
-            if let track = playlist.fileInfoTrack { model.showFileInfo(for: track) }
+        case "PLAYLIST_SORT_LIST": PlaylistContextMenus.sort(model)
         case "PLAYLIST_MISC_OPTIONS": PlaylistContextMenus.miscOptions(model)
-        default: break
+        default: if let command = PlaylistMenu.command(forSprite: sprite) { model.perform(command) }
         }
         hovered = nil
         playlist.openMenu = nil
