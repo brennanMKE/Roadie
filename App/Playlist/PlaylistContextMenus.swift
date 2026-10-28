@@ -17,10 +17,40 @@ final class ActionMenuItem: NSMenuItem {
     @objc private func fire() { handler() }
 }
 
-/// The native menus the playlist's MISC entries pop up at the pointer (Winamp and Webamp do the same).
+/// The native menus the playlist's MISC entries pop up at the pointer (Winamp and Webamp do the same). They pop in the
+/// playlist window's view, not `in: nil`, so VoiceOver and XCUITest see them (#0230): a menu popped with no view opens
+/// in a window of its own that isn't in the accessibility tree.
 @MainActor
 enum PlaylistContextMenus {
     typealias Item = (title: String, action: () -> Void)
+
+    /// The playlist window's hosting view, set by its `SkinWindowController` (#0230).
+    static weak var host: NSView?
+
+    /// Where a pop-up opens: the playlist window's view while that window is visible, else the key window's (#0226's
+    /// menu-bar Load Playlist… with the editor closed), else nil (`in: nil`, as before #0230).
+    static func popUpView(playlist: NSView?, playlistVisible: Bool, key: NSView?) -> NSView? {
+        if let playlist, playlistVisible { return playlist }
+        return key
+    }
+
+    /// `screen` (e.g. `NSEvent.mouseLocation`) in `view`'s coordinates, flipped or not.
+    static func point(_ screen: NSPoint, in view: NSView) -> NSPoint {
+        guard let window = view.window else { return screen }
+        return view.convert(window.convertPoint(fromScreen: screen), from: nil)
+    }
+
+    /// Pops `menu` with its top-left at the pointer, in `popUpView`'s view.
+    private static func popUpAtPointer(_ menu: NSMenu) {
+        let mouse = NSEvent.mouseLocation
+        let view = popUpView(playlist: host, playlistVisible: host?.window?.isVisible == true,
+                             key: NSApp.keyWindow?.contentView)
+        if let view {
+            menu.popUp(positioning: nil, at: point(mouse, in: view), in: view)
+        } else {
+            menu.popUp(positioning: nil, at: mouse, in: nil)
+        }
+    }
 
     #if DEBUG
     /// Unit tests only (#0211): when set, receives the items and their enabled state instead of a menu popping up.
@@ -49,7 +79,7 @@ enum PlaylistContextMenus {
         }
         // Next main-actor turn, so the skinned menu's tap finishes and it has closed first.
         Task { @MainActor in
-            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            popUpAtPointer(menu)
         }
     }
 
@@ -68,7 +98,7 @@ enum PlaylistContextMenus {
         #endif
         let menu = PlaylistMenuBuilder.menu(entries, perform: perform)
         Task { @MainActor in
-            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            popUpAtPointer(menu)
         }
     }
 

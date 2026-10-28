@@ -236,10 +236,11 @@ final class PlaylistUITests: RoadieUITestCase {
     func testSortMenu() {
         launchQueue()
         let original = titles
-        // SORT LIST pops at the pointer with `popUp(positioning:at:in: nil)`; its entries are under `app.menuItems` (#0230).
+        // SORT LIST pops at the pointer in the playlist window's view, so its entries are under the window (#0230).
+        // The lookup is scoped there: the menu bar's Playlist menu has the same titles.
         func sort(_ item: String) {
             roadie.playlist.menu(AXID.PL.Menu.misc, "pl.menu.misc.sort")
-            let entry = menuItem(item)
+            let entry = roadie.playlist.popUpMenuItem(item)
             guard entry.waitForExistence(timeout: 3) else { return XCTFail("SORT LIST has no \(item) menu item (#0230)") }
             entry.click()
         }
@@ -258,7 +259,7 @@ final class PlaylistUITests: RoadieUITestCase {
     func testMiscOptionsMenu() {
         launchQueue()
         roadie.playlist.menu(AXID.PL.Menu.misc, "pl.menu.misc.options")
-        let entry = menuItem("Generate HTML Playlist")
+        let entry = roadie.playlist.popUpMenuItem("Generate HTML Playlist")
         guard entry.waitForExistence(timeout: 3) else {
             return XCTFail("MISC OPTIONS has no Generate HTML Playlist menu item (#0230)")
         }

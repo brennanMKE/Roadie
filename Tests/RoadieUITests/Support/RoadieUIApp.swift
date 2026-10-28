@@ -215,6 +215,13 @@ final class RoadieUIApp {
             XCTAssertTrue(item.waitForExistence(timeout: 3), "\(button) didn't show \(entry)", file: file, line: line)
             ui.click(item, file: file, line: line)
         }
+
+        /// An item of the SORT LIST / MISC OPTIONS pop-up while it is open. Looked up under the app's windows, not the
+        /// application, so it can't match #0226's menu-bar Playlist menu, which has the same titles (#0230): a match
+        /// there makes XCUITest traverse the menu bar while the pop-up is still tracking.
+        func popUpMenuItem(_ title: String) -> XCUIElement {
+            ui.app.windows.descendants(matching: .menuItem).matching(NSPredicate(format: "title == %@", title)).firstMatch
+        }
     }
 
     var main: Main { Main(ui: self) }
