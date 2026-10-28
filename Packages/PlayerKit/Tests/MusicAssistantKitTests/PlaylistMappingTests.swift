@@ -17,6 +17,7 @@ extension ModelDecodingTests {
             #expect(playlist.libraryID != nil)
         }
         #expect(playlists[0].libraryID == "4")
+        // The recorder scrubbed every owner to "user" before #0221; after a re-record this is "Music Assistant".
         #expect(playlists[0].owner == "user")
         #expect(playlists[0].isFavorite == false)
         #expect(playlists[2].isDynamic == true)
@@ -31,12 +32,15 @@ extension ModelDecodingTests {
 }
 
 struct MAMappingTests {
-    private func playlist(domain: String, owner: String?, editable: Bool, dynamic: Bool = false) throws -> MAPlaylist {
+    private func playlist(
+        domain: String, owner: String?, editable: Bool, dynamic: Bool = false, mappingID: String = "abc",
+        itemID: String = "12", name: String = "Road Trip"
+    ) throws -> MAPlaylist {
         var json: [String: Any] = [
-            "item_id": "12", "provider": "library", "name": "Road Trip", "uri": "library://playlist/12",
+            "item_id": itemID, "provider": "library", "name": name, "uri": "library://playlist/\(itemID)",
             "is_editable": editable, "is_dynamic": dynamic, "favorite": true,
             "supported_mediatypes": ["track"],
-            "provider_mappings": [["item_id": "abc", "provider_domain": domain, "provider_instance": domain]],
+            "provider_mappings": [["item_id": mappingID, "provider_domain": domain, "provider_instance": domain]],
         ]
         if let owner { json["owner"] = owner }
         return try JSONDecoder().decode(MAPlaylist.self, from: JSONSerialization.data(withJSONObject: json))
@@ -56,6 +60,30 @@ struct MAMappingTests {
 
     @Test func builtinOwnedByMusicAssistantIsBuiltIn() throws {
         let mapped = LibraryPlaylist(ma: try playlist(domain: "builtin", owner: "Music Assistant", editable: false))
+        #expect(mapped.source == .builtIn)
+        #expect(mapped.editing.isEmpty)
+    }
+
+    /// #0221: the live server stamps owner "Music Assistant" on the user's own builtin playlists too (Party, item 9).
+    @Test func builtinEditablePlaylistOwnedByMusicAssistantIsTheUsers() throws {
+        let ma = try playlist(
+            domain: "builtin", owner: "Music Assistant", editable: true, mappingID: "9", itemID: "9", name: "Party")
+        let mapped = LibraryPlaylist(ma: ma)
+        #expect(mapped.source == .user)
+        #expect(mapped.editing == [.addRemove, .rename, .delete])
+        #expect(mapped.libraryID == "9")
+    }
+
+    @Test func generatedBuiltinPlaylistStaysBuiltInWhenEditable() throws {
+        let mapped = LibraryPlaylist(
+            ma: try playlist(domain: "builtin", owner: "Music Assistant", editable: true, mappingID: "random_tracks"))
+        #expect(mapped.source == .builtIn)
+        #expect(!mapped.editing.contains(.rename))
+        #expect(!mapped.editing.contains(.delete))
+    }
+
+    @Test func readOnlyBuiltinPlaylistIsBuiltIn() throws {
+        let mapped = LibraryPlaylist(ma: try playlist(domain: "builtin", owner: "Brennan", editable: false, mappingID: "x1"))
         #expect(mapped.source == .builtIn)
         #expect(mapped.editing.isEmpty)
     }

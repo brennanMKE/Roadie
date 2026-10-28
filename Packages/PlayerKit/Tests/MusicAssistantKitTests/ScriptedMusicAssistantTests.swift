@@ -208,6 +208,22 @@ struct ScriptedMusicAssistantTests {
         await rig.backend.disconnect()
     }
 
+    /// #0221: a playlist created on the server (owner "Music Assistant", editable) is the user's; the recorded
+    /// generated playlists stay built-in.
+    @Test func createdPlaylistIsTheUsers() async throws {
+        let rig = try await scripted(.libraryIdle)
+        let created = try await rig.backend.createPlaylist(named: "Party")
+        let listed = try await rig.backend.playlists(page: PageRequest()).items
+        let party = try #require(listed.first { $0.id == created.id })
+        #expect(party.source == .user)
+        #expect(party.editing.contains(.rename))
+        #expect(party.editing.contains(.delete))
+        let others = listed.filter { $0.id != created.id }
+        #expect(others.count == 3)
+        #expect(others.allSatisfy { $0.source == .builtIn })
+        await rig.backend.disconnect()
+    }
+
     @Test func unreachableScenarioFailsToConnect() async throws {
         let rig = try await scripted(.unreachable, connect: false)
         do {

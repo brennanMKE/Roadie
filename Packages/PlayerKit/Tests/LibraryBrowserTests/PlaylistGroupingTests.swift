@@ -52,4 +52,16 @@ struct PlaylistGroupingTests {
                 == "Spotify · Spotify Editors · Read-only")
         #expect(PlaylistGrouping.detailLine(playlist("R", .user, editable: true, owner: "Brennan")) == "Music Assistant · Brennan")
     }
+
+    /// #0221: the user's playlist owned by "Music Assistant" groups under My Playlists, without a doubled owner.
+    @Test func partyGroupsUnderMyPlaylists() {
+        let party = playlist("Party", .user, editable: true, owner: "Music Assistant")
+        let groups = PlaylistGrouping.groups([
+            playlist("Random", .builtIn, owner: "Music Assistant"), party,
+            playlist("Recently added", .builtIn, owner: "Music Assistant"),
+        ])
+        #expect(groups.map(\.kind) == [.mine, .builtIn])
+        #expect(groups[0].playlists.map(\.name) == ["Party"])
+        #expect(PlaylistGrouping.detailLine(party) == "Music Assistant")
+    }
 }

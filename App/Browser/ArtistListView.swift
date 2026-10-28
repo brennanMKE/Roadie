@@ -56,6 +56,15 @@ struct PlaylistListView: View {
         }
     }
 
+    /// The `AXID.Library.playlistGroup` kind for a group header.
+    static func groupKind(_ kind: PlaylistGrouping.Kind) -> String {
+        switch kind {
+        case .mine: "mine"
+        case .builtIn: "builtIn"
+        case .provider(let name): name
+        }
+    }
+
     var body: some View {
         PagedListView(
             list: library.playlists, rows: PlaylistGrouping.rows(library.playlists.items),
@@ -81,6 +90,8 @@ struct PlaylistListView: View {
                             .accessibilityLabel("Read-only")
                     }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(AXID.Library.playlistGroup(Self.groupKind(group.kind)))
                 .selectionDisabled()
             case .playlist(let playlist):
                 FavoriteRow(id: playlist.id, stored: playlist.isFavorite) {

@@ -22,14 +22,22 @@ enum MAMapping {
         playlist.providerMappings?.first?.providerDomain ?? playlist.provider
     }
 
-    /// The builtin provider's own playlists (`random_tracks`, `all_favorite_tracks`, ...) are `.builtIn`: they are owned
-    /// by "Music Assistant" or are read-only (2.10.6 records them with `owner: "user"`, `is_editable: false`). An editable
-    /// builtin playlist is the user's M3U-backed one. Anything else belongs to its provider.
+    /// The builtin provider's generated playlist ids (`providers/builtin/constants.py`, docs/design/playlists.md §1.2).
+    static let builtinPlaylistIDs: Set<String> = [
+        "all_favorite_tracks", "random_artist", "random_album", "random_tracks", "recently_played",
+        "recently_added_tracks", "infinite_mix", "infinite_mix_favorites",
+    ]
+
+    /// On the builtin provider, a playlist is `.builtIn` when its mapping's `item_id` is one of the generated ids or it
+    /// is read-only; an editable one is the user's M3U-backed playlist. The owner can't tell them apart: the live server
+    /// stamps "Music Assistant" on every builtin playlist, the user's own included (#0221); the recorder scrubbed owners
+    /// to "user" before #0221. Anything else belongs to its provider.
     static func playlistSource(_ playlist: MAPlaylist) -> PlaylistSource {
         let domain = playlistDomain(playlist)
         switch domain {
         case "builtin":
-            return playlist.owner == "Music Assistant" || playlist.isEditable != true ? .builtIn : .user
+            if let id = playlist.providerMappings?.first?.itemID, builtinPlaylistIDs.contains(id) { return .builtIn }
+            return playlist.isEditable == true ? .user : .builtIn
         case nil, "library":
             return .user
         case let domain?:
