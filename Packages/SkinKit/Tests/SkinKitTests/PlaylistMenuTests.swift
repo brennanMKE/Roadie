@@ -123,4 +123,20 @@ struct PlaylistMenuTests {
             "Sort by Title", "Sort by File Name", "Sort by Path and File Name", "Reverse List", "Randomize List",
         ])
     }
+
+    /// #0229: the right-click menu's Load Playlist… and Clear Playlist.
+    @Test func contextEntriesAreLoadAndClear() {
+        func state(_ entries: [PlaylistMenuEntry]) -> [String: Bool] {
+            Dictionary(uniqueKeysWithValues: items(entries).map { ($0.title, $0.isEnabled) })
+        }
+        let entries = PlaylistMenu.contextEntries(full)
+        #expect(entries.count == 2)
+        #expect(items(entries).map(\.command) == [.loadPlaylist, .clearPlaylist])
+        #expect(items(entries).first?.shortcut != nil)
+        let emptyLocal = PlaylistMenuState(canLoad: true)
+        #expect(state(PlaylistMenu.contextEntries(emptyLocal)) == ["Load Playlist…": true, "Clear Playlist": false])
+        #expect(state(entries) == ["Load Playlist…": true, "Clear Playlist": true])
+        let remote = PlaylistMenuState(hasRows: true, isRemote: true, canLoad: true)
+        #expect(state(PlaylistMenu.contextEntries(remote)) == ["Load Playlist…": true, "Clear Playlist": true])
+    }
 }

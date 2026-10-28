@@ -117,6 +117,11 @@ public enum PlaylistMenu {
         ]
     }
 
+    /// What the track list's right-click menu adds, on a row and below the rows (#0229).
+    public static func contextEntries(_ state: PlaylistMenuState) -> [PlaylistMenuEntry] {
+        [.item(item(.loadPlaylist, state)), .item(item(.clearPlaylist, state))]
+    }
+
     /// What MISC › MISC OPTIONS pops up.
     public static func miscOptionsEntries(_ state: PlaylistMenuState) -> [PlaylistMenuEntry] {
         [.item(item(.generateHTML, state))]

@@ -96,7 +96,15 @@ enum PlaylistContextMenus {
         let info = ActionMenuItem(title: "File Info…") { if let track { model.showFileInfo(for: track) } }
         info.isEnabled = track != nil
         menu.addItem(info)
+        // Then Load Playlist… and Clear Playlist (#0229), from the same model as LIST and REM.
+        menu.addItem(.separator())
+        PlaylistMenuBuilder.add(PlaylistMenu.contextEntries(model.playlistMenuState), to: menu) { model.perform($0) }
         return menu
+    }
+
+    /// The right-click menu below the rows, or on an empty list (#0229): Load Playlist… and Clear Playlist only.
+    static func emptyAreaMenu(_ model: PlayerModel) -> NSMenu {
+        PlaylistMenuBuilder.menu(PlaylistMenu.contextEntries(model.playlistMenuState)) { model.perform($0) }
     }
 
     static func miscOptions(_ model: PlayerModel) {

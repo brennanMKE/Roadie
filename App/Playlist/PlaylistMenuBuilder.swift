@@ -8,6 +8,12 @@ enum PlaylistMenuBuilder {
     static func menu(_ entries: [PlaylistMenuEntry], perform: @escaping (PlaylistCommand) -> Void) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
+        add(entries, to: menu, perform: perform)
+        return menu
+    }
+
+    /// Appends the entries to an existing menu (the track list's right-click menu, #0229).
+    static func add(_ entries: [PlaylistMenuEntry], to menu: NSMenu, perform: @escaping (PlaylistCommand) -> Void) {
         for entry in entries {
             switch entry {
             case .separator:
@@ -22,7 +28,6 @@ enum PlaylistMenuBuilder {
                 menu.addItem(item)
             }
         }
-        return menu
     }
 
     static func modifierMask(_ modifiers: MainMenuShortcut.Modifiers) -> NSEvent.ModifierFlags {

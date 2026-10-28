@@ -133,7 +133,12 @@ final class PlaylistListInputView: NSView {
             window?.makeFirstResponder(self)
             let playlist = model.playlist
             playlist.openMenu = nil
-            guard let index = row(atY: skinPoint(event).y) else { return }
+            // Below the last row (or on an empty list): deselect, as a left-click there does, and offer Load / Clear (#0229).
+            guard let index = row(atY: skinPoint(event).y) else {
+                playlist.selectNone()
+                NSMenu.popUpContextMenu(PlaylistContextMenus.emptyAreaMenu(model), with: event, for: self)
+                return
+            }
             if !playlist.isSelected(index) { playlist.click(index) }   // Finder-style: right-click selects the row
             NSMenu.popUpContextMenu(PlaylistContextMenus.rowMenu(model), with: event, for: self)
         }

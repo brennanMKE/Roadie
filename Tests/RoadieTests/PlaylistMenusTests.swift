@@ -12,17 +12,66 @@ final class PlaylistMenusTests: PlayerModelTestCase {
         restoreThreeTracks(model)
         model.playlist.click(1)
         var menu = PlaylistContextMenus.rowMenu(model)
-        XCTAssertEqual(menu.items.map(\.title), ["Play", "Queue", "", "Remove", "File Info…"])
-        XCTAssertTrue(try XCTUnwrap(menu.items.last).isEnabled)
+        let info = { try XCTUnwrap(menu.items.first { $0.title == "File Info…" }) }
+        XCTAssertEqual(
+            menu.items.map(\.title),
+            ["Play", "Queue", "", "Remove", "File Info…", "", "Load Playlist…", "Clear Playlist"])
+        XCTAssertTrue(try info().isEnabled)
 
         model.playlist.toggleQueueForSelection()
         menu = PlaylistContextMenus.rowMenu(model)
-        XCTAssertEqual(menu.items.map(\.title), ["Play", "Dequeue", "Clear Queue", "", "Remove", "File Info…"])
+        XCTAssertEqual(
+            menu.items.map(\.title),
+            ["Play", "Dequeue", "Clear Queue", "", "Remove", "File Info…", "", "Load Playlist…", "Clear Playlist"])
 
         model.playlist.selectNone()
         model.player.clearQueue()
         menu = PlaylistContextMenus.rowMenu(model)
-        XCTAssertFalse(try XCTUnwrap(menu.items.last).isEnabled, "File Info… needs a selected row or a current track")
+        XCTAssertFalse(try info().isEnabled, "File Info… needs a selected row or a current track")
+    }
+
+    private func fire(_ menu: NSMenu, _ title: String) throws {
+        let item = try XCTUnwrap(menu.items.first { $0.title == title })
+        NSApp.sendAction(try XCTUnwrap(item.action), to: item.target, from: item)
+    }
+
+    func testEmptyAreaMenu() throws {
+        let model = try makeModel(folder: true)
+        var menu = PlaylistContextMenus.emptyAreaMenu(model)
+        XCTAssertEqual(menu.items.map(\.title), ["Load Playlist…", "Clear Playlist"])
+        XCTAssertFalse(menu.items[1].isEnabled, "nothing to clear on an empty list")
+        XCTAssertTrue(menu.items[0].isEnabled)
+        try fire(menu, "Load Playlist…")
+        XCTAssertEqual(systemRequests.last, .openPlaylistFile)
+
+        restoreThreeTracks(model)
+        menu = PlaylistContextMenus.emptyAreaMenu(model)
+        XCTAssertTrue(menu.items[1].isEnabled)
+        try fire(menu, "Clear Playlist")
+        XCTAssertTrue(model.playlist.tracks.isEmpty)
+    }
+
+    func testContextLoadOnAMusicAssistantQueueOpensThePicker() async throws {
+        let model = try makeModel(scenario: .queueLoaded)
+        try await selectSpeakerWithQueue(model)
+        model.isPickingPlaylist = false
+        try fire(PlaylistContextMenus.emptyAreaMenu(model), "Load Playlist…")
+        XCTAssertTrue(model.isPickingPlaylist)
+    }
+
+    /// Regression (#0229): the right-click menu ends with Load Playlist… and Clear Playlist.
+    func testRowMenuOffersLoadAndClear() throws {
+        let model = try makeModel()
+        restoreThreeTracks(model)
+        model.playlist.click(1)
+        let menu = PlaylistContextMenus.rowMenu(model)
+        XCTAssertEqual(Array(menu.items.map(\.title).suffix(3)), ["", "Load Playlist…", "Clear Playlist"])
+        let clear = try XCTUnwrap(menu.items.first { $0.title == "Clear Playlist" })
+        XCTAssertTrue(clear.isEnabled)
+        XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == "Load Playlist…" }).isEnabled)
+        let action = try XCTUnwrap(clear.action)
+        NSApp.sendAction(action, to: clear.target, from: clear)
+        XCTAssertTrue(model.playlist.tracks.isEmpty)
     }
 
     func testSortMenuIsDisabledOnRemote() async throws {

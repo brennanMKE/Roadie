@@ -358,6 +358,87 @@ final class PlaylistUITests: RoadieUITestCase {
         menuItem("Remove").click()
         waitForRows(Self.fixtureCount - 1)
         XCTAssertNotEqual(titles[4], removed)
+
+        // #0229: the row menu also ends with Load Playlist… and Clear Playlist.
+        row(1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
+        XCTAssertTrue(contextMenuItem("Load Playlist…").waitForExistence(timeout: 3), "row menu has no Load Playlist…")
+        XCTAssertTrue(contextMenuItem("Clear Playlist").exists, "row menu has no Clear Playlist")
+        XCTAssertEqual(Array(contextMenuTitles().suffix(2)), ["Load Playlist…", "Clear Playlist"])
+        roadie.app.typeKey(.escape, modifierFlags: [])
+    }
+
+    // MARK: Right-click Load / Clear (#0229)
+
+    /// The open right-click menu: `popUpContextMenu(_:with:for:)` puts it under the window it was popped for (#0208),
+    /// never the menu bar's Playlist menu, which has items with the same titles (#0226).
+    /// The hierarchy at #0229's first run showed it as a direct child of the playlist window.
+    private var contextMenu: XCUIElement {
+        roadie.app.windows.descendants(matching: .menu)
+            .containing(NSPredicate(format: "title == %@", "Load Playlist…")).firstMatch
+    }
+
+    private func contextMenuItem(_ title: String) -> XCUIElement { windowMenuItem(title) }
+
+    private func contextMenuTitles() -> [String] {
+        contextMenu.menuItems.allElementsBoundByIndex.map(\.title).filter { !$0.isEmpty }
+    }
+
+    /// A point in the track list `rows` row heights below row 0's centre, fixed to the playlist window, so it still
+    /// works once the rows are gone.
+    private func listPoint(rowsBelowFirst rows: CGFloat) -> XCUICoordinate {
+        let first = row(0)
+        XCTAssertTrue(first.waitForExistence(timeout: 5), "no \(AXID.PL.row(0))")
+        // Anchored on an element that outlives the rows: the coordinate resolves its window again when clicked.
+        let window = roadie.app.windows.containing(.any, identifier: AXID.PL.titleClose).firstMatch
+        let frame = first.frame
+        let origin = window.frame.origin
+        return window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX - origin.x, dy: frame.midY + rows * frame.height - origin.y))
+    }
+
+    func testRowMenuLoadsAndClears() {
+        let saved = (dataDir as NSString).appendingPathComponent("Context.m3u")
+        launchQueue(extra: ["-RoadieSaveTo", saved, "-RoadieLoadList", saved])
+        roadie.playlist.menu(AXID.PL.Menu.list, "pl.menu.list.save")
+        XCTAssertTrue(roadie.wait { FileManager.default.fileExists(atPath: saved) }, "LIST › Save wrote no \(saved)")
+        let empty = listPoint(rowsBelowFirst: 0)
+        row(2).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
+        let clear = contextMenuItem("Clear Playlist")
+        XCTAssertTrue(clear.waitForExistence(timeout: 3), "row menu has no Clear Playlist")
+        clear.click()
+        waitForRows(0)
+
+        empty.rightClick()
+        let load = contextMenuItem("Load Playlist…")
+        XCTAssertTrue(load.waitForExistence(timeout: 3), "empty list's menu has no Load Playlist…")
+        load.click()
+        waitForRows(Self.fixtureCount)
+        roadie.stopPlayback()
+    }
+
+    func testEmptyAreaRightClickMenu() {
+        launchQueue()
+        // Crop to one row so the slot under it is inside the list on any window height; the point is the next row
+        // slot, measured from that row's frame.
+        click(0)
+        roadie.playlist.menu(AXID.PL.Menu.rem, "pl.menu.rem.crop")
+        waitForRows(1)
+        let below = listPoint(rowsBelowFirst: 1)
+        expectSelection([0])
+        below.rightClick()
+        XCTAssertTrue(contextMenuItem("Load Playlist…").waitForExistence(timeout: 3), "no menu below the rows")
+        XCTAssertEqual(contextMenuTitles(), ["Load Playlist…", "Clear Playlist"])
+        XCTAssertTrue(contextMenuItem("Clear Playlist").isEnabled)
+        roadie.app.typeKey(.escape, modifierFlags: [])
+        expectSelection([])
+
+        roadie.playlist.menu(AXID.PL.Menu.rem, "pl.menu.rem.all")
+        waitForRows(0)
+        below.rightClick()
+        let clear = contextMenuItem("Clear Playlist")
+        XCTAssertTrue(clear.waitForExistence(timeout: 3), "no menu on the empty list")
+        XCTAssertFalse(clear.isEnabled, "Clear Playlist is enabled on an empty list")
+        roadie.app.typeKey(.escape, modifierFlags: [])
     }
 
     func testQueueMarkers() {

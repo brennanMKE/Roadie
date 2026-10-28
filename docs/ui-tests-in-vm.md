@@ -135,6 +135,12 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   `sources.select(…)` starts a second connection, and a play sent while it authenticates fails with "Can't reach
   the Music Assistant server" (run 20261027-173236-61397). `PlayerModelDropTests.connectMusicAssistant` does it in
   order and waits for `isConnected`.
+- **A right-click menu sits under its window (#0229).** `NSMenu.popUpContextMenu(_:with:for:)` puts the menu as a
+  direct child of the window it was popped for, so `app.children(matching: .menu)` never finds it. Look items up with
+  `app.windows.descendants(matching: .menuItem)` by title, which also keeps the menu bar's same-titled items out.
+- **Queries resolve again when used (#0229).** An `XCUICoordinate` built from `windows.containing(.any, identifier:
+  "pl.row.0")` fails once the rows are gone ("No matches found … Elements containing elements"). Anchor a coordinate
+  on an element that outlives the change, such as `pl.title.close`.
 - **The About panel isn't in `app.windows`**; find it as a dialog by its text.
 
 ## Gotchas carried over from the cameron setup
