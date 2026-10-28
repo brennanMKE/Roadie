@@ -43,6 +43,8 @@ final class PlaylistListInputView: NSView {
     /// Pointer y (skin pixels, from this view's top) where the drag began, and the rows moved so far.
     private var dragStartY: CGFloat?
     private var lastDiff = 0
+    /// Whether ⌥ is held: a drop then replaces the list (#0228). `NSDraggingInfo` carries no modifier flags.
+    var isOptionDown: () -> Bool = { NSEvent.modifierFlags.contains(.option) }
 
     init(model: PlayerModel) {
         self.model = model
@@ -187,12 +189,21 @@ final class PlaylistListInputView: NSView {
     private static let dropLog = Logger(subsystem: "co.sstools.roadie", category: "LibraryDrop")
 
     private func dragOperation(_ sender: NSDraggingInfo) -> NSDragOperation {
-        let pasteboard = sender.draggingPasteboard
-        if LibraryDropDecoder.hasMediaID(pasteboard) {
-            return LibraryDropDecoder.operation(for: sender.draggingSourceOperationMask)
+        let plan = LibraryDropDecoder.plan(
+            pasteboard: sender.draggingPasteboard, mask: sender.draggingSourceOperationMask, replacing: isOptionDown())
+        MainActor.assumeIsolated {
+            if model.playlist.dropCue != plan?.cue { model.playlist.dropCue = plan?.cue }
         }
-        return LibraryDropDecoder.hasFileURLs(pasteboard) ? .copy : []
+        return plan?.operation ?? []
     }
+
+    private func clearDropCue() {
+        MainActor.assumeIsolated { model.playlist.dropCue = nil }
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) { clearDropCue() }
+    override func concludeDragOperation(_ sender: NSDraggingInfo?) { clearDropCue() }
+    override func draggingEnded(_ sender: NSDraggingInfo) { clearDropCue() }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         let pasteboard = sender.draggingPasteboard
@@ -207,7 +218,9 @@ final class PlaylistListInputView: NSView {
     /// Files and folders go in before the row under the pointer, or at the end below the last row (Winamp). A remote
     /// queue's row means nothing in the local queue, so there the drop appends as before.
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        clearDropCue()
         let pasteboard = sender.draggingPasteboard
+        let replacing = isOptionDown()
         if LibraryDropDecoder.hasMediaID(pasteboard) {
             guard let ids = LibraryDropDecoder.mediaIDs(from: pasteboard), !ids.isEmpty else {
                 Self.dropLog.error("drop: media-id type present but no data decoded")
@@ -218,8 +231,8 @@ final class PlaylistListInputView: NSView {
                 // Library items go through the selected output's backend and its gates (a folder library on a speaker
                 // is refused with a notice). Music Assistant can't place items, so there they append (#0173 decision 4).
                 let row = row(atY: skinPoint(windowPoint: sender.draggingLocation).y) ?? model.playlist.count
-                Self.dropLog.info("drop: \(ids.count) id(s) at row \(row)")
-                model.playFromLibrary(PlayRequest(items: ids, mode: .insert(at: row)))
+                Self.dropLog.info("drop: \(ids.count) id(s) at row \(row), \(replacing ? "replace" : "insert", privacy: .public)")
+                model.dropLibraryItems(ids, at: row, replacing: replacing)
                 return true
             }
         }
@@ -227,10 +240,11 @@ final class PlaylistListInputView: NSView {
         guard !urls.isEmpty else { return false }
         return MainActor.assumeIsolated {
             let playlist = model.playlist
-            let row: Int? = playlist.remote != nil
+            let row: Int? = playlist.remote != nil || replacing
                 ? nil
                 : (row(atY: skinPoint(windowPoint: sender.draggingLocation).y) ?? playlist.count)
-            return model.open(urls, replace: false, at: row)
+            Self.dropLog.info("drop: \(urls.count) file(s), \(replacing ? "replace" : "insert", privacy: .public)")
+            return model.open(urls, replace: replacing, at: row)
         }
     }
 

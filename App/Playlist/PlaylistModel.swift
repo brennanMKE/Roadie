@@ -10,6 +10,9 @@ import SkinKit
 /// `PlayerModel`. Edits go straight to `Player` (not through `TransportCommand`: that stream exists for transport
 /// ordering). With a speaker selected, or This Mac fed by Music Assistant, it shows that backend's queue instead
 /// (`remote`, set by `PlayerModel`, #0144): read-only apart from playing a row.
+/// What a drop on the track list will do, when it isn't a plain insert (#0228).
+enum PlaylistDropCue: Equatable { case replace }
+
 @MainActor
 @Observable
 final class PlaylistModel {
@@ -30,6 +33,9 @@ final class PlaylistModel {
         /// 0 for the first visible row.
         let position: Int
     }
+
+    /// The cue drawn over the track list while a drag is over it (#0228): `.replace` while ⌥ is held.
+    var dropCue: PlaylistDropCue?
 
     private let player: Player
     @ObservationIgnored private let defaults: UserDefaults

@@ -127,6 +127,14 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
 - **Toggle and check-mark state:** XCUITest doesn't read `isSelected` from skinned toggle buttons or from menu check
   marks. Read the model state from the probe (`shuffle`, `repeatAll`, `timeMode`, `alwaysOnTop`, `doubleSize`);
   the toggles also carry an `on`/`off` value.
+- **A Library → playlist drag doesn't land in the guest (#0228):** neither `album.press(forDuration: 0.3, thenDragTo:
+  plRow, withVelocity: .slow, thenHoldForDuration: 0.3)` nor a coordinate drag with a 1 s press reached the track list
+  (runs 20261027-170547-43705, 20261027-171510-47592: the queue unchanged, the album not even selected). Library
+  drops are unit tested through `PlayerModel.dropLibraryItems` and `LibraryDropDecoder.plan`; the drag stays by hand.
+- **Unit tests on the scripted Music Assistant: select the source, then connect.** `connect()` then
+  `sources.select(…)` starts a second connection, and a play sent while it authenticates fails with "Can't reach
+  the Music Assistant server" (run 20261027-173236-61397). `PlayerModelDropTests.connectMusicAssistant` does it in
+  order and waits for `isConnected`.
 - **The About panel isn't in `app.windows`**; find it as a dialog by its text.
 
 ## Gotchas carried over from the cameron setup

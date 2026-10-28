@@ -143,6 +143,36 @@ final class DropDecoderTests: XCTestCase {
         XCTAssertEqual(LibraryDropDecoder.fileURLs(from: pasteboard).map(\.path), urls.map(\.path))
     }
 
+    // MARK: Drop plan (#0228)
+
+    func testPlanForAnOptionDragIsCopyWithTheReplaceCue() throws {
+        let pasteboard = makePasteboard()
+        XCTAssertTrue(pasteboard.writeObjects([try item([MediaID(.album, "a")])]))
+        let replacing = try XCTUnwrap(LibraryDropDecoder.plan(pasteboard: pasteboard, mask: .copy, replacing: true))
+        XCTAssertEqual(replacing.operation, .copy)
+        XCTAssertEqual(replacing.cue, .replace)
+        let plain = try XCTUnwrap(LibraryDropDecoder.plan(pasteboard: pasteboard, mask: .copy, replacing: false))
+        XCTAssertEqual(plain.operation, .copy)
+        XCTAssertNil(plain.cue)
+    }
+
+    func testPlanForFilesWithOptionHasTheReplaceCue() throws {
+        let pasteboard = makePasteboard()
+        XCTAssertTrue(pasteboard.writeObjects([URL(fileURLWithPath: "/nonexistent/roadie-tests/a.mp3") as NSURL]))
+        let plan = try XCTUnwrap(LibraryDropDecoder.plan(pasteboard: pasteboard, mask: .copy, replacing: true))
+        XCTAssertEqual(plan.operation, .copy)
+        XCTAssertEqual(plan.cue, .replace)
+    }
+
+    func testPlanForAnUnrelatedPasteboardIsNil() throws {
+        let pasteboard = makePasteboard()
+        XCTAssertTrue(pasteboard.writeObjects([URL(string: "https://roadie.sstools.co/")! as NSURL]))
+        XCTAssertNil(LibraryDropDecoder.plan(pasteboard: pasteboard, mask: .every, replacing: true))
+        let ids = makePasteboard()
+        XCTAssertTrue(ids.writeObjects([try item([MediaID(.album, "a")])]))
+        XCTAssertNil(LibraryDropDecoder.plan(pasteboard: ids, mask: .link, replacing: true), "no cue for a refused drag")
+    }
+
     func testWebURLsAreNotFileURLs() {
         let pasteboard = makePasteboard()
         XCTAssertTrue(pasteboard.writeObjects([URL(string: "https://roadie.sstools.co/")! as NSURL]))

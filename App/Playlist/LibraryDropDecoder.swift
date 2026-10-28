@@ -36,6 +36,24 @@ enum LibraryDropDecoder {
         return MediaIDTransfer.decode(data)?.ids
     }
 
+    /// The operation and cue for a drag (#0228). The operation stays copy-first with ⌥ held (AppKit narrows the
+    /// source mask to copy then), so the replace cue is drawn by the editor, not the badge. nil when refused.
+    struct DropPlan: Equatable {
+        var operation: NSDragOperation
+        var cue: PlaylistDropCue?
+    }
+
+    static func plan(pasteboard: NSPasteboard, mask: NSDragOperation, replacing: Bool) -> DropPlan? {
+        let operation: NSDragOperation
+        if hasMediaID(pasteboard) {
+            operation = self.operation(for: mask)
+        } else {
+            operation = hasFileURLs(pasteboard) ? .copy : []
+        }
+        guard !operation.isEmpty else { return nil }
+        return DropPlan(operation: operation, cue: replacing ? .replace : nil)
+    }
+
     /// Whether the pasteboard holds file URLs.
     static func hasFileURLs(_ pasteboard: NSPasteboard) -> Bool {
         pasteboard.canReadObject(forClasses: [NSURL.self], options: fileURLOptions)

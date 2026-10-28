@@ -57,7 +57,7 @@ struct PlaylistView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            model.open(urls, replace: false)
+            model.open(urls, replace: NSEvent.modifierFlags.contains(.option))
         }
         .sheet(isPresented: Bindable(model).isPickingPlaylist) {
             PlaylistPickerSheet(library: model.library) { playlist in
@@ -101,13 +101,14 @@ struct PlaylistWindowView: View {
             }
 
             PlaylistTrackListView(skin: skin)
+            PlaylistDropCueView(skin: skin)
             PlaylistScrollBarView(skin: skin)
             PlaylistBottomView(skin: skin)
             PlaylistTitleButtons(skin: skin)
             PlaylistMenusView(skin: skin)
         }
         .frame(width: layout.size.width, height: layout.size.height, alignment: .topLeading)
-        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.appendDroppedLibraryItems(transfers) }
+        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.dropLibraryItems(transfers, replacing: NSEvent.modifierFlags.contains(.option)) }
     }
 }
 
@@ -451,7 +452,7 @@ struct PlaylistShadeView: View {
             }
         }
         .frame(width: width, height: PlaylistShadeLayout.height, alignment: .topLeading)
-        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.appendDroppedLibraryItems(transfers) }
+        .dropDestination(for: MediaIDTransfer.self) { transfers, _ in model.dropLibraryItems(transfers, replacing: NSEvent.modifierFlags.contains(.option)) }
     }
 
     private func button(_ rect: CGRect, _ id: String, _ label: String, pressed: String, action: @escaping () -> Void) -> some View {
@@ -466,12 +467,41 @@ extension PlayerModel {
     private static let libraryDropLog = Logger(subsystem: "co.sstools.roadie", category: "LibraryDrop")
 
     /// The SwiftUI fallback for Library drops outside the AppKit track list (title bar, scroll bar, bottom bar, shade):
-    /// the items are appended (#0188). false when there are no ids.
-    func appendDroppedLibraryItems(_ transfers: [MediaIDTransfer]) -> Bool {
+    /// the items are appended (#0188), or replace the list with ⌥ held (#0228). false when there are no ids.
+    func dropLibraryItems(_ transfers: [MediaIDTransfer], replacing: Bool) -> Bool {
         let ids = transfers.flatMap(\.ids)
         guard !ids.isEmpty else { return false }
-        Self.libraryDropLog.info("drop (SwiftUI): \(ids.count) id(s), appended")
-        playFromLibrary(PlayRequest(items: ids, mode: .insert(at: playlist.count)))
+        Self.libraryDropLog.info("drop (SwiftUI): \(ids.count) id(s), \(replacing ? "replace" : "append", privacy: .public)")
+        dropLibraryItems(ids, at: playlist.count, replacing: replacing)
         return true
     }
+
+    /// A Library drop at `row`: inserted there, or with `replacing` (⌥ held) the list is replaced and plays, as a
+    /// double-click in the Library does (#0228). Music Assistant can't place items, so its insert appends (#0173).
+    func dropLibraryItems(_ ids: [MediaID], at row: Int, replacing: Bool) {
+        playFromLibrary(PlayRequest(items: ids, mode: replacing ? .replace() : .insert(at: row)))
+    }
+}
+
+/// The REPLACE PLAYLIST cue over the track list while a ⌥-drag is over it (#0228): the rows shaded with the skin's
+/// selection colour and the words in the skin's text font. Drawing only.
+struct PlaylistDropCueView: View {
+    let skin: Skin
+    @Environment(PlayerModel.self) private var model
+
+    var body: some View {
+        let area = model.playlist.layout.trackArea
+        if model.playlist.dropCue == .replace {
+            ZStack {
+                Color(skin.playlistStyle.selectedBackground).opacity(0.6)
+                if let image = skin.textImage("REPLACE PLAYLIST") {
+                    Image(decorative: image, scale: 1).interpolation(.none)
+                }
+            }
+            .frame(width: area.width, height: area.height)
+            .offset(x: area.minX, y: area.minY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+}
 }
