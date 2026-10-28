@@ -28,14 +28,14 @@ final class PlaylistMenusTests: PlayerModelTestCase {
     func testSortMenuIsDisabledOnRemote() async throws {
         let local = try makeModel()
         restoreThreeTracks(local)
-        PlaylistContextMenus.sort(local.playlist)
+        PlaylistContextMenus.sort(local)
         XCTAssertEqual(popUps.last?.enabled, true)
         XCTAssertEqual(popUps.last?.titles.count, 6)
 
         let model = try makeModel(scenario: .queueLoaded)
         try await selectSpeakerWithQueue(model)
         model.clearNotice()
-        PlaylistContextMenus.sort(model.playlist)
+        PlaylistContextMenus.sort(model)
         XCTAssertEqual(popUps.last?.enabled, false)
         XCTAssertEqual(model.notice?.text, "Not for Music Assistant queues")
     }
