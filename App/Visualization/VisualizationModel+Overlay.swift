@@ -131,7 +131,24 @@ extension VisualizationModel {
     func showOverlay() {
         let wasVisible = overlay.isOverlayVisible
         overlay.show(at: currentTime())
+        syncPointerInside()
         overlayChanged(wasVisible: wasVisible, force: true)
+    }
+
+    /// The pointer isn't over the picture (opened by key from another window, or it left while the window wasn't
+    /// key): the state machine stops counting it inside, so the cursor never hides there.
+    func syncPointerInside() {
+        if let isPointerInside, !isPointerInside() { overlay.pointerExited(at: currentTime()) }
+    }
+
+    /// Settings › Visualization's idle time changed (#0241): the running overlay takes it, shown and counting again
+    /// from now; Never keeps it up.
+    func applyOverlayIdleTimeout() {
+        let wasVisible = overlay.isOverlayVisible
+        overlay.idleTimeout = overlayIdleTimeout
+        overlay.show(at: currentTime())
+        syncPointerInside()
+        overlayChanged(wasVisible: wasVisible)
     }
 
     func overlayPointerMoved(inside: Bool) {
@@ -164,6 +181,7 @@ extension VisualizationModel {
 
     /// The idle timer's fire: hides the overlay (and the cursor, when the pointer is inside) once the deadline passed.
     func tickOverlay() {
+        syncPointerInside()
         overlay.tick(at: currentTime())
         if overlay.isCursorHidden { hideCursor?() }
         scheduleOverlayTick()

@@ -344,6 +344,40 @@ final class VisualizationUITests: RoadieUITestCase {
         XCTAssertTrue(roadie.element(AXID.Vis.noAudioBadge).exists, "no \(AXID.Vis.noAudioBadge)")
     }
 
+    /// Settings › Visualization › Never (#0241) applies to the open window: playing, the overlay stays up past the
+    /// launch's 3 s idle time. Set before playing, since the fixture queue lasts only about 14 s.
+    func testNeverKeepsTheOverlayUp() {
+        openKeyWindow(extra: ["-RoadieOpenFiles", paths.music] + Self.overlayIdle)
+        XCTAssertTrue(roadie.wait { (self.roadie.probe?.queue.count ?? 0) > 0 }, "no queue: \(roadie.probeJSON)")
+        openVisualizationSettings()
+        choose("Never", in: "vis.settings.idle")
+        let idle = roadie.element("vis.settings.idle")
+        XCTAssertTrue(roadie.wait { self.roadie.value(of: idle) == "Never" }, "idle: \(roadie.describe(idle))")
+        roadie.app.typeKey("w", modifierFlags: .command)  // close Settings
+        vis.window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click()
+        roadie.app.typeKey("x", modifierFlags: [])
+        roadie.waitForPlaying()
+        Thread.sleep(forTimeInterval: 4)
+        let probe = roadie.probe
+        XCTAssertEqual(probe?.state, "playing", "playback ended before the check: \(roadie.probeJSON)")
+        XCTAssertEqual(probe?.visualization?.overlay, "shown", "the overlay hid with Never: \(roadie.probeJSON)")
+    }
+
+    /// Opened by key with the pointer over the main window: the overlay hides on time, but the cursor never does,
+    /// since the pointer isn't over the picture (design §2.4; the #0238 review's bounce).
+    func testCursorStaysWhenThePointerIsOutsideTheVisualization() {
+        launchPlain(extra: ["-RoadieOpenFiles", paths.music] + Self.overlayIdle)
+        XCTAssertTrue(roadie.wait { (self.roadie.probe?.queue.count ?? 0) > 0 }, "no queue: \(roadie.probeJSON)")
+        roadie.click(roadie.main.play)
+        roadie.waitForPlaying()
+        roadie.main.play.hover()
+        vis.open()
+        expectOpen()
+        XCTAssertTrue(
+            roadie.wait(timeout: 10) { self.vis.probe?.overlay == "hidden" }, "the overlay didn't hide: \(roadie.probeJSON)")
+        XCTAssertEqual(vis.probe?.cursorHidden, false, "the cursor hid outside the visualization: \(roadie.probeJSON)")
+    }
+
     // MARK: Preset list (#0240)
 
     /// L in the key window opens the list; the search field is clicked so the keys go to it.

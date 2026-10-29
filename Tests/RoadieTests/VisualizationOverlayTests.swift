@@ -125,6 +125,49 @@ final class VisualizationOverlayTests: PlayerModelTestCase {
         vis.stopOverlayTimer()
     }
 
+    func testThePointerOutsideNeverHidesTheCursor() throws {
+        let vis = try openVis()
+        var inside = false
+        var hides = 0
+        vis.isPointerInside = { inside }
+        vis.hideCursor = { hides += 1 }
+        vis.syncOverlayPlaybackHold(state: .playing)
+        vis.showOverlay()
+        now = 5
+        vis.tickOverlay()
+        XCTAssertFalse(vis.overlay.isOverlayVisible, "the overlay should still hide on time")
+        XCTAssertFalse(vis.overlay.isCursorHidden, "the cursor hid with the pointer outside")
+        XCTAssertEqual(hides, 0)
+        // Back over the picture: it hides with the overlay again.
+        inside = true
+        vis.overlayPointerMoved(inside: true)
+        now = 10
+        vis.tickOverlay()
+        XCTAssertTrue(vis.overlay.isCursorHidden)
+        XCTAssertEqual(hides, 1)
+        vis.stopOverlayTimer()
+    }
+
+    func testTheIdleSettingAppliesToTheRunningOverlay() throws {
+        let vis = try openVis()
+        vis.syncOverlayPlaybackHold(state: .playing)
+        vis.showOverlay()
+        vis.updateSettings { $0.overlayIdleSeconds = 10 }
+        XCTAssertEqual(vis.overlay.idleTimeout, 10)
+        now = 5
+        vis.tickOverlay()
+        XCTAssertTrue(vis.overlay.isOverlayVisible, "hid before the new idle time")
+        now = 10.5
+        vis.tickOverlay()
+        XCTAssertFalse(vis.overlay.isOverlayVisible, "didn't hide after the new idle time")
+        vis.updateSettings { $0.overlayIdleSeconds = 0 }
+        XCTAssertTrue(vis.overlay.isOverlayVisible, "Never didn't bring the overlay back")
+        now = 1000
+        vis.tickOverlay()
+        XCTAssertTrue(vis.overlay.isOverlayVisible, "Never still hid the overlay")
+        vis.stopOverlayTimer()
+    }
+
     func testIdleOverrideHookSetsTheTimeout() throws {
         let suite = "co.sstools.roadie.tests.overlayIdle.\(UUID())"
         let arguments = try XCTUnwrap(UserDefaults(suiteName: suite))

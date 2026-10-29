@@ -56,6 +56,9 @@ final class VisualizationModel {
     /// The overlay's one-shot idle timer and the window's cursor hiding (#0238).
     @ObservationIgnored var overlayTimer: Timer?
     @ObservationIgnored var hideCursor: (() -> Void)?
+    /// Whether the pointer is over the picture now, from the window (nil: no window, taken as inside). Read when the
+    /// window shows the overlay rather than movement, since the tracking area only sees enters and exits.
+    @ObservationIgnored var isPointerInside: (() -> Bool)?
     /// The window, for full screen (#0237).
     @ObservationIgnored weak var fullScreenController: (any FullScreenToggling)?
     /// `close()` while full screen leaves full screen first and closes when that completes.
@@ -372,6 +375,7 @@ final class VisualizationModel {
         if navigator.order != new.order { navigator.order = new.order }
         if navigator.isLocked != new.locked { navigator.isLocked = new.locked }
         if new.presetsFolder != old.presetsFolder { reloadCatalogue() }
+        if new.overlayIdleSeconds != old.overlayIdleSeconds { applyOverlayIdleTimeout() }
     }
 
     /// How long the full-screen overlay and pointer wait before hiding; nil never hides (#0238 reads it).

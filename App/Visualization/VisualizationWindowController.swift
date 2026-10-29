@@ -106,6 +106,8 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
 
     func windowDidBecomeKey(_ notification: Notification) {
         window?.makeFirstResponder(hostView)
+        // The tracking area is key-window only, so a pointer that left meanwhile went unseen (#0238).
+        visualization.syncPointerInside()
     }
 
     func windowDidMiniaturize(_ notification: Notification) { updateVisibility() }
@@ -169,6 +171,8 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
             badge: VisualizationOverlayHostingView(rootView: VisualizationNoAudioBadge(model: visualization)))
         hostView.onPointerMoved = { [weak visualization] in visualization?.overlayPointerMoved(inside: true) }
         // The overlay's hosting views sit above the host view, so movement is also caught for the whole window here.
+        // The monitor is never removed: this controller lives as long as the app (`AppDelegate.visualizationWindow`
+        // caches it), the closure holds it weakly and it ignores every other window's events.
         window?.acceptsMouseMovedEvents = true
         mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) {
             [weak self] event in
@@ -179,10 +183,21 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
             return event
         }
         hostView.onPointerExited = { [weak visualization] in visualization?.overlayPointerExited() }
+        visualization.isPointerInside = { [weak self] in self?.isPointerInside ?? false }
+        // Only over the picture, in the key window of the active app (design §2.4).
         visualization.hideCursor = { [weak self] in
-            guard let window = self?.window, window.isKeyWindow, NSApp.isActive else { return }
+            guard let self, let window = self.window, window.isKeyWindow, NSApp.isActive, self.isPointerInside else {
+                return
+            }
             NSCursor.setHiddenUntilMouseMoves(true)
         }
+    }
+
+    /// The pointer's real position, whatever the tracking area last saw.
+    private var isPointerInside: Bool {
+        guard let window, window.isVisible else { return false }
+        let point = hostView.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        return hostView.bounds.contains(point)
     }
 }
 
