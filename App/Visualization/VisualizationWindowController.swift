@@ -16,8 +16,6 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
     private var observers: [NSObjectProtocol] = []
     /// Pointer movement in this window, for the song overlay (#0238).
     private var mouseMonitor: Any?
-    /// The windowed frame, style and level while in the Debug borderless full screen (#0237).
-    var borderlessSaved: BorderlessSaved?
 
     init(model: PlayerModel) {
         self.model = model
@@ -95,7 +93,6 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         stopLink()
         visualization.stopOverlayTimer()
         NSCursor.setHiddenUntilMouseMoves(false)
-        if let saved = borderlessSaved { restoreFromBorderless(saved) }
         visualization.setFullScreen(false)
         visualization.setVisible(false)
         visualization.close()
@@ -217,46 +214,8 @@ extension VisualizationWindowController {
 
 extension VisualizationWindowController: FullScreenToggling {
     func toggleFullScreen() {
-        guard let window else { return }
-        #if DEBUG
-        if model.configuration.visFullScreenBorderless {
-            if let saved = borderlessSaved {
-                restoreFromBorderless(saved)
-                visualization.setFullScreen(false)
-            } else {
-                enterBorderless(window)
-                visualization.setFullScreen(true)
-            }
-            return
-        }
-        #endif
-        window.toggleFullScreen(nil)
+        window?.toggleFullScreen(nil)
     }
-
-    /// The Debug `-RoadieVisFullScreen borderless` path: a screen-sized borderless window above the menu bar.
-    fileprivate func enterBorderless(_ window: NSWindow) {
-        borderlessSaved = BorderlessSaved(frame: window.frame, styleMask: window.styleMask, level: window.level)
-        let screen = window.screen ?? NSScreen.main
-        window.styleMask = [.borderless]
-        window.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
-        if let screen { window.setFrame(screen.frame, display: true) }
-        window.makeFirstResponder(hostView)
-    }
-
-    func restoreFromBorderless(_ saved: BorderlessSaved) {
-        guard let window else { return }
-        borderlessSaved = nil
-        window.styleMask = saved.styleMask
-        window.level = saved.level
-        window.setFrame(saved.frame, display: true)
-        window.makeFirstResponder(hostView)
-    }
-}
-
-struct BorderlessSaved {
-    var frame: NSRect
-    var styleMask: NSWindow.StyleMask
-    var level: NSWindow.Level
 }
 
 /// `CADisplayLink` retains its target, so this trampoline holds the model weakly.

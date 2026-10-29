@@ -60,7 +60,7 @@ means the same intent, done the Mac way or changed for a reason given. **Dropped
 | — | **⌃⌘F** / View-style "Enter Full Screen" from the window's green button and the Window menu | Added | The Mac's standard; free with `.fullScreenPrimary` |
 | Escape: leave full screen (and close the help screen / menus first) | Same order: Esc closes the help, then the preset browser, then leaves full screen; windowed, it does nothing | Kept | |
 | Full screen on a chosen monitor (config) | Native full screen on the screen the window is on; move the window first to pick | Adapted | Native Spaces; no device picker |
-| "Fake full screen" (a borderless topmost window) | Not offered; native full screen only (a borderless fallback exists only as a Debug test hook if the guest can't do native full screen, #0237) | Dropped | Native is what Mac users expect |
+| "Fake full screen" (a borderless topmost window) | Not offered; native full screen only (it works in the guest, #0237; the unused Debug borderless hook was removed, #0245) | Dropped | Native is what Mac users expect |
 | The cursor hidden in full screen | The cursor hides **with the overlay** after the idle timeout, in full screen and windowed (pointer inside the view only), and comes back on movement | Adapted | The user's request |
 | Desktop mode (render behind the desktop icons) | — | Dropped | A DirectX overlay trick with no sane macOS equivalent |
 
@@ -655,7 +655,7 @@ Each user-facing child also adds a CHANGELOG `[Unreleased]` bullet and, at the e
    without the cursor's lag.
 3. **Main-actor stalls.** `render` waits on a 3-frame semaphore; a command buffer never committed stalls the main
    thread (F3). #0243 commits every buffer and draws only when a drawable is available.
-4. **Full screen in the headless guest.** Covered by #0237's spike and fallback.
+4. **Full screen in the headless guest.** Covered by #0237's spike: native full screen works in the guest.
 5. **Hidden cursor stuck.** `setHiddenUntilMouseMoves` unhides on any movement, and the window unhides on close,
    resign key and exit of full screen. A by-hand check on a second display.
 6. **Key conflicts.** S, R, L, J change meaning in this window (as in MilkDrop). The help card and right-click menu

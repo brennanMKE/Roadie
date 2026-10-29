@@ -39,7 +39,7 @@ struct TestProbe: Codable, Equatable {
         var locked: Bool
         var audio: String
         var presetChanges: Int
-        /// In full screen, native or the Debug borderless hook (#0237).
+        /// In full screen (#0237).
         var fullScreen: Bool
         var lastTransition: String?
         /// The song overlay (#0238): `shown` or `hidden`, and whether its state machine has the cursor hidden.

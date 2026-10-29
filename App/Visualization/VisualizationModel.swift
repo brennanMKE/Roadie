@@ -43,7 +43,7 @@ final class VisualizationModel {
     private(set) var navigator: PresetNavigator
     /// Low Power Mode or a serious thermal state: 30 fps whatever plays.
     private(set) var isConstrained = false
-    /// In full screen (native or the Debug borderless hook), from the window controller (#0237).
+    /// In full screen from the window controller (#0237).
     private(set) var isFullScreen = false
     /// Stand-in for the help overlay (a later issue): Esc closes it before leaving full screen.
     var isHelpOpen = false
@@ -159,6 +159,8 @@ final class VisualizationModel {
     func close() {
         guard isOpen else { return }
         if isFullScreen, let fullScreenController {
+            // A second close during the exit is idempotent (#0245).
+            guard !closesAfterFullScreen else { return }
             closesAfterFullScreen = true
             fullScreenController.toggleFullScreen()
             return
@@ -177,7 +179,13 @@ final class VisualizationModel {
             isFullScreen = fullScreen
             if fullScreen { showOverlay() }
         }
-        if !fullScreen, closesAfterFullScreen { close() }
+        guard closesAfterFullScreen else { return }
+        if fullScreen {
+            // AppKit ignored the exit mid-transition (#0245): ask again now the transition is over.
+            fullScreenController?.toggleFullScreen()
+        } else {
+            close()
+        }
     }
 
     /// From the window controller: on screen, not miniaturized, `occlusionState.contains(.visible)`, app not hidden.

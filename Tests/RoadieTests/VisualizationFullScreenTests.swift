@@ -95,6 +95,31 @@ final class VisualizationFullScreenTests: PlayerModelTestCase {
         XCTAssertEqual(fake.toggles, 2)
     }
 
+    /// #0245: AppKit ignores a toggle while a transition runs; the close must neither repeat nor go stale.
+    func testCloseIgnoredMidTransitionIsReissuedAndClosesOnce() throws {
+        let vis = try visModel().visualization
+        vis.open()
+        vis.handleFullScreenCommand(.toggleFullScreen)
+        XCTAssertEqual(fake.toggles, 1)
+        fake.reportsBack = false
+        vis.close()
+        vis.close()
+        XCTAssertEqual(fake.toggles, 2, "a second close asked for full screen again")
+        XCTAssertTrue(vis.isOpen)
+        // The running transition ends still in full screen: the ignored exit is asked for again.
+        vis.setFullScreen(true)
+        XCTAssertEqual(fake.toggles, 3, "the ignored exit wasn't re-issued")
+        XCTAssertTrue(vis.isOpen)
+        vis.setFullScreen(false)
+        XCTAssertFalse(vis.isOpen)
+        // Nothing pending afterwards: a later full screen and exit don't close a reopened window.
+        vis.open()
+        vis.setFullScreen(true)
+        vis.setFullScreen(false)
+        XCTAssertTrue(vis.isOpen)
+        XCTAssertEqual(fake.toggles, 3)
+    }
+
     func testContextMenuTogglesFullScreen() throws {
         let vis = try visModel().visualization
         vis.open()
