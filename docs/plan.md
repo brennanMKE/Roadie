@@ -195,6 +195,18 @@ Follows `docs/plex-music-library.md`:
   have music, each opening its albums, artists and tracks, with play and shuffle for the whole genre. Also #0221
   (a user-created playlist filed under "Built-in").
 
+**M18: Visualization** ([#0231](../issues/0231.md))
+- Winamp's MilkDrop window, the Roadie way. Design in [design/visualization.md](design/visualization.md): a
+  resizable visualization window opened as Winamp did (⇧⌘K, the clutter bar's V menu, the main menu's Visualization
+  submenu, right-click on the built-in vis); full screen (⌥Return, double-click; Esc leaves) with an overlay of the
+  song, artist and playback details that hides with the cursor after 3 s idle; ← → between presets, ↑ ↓ volume, and
+  MilkDrop's own keys (Space, ⌫, H, R, \`, L, T, F1–F5, Z X C V B); automatic preset changes, the song title on track
+  change, a preset list, Settings › Visualization; a stereo, lock-free sink beside the mono analyzer ring; Reduce
+  Motion, Dim Flashing Lights and VoiceOver handled.
+- Built now behind a Roadie-owned renderer seam with a Core Graphics classic visualizer; MilkDropMetalKit
+  (`MilkMetal`) is adopted by URL and version once it is tagged 1.0.0 (#0243).
+- Children #0232 to #0243. Started 2026-10-29 at the user's request while M16 and M17 are still open.
+
 ## Verification
 - `swift test` for SkinKit and PlayerKit: the folder index, queue save and restore, Music Assistant decoding against
   recorded fixtures, and the connection-test error paths.

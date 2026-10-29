@@ -434,6 +434,7 @@ The `*` matches the U+202F. Substitute the actual timestamp; if you don't know w
 - `SkinKit`: skin parsing, sprites, `skintool` (`Packages/SkinKit`)
 - `AudioCore`: AVAudioEngine playback, EQ, analyzer, queue (`Packages/PlayerKit`)
 - `MusicAssistantKit`: Music Assistant WebSocket client and models (`Packages/PlayerKit`)
+- `VisualizationKit`: visualization presets, navigator, auto-advance, overlay and key models (`Packages/PlayerKit`, M18)
 - `App`: SwiftUI/AppKit app (`App/`), with its unit tests (`RoadieTests`) and UI tests (`RoadieUITests`)
 - `Tooling`: scripts, the VM runner, CI and docs about them (`scripts/`)
 - `QuickLook`: Quick Look thumbnail and preview extensions for `.wsz` (new targets in `project.yml`)
