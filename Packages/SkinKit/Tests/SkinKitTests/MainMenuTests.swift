@@ -80,7 +80,7 @@ struct MainMenuTests {
     @Test func everyCommandAppearsOnce() {
         let commands = items(MainMenu.entries(MainMenuState())).map(\.command)
         #expect(Set(commands).count == commands.count)
-        #expect(commands.count == 28)
+        #expect(commands.count == 29)
     }
 
     @Test func unsupportedEntriesAreAbsent() {
@@ -113,6 +113,15 @@ struct MainMenuTests {
         #expect(item(.previousSkin)?.shortcut == MainMenuShortcut("["))
         #expect(item(.randomSkin)?.shortcut == MainMenuShortcut("r", [.command, .shift]))
         #expect(item(.toggleVisualization)?.shortcut == MainMenuShortcut("k", [.command, .shift]))
+        #expect(item(.visualizationSettings)?.shortcut == MainMenuShortcut("k", [.command, .option]))
+    }
+
+    @Test func visualizationSubmenuHasSettings() {
+        let entries = MainMenu.visualizationEntries(MainMenuState())
+        #expect(entries.count == 2)
+        let settings = item(.visualizationSettings)
+        #expect(settings?.title == "Visualization Settings\u{2026}")
+        #expect(settings?.shortcut == MainMenuShortcut("k", [.command, .option]))
     }
 
     @Test func visualizationSubmenuHasStartStop() {

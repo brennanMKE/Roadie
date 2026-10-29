@@ -83,6 +83,18 @@ final class VisualizationModel {
 
     enum Suspension: Hashable { case notRendering, menu, list }
 
+    /// What the presets folder setting found (Settings › Visualization, #0241).
+    enum FolderStatus: Equatable { case none, scanning, notFound, found(Int) }
+    /// `.milk` presets from the presets folder, after the last scan.
+    private(set) var userPresets: [VisualizationPreset] = []
+    private(set) var folderStatus: FolderStatus = .none
+    /// Bumped by each `reloadCatalogue`, so an older scan can't overwrite a newer one.
+    @ObservationIgnored private var catalogueGeneration = 0
+    /// The last playback state other than `.loading`, for open on play.
+    @ObservationIgnored private var settledPlayback: NowPlaying.State = .stopped
+    /// Debug `-RoadieVisPresetsFolder` in test mode: Choose…'s answer instead of the panel.
+    @ObservationIgnored let presetsFolderStandIn: String?
+
     init(analyzer: AnalyzerTap, configuration: RoadieConfiguration) {
         self.analyzer = analyzer
         reader = StereoFeedReader(tap: analyzer)
@@ -93,6 +105,11 @@ final class VisualizationModel {
             settings.autoAdvance = true
             settings.autoAdvanceSeconds = seconds
             settings.autoAdvanceVaries = false
+        }
+        presetsFolderStandIn = configuration.visPresetsFolder
+        if let folder = configuration.visPresetsFolder {
+            Self.seedPresets(configuration.visSeedPresets ?? 0, in: folder)
+            settings.presetsFolder = folder
         }
         self.settings = settings
         let seed = configuration.visSeed ?? UInt64.random(in: .min ... .max)
@@ -113,6 +130,7 @@ final class VisualizationModel {
             })
         }
         clock.suspend(at: currentTime())
+        if settings.presetsFolder != nil { reloadCatalogue() }
     }
 
     // MARK: Open and close
@@ -120,6 +138,7 @@ final class VisualizationModel {
     func open() {
         guard !isOpen else { return }
         prepareRenderer()
+        if settings.presetsFolder != nil { reloadCatalogue() }
         isOpen = true
         hasOpened = true
         setWindowOpenSetting(true)
@@ -171,7 +190,7 @@ final class VisualizationModel {
         let renderer = makeRenderer()
         renderer.setColors(colors)
         self.renderer = renderer
-        let usable = PresetCatalog.ordered(PresetCatalog.classics).filter { renderer.canLoad($0) }
+        let usable = PresetCatalog.ordered(PresetCatalog.classics + userPresets).filter { renderer.canLoad($0) }
         navigator.replacePresets(usable)
         if let lastPreset = settings.lastPreset, navigator.current?.id != lastPreset { _ = navigator.select(id: lastPreset) }
         var candidate = navigator.current
@@ -319,6 +338,98 @@ final class VisualizationModel {
         if state == .stopped { return .none }
         if selectedOutput != thisMacID { return .remote(outputName ?? selectedOutput.rawValue) }
         return .local
+    }
+
+    // MARK: Settings (#0241)
+
+    /// A Settings › Visualization change: clamped, saved and applied to the running window.
+    func updateSettings(_ change: (inout VisualizationSettings) -> Void) {
+        let old = settings
+        var new = settings
+        change(&new)
+        new.autoAdvanceSeconds = min(max(new.autoAdvanceSeconds, VisualizationSettings.autoAdvanceRange.lowerBound),
+                                     VisualizationSettings.autoAdvanceRange.upperBound)
+        new.blendSeconds = min(max(new.blendSeconds, VisualizationSettings.blendRange.lowerBound),
+                               VisualizationSettings.blendRange.upperBound)
+        new.overlayIdleSeconds = max(0, new.overlayIdleSeconds)
+        if new.presetsFolder?.isEmpty == true { new.presetsFolder = nil }
+        guard new != old else { return }
+        settings = new
+        new.save(to: defaults)
+        if new.autoAdvancePolicy != clock.policy { clock.policy = new.autoAdvancePolicy }
+        if navigator.order != new.order { navigator.order = new.order }
+        if navigator.isLocked != new.locked { navigator.isLocked = new.locked }
+        if new.presetsFolder != old.presetsFolder { reloadCatalogue() }
+    }
+
+    /// How long the full-screen overlay and pointer wait before hiding; nil never hides (#0238 reads it).
+    var overlayIdleTimeout: TimeInterval? {
+        settings.overlayIdleSeconds > 0 ? settings.overlayIdleSeconds : nil
+    }
+
+    /// The presets folder setting shows only where the renderer can draw `.milk` presets: Debug's classic renderer
+    /// stands in for them; Release after #0243.
+    var showsPresetsFolder: Bool {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// Rescans the presets folder off the main actor, then lists the classics and its presets in the navigator.
+    @discardableResult
+    func reloadCatalogue() -> Task<Void, Never> {
+        catalogueGeneration += 1
+        let generation = catalogueGeneration
+        guard let path = settings.presetsFolder else {
+            applyCatalogue([], status: .none)
+            return Task {}
+        }
+        folderStatus = .scanning
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        return Task { [weak self] in
+            let found = await Task.detached { () -> [VisualizationPreset]? in
+                var isDirectory: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue
+                else { return nil }
+                return PresetCatalog.scan(folder: url, source: .user)
+            }.value
+            guard let self, generation == self.catalogueGeneration else { return }
+            self.applyCatalogue(found ?? [], status: found.map { .found($0.count) } ?? .notFound)
+        }
+    }
+
+    private func applyCatalogue(_ presets: [VisualizationPreset], status: FolderStatus) {
+        userPresets = presets
+        if folderStatus != status { folderStatus = status }
+        let all = PresetCatalog.ordered(PresetCatalog.classics + presets)
+        navigator.replacePresets(renderer.map { renderer in all.filter { renderer.canLoad($0) } } ?? all)
+        // The preset showing went with its folder: show what the navigator moved to.
+        if renderer != nil, let current = navigator.current, current.id != currentPreset?.id {
+            _ = load(current, transition: 0, countsAsChange: false)
+        }
+    }
+
+    /// From `PlayerModel` on each playback state change: stopped → playing opens the window when Open on Play is on;
+    /// resuming from pause and track changes (through `.loading`) don't.
+    func playbackStateChanged(to state: NowPlaying.State) {
+        guard state != .loading else { return }
+        let previous = settledPlayback
+        settledPlayback = state
+        if state == .playing, previous == .stopped, settings.openOnPlay, !isOpen { open() }
+    }
+
+    /// Debug `-RoadieVisSeedPresets N`: N tiny `.milk` files in `folder`, since the sandboxed UI-test runner can't
+    /// write them.
+    private static func seedPresets(_ count: Int, in folder: String) {
+        guard count > 0 else { return }
+        let url = URL(fileURLWithPath: folder, isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        for index in 1...count {
+            let file = url.appending(path: "Seeded Preset \(index).milk")
+            try? Data("[preset00]\nfRating=3.0\n".utf8).write(to: file)
+        }
     }
 
     // MARK: Private

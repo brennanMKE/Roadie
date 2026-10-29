@@ -52,6 +52,10 @@ struct RoadieConfiguration: @unchecked Sendable {
     var visFullScreenBorderless = false
     /// `-RoadieVisAutoAdvance <seconds>` (#0236, Debug): the auto-advance interval, not varied. Release ignores it.
     var visAutoAdvance: TimeInterval?
+    /// `-RoadieVisPresetsFolder <path>` (#0241, Debug): the presets folder at launch and Choose…'s answer.
+    var visPresetsFolder: String?
+    /// `-RoadieVisSeedPresets N` (#0241, Debug): N tiny `.milk` files written to that folder at launch.
+    var visSeedPresets: Int?
 
     static let standard = RoadieConfiguration()
 
@@ -74,6 +78,8 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let visSeed = "RoadieVisSeed"
         static let visFullScreen = "RoadieVisFullScreen"
         static let visAutoAdvance = "RoadieVisAutoAdvance"
+        static let visPresetsFolder = "RoadieVisPresetsFolder"
+        static let visSeedPresets = "RoadieVisSeedPresets"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -127,6 +133,8 @@ struct RoadieConfiguration: @unchecked Sendable {
         visAutoAdvance = arguments.string(forKey: Argument.visAutoAdvance).flatMap { TimeInterval($0) }.flatMap {
             $0 > 0 && $0.isFinite ? $0 : nil
         }
+        visPresetsFolder = arguments.string(forKey: Argument.visPresetsFolder).flatMap { $0.isEmpty ? nil : $0 }
+        visSeedPresets = arguments.string(forKey: Argument.visSeedPresets).flatMap { Int($0) }
     }
     #endif
 

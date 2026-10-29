@@ -119,6 +119,7 @@ final class PlayerModelDispatchTests: PlayerModelTestCase {
         table[.next] = transport["next"]
         table[.jumpToFile] = requested(.jumpToFile)
         table[.toggleVisualization] = becomes { $0.visualization.isOpen }
+        table[.visualizationSettings] = requested(.settings)
         table[.quit] = requested(.quit)
         // CRASH CHECKS ONLY, not dispatch checks: no skins are indexed in a test model, so next, previous and random
         // skin are no-ops whatever they're wired to. Seeding an index is a follow-up (issues/0211.md ## Follow-ups).

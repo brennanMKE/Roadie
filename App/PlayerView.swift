@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct PlayerView: View {
     @Environment(PlayerModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Group {
@@ -36,7 +37,10 @@ struct PlayerView: View {
         .dropDestination(for: URL.self) { urls, _ in
             model.open(urls, replace: false)
         }
-        .onAppear { model.openWindowAction = openWindow }
+        .onAppear {
+            model.openWindowAction = openWindow
+            model.openSettingsAction = openSettings
+        }
     }
 }
 

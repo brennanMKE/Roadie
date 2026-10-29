@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The Settings tabs; the selection persists so another window (the Welcome, #0169) can pick one before opening Settings.
 enum SettingsTab: String {
-    case library, musicAssistant, skins, updates
+    case library, musicAssistant, skins, visualization, updates
     static let defaultsKey = "settingsSelectedTab"
 }
 
@@ -20,6 +20,9 @@ struct SettingsView: View {
             SkinsSettingsView()
                 .tabItem { Label("Skins", systemImage: "paintpalette") }
                 .tag(SettingsTab.skins)
+            VisualizationSettingsView()
+                .tabItem { Label("Visualization", systemImage: "waveform") }
+                .tag(SettingsTab.visualization)
             UpdatesSettingsView()
                 .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
                 .tag(SettingsTab.updates)
