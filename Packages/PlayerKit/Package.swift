@@ -16,6 +16,7 @@ let package = Package(
         .library(name: "MusicAssistantKitStub", targets: ["MusicAssistantKitStub"]),
         .library(name: "SendspinKit", targets: ["SendspinKit"]),
         .library(name: "SendspinPlayback", targets: ["SendspinPlayback"]),
+        .library(name: "VisualizationKit", targets: ["VisualizationKit"]),
         // The fixture audio and music folder (#0195), test-only: the app's RoadieTests bundle links it (#0210, #0211);
         // the app itself never does.
         .library(name: "PlayerKitTestFixtures", targets: ["PlayerKitTestFixtures"]),
@@ -57,5 +58,8 @@ let package = Package(
         // The bridge from a Sendspin session to AudioCore's stream input (#0108). Built by LocalPlaybackStack.
         .target(name: "SendspinPlayback", dependencies: ["SendspinKit", "AudioCore"]),
         .testTarget(name: "SendspinPlaybackTests", dependencies: ["SendspinPlayback", "SendspinKit", "AudioCore"]),
+        // Visualization presets: catalogue, order, history and lock (#0233). Foundation only.
+        .target(name: "VisualizationKit"),
+        .testTarget(name: "VisualizationKitTests", dependencies: ["VisualizationKit"]),
     ]
 )
