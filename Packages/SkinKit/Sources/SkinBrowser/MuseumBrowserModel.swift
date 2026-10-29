@@ -89,6 +89,14 @@ public final class MuseumBrowserModel {
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var moreTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
+    /// Bumped by each finished download; `downloadStamps[md5]` is the value it set. A badge lookup that started
+    /// before a download finished must not overwrite that download's badge with what the index said earlier (#0149).
+    @ObservationIgnored private var downloadClock = 0
+    @ObservationIgnored private var downloadStamps: [String: Int] = [:]
+    #if DEBUG
+    /// Badge lookups started and not yet applied; tests wait for 0.
+    @ObservationIgnored private(set) var badgesInFlight = 0
+    #endif
     @ObservationIgnored private static let logger = Logger(subsystem: "co.sstools.roadie", category: "SkinMuseum")
 
     public init(
@@ -259,12 +267,20 @@ public final class MuseumBrowserModel {
     /// One `skins(md5s:)` call per page.
     private func badge(_ skins: [MuseumSkin]) async {
         guard !skins.isEmpty, let root = folder() else { return }
+        #if DEBUG
+        badgesInFlight += 1
+        defer { badgesInFlight -= 1 }
+        #endif
+        let started = downloadClock
         do {
             guard let reader = try await lookup() else { return }
             let found = try await reader.skins(md5s: skins.map(\.md5))
+            // A download that finished while this lookup was suspended is newer than the answer: keep its badge.
+            let stamps = downloadStamps
+            let isNewer = { (md5: String) in (stamps[md5] ?? 0) > started }
             // A skin that left the index (moved to the Trash, #0131) loses its badge.
-            for skin in skins where found[skin.md5] == nil { downloaded[skin.md5] = nil }
-            for (md5, record) in found {
+            for skin in skins where found[skin.md5] == nil && !isNewer(skin.md5) { downloaded[skin.md5] = nil }
+            for (md5, record) in found where !isNewer(md5) {
                 downloaded[md5] = SkinBrowserFormat.fileURL(folder: root, path: record.primaryPath)
             }
         } catch {
@@ -298,6 +314,8 @@ public final class MuseumBrowserModel {
                 }
                 guard let self else { return }
                 if case .added(let url) = result { await indexAdded(url) }
+                downloadClock += 1
+                downloadStamps[skin.md5] = downloadClock
                 downloaded[skin.md5] = result.url
                 downloads[skin.md5] = nil
                 Self.logger.info("museum skin \(skin.md5, privacy: .public) ready")

@@ -158,7 +158,7 @@ final class VisualizationModelKeyTests: PlayerModelTestCase {
             "Next Preset", "Previous Preset", "Next Preset Without Blending", "-",
             "Random Order", "Lock Preset", "Presets…", "-",
             "Show Song Title", "Song Title", "Song Time", "Preset Name", "Frame Rate", "-",
-            "Enter Full Screen", "Keyboard Shortcuts",
+            "Enter Full Screen", "Keyboard Shortcuts", "-", "Visualization Settings\u{2026}",
         ])
         for item in menu.items where !item.isSeparatorItem {
             XCTAssertFalse(item.keyEquivalent.isEmpty, "\(item.title) shows no key")

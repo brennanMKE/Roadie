@@ -48,6 +48,14 @@ final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
             }
             menu.addItem(item)
         }
+        // Last: Visualization Settings… (#0241), which isn't a window command.
+        menu.addItem(.separator())
+        let settings = ActionMenuItem(title: VisualizerMenu.settingsTitle) { [weak model] in
+            model?.owner?.showSettings(.visualization)
+        }
+        settings.keyEquivalent = "k"
+        settings.keyEquivalentModifierMask = [.command, .option]
+        menu.addItem(settings)
         return menu
     }
 

@@ -361,6 +361,7 @@ Design: [visualization.md](visualization.md) §8.4; one row per feature, added b
 | L / Presets… list: search, ↑ ↓, Return loads, Esc closes (#0240) | UI `VisualizationUITests.testLOpensTheListAndReturnLoadsTheSelection`, `.testTypingFiltersTheList`, `.testEscapeClosesTheList`; Unit `RoadieTests.VisualizationListTests` |
 | Overlay: title, artist — album, state, elapsed / total, next track, output, volume; hides with the cursor after the idle time, back on movement; stays up while paused, hovered or with the preset list open (#0238) | UI `VisualizationUITests.testOverlayShowsTheSong`, `.testOverlayHidesAfterIdleAndReturnsOnMovement`, `.testOverlayStaysUpWhilePaused`; Unit `OverlayVisibilityTests`, `RoadieTests.VisualizationOverlayTests`; *by hand* for the real cursor |
 | Music Assistant speaker: overlay note and No audio badge (#0238) | UI `VisualizationUITests.testSpeakerPlaybackExplainsTheIdlePicture` (scenario `playingOnSpeaker`) |
+| Settings › Visualization: automatic changes, interval, vary, blend, order, presets folder, overlay idle time, song title, open on play; ⌥⌘K from the Window menu, skinned main menu, clutter V (#0241) | UI `VisualizationUITests.testCommandOptionKOpensTheVisualizationTab`, `.testSettingsChangeTheRunningVisualization`, `.testPresetsFolderAddsItsPresets`, `.testOpenOnPlayOpensTheWindow`; Unit `RoadieTests.VisualizationSettingsModelTests`, SkinKit `MainMenuTests.visualizationSubmenuHasSettings`; *by hand* for the folder panel |
 
 ## 6. Runner and logging
 

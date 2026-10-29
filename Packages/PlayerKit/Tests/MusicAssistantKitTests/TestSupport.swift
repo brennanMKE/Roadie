@@ -134,11 +134,13 @@ struct BackendRig {
 
 func makeBackend(
     address: MusicAssistantServerAddress? = testAddress, token: MusicAssistantToken? = testToken,
-    script: FixtureScript? = nil, connectError: MusicAssistantError? = nil
+    script: FixtureScript? = nil, connectError: MusicAssistantError? = nil,
+    extraTransports: [StubWebSocketTransport] = []
 ) throws -> BackendRig {
     let script = try script ?? FixtureScript.recorded(token: testToken)
     let factory = StubTransportFactory(
-        transports: [StubWebSocketTransport(script: script, connectError: connectError)], script: script)
+        transports: [StubWebSocketTransport(script: script, connectError: connectError)] + extraTransports,
+        script: script)
     let http = StubHTTPTransport()
     let calls = CallCounter()
     let clock = ManualClock()
@@ -147,9 +149,11 @@ func makeBackend(
     return BackendRig(backend: backend, factory: factory, http: http, tokenCalls: calls, clock: clock)
 }
 
-/// A connected backend.
-func connectedBackend(script: FixtureScript? = nil) async throws -> BackendRig {
-    let rig = try makeBackend(script: script)
+/// A connected backend. `extraTransports` serve reconnects, in order.
+func connectedBackend(
+    script: FixtureScript? = nil, extraTransports: [StubWebSocketTransport] = []
+) async throws -> BackendRig {
+    let rig = try makeBackend(script: script, extraTransports: extraTransports)
     try await rig.backend.connect()
     return rig
 }

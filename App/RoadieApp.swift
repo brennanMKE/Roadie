@@ -36,6 +36,7 @@ struct RoadieApp: App {
                 .environment(appDelegate.model.sources)
                 .environment(appDelegate.model.fallback)
                 .environment(appDelegate.model.skinLibrary)
+                .environment(appDelegate.model.visualization)
                 .environment(appDelegate.updater)
                 .defaultAppStorage(appDelegate.model.defaults)
         }
@@ -83,6 +84,8 @@ struct RoadieApp: App {
                         get: { appDelegate.model.visualization.isOpen },
                         set: { _ in appDelegate.model.visualization.toggle() }))
                     .keyboardShortcut("k", modifiers: [.command, .shift])
+                Button("Visualization Settings\u{2026}") { appDelegate.model.showSettings(.visualization) }
+                    .keyboardShortcut("k", modifiers: [.command, .option])
                 Toggle(
                     "Always on Top",
                     isOn: Binding(
