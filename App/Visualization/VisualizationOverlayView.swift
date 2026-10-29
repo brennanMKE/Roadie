@@ -17,6 +17,9 @@ struct VisualizationOverlayCard: View {
                 .transition(.opacity)
             }
         }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .animation(.easeInOut(duration: 0.25), value: model.overlay.isOverlayVisible)
     }
 
@@ -114,24 +117,24 @@ struct VisualizationNoAudioBadge: View {
                 .padding(6)
                 .accessibilityIdentifier(AXID.Vis.noAudioBadge)
                 .accessibilityLabel("No audio on this Mac")
+                .padding(.leading, 8)
+                .padding(.bottom, 6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
     }
 }
 
-/// A hosting view sized to its SwiftUI content, so it covers (and takes clicks over) only what it draws.
+/// A hosting view filling the picture that never takes a click, so double-click and right-click reach the host view;
+/// the card's hover still works through SwiftUI's own tracking.
 final class VisualizationOverlayHostingView<Content: View>: NSHostingView<Content> {
     required init(rootView: Content) {
         super.init(rootView: rootView)
-        sizingOptions = [.intrinsicContentSize]
+        sizingOptions = []
         translatesAutoresizingMaskIntoConstraints = false
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    /// Clicks on its transparent parts (nothing drawn) fall through to the picture.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        let hit = super.hitTest(point)
-        return hit === self && intrinsicContentSize.width <= 1 ? nil : hit
-    }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

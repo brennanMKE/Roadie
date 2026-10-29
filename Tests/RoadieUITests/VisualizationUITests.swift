@@ -263,7 +263,7 @@ final class VisualizationUITests: RoadieUITestCase {
         roadie.waitForPlaying()
     }
 
-    /// The pointer over the canvas at `dx`, `dy` (normalized).
+    /// The pointer over the canvas at `dx`, `dy` (normalized; the top half, clear of the card, which holds it up).
     private func hoverCanvas(_ dx: CGFloat = 0.5, _ dy: CGFloat = 0.3) {
         roadie.element(AXID.Vis.canvas).coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).hover()
     }
@@ -288,16 +288,16 @@ final class VisualizationUITests: RoadieUITestCase {
         XCTAssertTrue(
             roadie.wait { self.vis.probe?.overlay == "hidden" && self.vis.probe?.cursorHidden == true },
             "probe: \(roadie.probeJSON)")
-        hoverCanvas(0.3, 0.6)
+        hoverCanvas(0.3, 0.15)
         XCTAssertTrue(overlayCard.waitForExistence(timeout: 3), "the overlay didn't come back on movement")
         XCTAssertEqual(vis.probe?.cursorHidden, false, roadie.probeJSON)
         // Full screen: the probe drops out of the tree there, so only the card is checked.
         roadie.app.typeKey(.return, modifierFlags: .option)
         expectFullScreen(true)
-        hoverCanvas(0.5, 0.4)
+        hoverCanvas(0.5, 0.3)
         XCTAssertTrue(overlayCard.waitForExistence(timeout: 3), "no overlay in full screen")
         XCTAssertTrue(roadie.wait(timeout: 3) { !self.overlayCard.exists }, "the overlay didn't hide in full screen")
-        hoverCanvas(0.4, 0.6)
+        hoverCanvas(0.4, 0.2)
         XCTAssertTrue(overlayCard.waitForExistence(timeout: 3), "the overlay didn't come back in full screen")
         roadie.app.typeKey(.escape, modifierFlags: [])
         expectFullScreen(false)

@@ -73,17 +73,15 @@ final class VisualizationHostView: NSView {
 
     /// Adds the overlay's views (`VisualizationOverlayView.swift`) above the renderer's view.
     func installOverlay(card: NSView, badge: NSView) {
-        addSubview(card)
-        addSubview(badge)
-        let width = card.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -48)
-        NSLayoutConstraint.activate([
-            card.centerXAnchor.constraint(equalTo: centerXAnchor),
-            card.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -24),
-            width,
-            badge.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            badge.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
-        ])
-        card.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        for view in [badge, card] {
+            addSubview(view)
+            NSLayoutConstraint.activate([
+                view.leadingAnchor.constraint(equalTo: leadingAnchor),
+                view.trailingAnchor.constraint(equalTo: trailingAnchor),
+                view.topAnchor.constraint(equalTo: topAnchor),
+                view.bottomAnchor.constraint(equalTo: bottomAnchor),
+            ])
+        }
     }
 
     override func updateTrackingAreas() {
