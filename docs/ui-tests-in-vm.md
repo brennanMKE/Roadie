@@ -155,6 +155,15 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   within 5 s. While it's there the main window's elements, `state.probe` included, drop out of the accessibility tree,
   so the probe reads `{}`. Check full screen by the window's own elements instead (`vis.canvas` as wide as the screen).
   The probe is back once the window leaves full screen.
+  It can also vanish *between* `probeElement.exists` and `.value`, which fails the test with "No matches found
+  … state.probe" (#0238): read full screen from the canvas first and the probe only when the canvas can't be read.
+  Don't "fix" that in the shared helper with `try? probeElement.snapshot()`: a snapshot's `value` isn't the full
+  live probe string, so every probe decode fails (run 20261029-060509-24109).
+- **SwiftUI `Text` needs `.skinDisplay(id, label:, value:)`** for XCUITest's `label` and `value` (#0238). A bare
+  `Text(…).accessibilityIdentifier(…).accessibilityLabel(…)` is found by identifier but its `label` reads `""`.
+- **Short idle timeouts race the query.** XCUITest's first query after a `hover()` lands about a second later; with
+  the overlay's idle timeout at 1 s the card was already gone (#0238). Give the hook room (3 s), find the element
+  first, then wait on the condition for it to go.
 
 ## Gotchas carried over from the cameron setup
 

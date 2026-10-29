@@ -187,14 +187,14 @@ final class VisualizationUITests: RoadieUITestCase {
 
     // MARK: Full screen (#0237)
 
-    /// Full screen per the probe, or, when the probe can't be read (native full screen puts the vis window in its own
-    /// Space, and the probe element in the main window drops out of the accessibility tree), per the canvas filling
-    /// the screen (the window is 640 pt wide, the guest's screen 1280+).
+    /// Full screen per the canvas filling the screen (the window is 640 pt wide, the guest's screen 1280+), or per
+    /// the probe only when the canvas can't be read. Not the probe first: native full screen puts the vis window in
+    /// its own Space, and the probe element in the main window drops out of the accessibility tree mid-transition,
+    /// between `exists` and `value`, which failed the read with "No matches found" (#0238, run 20261029-054950-17473).
     private var isFullScreen: Bool? {
-        if let probe = vis.probe { return probe.fullScreen }
         let canvas = roadie.element(AXID.Vis.canvas)
-        guard canvas.exists else { return nil }
-        return canvas.frame.width >= 1000
+        if canvas.exists { return canvas.frame.width >= 1000 }
+        return vis.probe?.fullScreen
     }
 
     /// Full screen reaches `expected` within 5 s (native full screen animates).

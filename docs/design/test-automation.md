@@ -359,6 +359,8 @@ Design: [visualization.md](visualization.md) §8.4; one row per feature, added b
 | Presets change on their own (16 s, varied, 2.7 s blend), not while locked (#0236) | UI `VisualizationUITests.testPresetsChangeOnTheirOwn`; Unit `AutoAdvanceClockTests`, `VisualizationModelKeyTests.testAutoAdvanceSkipsWhileLocked` |
 | Right-click menu lists every command with its key (#0236) | UI `VisualizationUITests.testRightClickMenuListsTheCommands`; Unit `VisualizationModelKeyTests.testContextMenuHasEveryCommandWithItsKey` |
 | L / Presets… list: search, ↑ ↓, Return loads, Esc closes (#0240) | UI `VisualizationUITests.testLOpensTheListAndReturnLoadsTheSelection`, `.testTypingFiltersTheList`, `.testEscapeClosesTheList`; Unit `RoadieTests.VisualizationListTests` |
+| Overlay: title, artist — album, state, elapsed / total, next track, output, volume; hides with the cursor after the idle time, back on movement; stays up while paused, hovered or with the preset list open (#0238) | UI `VisualizationUITests.testOverlayShowsTheSong`, `.testOverlayHidesAfterIdleAndReturnsOnMovement`, `.testOverlayStaysUpWhilePaused`; Unit `OverlayVisibilityTests`, `RoadieTests.VisualizationOverlayTests`; *by hand* for the real cursor |
+| Music Assistant speaker: overlay note and No audio badge (#0238) | UI `VisualizationUITests.testSpeakerPlaybackExplainsTheIdlePicture` (scenario `playingOnSpeaker`) |
 
 ## 6. Runner and logging
 

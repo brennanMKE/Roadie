@@ -16,6 +16,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 - The Visualization window goes full screen with ⌥Return or a double-click; Escape comes back.
 - In the Visualization window, ← → (or Space and Delete) change presets, H cuts straight to the next, R switches random and in-order, ` locks the preset, and presets change on their own every 16 seconds or so, as in MilkDrop.
 - L in the Visualization window lists the presets; type to search, Return to switch.
+- The Visualization window shows the song, artist, time and what's next over the picture; it and the pointer hide after 3 seconds without mouse movement.
 
 ### Changed
 
