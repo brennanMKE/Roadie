@@ -20,6 +20,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ### Fixed
 
+- Right after launch, a play or drop on a Music Assistant speaker no longer fails with "Can't reach the Music Assistant server".
 - Dragging albums and tracks from the Library onto the playlist editor adds them.
 - Double-clicking a track in the playlist editor, or choosing one in Jump to File, plays that track on a Music Assistant queue instead of restarting the first one.
 
