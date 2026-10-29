@@ -727,7 +727,7 @@ final class PlayerModel {
             return
         }
         if isSelected {
-            activeMusicAssistantServerChanged()
+            activeMusicAssistantServerChanged(replacing: old)
         } else {
             fallback.retryNow()
         }
@@ -782,12 +782,14 @@ final class PlayerModel {
     }
 
     /// The server the backend uses changed: drop the connection (the next browse reconnects to the new one) and rebuild
-    /// the Library if Music Assistant is what it shows. A track playing on This Mac is not touched.
-    private func activeMusicAssistantServerChanged() {
+    /// the Library if Music Assistant is what it shows. A track playing on This Mac is not touched. When nothing was
+    /// resolved before (`old == nil`) there is nothing to drop: keep the connection and the output, only rebuild (#0246).
+    private func activeMusicAssistantServerChanged(replacing old: MusicAssistantServerConfiguration?) {
         let ma = musicAssistant
         let sources = sources
+        let replacing = old != nil
         // The old server's players are gone with it.
-        if outputSelection != .thisMac {
+        if replacing, outputSelection != .thisMac {
             let wasThisMac = selectedOutput == OutputDevice.thisMacID
             outputSelection = .thisMac
             selectedOutput = OutputDevice.thisMacID
@@ -795,7 +797,7 @@ final class PlayerModel {
         }
         let picker = outputPicker
         Task {
-            await ma.disconnect()
+            if replacing { await ma.disconnect() }
             sources.reload(ma.sourceID)
             await picker.refresh()
         }

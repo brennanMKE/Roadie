@@ -324,7 +324,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 
 | Feature | Test |
 |---|---|
-| Connect at launch when a verified server exists; reconnect; server re-pick on failure | UI `MusicAssistantUITests.connectsAtLaunch`; Unit `ClientConnectionTests`, `SelectionControllerTests` (exist) |
+| Connect at launch when a verified server exists; reconnect; server re-pick on failure | UI `MusicAssistantUITests.connectsAtLaunch`; Unit `ClientConnectionTests`, `SelectionControllerTests` (exist), `RoadieTests.PlayerModelOutputTests.testFirstServerResolutionKeepsTheConnectionAndTheSpeaker`, `.testServerChangeDisconnectsAndSwitchesToThisMac` (#0246) |
 | Browse the server's library (all sections) | UI `MusicAssistantUITests.sidebarSections` |
 | Play on This Mac (Sendspin feed) and on a speaker; the playlist editor shows the server queue | UI `MusicAssistantUITests.playAlbumShowsRemoteQueue`; Unit `MusicAssistantThisMacTests`, `SendspinPlayerTests` (exist) |
 | Transport and volume on a speaker; balance refused quietly | UI `MusicAssistantUITests.transportOnSpeaker`; Unit `BackendTransportTests` (exists) |
