@@ -3,6 +3,7 @@ import Foundation
 import LibraryBrowser
 import MusicBackendKit
 import SkinKit
+import VisualizationKit
 
 /// What the hidden `state.probe` element reports (#0199): compound state a UI test can't read off the skinned controls.
 struct TestProbe: Codable, Equatable {
@@ -45,6 +46,10 @@ struct TestProbe: Codable, Equatable {
         /// The song overlay (#0238): `shown` or `hidden`, and whether its state machine has the cursor hidden.
         var overlay: String = "shown"
         var cursorHidden = false
+        /// The song title animation's runs, the readouts on, and the help card (#0239).
+        var songTitleShows = 0
+        var readouts: [String] = []
+        var help = false
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -114,7 +119,9 @@ extension PlayerModel {
             locked: vis.navigator.isLocked, audio: vis.audioSource.probeName, presetChanges: vis.presetChanges,
             fullScreen: vis.isFullScreen,
             lastTransition: vis.lastTransition,
-            overlay: vis.overlay.isOverlayVisible ? "shown" : "hidden", cursorHidden: vis.overlay.isCursorHidden)
+            overlay: vis.overlay.isOverlayVisible ? "shown" : "hidden", cursorHidden: vis.overlay.isCursorHidden,
+            songTitleShows: vis.songTitleShowCount,
+            readouts: VisReadout.allCases.filter(vis.settings.readouts.contains).map(\.rawValue), help: vis.isHelpOpen)
     }
 
     /// `.wsz` files under `folder`, as sorted folder-relative paths.

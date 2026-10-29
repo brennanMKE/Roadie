@@ -496,4 +496,64 @@ final class VisualizationUITests: RoadieUITestCase {
         roadie.waitForPlaying()
         XCTAssertTrue(vis.window.waitForExistence(timeout: 5), "vis.window didn't open on play")
     }
+
+    // MARK: Song title, readouts and help (#0239)
+
+    private var songTitle: XCUIElement { roadie.element(AXID.Vis.songTitle) }
+
+    func testSongTitleShowsWhenTheTrackChanges() {
+        // The fixture tracks are 2.5 s long, so the queue moves on by itself.
+        openPlaying(idle: Self.readIdle)
+        XCTAssertTrue(
+            roadie.wait(timeout: 15) { (self.vis.probe?.songTitleShows ?? 0) >= 1 }, "no title show: \(roadie.probeJSON)")
+        XCTAssertTrue(songTitle.waitForExistence(timeout: 5), "no \(AXID.Vis.songTitle): \(roadie.probeJSON)")
+        let label = songTitle.label
+        let title = label.components(separatedBy: " – ").last ?? label
+        XCTAssertFalse(title.isEmpty)
+        let rows = roadie.probe?.queue.map(\.title) ?? []
+        XCTAssertTrue(rows.contains { $0.contains(title) }, "song title \"\(label)\", queue \(rows)")
+    }
+
+    func testTShowsTheSongTitle() {
+        openKeyWindow()
+        roadie.app.typeKey("t", modifierFlags: [])
+        XCTAssertTrue(songTitle.waitForExistence(timeout: 3), "no \(AXID.Vis.songTitle): \(roadie.probeJSON)")
+        XCTAssertEqual(vis.probe?.songTitleShows, 1)
+    }
+
+    func testFunctionKeysToggleReadouts() {
+        openPlaying(idle: ["-RoadieVisOverlayIdle", "1"])
+        roadie.app.typeKey(.F3, modifierFlags: [])
+        roadie.app.typeKey(.F5, modifierFlags: [])
+        XCTAssertTrue(
+            roadie.wait { self.vis.probe?.readouts == ["time", "fps"] }, "readouts: \(roadie.probeJSON)")
+        let time = roadie.element(AXID.Vis.Readout.time)
+        let fps = roadie.element(AXID.Vis.Readout.fps)
+        // They stay once the overlay hides.
+        XCTAssertTrue(roadie.wait(timeout: 10) { self.vis.probe?.overlay == "hidden" }, "probe: \(roadie.probeJSON)")
+        XCTAssertTrue(time.waitForExistence(timeout: 5), "no \(AXID.Vis.Readout.time): \(roadie.probeJSON)")
+        XCTAssertTrue(fps.waitForExistence(timeout: 5), "no \(AXID.Vis.Readout.fps)")
+        XCTAssertTrue(time.label.contains(":"), "time readout \"\(time.label)\"")
+        XCTAssertTrue(fps.label.hasSuffix("fps"), "fps readout \"\(fps.label)\"")
+        roadie.app.typeKey(.F3, modifierFlags: [])
+        XCTAssertTrue(roadie.wait { !time.exists }, "\(AXID.Vis.Readout.time) still shows")
+        XCTAssertTrue(fps.exists)
+    }
+
+    func testHelpOpensWithF1AndQuestionMarkAndClosesWithEscape() {
+        openKeyWindow()
+        let help = roadie.element(AXID.Vis.help)
+        roadie.app.typeKey(.F1, modifierFlags: [])
+        XCTAssertTrue(help.waitForExistence(timeout: 3), "no \(AXID.Vis.help): \(roadie.probeJSON)")
+        let next = help.staticTexts.matching(NSPredicate(format: "label == %@", "Next Preset")).firstMatch
+        XCTAssertTrue(next.waitForExistence(timeout: 3), "the help has no Next Preset")
+        XCTAssertEqual(vis.probe?.help, true)
+        roadie.app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(roadie.wait { !help.exists }, "Esc didn't close the help")
+        roadie.app.typeKey("?", modifierFlags: [])
+        XCTAssertTrue(help.waitForExistence(timeout: 3), "? didn't open the help")
+        roadie.app.typeKey(.F1, modifierFlags: [])
+        XCTAssertTrue(roadie.wait { !help.exists }, "F1 didn't close the help")
+        XCTAssertEqual(vis.probe?.help, false)
+    }
 }
