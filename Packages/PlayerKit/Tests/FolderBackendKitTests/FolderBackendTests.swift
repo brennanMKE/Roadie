@@ -340,6 +340,9 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         defer { fixture.cleanup() }
         try await fixture.backend.connect()
         try await fixture.backend.play([trackID(backDisc1)], on: OutputDevice.thisMacID, mode: .replace())
+        // The file is missing, so the player fails it and stops. Wait for that before queueing more: a failure
+        // landing after the next play would skip to the new track and move currentIndex (#0149).
+        #expect(await waitFor { fixture.player.state == .stopped && fixture.player.errorMessage != nil })
         #expect(fixture.player.queue.tracks.count == 1)
         let index = fixture.player.queue.currentIndex
         try await fixture.backend.play([albumID(eden)], on: OutputDevice.thisMacID, mode: .append)
@@ -352,6 +355,9 @@ private func thrown<T>(_ body: @MainActor () async throws -> T) async -> MusicBa
         defer { fixture.cleanup() }
         try await fixture.backend.connect()
         try await fixture.backend.play([trackID(backDisc1)], on: OutputDevice.thisMacID, mode: .replace())
+        // The file is missing, so the player fails it and stops. Wait for that before queueing more: a failure
+        // landing after the next play would skip to the new track and move currentIndex (#0149).
+        #expect(await waitFor { fixture.player.state == .stopped && fixture.player.errorMessage != nil })
         let index = fixture.player.queue.currentIndex
         try await fixture.backend.play([albumID(eden)], on: OutputDevice.thisMacID, mode: .next)
         let tracks = fixture.player.queue.tracks

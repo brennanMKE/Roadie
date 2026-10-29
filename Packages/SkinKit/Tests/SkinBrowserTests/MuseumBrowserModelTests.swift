@@ -207,6 +207,23 @@ private func makeMuseum(
         #expect(model.downloads[skin.md5] == nil)
     }
 
+    /// #0149: the page's badge lookup can still be suspended when a download finishes; its answer (taken before
+    /// the skin was indexed) must not erase the download's badge.
+    @Test func downloadFinishingDuringABadgeLookupKeepsItsBadge() async {
+        let (model, _, _, applier, _, index) = makeMuseum()
+        await index.gateMD5Lookups()
+        await load(model)
+        #expect(await waitFor { await index.suspendedMD5Count == 1 })
+        let skin = model.items[5]
+        #expect(model.primaryAction(for: skin) == .started)
+        #expect(await waitFor { applier.applied.count == 1 })
+        let url = testFolder.appending(path: "Museum/\(skin.filename)")
+        #expect(model.downloaded[skin.md5] == url)
+        await index.releaseMD5Lookups()
+        #expect(await waitFor { model.badgesInFlight == 0 })
+        #expect(model.downloaded[skin.md5] == url)
+    }
+
     @Test func primaryActionOnDownloadedSkinAppliesWithoutDownloading() async {
         let had = SkinRecord(id: 1, hash: "h", name: "s3", status: .ok, primaryPath: "Museum/s3.wsz", md5: md5(3))
         let (model, _, downloader, applier, hooks, _) = makeMuseum(records: [had])
