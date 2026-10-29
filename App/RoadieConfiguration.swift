@@ -47,6 +47,8 @@ struct RoadieConfiguration: @unchecked Sendable {
     var visRenderer: String?
     /// `-RoadieVisSeed N` (#0235, Debug): the preset navigator's random seed; else random. Release ignores it.
     var visSeed: UInt64?
+    /// `-RoadieVisAutoAdvance <seconds>` (#0236, Debug): the auto-advance interval, not varied. Release ignores it.
+    var visAutoAdvance: TimeInterval?
 
     static let standard = RoadieConfiguration()
 
@@ -67,6 +69,7 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let seedSkinsOmit = "RoadieSeedSkinsOmit"
         static let visRenderer = "RoadieVisRenderer"
         static let visSeed = "RoadieVisSeed"
+        static let visAutoAdvance = "RoadieVisAutoAdvance"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -116,6 +119,9 @@ struct RoadieConfiguration: @unchecked Sendable {
     private mutating func readVisualizationArguments(_ arguments: UserDefaults) {
         visRenderer = arguments.string(forKey: Argument.visRenderer)
         visSeed = arguments.string(forKey: Argument.visSeed).flatMap { UInt64($0) }
+        visAutoAdvance = arguments.string(forKey: Argument.visAutoAdvance).flatMap { TimeInterval($0) }.flatMap {
+            $0 > 0 && $0.isFinite ? $0 : nil
+        }
     }
     #endif
 

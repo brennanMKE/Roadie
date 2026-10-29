@@ -1,10 +1,17 @@
 import AppKit
+import VisualizationKit
 
 /// The visualization window's content: the renderer's view, filling it, and the preset name in a top strip (#0238
 /// folds that into the overlay). The renderer's view is the accessibility image `vis.canvas`.
 final class VisualizationHostView: NSView {
     let rendererView: NSView
     private let presetLabel = NSTextField(labelWithString: "")
+    private let toast = NSTextField(labelWithString: "")
+    private var toastGeneration = 0
+    /// A key that maps to a visualization command (design §2.5).
+    var onCommand: ((VisCommand) -> Void)?
+    /// The right-click / control-click menu (design §2.6).
+    var makeContextMenu: (() -> NSMenu?)?
 
     init(rendererView: NSView) {
         self.rendererView = rendererView
@@ -36,10 +43,100 @@ final class VisualizationHostView: NSView {
             presetLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             presetLabel.topAnchor.constraint(equalTo: topAnchor, constant: 6),
         ])
+
+        toast.font = .systemFont(ofSize: 13, weight: .semibold)
+        toast.textColor = .white
+        toast.alignment = .center
+        toast.drawsBackground = false
+        toast.wantsLayer = true
+        toast.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.6).cgColor
+        toast.layer?.cornerRadius = 6
+        toast.alphaValue = 0
+        toast.isHidden = true
+        toast.setAccessibilityIdentifier(AXID.Vis.toast)
+        toast.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(toast)
+        NSLayoutConstraint.activate([
+            toast.centerXAnchor.constraint(equalTo: centerXAnchor),
+            toast.topAnchor.constraint(equalTo: topAnchor, constant: 28),
+        ])
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
+
+    // MARK: Keys and menu
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if let key = Self.visKey(for: event),
+            let command = VisKeyMap.command(
+                for: key, command: flags.contains(.command), control: flags.contains(.control),
+                option: flags.contains(.option), shift: flags.contains(.shift), isRepeat: event.isARepeat),
+            let onCommand
+        {
+            onCommand(command)
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    /// The `NSEvent` as a `VisKey`: special keys by `specialKey`, else the characters ignoring modifiers.
+    static func visKey(for event: NSEvent) -> VisKey? {
+        if let special = event.specialKey {
+            switch special {
+            case .leftArrow: return .left
+            case .rightArrow: return .right
+            case .upArrow: return .up
+            case .downArrow: return .down
+            case .delete, .backspace: return .delete
+            case .carriageReturn, .enter, .newline: return .returnKey
+            case .f1: return .function(1)
+            case .f2: return .function(2)
+            case .f3: return .function(3)
+            case .f4: return .function(4)
+            case .f5: return .function(5)
+            default: break
+            }
+        }
+        guard let text = event.charactersIgnoringModifiers, !text.isEmpty else { return nil }
+        switch text {
+        case " ": return .space
+        case "\u{1b}": return .escape
+        case "\u{7f}", "\u{8}": return .delete
+        case "\r", "\u{3}": return .returnKey
+        default: return .character(text)
+        }
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        makeContextMenu?() ?? super.menu(for: event)
+    }
+
+    // MARK: Labels
+
+    /// The preset name, top-centre, for 2 s, fading (a key change).
+    func showToast(_ name: String) {
+        toastGeneration += 1
+        let generation = toastGeneration
+        toast.stringValue = "  \(name)  "
+        toast.setAccessibilityLabel(name)
+        toast.isHidden = false
+        toast.alphaValue = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self, generation == self.toastGeneration else { return }
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.3
+                self.toast.animator().alphaValue = 0
+            }, completionHandler: {
+                MainActor.assumeIsolated {
+                    if generation == self.toastGeneration { self.toast.isHidden = true }
+                }
+            })
+        }
+    }
 
     func setPresetName(_ name: String) {
         presetLabel.stringValue = name

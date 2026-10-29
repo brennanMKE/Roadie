@@ -39,6 +39,7 @@ struct TestProbe: Codable, Equatable {
         var locked: Bool
         var audio: String
         var presetChanges: Int
+        var lastTransition: String?
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -105,7 +106,8 @@ extension PlayerModel {
         return TestProbe.VisProbe(
             open: vis.isOpen, rendering: vis.isRendering, renderer: vis.renderer?.kindName,
             preset: vis.currentPreset?.id, presetName: vis.currentPreset?.name, order: vis.navigator.order.rawValue,
-            locked: vis.navigator.isLocked, audio: vis.audioSource.probeName, presetChanges: vis.presetChanges)
+            locked: vis.navigator.isLocked, audio: vis.audioSource.probeName, presetChanges: vis.presetChanges,
+            lastTransition: vis.lastTransition)
     }
 
     /// `.wsz` files under `folder`, as sorted folder-relative paths.
