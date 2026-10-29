@@ -62,6 +62,9 @@ targets:
         product: MusicLibraryKit
       - package: PlayerKit
         product: MusicAssistantKit
+      # #0233: presets for the visualization window (used from #0235).
+      - package: PlayerKit
+        product: VisualizationKit
       - package: Sparkle
       # App extensions embed into Contents/PlugIns and are signed on copy (#0043).
       - target: RoadieThumbnail
