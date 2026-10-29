@@ -264,8 +264,11 @@ final class VisualizationUITests: RoadieUITestCase {
     }
 
     /// The pointer over the canvas at `dx`, `dy` (normalized; the top half, clear of the card, which holds it up).
+    /// Moves between two distinct points so there is real movement even when the pointer is already at `dx`, `dy`.
     private func hoverCanvas(_ dx: CGFloat = 0.5, _ dy: CGFloat = 0.3) {
-        roadie.element(AXID.Vis.canvas).coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).hover()
+        let canvas = roadie.element(AXID.Vis.canvas)
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: dx + 0.1, dy: dy + 0.05)).hover()
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).hover()
     }
 
     func testOverlayShowsTheSong() {

@@ -14,6 +14,8 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
     private var link: CADisplayLink?
     private var target: VisualizationLinkTarget?
     private var observers: [NSObjectProtocol] = []
+    /// Pointer movement in this window, for the song overlay (#0238).
+    private var mouseMonitor: Any?
     /// The windowed frame, style and level while in the Debug borderless full screen (#0237).
     var borderlessSaved: BorderlessSaved?
 
@@ -165,6 +167,16 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
             card: VisualizationOverlayHostingView(rootView: VisualizationOverlayCard(model: visualization)),
             badge: VisualizationOverlayHostingView(rootView: VisualizationNoAudioBadge(model: visualization)))
         hostView.onPointerMoved = { [weak visualization] in visualization?.overlayPointerMoved(inside: true) }
+        // The overlay's hosting views sit above the host view, so movement is also caught for the whole window here.
+        window?.acceptsMouseMovedEvents = true
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) {
+            [weak self] event in
+            if let self, let window = self.window, event.window === window {
+                let point = self.hostView.convert(event.locationInWindow, from: nil)
+                if self.hostView.bounds.contains(point) { self.visualization.overlayPointerMoved(inside: true) }
+            }
+            return event
+        }
         hostView.onPointerExited = { [weak visualization] in visualization?.overlayPointerExited() }
         visualization.hideCursor = { [weak self] in
             guard let window = self?.window, window.isKeyWindow, NSApp.isActive else { return }
