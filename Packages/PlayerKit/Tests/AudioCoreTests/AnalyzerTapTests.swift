@@ -72,6 +72,93 @@ import Testing
         }
     }
 
+    // MARK: Stereo ring (#0232)
+
+    private static func latest(_ ring: VisSampleRing, _ count: Int) -> [Float] {
+        var out = [Float](repeating: .nan, count: count)
+        let ok = out.withUnsafeMutableBufferPointer { ring.copyLatest(count: count, into: $0.baseAddress!) }
+        #expect(ok)
+        return out
+    }
+
+    @Test func stereoIsOffByDefaultAndWritesNothing() {
+        let tap = AnalyzerTap()
+        tap.prepare(sampleRate: 48_000)
+        #expect(!tap.isStereoEnabled)
+        tap.deliver(TapBuffers.make(frames: 512, channels: 2) { c, _ in c == 0 ? 0.25 : -0.5 })
+        #expect(tap.stereo.writeCount == 0)
+        #expect(tap.ring.writeCount == 512)
+    }
+
+    @Test func stereoInterleavesLeftAndRight() {
+        let tap = AnalyzerTap()
+        tap.prepare(sampleRate: 48_000)
+        tap.setStereoEnabled(true)
+        #expect(tap.isStereoEnabled)
+        tap.deliver(TapBuffers.make(frames: 512, channels: 2) { c, _ in c == 0 ? 0.25 : -0.5 })
+        #expect(tap.stereo.writeCount == 1_024)
+        let s = Self.latest(tap.stereo, 1_024)
+        for i in 0..<512 {
+            #expect(s[2 * i] == 0.25)
+            #expect(s[2 * i + 1] == -0.5)
+        }
+    }
+
+    @Test func monoSourceIsDuplicatedIntoBothChannels() {
+        let tap = AnalyzerTap()
+        tap.prepare(sampleRate: 48_000)
+        tap.setStereoEnabled(true)
+        tap.deliver(TapBuffers.make(frames: 300, channels: 1) { _, i in Float(i) })
+        let s = Self.latest(tap.stereo, 600)
+        for i in 0..<300 {
+            #expect(s[2 * i] == Float(i))
+            #expect(s[2 * i + 1] == s[2 * i])
+        }
+    }
+
+    @Test func extraChannelsAreIgnored() {
+        let tap = AnalyzerTap()
+        tap.prepare(sampleRate: 48_000)
+        tap.setStereoEnabled(true)
+        tap.deliver(TapBuffers.make(frames: 256, channels: 4) { c, _ in Float(c + 1) })
+        #expect(tap.stereo.writeCount == 512)
+        let s = Self.latest(tap.stereo, 512)
+        for i in 0..<256 {
+            #expect(s[2 * i] == 1)
+            #expect(s[2 * i + 1] == 2)
+        }
+    }
+
+    @Test func monoRingIsUnchangedWithStereoOn() {
+        let off = AnalyzerTap(), on = AnalyzerTap()
+        off.prepare(sampleRate: 48_000); on.prepare(sampleRate: 48_000)
+        on.setStereoEnabled(true)
+        for k in 0..<5 {
+            let buffer = TapBuffers.make(frames: 1_000 + 37 * k, channels: 2) { c, i in
+                c == 0 ? Float(sin(Double(i) * 0.01)) : Float(i % 97) / 97
+            }
+            off.deliver(buffer); on.deliver(buffer)
+        }
+        #expect(on.ring.writeCount == off.ring.writeCount)
+        #expect(Self.latest(on.ring, 4_096) == Self.latest(off.ring, 4_096))
+    }
+
+    @Test func stereoWritesWholeFramesAcrossChunkBoundaries() {
+        let tap = AnalyzerTap()
+        tap.prepare(sampleRate: 48_000)
+        tap.setStereoEnabled(true)
+        let a = TapBuffers.make(frames: 4_801, channels: 2) { c, _ in c == 0 ? 0.25 : -0.5 }
+        let b = TapBuffers.make(frames: 4_799, channels: 2) { c, _ in c == 0 ? 0.25 : -0.5 }
+        for k in 0..<60 {
+            tap.deliver(k % 2 == 0 ? a : b)
+            #expect(tap.stereo.writeCount % 2 == 0)
+            let s = Self.latest(tap.stereo, 2_048)
+            #expect(s[0] == 0.25)
+            #expect(zip(s, s.dropFirst()).allSatisfy { $0 != $1 })
+        }
+        #expect(tap.stereo.writeCount > 10 * tap.stereo.capacity)
+    }
+
     private static func offlineEngine() throws -> AVAudioEngine {
         let engine = AVAudioEngine()
         let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!

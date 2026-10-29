@@ -1,5 +1,6 @@
 import Accelerate
 import AVFoundation
+import CAtomics
 
 /// Taps an audio node, hands mono samples to the UI through a lock-free ring, and runs the FFT
 /// on the consumer's tick. The tap block allocates nothing and takes no locks.
@@ -12,6 +13,11 @@ public final class AnalyzerTap: @unchecked Sendable {
     public private(set) var isInstalled = false
     /// Sample rate the current analyzer was built for (0 before the first install).
     public private(set) var sampleRate: Double = 0
+    /// Interleaved L R copy of the signal for the visualization window; written only while enabled.
+    public var stereo: VisSampleRing { sink.stereo }
+    /// Sample rate of the last `prepare` (same as `sampleRate`, kept separate so `StereoFeedReader`
+    /// can notice a change without touching the mono analyzer).
+    public private(set) var stereoSampleRate: Double = 0
 
     private weak var node: AVAudioNode?
     private var bus: AVAudioNodeBus = 0
@@ -27,7 +33,7 @@ public final class AnalyzerTap: @unchecked Sendable {
 
     public init(fftSize: Int = 1024, ringCapacity: Int = 32_768) {
         self.fftSize = fftSize
-        let sink = TapSink(ring: VisSampleRing(capacity: ringCapacity))
+        let sink = TapSink(ring: VisSampleRing(capacity: ringCapacity), stereo: VisSampleRing(capacity: 32_768))
         self.sink = sink
         cursor = VisReadCursor(window: fftSize, readable: sink.ring.capacity - sink.ring.maxChunk)
         window = .allocate(capacity: fftSize)
@@ -67,8 +73,18 @@ public final class AnalyzerTap: @unchecked Sendable {
             analyzer = SpectrumAnalyzer(fftSize: fftSize, sampleRate: sampleRate)
             self.sampleRate = sampleRate
         }
+        if sampleRate > 0 { stereoSampleRate = sampleRate }
         resetCursor()
     }
+
+    /// Turns the stereo ring on or off. Off by default, so the tap does only the mono work until a
+    /// visualization renders.
+    public nonisolated func setStereoEnabled(_ on: Bool) { sink.setStereoEnabled(on) }
+
+    public var isStereoEnabled: Bool { sink.isStereoEnabled }
+
+    /// Runs the real tap body on `buffer` without an engine (tests).
+    func deliver(_ buffer: AVAudioPCMBuffer) { sink.handle(buffer) }
 
     /// Call when the UI pauses or resumes so the cursor re-lags instead of replaying old audio.
     public nonisolated func resetCursor() {
@@ -128,15 +144,32 @@ public final class AnalyzerTap: @unchecked Sendable {
 /// Producer side of the tap: the ring plus its scratch buffer. Only the tap block calls `handle`.
 private final class TapSink: @unchecked Sendable {
     let ring: VisSampleRing
+    let stereo: VisSampleRing
     private let scratch: UnsafeMutablePointer<Float>
+    private let stereoScratch: UnsafeMutablePointer<Float>
+    /// 1 while the stereo ring is written; release / acquire.
+    private let stereoFlag: UnsafeMutablePointer<Int64>
 
-    init(ring: VisSampleRing) {
+    init(ring: VisSampleRing, stereo: VisSampleRing) {
         self.ring = ring
+        self.stereo = stereo
         scratch = .allocate(capacity: ring.capacity)
         scratch.initialize(repeating: 0, count: ring.capacity)
+        stereoScratch = .allocate(capacity: stereo.capacity)
+        stereoScratch.initialize(repeating: 0, count: stereo.capacity)
+        stereoFlag = .allocate(capacity: 1)
+        stereoFlag.initialize(to: 0)
     }
 
-    deinit { scratch.deallocate() }
+    deinit {
+        scratch.deallocate()
+        stereoScratch.deallocate()
+        stereoFlag.deallocate()
+    }
+
+    func setStereoEnabled(_ on: Bool) { ca_store_release(stereoFlag, on ? 1 : 0) }
+
+    var isStereoEnabled: Bool { ca_load_acquire(stereoFlag) != 0 }
 
     /// Tap block body. Preallocated buffers only.
     func handle(_ buffer: AVAudioPCMBuffer) {
@@ -155,5 +188,17 @@ private final class TapSink: @unchecked Sendable {
             memcpy(scratch, left, n * MemoryLayout<Float>.stride)
         }
         ring.write(scratch, count: n)
+        guard isStereoEnabled else { return }
+        // Newest whole frames, interleaved L R. The ring publishes in maxChunk (capacity / 4, even) slices,
+        // so every published slice holds whole frames.
+        let frames = min(available, stereo.capacity / 2)
+        let stereoSkip = available - frames
+        let l = channels[0] + stereoSkip
+        let r = buffer.format.channelCount >= 2 ? channels[1] + stereoSkip : l
+        var split = DSPSplitComplex(realp: l, imagp: r)
+        stereoScratch.withMemoryRebound(to: DSPComplex.self, capacity: frames) { out in
+            vDSP_ztoc(&split, 1, out, 2, vDSP_Length(frames))
+        }
+        stereo.write(stereoScratch, count: 2 * frames)
     }
 }
