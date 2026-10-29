@@ -359,6 +359,7 @@ Design: [visualization.md](visualization.md) §8.4; one row per feature, added b
 | Presets change on their own (16 s, varied, 2.7 s blend), not while locked (#0236) | UI `VisualizationUITests.testPresetsChangeOnTheirOwn`; Unit `AutoAdvanceClockTests`, `VisualizationModelKeyTests.testAutoAdvanceSkipsWhileLocked` |
 | Right-click menu lists every command with its key (#0236) | UI `VisualizationUITests.testRightClickMenuListsTheCommands`; Unit `VisualizationModelKeyTests.testContextMenuHasEveryCommandWithItsKey` |
 | L / Presets… list: search, ↑ ↓, Return loads, Esc closes (#0240) | UI `VisualizationUITests.testLOpensTheListAndReturnLoadsTheSelection`, `.testTypingFiltersTheList`, `.testEscapeClosesTheList`; Unit `RoadieTests.VisualizationListTests` |
+| Settings › Visualization: automatic changes, interval, vary, blend, order, presets folder, overlay idle time, song title, open on play; ⌥⌘K from the Window menu, skinned main menu, clutter V (#0241) | UI `VisualizationUITests.testCommandOptionKOpensTheVisualizationTab`, `.testSettingsChangeTheRunningVisualization`, `.testPresetsFolderAddsItsPresets`, `.testOpenOnPlayOpensTheWindow`; Unit `RoadieTests.VisualizationSettingsModelTests`, SkinKit `MainMenuTests.visualizationSubmenuHasSettings`; *by hand* for the folder panel |
 
 ## 6. Runner and logging
 

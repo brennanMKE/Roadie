@@ -43,8 +43,26 @@ extension PlayerModel {
         case .next: next()
         case .jumpToFile: showJumpToFile()
         case .toggleVisualization: visualization.toggle()
+        case .visualizationSettings: showSettings(.visualization)
         case .quit: if !intercepted(.quit) { NSApp.terminate(nil) }
         }
+    }
+}
+
+// MARK: - Settings (#0241)
+
+extension PlayerModel {
+    /// Selects `tab` and opens Settings: the `openSettings` action `PlayerView` captured, else the app's
+    /// `showSettingsWindow:` action.
+    func showSettings(_ tab: SettingsTab) {
+        defaults.set(tab.rawValue, forKey: SettingsTab.defaultsKey)
+        if intercepted(.settings) { return }
+        if let openSettingsAction {
+            openSettingsAction()
+        } else {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        }
+        NSApp.activate()
     }
 }
 

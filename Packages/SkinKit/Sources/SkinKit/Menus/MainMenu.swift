@@ -5,7 +5,7 @@ public enum MainMenuCommand: Hashable, Sendable, CaseIterable {
     case openSkin, nextSkin, previousSkin, randomSkin
     case timeElapsed, timeRemaining, toggleAlwaysOnTop, toggleDoubleSize, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle
     case previous, play, pause, stop, next, jumpToFile
-    case toggleVisualization
+    case toggleVisualization, visualizationSettings
     case quit
 }
 
@@ -177,13 +177,17 @@ public enum MainMenu {
         ]
     }
 
-    /// Winamp's Visualization submenu (#0235); its settings item comes in #0241.
+    /// Winamp's Visualization submenu (#0235); with its settings item (#0241).
     public static func visualizationEntries(_ state: MainMenuState) -> [MainMenuEntry] {
         [
             .item(
                 MainMenuItem(
                     .toggleVisualization, "Start/Stop Visualization", checked: state.isVisualizationOpen,
                     shortcut: MainMenuShortcut("k", [.command, .shift]))),
+            .item(
+                MainMenuItem(
+                    .visualizationSettings, "Visualization Settings\u{2026}",
+                    shortcut: MainMenuShortcut("k", [.command, .option]))),
         ]
     }
 }

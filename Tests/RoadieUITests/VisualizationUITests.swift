@@ -294,4 +294,77 @@ final class VisualizationUITests: RoadieUITestCase {
         XCTAssertEqual(vis.preset, "Classic Spectrum")
         XCTAssertEqual(vis.probe?.presetChanges, 0)
     }
+
+    // MARK: Settings › Visualization (#0241)
+
+    /// ⌥⌘K opens Settings on the Visualization tab.
+    private func openVisualizationSettings(file: StaticString = #filePath, line: UInt = #line) {
+        roadie.app.typeKey("k", modifierFlags: [.command, .option])
+        XCTAssertTrue(
+            roadie.element("vis.settings.interval").waitForExistence(timeout: 10),
+            "Settings › Visualization didn't open", file: file, line: line)
+    }
+
+    /// Picks `title` from the pop-up button `id`.
+    private func choose(_ title: String, in id: String, file: StaticString = #filePath, line: UInt = #line) {
+        let popUp = roadie.element(id)
+        XCTAssertTrue(popUp.waitForExistence(timeout: 5), "no \(id)", file: file, line: line)
+        popUp.click()
+        let item = roadie.app.menuItems[title]
+        XCTAssertTrue(item.waitForExistence(timeout: 3), "\(id) has no \(title)", file: file, line: line)
+        item.click()
+    }
+
+    func testCommandOptionKOpensTheVisualizationTab() {
+        launchPlain()
+        openVisualizationSettings()
+        XCTAssertTrue(roadie.element("vis.settings.order").exists, "no vis.settings.order")
+    }
+
+    func testSettingsChangeTheRunningVisualization() {
+        launch(windows: [.main], extra: ["-RoadieVisRenderer", "classic", "-RoadieVisSeed", "1"])
+        XCTAssertTrue(roadie.main.play.waitForExistence(timeout: 10), "main.play never appeared")
+        vis.open()
+        XCTAssertTrue(vis.window.waitForExistence(timeout: 5), "vis.window never appeared")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.open == true }, "probe: \(roadie.probeJSON)")
+        XCTAssertEqual(vis.probe?.order, "random")
+        openVisualizationSettings()
+        choose("In order", in: "vis.settings.order")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.order == "sequential" }, roadie.probeJSON)
+        choose("Never", in: "vis.settings.idle")
+        let idle = roadie.element("vis.settings.idle")
+        XCTAssertTrue(roadie.wait { self.roadie.value(of: idle) == "Never" }, "idle: \(roadie.describe(idle))")
+    }
+
+    func testPresetsFolderAddsItsPresets() {
+        let folder = (paths.data as NSString).appendingPathComponent("vis-presets-\(UUID().uuidString)")
+        launchPlain(extra: ["-RoadieVisPresetsFolder", folder, "-RoadieVisSeedPresets", "2", "-RoadieVisSeed", "1"])
+        openVisualizationSettings()
+        let count = roadie.element("vis.settings.folderCount")
+        XCTAssertTrue(
+            roadie.wait(timeout: 10) { count.exists && (self.roadie.value(of: count) == "2 presets found" || count.label == "2 presets found") },
+            "folder count: \(roadie.describe(count))")
+        roadie.app.typeKey("w", modifierFlags: .command)  // close Settings
+        vis.open()
+        expectOpen()
+        vis.window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click()
+        roadie.app.typeKey("l", modifierFlags: [])
+        let search = roadie.element(AXID.Vis.browserSearch)
+        XCTAssertTrue(search.waitForExistence(timeout: 5), "no \(AXID.Vis.browserSearch)")
+        search.click()
+        roadie.app.typeText("Seeded")
+        XCTAssertTrue(
+            roadie.wait { self.row(0).exists && self.row(0).label == "Seeded Preset 1" && self.row(1).label == "Seeded Preset 2" },
+            "the list doesn't have the folder's presets")
+        roadie.app.typeKey(.escape, modifierFlags: [])
+    }
+
+    func testOpenOnPlayOpensTheWindow() {
+        launchPlain(extra: ["-visualization.openOnPlay", "YES", "-RoadieOpenFiles", paths.music])
+        XCTAssertTrue(roadie.wait { (self.roadie.probe?.queue.count ?? 0) > 0 }, "no queue: \(roadie.probeJSON)")
+        XCTAssertFalse(vis.window.exists, "vis.window open before playing")
+        roadie.click(roadie.main.play)
+        roadie.waitForPlaying()
+        XCTAssertTrue(vis.window.waitForExistence(timeout: 5), "vis.window didn't open on play")
+    }
 }

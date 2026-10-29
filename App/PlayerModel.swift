@@ -35,6 +35,8 @@ final class PlayerModel {
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
     /// Captured from `PlayerView` so the skinned menu can open SwiftUI windows (#0185).
     @ObservationIgnored var openWindowAction: OpenWindowAction?
+    /// Captured from `PlayerView` so Visualization Settings… can open Settings (#0241).
+    @ObservationIgnored var openSettingsAction: OpenSettingsAction?
     /// Check for Updates… in the skinned main menu (#0158). The app injects these from `Updater`, so the model and
     /// SkinKit stay free of Sparkle; nil leaves the item disabled.
     @ObservationIgnored var updateActions: (canCheck: () -> Bool, check: () -> Void)?
@@ -155,7 +157,10 @@ final class PlayerModel {
     @ObservationIgnored var musicAssistantIsConnected = false
     /// Roadie itself asked Music Assistant to play on This Mac; cleared when the stream starts.
     @ObservationIgnored var ownStreamRequested = false
-    private(set) var nowPlaying: NowPlaying = .idle(on: OutputDevice.thisMacID)
+    private(set) var nowPlaying: NowPlaying = .idle(on: OutputDevice.thisMacID) {
+        // Open on play (#0241).
+        didSet { if oldValue.state != nowPlaying.state { visualization.playbackStateChanged(to: nowPlaying.state) } }
+    }
     private var nowPlayingTask: Task<Void, Never>?
     /// Follows the remote queue the playlist window shows (#0144).
     private var queueTask: Task<Void, Never>?
@@ -365,7 +370,7 @@ final class PlayerModel {
     #endif
 
     enum SystemRequest: Equatable {
-        case openFiles(replace: Bool), openFolder, openSkin, openPlaylistFile, about, quit, jumpToFile, library
+        case openFiles(replace: Bool), openFolder, openSkin, openPlaylistFile, about, quit, jumpToFile, library, settings
     }
 
     /// true when `systemRequestOverride` took `request`; always false in Release.
