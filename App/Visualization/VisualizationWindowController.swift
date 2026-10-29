@@ -47,6 +47,7 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         visualization.fullScreenController = self
         hostView.onDoubleClick = { [weak visualization] in visualization?.toggleFullScreen() }
         installOverlay()
+        hostView.installTitleViews(model: visualization)
         // Frame autosave writes the standard defaults, so a test launch places the window fresh every time.
         let isTest = model.configuration.defaults !== UserDefaults.standard
         if isTest || !window.setFrameUsingName(Self.autosaveName) { placeBesideSkinnedWindows() }

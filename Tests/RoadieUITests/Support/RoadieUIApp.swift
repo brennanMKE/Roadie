@@ -65,6 +65,9 @@ struct ProbeState: Decodable {
         var lastTransition: String?
         var overlay: String
         var cursorHidden: Bool
+        var songTitleShows: Int
+        var readouts: [String]
+        var help: Bool
     }
 }
 

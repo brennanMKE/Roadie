@@ -45,8 +45,17 @@ final class VisualizationModel {
     private(set) var isConstrained = false
     /// In full screen (native or the Debug borderless hook), from the window controller (#0237).
     private(set) var isFullScreen = false
-    /// Stand-in for the help overlay (a later issue): Esc closes it before leaving full screen.
-    var isHelpOpen = false
+    /// The keyboard shortcuts card (F1 / ?, #0239): holds the overlay and suspends auto-advance while open; Esc closes
+    /// it before leaving full screen.
+    var isHelpOpen = false {
+        didSet { if oldValue != isHelpOpen { helpOpenChanged() } }
+    }
+    /// The song title show running now and how many have started (#0239, `VisualizationModel+Title`).
+    var songTitle: SongTitleShow?
+    var songTitleShowCount = 0
+    /// The display link's measured rate, smoothed, updated once a second (the F5 readout).
+    var measuredFPS: Double = 0
+    @ObservationIgnored var titleState = TitleState()
     /// The preset list while it's open (L / Presets…, #0240); set through `openList` / `closeList`.
     var presetList: PresetListModel?
     /// The song overlay's and cursor's visibility (#0238); `VisualizationModel+Overlay` drives it.
@@ -91,7 +100,7 @@ final class VisualizationModel {
     /// Why auto-advance is paused (not rendering, the right-click menu open); the clock runs only when empty.
     @ObservationIgnored private var suspensions: Set<Suspension> = []
 
-    enum Suspension: Hashable { case notRendering, menu, list }
+    enum Suspension: Hashable { case notRendering, menu, list, help }
 
     /// What the presets folder setting found (Settings › Visualization, #0241).
     enum FolderStatus: Equatable { case none, scanning, notFound, found(Int) }
@@ -154,6 +163,7 @@ final class VisualizationModel {
         isOpen = true
         hasOpened = true
         setWindowOpenSetting(true)
+        startTrackingTitle()
     }
 
     func close() {
@@ -251,8 +261,8 @@ final class VisualizationModel {
 
     // MARK: Commands
 
-    /// One visualization-window command (design §2.5). Full screen and Escape are #0237's; the list, song title,
-    /// help and readouts are later issues'.
+    /// One visualization-window command (design §2.5). Full screen and Escape are #0237's, the list #0240's, the song
+    /// title, help and readouts #0239's.
     func perform(_ command: VisCommand) {
         // While the list is open, keys go to it; only Esc and full screen get through (#0240).
         if isListOpen, command != .escape, command != .toggleFullScreen { return }
@@ -270,8 +280,9 @@ final class VisualizationModel {
             defaults.set(navigator.isLocked, forKey: VisualizationSettings.Key.locked)
         case .transport(let transport): hotkey(Self.hotkey(for: transport))
         case .presetList: openList()
-        case .showSongTitle, .help, .toggleReadout:
-            break  // #0239
+        case .showSongTitle: showSongTitleNow()
+        case .help: isHelpOpen.toggle()
+        case .toggleReadout(let readout): toggleReadout(readout)
         case .toggleFullScreen, .escape:
             handleFullScreenCommand(command)
         }
@@ -322,6 +333,7 @@ final class VisualizationModel {
         let dt = max(lastTick.map { now - $0 } ?? 1.0 / 60, 0)
         lastTick = now
         renderTime += dt
+        countFrame(at: now)
         if clock.isDue(at: now) {
             if let preset = navigator.advanceAutomatically() { load(preset, transition: settings.blendSeconds) }
             clock.restart(at: now)

@@ -3,8 +3,7 @@ import VisualizationKit
 
 /// The visualization window's right-click menu (design §2.6), built from `VisKeyMap.rows`. Each item shows its key as
 /// a bare key equivalent (a pop-up menu's equivalents act only while it's open, so they don't take the key from the
-/// view). Commands still to come (song title, readouts, full screen, help) are listed but disabled.
-/// Auto-advance pauses while it's open.
+/// view). The readouts show ✓ while on (#0239). Auto-advance pauses while it's open.
 @MainActor
 final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
     private weak var model: VisualizationModel?
@@ -17,10 +16,8 @@ final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
         .toggleFullScreen, .help,
     ]
 
-    /// Commands that do something yet; the rest are disabled until their issue wires them.
-    static let enabledCommands: Set<VisCommand> = [
-        .nextPreset, .previousPreset, .hardCut, .toggleOrder, .toggleLock, .presetList, .toggleFullScreen,
-    ]
+    /// Every command in the menu works (the song title, readouts and help since #0239).
+    static let enabledCommands: Set<VisCommand> = Set(layout.compactMap { $0 })
 
     static func make(model: VisualizationModel) -> VisualizationContextMenu {
         let menu = VisualizationContextMenu(title: "Visualization")
@@ -44,6 +41,7 @@ final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
             switch command {
             case .toggleOrder: item.state = model.navigator.order == .random ? .on : .off
             case .toggleLock: item.state = model.navigator.isLocked ? .on : .off
+            case .toggleReadout(let readout): item.state = model.settings.readouts.contains(readout) ? .on : .off
             default: break
             }
             menu.addItem(item)
