@@ -60,7 +60,7 @@ means the same intent, done the Mac way or changed for a reason given. **Dropped
 | — | **⌃⌘F** / View-style "Enter Full Screen" from the window's green button and the Window menu | Added | The Mac's standard; free with `.fullScreenPrimary` |
 | Escape: leave full screen (and close the help screen / menus first) | Same order: Esc closes the help, then the preset browser, then leaves full screen; windowed, it does nothing | Kept | |
 | Full screen on a chosen monitor (config) | Native full screen on the screen the window is on; move the window first to pick | Adapted | Native Spaces; no device picker |
-| "Fake full screen" (a borderless topmost window) | Not offered; native full screen only (a borderless fallback exists only as a Debug test hook if the guest can't do native full screen, #0237) | Dropped | Native is what Mac users expect |
+| "Fake full screen" (a borderless topmost window) | Not offered; native full screen only (it works in the guest, #0237; the unused Debug borderless hook was removed, #0245) | Dropped | Native is what Mac users expect |
 | The cursor hidden in full screen | The cursor hides **with the overlay** after the idle timeout, in full screen and windowed (pointer inside the view only), and comes back on movement | Adapted | The user's request |
 | Desktop mode (render behind the desktop icons) | — | Dropped | A DirectX overlay trick with no sane macOS equivalent |
 
@@ -562,8 +562,7 @@ Debug-only launch arguments (test hooks, never in Release; `RoadieConfiguration`
 `-RoadieVisAutoAdvance <seconds>` (a short interval, no variation), `-RoadieVisReduceMotion 1`, `-RoadieVisDimFlashing 1`
 and `-RoadieVisVoiceOver 1` (stand in for the system settings, which a test can't change),
 `-RoadieVisPresetsFolder <path>` (instead of the folder panel) with `-RoadieVisSeedPresets <n>` (the app writes n tiny
-`.milk` files there; the sandboxed test runner can't), and `-RoadieVisFullScreen borderless` (only if #0237's spike
-needs it). Plain settings are passed as
+`.milk` files there; the sandboxed test runner can't). Plain settings are passed as
 `-visualization.order sequential` through `NSArgumentDomain`, as other tests do.
 
 ---
@@ -625,10 +624,9 @@ library. A `RoadieUIApp.Visualization` helper: `open()` (⇧⌘K), `window`, `pr
   (the package's own VM tests render frames), but timing is meaningless. UI tests use the classic renderer;
   #0243 adds one smoke test with `-RoadieVisRenderer milk` that skips (`XCTSkip`) when the probe says the factory
   fell back to classic (no Metal device).
-- **Full screen** may not complete in a headless guest's virtual display. #0237 spikes it first; if the window never
-  reports `.fullScreen`, the test uses the Debug `-RoadieVisFullScreen borderless` path (a screen-sized borderless
-  window driving the same overlay/cursor/Esc code) and the native transition is by hand; the finding goes in
-  docs/ui-tests-in-vm.md.
+- **Full screen** works natively in the headless guest (#0237's spike), so the UI tests drive the real transition. In
+  full screen the main window's probe leaves the accessibility tree, so the tests read full-screen state from the
+  canvas frame (docs/ui-tests-in-vm.md). The Debug borderless fallback was never needed and was removed (#0245).
 - **Cursor hiding** can't be observed by XCUITest; the probe's `cursorHidden` reports the state machine, and the real
   cursor is a by-hand check.
 - **Function keys:** `typeKey(.F1, [])` is supported by XCUITest; `?` is tested too.
@@ -655,7 +653,7 @@ Each user-facing child also adds a CHANGELOG `[Unreleased]` bullet and, at the e
    without the cursor's lag.
 3. **Main-actor stalls.** `render` waits on a 3-frame semaphore; a command buffer never committed stalls the main
    thread (F3). #0243 commits every buffer and draws only when a drawable is available.
-4. **Full screen in the headless guest.** Covered by #0237's spike and fallback.
+4. **Full screen in the headless guest.** Covered by #0237's spike: native full screen works in the guest.
 5. **Hidden cursor stuck.** `setHiddenUntilMouseMoves` unhides on any movement, and the window unhides on close,
    resign key and exit of full screen. A by-hand check on a second display.
 6. **Key conflicts.** S, R, L, J change meaning in this window (as in MilkDrop). The help card and right-click menu
