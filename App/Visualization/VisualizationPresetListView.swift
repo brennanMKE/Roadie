@@ -9,6 +9,8 @@ struct VisualizationPresetListView: View {
     let onLoad: () -> Void
     let onClose: () -> Void
     let onToggleFullScreen: () -> Void
+    /// VoiceOver keeps focus in the search field, so each ↑ ↓ move is announced (#0242).
+    var onSelectionMoved: (String) -> Void = { _ in }
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -25,8 +27,8 @@ struct VisualizationPresetListView: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($searchFocused)
                 .accessibilityIdentifier(AXID.Vis.browserSearch)
-                .onKeyPress(.upArrow) { list.moveSelection(by: -1); return .handled }
-                .onKeyPress(.downArrow) { list.moveSelection(by: 1); return .handled }
+                .onKeyPress(.upArrow) { move(by: -1); return .handled }
+                .onKeyPress(.downArrow) { move(by: 1); return .handled }
                 .onKeyPress(keys: [.return]) { press in
                     if press.modifiers.contains(.option) { onToggleFullScreen() } else { onLoad() }
                     return .handled
@@ -86,6 +88,13 @@ struct VisualizationPresetListView: View {
         .skinDisplay(AXID.Vis.browserRow(index), label: row.preset.name, value: row.status)
         // The cursor row is announced through the hint, so the row stays plain static text for the value.
         .accessibilityHint(selected ? "Selected" : "")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func move(by step: Int) {
+        let before = list.selection
+        list.moveSelection(by: step)
+        if list.selection != before, let row = list.selectedRow { onSelectionMoved(row.preset.name) }
     }
 
     private func scroll(_ proxy: ScrollViewProxy) {
@@ -111,7 +120,8 @@ extension VisualizationHostView {
             list: list,
             onLoad: { [weak model] in model?.loadListSelection() },
             onClose: { [weak model] in model?.closeList() },
-            onToggleFullScreen: { [weak model] in model?.perform(.toggleFullScreen) })
+            onToggleFullScreen: { [weak model] in model?.perform(.toggleFullScreen) },
+            onSelectionMoved: { [weak model] in model?.announceForVoiceOver($0) })
         let host = NSHostingView(rootView: view)
         host.identifier = Self.listIdentifier
         host.frame = bounds

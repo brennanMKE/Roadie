@@ -8,6 +8,13 @@ final class VisualizationHostView: NSView {
     private let presetLabel = NSTextField(labelWithString: "")
     private let toast = NSTextField(labelWithString: "")
     private var toastGeneration = 0
+    /// Dim Flashing Lights and the flashing notice (#0242): a 40 % black layer over the picture, under everything else.
+    let dimmingView: NSView = PassThroughView()
+    static let dimmingOpacity: Float = 0.4
+    /// Reduce Motion: the toast appears and goes without fading (#0242).
+    var animatesToast = true
+    /// Return while the flashing notice is up (#0242): true when it took the key.
+    var onReturnKey: (() -> Bool)?
     /// A key that maps to a visualization command (design §2.5).
     var onCommand: ((VisCommand) -> Void)?
     /// The right-click / control-click menu (design §2.6).
@@ -27,6 +34,14 @@ final class VisualizationHostView: NSView {
         rendererView.setAccessibilityLabel("Visualization")
         rendererView.setAccessibilityIdentifier(AXID.Vis.canvas)
         addSubview(rendererView)
+
+        dimmingView.frame = bounds
+        dimmingView.autoresizingMask = [.width, .height]
+        dimmingView.wantsLayer = true
+        dimmingView.layer?.backgroundColor = NSColor.black.cgColor
+        dimmingView.layer?.opacity = 0
+        dimmingView.setAccessibilityElement(false)
+        addSubview(dimmingView)
 
         presetLabel.font = .systemFont(ofSize: 11, weight: .medium)
         presetLabel.textColor = .white
@@ -110,6 +125,9 @@ final class VisualizationHostView: NSView {
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = Self.visKey(for: event)
+        if key == .returnKey, flags.isDisjoint(with: [.option, .command, .control, .shift]), onReturnKey?() == true {
+            return
+        }
         if let key, let onCommand,
             let command = Self.command(for: key, flags: flags, isRepeat: event.isARepeat)
         {
@@ -183,7 +201,7 @@ final class VisualizationHostView: NSView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             guard let self, generation == self.toastGeneration else { return }
             NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.3
+                context.duration = self.animatesToast ? 0.3 : 0
                 self.toast.animator().alphaValue = 0
             }, completionHandler: {
                 MainActor.assumeIsolated {
@@ -193,8 +211,20 @@ final class VisualizationHostView: NSView {
         }
     }
 
+    /// Whether the picture sits under the dimming layer.
+    func setDimmed(_ dimmed: Bool) {
+        dimmingView.layer?.opacity = dimmed ? Self.dimmingOpacity : 0
+    }
+
+    var isDimmed: Bool { (dimmingView.layer?.opacity ?? 0) > 0 }
+
     func setPresetName(_ name: String) {
         presetLabel.stringValue = name
         rendererView.setAccessibilityValue(name)
     }
+}
+
+/// A view that never takes the mouse, so clicks reach the picture beneath it.
+private final class PassThroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

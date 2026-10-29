@@ -100,7 +100,27 @@ final class VisualizationModel {
     /// Why auto-advance is paused (not rendering, the right-click menu open); the clock runs only when empty.
     @ObservationIgnored private var suspensions: Set<Suspension> = []
 
-    enum Suspension: Hashable { case notRendering, menu, list, help }
+    enum Suspension: Hashable { case notRendering, menu, list, help, reduceMotion, notice }
+
+    var hasSuspensions: Bool { !suspensions.isEmpty }
+
+    // MARK: Accessibility (#0242, `VisualizationModel+Accessibility`)
+
+    /// The system's Reduce Motion, Dim Flashing Lights and VoiceOver as last read, and the policy they make.
+    var accessibilityState = VisAccessibilityInputs()
+    var accessibility = VisualizationAccessibilityPolicy()
+    /// The flashing notice is up (first open only).
+    var isFlashNoticeUp = false
+    /// Where the inputs come from; tests replace it, then call `refreshAccessibility()`.
+    @ObservationIgnored var accessibilityInputs: () -> VisAccessibilityInputs = { VisAccessibilityInputs() }
+    /// Posts a VoiceOver announcement; the window points it at its view, tests at a spy.
+    @ObservationIgnored var announce: (String) -> Void = { text in
+        NSAccessibility.post(
+            element: NSApplication.shared, notification: .announcementRequested,
+            userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
+    }
+    @ObservationIgnored var accessibilityObservers: [NSObjectProtocol] = []
+    @ObservationIgnored var voiceOverObservation: NSKeyValueObservation?
 
     /// What the presets folder setting found (Settings › Visualization, #0241).
     enum FolderStatus: Equatable { case none, scanning, notFound, found(Int) }
@@ -152,6 +172,9 @@ final class VisualizationModel {
         }
         clock.suspend(at: currentTime())
         if settings.presetsFolder != nil { reloadCatalogue() }
+        accessibilityInputs = { VisAccessibilityInputs.system(overrides: configuration) }
+        refreshAccessibility()
+        observeAccessibility()
     }
 
     // MARK: Open and close
@@ -222,6 +245,7 @@ final class VisualizationModel {
         if let renderer { return renderer }
         let renderer = makeRenderer()
         renderer.setColors(colors)
+        renderer.setReducedMotion(accessibility.crossfadeOnly)
         self.renderer = renderer
         let usable = PresetCatalog.ordered(PresetCatalog.classics + userPresets).filter { renderer.canLoad($0) }
         navigator.replacePresets(usable)
@@ -242,8 +266,10 @@ final class VisualizationModel {
         load(preset, transition: transition, countsAsChange: true)
     }
 
-    private func load(_ preset: VisualizationPreset, transition: TimeInterval, countsAsChange: Bool) -> Bool {
+    private func load(_ preset: VisualizationPreset, transition requested: TimeInterval, countsAsChange: Bool) -> Bool {
         let renderer = renderer ?? prepareRenderer()
+        // Reduce Motion and Dim Flashing Lights blend cuts and lengthen blends (#0242); the first load isn't a change.
+        let transition = countsAsChange ? accessibility.transition(requested) : requested
         do {
             try renderer.load(preset, transition: transition)
         } catch {
@@ -273,6 +299,8 @@ final class VisualizationModel {
     /// title, help and readouts #0239's.
     func perform(_ command: VisCommand) {
         // While the list is open, keys go to it; only Esc and full screen get through (#0240).
+        // The flashing notice (#0242) takes Return through the window; only full screen gets past it.
+        if isFlashNoticeUp, command != .toggleFullScreen { return }
         if isListOpen, command != .escape, command != .toggleFullScreen { return }
         switch command {
         case .nextPreset: changeByKey(transition: VisualizationSettings.keyBlend) { $0.next() }
@@ -321,6 +349,7 @@ final class VisualizationModel {
         }
         guard let target, load(target, transition: transition) else { return }
         onKeyChange?(target)
+        announceForVoiceOver(target.name)
     }
 
     var windowTitle: String {
@@ -396,6 +425,7 @@ final class VisualizationModel {
         if navigator.isLocked != new.locked { navigator.isLocked = new.locked }
         if new.presetsFolder != old.presetsFolder { reloadCatalogue() }
         if new.overlayIdleSeconds != old.overlayIdleSeconds { applyOverlayIdleTimeout() }
+        if new.changeWithReduceMotion != old.changeWithReduceMotion { refreshAccessibility() }
     }
 
     /// How long the full-screen overlay and pointer wait before hiding; nil never hides (#0238 reads it).

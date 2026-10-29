@@ -20,7 +20,7 @@ struct VisualizationOverlayCard: View {
         .padding(.horizontal, 24)
         .padding(.bottom, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .animation(.easeInOut(duration: 0.25), value: model.overlay.isOverlayVisible)
+        .animation(model.accessibility.animatesOverlay ? .easeInOut(duration: 0.25) : nil, value: model.overlay.isOverlayVisible)
     }
 
     private func card(_ content: VisualizationOverlayContent) -> some View {

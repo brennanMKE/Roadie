@@ -50,6 +50,10 @@ struct TestProbe: Codable, Equatable {
         var songTitleShows = 0
         var readouts: [String] = []
         var help = false
+        /// #0242: `running` or `suspended`, the picture under the dimming layer, the flashing notice up.
+        var autoAdvance = "running"
+        var dimmed = false
+        var flashNotice = false
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -121,7 +125,9 @@ extension PlayerModel {
             lastTransition: vis.lastTransition,
             overlay: vis.overlay.isOverlayVisible ? "shown" : "hidden", cursorHidden: vis.overlay.isCursorHidden,
             songTitleShows: vis.songTitleShowCount,
-            readouts: VisReadout.allCases.filter(vis.settings.readouts.contains).map(\.rawValue), help: vis.isHelpOpen)
+            readouts: VisReadout.allCases.filter(vis.settings.readouts.contains).map(\.rawValue), help: vis.isHelpOpen,
+            autoAdvance: vis.isAutoAdvanceSuspended ? "suspended" : "running", dimmed: vis.isPictureDimmed,
+            flashNotice: vis.isFlashNoticeUp)
     }
 
     /// `.wsz` files under `folder`, as sorted folder-relative paths.

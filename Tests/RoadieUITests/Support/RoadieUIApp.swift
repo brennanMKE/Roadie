@@ -68,6 +68,9 @@ struct ProbeState: Decodable {
         var songTitleShows: Int
         var readouts: [String]
         var help: Bool
+        var autoAdvance: String
+        var dimmed: Bool
+        var flashNotice: Bool
     }
 }
 
@@ -255,6 +258,8 @@ final class RoadieUIApp {
         /// The top strip's preset name.
         var preset: String { ui.value(of: ui.element(AXID.Vis.preset)) }
         var probe: ProbeState.VisProbe? { ui.probe?.visualization }
+        /// The flashing notice already seen (#0242): every visualization launch passes it but the notice's own test.
+        static let flashNoticeShown = ["-visualization.flashNoticeShown", "YES"]
 
         /// ⇧⌘K (Window › Visualization), with the main window key.
         func open() {

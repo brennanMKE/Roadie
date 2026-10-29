@@ -55,6 +55,11 @@ struct RoadieConfiguration: @unchecked Sendable {
     var visPresetsFolder: String?
     /// `-RoadieVisSeedPresets N` (#0241, Debug): N tiny `.milk` files written to that folder at launch.
     var visSeedPresets: Int?
+    /// `-RoadieVisReduceMotion 1`, `-RoadieVisDimFlashing 1`, `-RoadieVisVoiceOver 1` (#0242, Debug): stand in for the
+    /// system's Reduce Motion, Dim Flashing Lights and VoiceOver, which tests can't change. nil reads the system.
+    var visReduceMotion: Bool?
+    var visDimFlashing: Bool?
+    var visVoiceOver: Bool?
 
     static let standard = RoadieConfiguration()
 
@@ -79,6 +84,9 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let visOverlayIdle = "RoadieVisOverlayIdle"
         static let visPresetsFolder = "RoadieVisPresetsFolder"
         static let visSeedPresets = "RoadieVisSeedPresets"
+        static let visReduceMotion = "RoadieVisReduceMotion"
+        static let visDimFlashing = "RoadieVisDimFlashing"
+        static let visVoiceOver = "RoadieVisVoiceOver"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -136,6 +144,10 @@ struct RoadieConfiguration: @unchecked Sendable {
         }
         visPresetsFolder = arguments.string(forKey: Argument.visPresetsFolder).flatMap { $0.isEmpty ? nil : $0 }
         visSeedPresets = arguments.string(forKey: Argument.visSeedPresets).flatMap { Int($0) }
+        func flag(_ key: String) -> Bool? { arguments.object(forKey: key) == nil ? nil : arguments.bool(forKey: key) }
+        visReduceMotion = flag(Argument.visReduceMotion)
+        visDimFlashing = flag(Argument.visDimFlashing)
+        visVoiceOver = flag(Argument.visVoiceOver)
     }
     #endif
 

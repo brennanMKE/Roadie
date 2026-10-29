@@ -42,6 +42,17 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
             visualization.map { VisualizationContextMenu.make(model: $0) }
         }
         visualization.onKeyChange = { [weak host = hostView] in host?.showToast($0.name) }
+        // VoiceOver announcements come from the visualization's view (#0242).
+        visualization.announce = { [weak host = hostView] text in
+            NSAccessibility.post(
+                element: host ?? NSApplication.shared, notification: .announcementRequested,
+                userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
+        }
+        hostView.onReturnKey = { [weak visualization] in
+            guard let visualization, visualization.isFlashNoticeUp else { return false }
+            visualization.dismissFlashNotice()
+            return true
+        }
         visualization.fullScreenController = self
         hostView.onDoubleClick = { [weak visualization] in visualization?.toggleFullScreen() }
         installOverlay()
@@ -86,6 +97,7 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         startLink()
         updateVisibility()
         visualization.showOverlay()
+        visualization.presentFlashNoticeIfNeeded()
     }
 
     // MARK: NSWindowDelegate
@@ -150,12 +162,16 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
             _ = model.playbackState
             _ = visualization.isRendering
             _ = visualization.preferredFrameRate
+            _ = visualization.isPictureDimmed
+            _ = visualization.accessibility
             return (visualization.windowTitle, visualization.currentPreset?.name ?? "")
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeModel() }
         }
         window?.title = title.0
         hostView.setPresetName(title.1)
+        hostView.setDimmed(visualization.isPictureDimmed)
+        hostView.animatesToast = visualization.accessibility.animatesOverlay
         applyLinkState()
         visualization.syncOverlayPlaybackHold()
     }

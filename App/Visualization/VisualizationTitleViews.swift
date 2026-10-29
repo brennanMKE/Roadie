@@ -182,6 +182,7 @@ extension VisualizationHostView {
             VisualizationOverlayHostingView(rootView: VisualizationReadoutsView(model: model)),
             VisualizationOverlayHostingView(rootView: VisualizationSongTitleView(model: model)),
             VisualizationHelpHostingView(model: model),
+            VisualizationFlashNoticeHostingView(model: model),
         ]
         for view in views {
             addSubview(view)

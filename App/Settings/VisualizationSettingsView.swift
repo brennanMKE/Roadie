@@ -15,6 +15,18 @@ struct VisualizationSettingsView: View {
             Section("Presets") {
                 Toggle("Change presets automatically", isOn: binding(\.autoAdvance))
                     .accessibilityIdentifier("vis.settings.autoAdvance")
+                if vis.accessibilityState.reduceMotion {
+                    // Reduce Motion pauses automatic changes unless the user asks for them (#0242, design §7).
+                    Text("Paused while Reduce Motion is on.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .skinDisplay(
+                            "vis.settings.reduceMotionNote", label: "Paused while Reduce Motion is on.",
+                            value: "Paused while Reduce Motion is on.")
+                    Toggle("Change them anyway", isOn: binding(\.changeWithReduceMotion))
+                        .disabled(!vis.settings.autoAdvance)
+                        .accessibilityIdentifier("vis.settings.changeAnyway")
+                }
                 LabeledContent("Every") {
                     HStack {
                         TextField("Seconds", value: binding(\.autoAdvanceSeconds), format: .number.precision(.fractionLength(0)))

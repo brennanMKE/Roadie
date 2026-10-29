@@ -31,6 +31,8 @@ extension VisualizationModel {
     func loadListSelection() {
         guard let row = presetList?.selectedRow, !row.isFailed else { return }
         closeList()
-        if row.preset.id != currentPreset?.id { load(row.preset, transition: VisualizationSettings.keyBlend) }
+        if row.preset.id != currentPreset?.id, load(row.preset, transition: VisualizationSettings.keyBlend) {
+            announceForVoiceOver(row.preset.name)
+        }
     }
 }

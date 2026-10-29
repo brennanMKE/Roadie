@@ -3,11 +3,13 @@ import XCTest
 /// The visualization window and its ways in (#0235). Run only in the Tart guest: scripts/verify.sh --ui.
 final class VisualizationUITests: RoadieUITestCase {
     private static let visArguments = ["-RoadieVisRenderer", "classic", "-visualization.order", "sequential"]
+        + RoadieUIApp.Visualization.flashNoticeShown
 
     private var vis: RoadieUIApp.Visualization { roadie.visualization }
 
-    private func launchPlain(extra: [String] = []) {
-        launch(windows: [.main], extra: Self.visArguments + extra)
+    private func launchPlain(extra: [String] = [], noticeShown: Bool = true) {
+        let base = noticeShown ? Self.visArguments : Array(Self.visArguments.dropLast(2))
+        launch(windows: [.main], extra: base + extra)
         XCTAssertTrue(roadie.main.play.waitForExistence(timeout: 10), "main.play never appeared")
     }
 
@@ -451,7 +453,9 @@ final class VisualizationUITests: RoadieUITestCase {
     }
 
     func testSettingsChangeTheRunningVisualization() {
-        launch(windows: [.main], extra: ["-RoadieVisRenderer", "classic", "-RoadieVisSeed", "1"])
+        launch(
+            windows: [.main],
+            extra: ["-RoadieVisRenderer", "classic", "-RoadieVisSeed", "1"] + RoadieUIApp.Visualization.flashNoticeShown)
         XCTAssertTrue(roadie.main.play.waitForExistence(timeout: 10), "main.play never appeared")
         vis.open()
         XCTAssertTrue(vis.window.waitForExistence(timeout: 5), "vis.window never appeared")
@@ -555,5 +559,61 @@ final class VisualizationUITests: RoadieUITestCase {
         roadie.app.typeKey(.F1, modifierFlags: [])
         XCTAssertTrue(roadie.wait { !help.exists }, "F1 didn't close the help")
         XCTAssertEqual(vis.probe?.help, false)
+    }
+
+    // MARK: Accessibility (#0242)
+
+    func testReduceMotionPausesAutomaticChanges() {
+        openKeyWindow(extra: ["-RoadieVisReduceMotion", "1", "-RoadieVisAutoAdvance", "2"])
+        XCTAssertTrue(roadie.wait { self.vis.probe?.autoAdvance == "suspended" }, roadie.probeJSON)
+        Thread.sleep(forTimeInterval: 6)
+        XCTAssertEqual(vis.probe?.presetChanges, 0, "changed under Reduce Motion: \(roadie.probeJSON)")
+        roadie.app.typeKey("h", modifierFlags: [])
+        expectPreset("Classic Oscilloscope")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.lastTransition == "blend 1.7" }, roadie.probeJSON)
+    }
+
+    func testDimFlashingLightsDimsAndNeverCuts() {
+        openKeyWindow(extra: ["-RoadieVisDimFlashing", "1"])
+        XCTAssertTrue(roadie.wait { self.vis.probe?.dimmed == true }, roadie.probeJSON)
+        roadie.app.typeKey("h", modifierFlags: [])
+        expectPreset("Classic Oscilloscope")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.lastTransition == "blend 5.0" }, roadie.probeJSON)
+    }
+
+    func testVoiceOverKeepsTheOverlayUp() {
+        openPlaying(idle: ["-RoadieVisOverlayIdle", "1", "-RoadieVisVoiceOver", "1"])
+        hoverCanvas()
+        XCTAssertTrue(overlayCard.waitForExistence(timeout: 5), "no \(AXID.Vis.overlay): \(roadie.probeJSON)")
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertTrue(overlayCard.exists, "the overlay hid under VoiceOver: \(roadie.probeJSON)")
+        XCTAssertEqual(vis.probe?.overlay, "shown")
+        XCTAssertEqual(vis.probe?.cursorHidden, false)
+    }
+
+    func testFlashingNoticeOnFirstOpen() {
+        launchPlain(noticeShown: false)
+        vis.open()
+        XCTAssertTrue(vis.window.waitForExistence(timeout: 5), "vis.window never appeared")
+        let notice = roadie.element(AXID.Vis.flashNotice)
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "no \(AXID.Vis.flashNotice): \(roadie.probeJSON)")
+        XCTAssertTrue(
+            roadie.wait { self.vis.probe?.autoAdvance == "suspended" && self.vis.probe?.dimmed == true },
+            roadie.probeJSON)
+        XCTAssertEqual(vis.probe?.flashNotice, true)
+        let continueButton = roadie.element(AXID.Vis.flashNoticeContinue)
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 3), "no Continue")
+        roadie.click(continueButton)
+        XCTAssertTrue(roadie.wait { !notice.exists }, "Continue didn't dismiss the notice")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.flashNotice == false && self.vis.probe?.dimmed == false }, roadie.probeJSON)
+        // Close (⇧⌘K toggles, with the vis window key) and reopen: not again.
+        vis.window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click()
+        roadie.app.typeKey("k", modifierFlags: [.command, .shift])
+        expectClosed()
+        vis.open()
+        XCTAssertTrue(roadie.wait { self.vis.probe?.open == true }, roadie.probeJSON)
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertFalse(notice.exists, "the notice came back")
+        XCTAssertEqual(vis.probe?.flashNotice, false)
     }
 }

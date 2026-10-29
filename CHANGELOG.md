@@ -19,6 +19,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 - L in the Visualization window lists the presets; type to search, Return to switch.
 - The Visualization window shows the song, artist, time and what's next over the picture; it and the pointer hide after 3 seconds without mouse movement.
 - MilkDrop's song title on track change (T shows it), F2–F5 corner readouts, and F1 for the keyboard shortcuts in the Visualization window.
+- The Visualization window respects Reduce Motion and Dim Flashing Lights, keeps its overlay up for VoiceOver, and warns about flashing the first time it opens.
 
 ### Changed
 

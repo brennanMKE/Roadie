@@ -17,8 +17,6 @@ struct TitleState {
     var titleTimer: Timer?
     var fpsWindowStart: TimeInterval?
     var fpsFrames = 0
-    /// Reduce Motion: the title fades without growing. Tests replace it.
-    var reduceMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 }
 
 /// The song title on track change and on T, the F2–F5 readouts and the F1 / ? help card (#0239, design §1.5, §2.7).
@@ -51,7 +49,8 @@ extension VisualizationModel {
             .joined(separator: "\u{1f}")
     }
 
-    var reducesMotion: Bool { titleState.reduceMotion() }
+    /// Reduce Motion (or its Debug stand-in, #0242): the title fades without growing.
+    var reducesMotion: Bool { accessibilityState.reduceMotion }
 
     // MARK: Song title
 
@@ -89,6 +88,7 @@ extension VisualizationModel {
         songTitleShowCount += 1
         let id = songTitleShowCount
         songTitle = SongTitleShow(id: id, text: text)
+        announceForVoiceOver(text)
         titleState.titleTimer?.invalidate()
         let timer = Timer(timeInterval: Self.songTitleDuration, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
