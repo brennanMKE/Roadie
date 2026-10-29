@@ -169,7 +169,16 @@ struct BackendNowPlayingTests {
     }
 
     @Test func reconnectRefetchesAndKeepsTheStream() async throws {
-        let rig = try await playingRig()
+        // The new socket answers with another title, so the reconnect refetch is seen finishing, not just sent
+        // (#0149: a refetch still in flight when the event below lands would put "playing" back over "paused").
+        let script = try controlScript {
+            $0.override("players/get", result: try SyntheticPlayback.player())
+            $0.override("player_queues/get_active_queue", result: try SyntheticPlayback.queue())
+        }
+        var reconnected = script
+        reconnected.override("players/get", result: try SyntheticPlayback.player(title: "Reconnected Song"))
+        let rig = try await connectedBackend(
+            script: script, extraTransports: [StubWebSocketTransport(script: reconnected)])
         let collector = Collector(await rig.backend.nowPlaying(on: output))
         #expect(await waitFor { collector.items.count == 1 })
         #expect(await settled(rig))
@@ -180,17 +189,18 @@ struct BackendNowPlayingTests {
             return false
         })
         // Past the first reconnect delay (1 s plus jitter); the watch refetches on the new socket once connected.
+        // The same advance wakes the poll, which may refetch on either socket.
         rig.clock.advance(by: .seconds(2))
         #expect(await waitFor { rig.factory.made == 2 })
-        #expect(await waitFor {
-            rig.factory.transports.count == 2
-                && rig.factory.transports[1].sentRequests.contains { $0.command == "players/get" }
-        })
+        #expect(await waitFor { collector.items.last?.title == "Reconnected Song" })
+        #expect(collector.items.last?.state == .playing)
+        // The poll is back asleep: no refetch is left in flight to race the event.
+        #expect(await settled(rig))
         // The stream survived: an event on the new socket still reaches it.
         try rig.factory.transports[1].push(
             MAJSON.object([
                 "event": "player_updated", "object_id": .string(SyntheticPlayback.playerID),
-                "data": try SyntheticPlayback.player(state: "paused"),
+                "data": try SyntheticPlayback.player(state: "paused", title: "Reconnected Song"),
             ]).encodedString())
         #expect(await waitFor { collector.items.last?.state == .paused })
         #expect(!collector.finished)

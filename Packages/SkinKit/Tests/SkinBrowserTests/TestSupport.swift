@@ -62,6 +62,17 @@ actor StubSkinIndex: SkinIndexReading {
         for (_, continuation) in pending { continuation.resume() }
     }
     var suspendedCount: Int { waiters.count }
+    private var md5Waiters: [CheckedContinuation<Void, Never>] = []
+    private var md5Gated = false
+    /// Holds `skins(md5s:)` (the Museum's badge lookup) until `releaseMD5Lookups()`.
+    func gateMD5Lookups() { md5Gated = true }
+    func releaseMD5Lookups() {
+        md5Gated = false
+        let pending = md5Waiters
+        md5Waiters = []
+        for continuation in pending { continuation.resume() }
+    }
+    var suspendedMD5Count: Int { md5Waiters.count }
     var skinsCalls: [SkinQuery] {
         calls.compactMap { if case .skins(let query) = $0 { query } else { nil } }
     }
@@ -159,6 +170,7 @@ actor StubSkinIndex: SkinIndexReading {
     }
 
     func skins(md5s: [String]) async throws -> [String: SkinRecord] {
+        if md5Gated { await withCheckedContinuation { md5Waiters.append($0) } }
         let wanted = Set(md5s)
         var result: [String: SkinRecord] = [:]
         for record in records { if let md5 = record.md5, wanted.contains(md5) { result[md5] = record } }

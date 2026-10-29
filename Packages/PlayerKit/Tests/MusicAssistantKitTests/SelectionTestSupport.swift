@@ -41,20 +41,21 @@ final class FakeInfo: @unchecked Sendable {
         case .answer(let id, let schema): return try Self.info(id, schema: schema)
         case .fail, nil: throw URLError(.cannotConnectToHost)
         case .gated(let id):
-            try await waitUntil { self.state.withLock { $0.released } }
+            try await waitUntil(url) { self.state.withLock { $0.released } }
             return try Self.info(id)
         case .hang:
-            try await waitUntil { false }
+            try await waitUntil(url) { false }
             throw CancellationError()
         }
     }
 
-    private func waitUntil(_ condition: () -> Bool) async throws {
-        let url = state.withLock { $0.calls.last }
+    /// Records `url` (this fetch's own) when cancelled. Not `calls.last`: a concurrent fetch can append its URL
+    /// first, and the cancel would then be recorded for the wrong server (#0149).
+    private func waitUntil(_ url: URL, _ condition: () -> Bool) async throws {
         do {
             while !condition() { try await Task.sleep(for: .milliseconds(2)) }
         } catch {
-            state.withLock { if let url { $0.cancelled.append(url) } }
+            state.withLock { $0.cancelled.append(url) }
             throw error
         }
     }
