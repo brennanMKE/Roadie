@@ -1,6 +1,7 @@
 import AppKit
 import AudioCore
 import Foundation
+import MusicBackendKit
 import Observation
 import VisualizationKit
 
@@ -14,6 +15,10 @@ struct SongTitleShow: Equatable {
 struct TitleState {
     /// The last track seen while the window is open; nil until the first one after opening.
     var trackIdentity: String?
+    /// Bumped by each `open()`; a chain armed under an older generation stops re-arming (#0248).
+    var trackGeneration = 0
+    /// Track observations armed and not yet fired, for the tests (#0248): one after a change settles.
+    var armedTrackObservations = 0
     var titleTimer: Timer?
     var fpsWindowStart: TimeInterval?
     var fpsFrames = 0
@@ -39,14 +44,20 @@ extension VisualizationModel {
             title: owner.nowPlaying.title ?? current?.title, artist: owner.nowPlaying.artist ?? current?.artist)
     }
 
-    /// What identifies the current track: the snapshot's title and artist and, locally, the queue entry.
+    /// What identifies the current track (`trackIdentity(nowPlaying:current:)`).
     var currentTrackIdentity: String? {
         guard let owner else { return nil }
         let current = owner.playsLocalQueue ? owner.player.queue.current : nil
-        let title = owner.nowPlaying.title ?? current?.title
-        guard title != nil || current != nil else { return nil }
-        return [title ?? "", owner.nowPlaying.artist ?? current?.artist ?? "", current.map { "\($0.id)" } ?? ""]
-            .joined(separator: "\u{1f}")
+        return Self.trackIdentity(nowPlaying: owner.nowPlaying, current: current)
+    }
+
+    /// The local queue entry, else the snapshot's item (a Music Assistant id), else the title alone (#0248): a
+    /// metadata refresh of the same item, such as a late artist, keeps it.
+    static func trackIdentity(nowPlaying: NowPlaying, current: Track?) -> String? {
+        if let current { return "queue:\(current.id)" }
+        if let item = nowPlaying.item { return "item:\(item)" }
+        guard let title = nowPlaying.title, !title.isEmpty else { return nil }
+        return "title:\(title)"
     }
 
     /// Reduce Motion (or its Debug stand-in, #0242): the title fades without growing.
@@ -57,15 +68,25 @@ extension VisualizationModel {
     /// From `open()`: the track playing now is remembered without a show, then each change is observed.
     func startTrackingTitle() {
         titleState.trackIdentity = currentTrackIdentity
+        // A chain from an earlier open that saw no change is still armed; the new generation ends it (#0248).
+        titleState.trackGeneration += 1
         observeTrack()
     }
 
     private func observeTrack() {
         guard isOpen else { return }
+        let generation = titleState.trackGeneration
+        titleState.armedTrackObservations += 1
         let identity = withObservationTracking { currentTrackIdentity } onChange: { [weak self] in
-            Task { @MainActor in self?.observeTrack() }
+            Task { @MainActor in self?.rearmTrackObservation(generation) }
         }
         noteTrack(identity: identity, text: currentSongTitleText)
+    }
+
+    private func rearmTrackObservation(_ generation: Int) {
+        titleState.armedTrackObservations -= 1
+        guard isOpen, generation == titleState.trackGeneration else { return }
+        observeTrack()
     }
 
     /// A track identity seen while open: a change shows the title (when the setting is on); the first track after

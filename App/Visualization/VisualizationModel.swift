@@ -98,7 +98,7 @@ final class VisualizationModel {
     @ObservationIgnored private var lastTick: TimeInterval?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     /// Why auto-advance is paused (not rendering, the right-click menu open); the clock runs only when empty.
-    @ObservationIgnored private var suspensions: Set<Suspension> = []
+    @ObservationIgnored private(set) var suspensions: Set<Suspension> = []
 
     enum Suspension: Hashable { case notRendering, menu, list, help, reduceMotion, notice }
 
@@ -199,6 +199,10 @@ final class VisualizationModel {
             return
         }
         closesAfterFullScreen = false
+        // Help and the preset list don't survive a close, nor do their holds and suspensions (#0248). The flash
+        // notice (#0242) does.
+        isHelpOpen = false
+        closeList()
         isOpen = false
         setVisible(false)
         setWindowOpenSetting(false)
