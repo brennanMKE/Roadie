@@ -358,6 +358,7 @@ Design: [visualization.md](visualization.md) §8.4; one row per feature, added b
 | ← → / Space / ⌫ next and previous preset with a blend, H hard cut, R random/sequential, \` lock, Z X C V B transport, ↑ ↓ volume in the vis window (#0236) | UI `VisualizationUITests.testArrowKeysMoveBetweenPresets`, `.testSpaceAndDeleteMoveLikeTheArrows`, `.testHCutsWithoutBlending`, `.testRAndBacktickToggleOrderAndLock`, `.testTransportKeysWorkInTheVisualizationWindow`; Unit `VisKeyMapTests`, `PresetNavigatorTests`, `RoadieTests.VisualizationModelKeyTests` |
 | Presets change on their own (16 s, varied, 2.7 s blend), not while locked (#0236) | UI `VisualizationUITests.testPresetsChangeOnTheirOwn`; Unit `AutoAdvanceClockTests`, `VisualizationModelKeyTests.testAutoAdvanceSkipsWhileLocked` |
 | Right-click menu lists every command with its key (#0236) | UI `VisualizationUITests.testRightClickMenuListsTheCommands`; Unit `VisualizationModelKeyTests.testContextMenuHasEveryCommandWithItsKey` |
+| L / Presets… list: search, ↑ ↓, Return loads, Esc closes (#0240) | UI `VisualizationUITests.testLOpensTheListAndReturnLoadsTheSelection`, `.testTypingFiltersTheList`, `.testEscapeClosesTheList`; Unit `RoadieTests.VisualizationListTests` |
 
 ## 6. Runner and logging
 

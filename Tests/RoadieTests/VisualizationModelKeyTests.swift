@@ -165,7 +165,7 @@ final class VisualizationModelKeyTests: PlayerModelTestCase {
         }
         XCTAssertEqual(menu.items[2].keyEquivalent, "h")
         XCTAssertTrue(menu.items[0].isEnabled)
-        XCTAssertFalse(menu.items[6].isEnabled, "Presets… waits for #0240")
+        XCTAssertTrue(menu.items[6].isEnabled, "Presets… (#0240)")
         XCTAssertEqual(menu.items[4].state, .off, "sequential")
         XCTAssertEqual(menu.items[5].state, .off)
         vis.perform(.toggleOrder)

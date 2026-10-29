@@ -15,6 +15,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 - A Visualization window (⇧⌘K, or the clutter bar's V menu) with five classic visualizations in the skin's colours.
 - The Visualization window goes full screen with ⌥Return or a double-click; Escape comes back.
 - In the Visualization window, ← → (or Space and Delete) change presets, H cuts straight to the next, R switches random and in-order, ` locks the preset, and presets change on their own every 16 seconds or so, as in MilkDrop.
+- L in the Visualization window lists the presets; type to search, Return to switch.
 
 ### Changed
 

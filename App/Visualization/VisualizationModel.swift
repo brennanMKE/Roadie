@@ -45,9 +45,10 @@ final class VisualizationModel {
     private(set) var isConstrained = false
     /// In full screen (native or the Debug borderless hook), from the window controller (#0237).
     private(set) var isFullScreen = false
-    /// Stand-ins for the help overlay and preset list (later issues): Esc closes them before leaving full screen.
+    /// Stand-in for the help overlay (a later issue): Esc closes it before leaving full screen.
     var isHelpOpen = false
-    var isListOpen = false
+    /// The preset list while it's open (L / Presets…, #0240); set through `openList` / `closeList`.
+    var presetList: PresetListModel?
     /// The window, for full screen (#0237).
     @ObservationIgnored weak var fullScreenController: (any FullScreenToggling)?
     /// `close()` while full screen leaves full screen first and closes when that completes.
@@ -80,7 +81,7 @@ final class VisualizationModel {
     /// Why auto-advance is paused (not rendering, the right-click menu open); the clock runs only when empty.
     @ObservationIgnored private var suspensions: Set<Suspension> = []
 
-    enum Suspension: Hashable { case notRendering, menu }
+    enum Suspension: Hashable { case notRendering, menu, list }
 
     init(analyzer: AnalyzerTap, configuration: RoadieConfiguration) {
         self.analyzer = analyzer
@@ -219,6 +220,8 @@ final class VisualizationModel {
     /// One visualization-window command (design §2.5). Full screen and Escape are #0237's; the list, song title,
     /// help and readouts are later issues'.
     func perform(_ command: VisCommand) {
+        // While the list is open, keys go to it; only Esc and full screen get through (#0240).
+        if isListOpen, command != .escape, command != .toggleFullScreen { return }
         switch command {
         case .nextPreset: changeByKey(transition: VisualizationSettings.keyBlend) { $0.next() }
         case .previousPreset: changeByKey(transition: VisualizationSettings.keyBlend) { $0.previous() }
@@ -232,8 +235,9 @@ final class VisualizationModel {
             settings.locked = navigator.isLocked
             defaults.set(navigator.isLocked, forKey: VisualizationSettings.Key.locked)
         case .transport(let transport): hotkey(Self.hotkey(for: transport))
-        case .presetList, .showSongTitle, .help, .toggleReadout:
-            break  // #0239, #0240
+        case .presetList: openList()
+        case .showSongTitle, .help, .toggleReadout:
+            break  // #0239
         case .toggleFullScreen, .escape:
             handleFullScreenCommand(command)
         }
