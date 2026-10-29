@@ -102,4 +102,72 @@ final class PlayerModelOutputTests: PlayerModelTestCase {
         }
         XCTAssertNil(model.notice, "\(String(describing: model.notice))")
     }
+
+    // MARK: Server resolution (#0246)
+
+    /// Music Assistant selected, connected and on the idle speaker. Returns the speaker and the active server.
+    private func connectedOnSpeaker(_ model: PlayerModel) async throws -> (OutputDevice.ID, MusicAssistantServerConfiguration) {
+        if model.sources.selectedID != model.musicAssistant.sourceID {
+            _ = model.sources.select(model.musicAssistant.sourceID, persist: false)
+        }
+        let speaker = try await connectedSpeaker(model)
+        model.selectOutput(speaker)
+        XCTAssertEqual(model.selectedOutput, speaker)
+        let configuration = try XCTUnwrap(model.musicAssistantSelection.current?.server)
+        return (speaker, configuration)
+    }
+
+    /// A late first resolution (`old == nil`) while connected on a speaker keeps the connection and the speaker.
+    func testFirstServerResolutionKeepsTheConnectionAndTheSpeaker() async throws {
+        let model = try makeModel(scenario: .libraryIdle)
+        let server = try XCTUnwrap(model.scriptedMusicAssistant)
+        let (speaker, configuration) = try await connectedOnSpeaker(model)
+        let transports = server.transports.count
+        let auths = commands(server).filter { $0 == "auth" }.count
+        let generation = model.sources.generation
+        model.clearNotice()
+
+        model.musicAssistantSelection.onChange?(nil, configuration)
+
+        XCTAssertEqual(model.selectedOutput, speaker)
+        XCTAssertEqual(model.outputSelection.leader, speaker)
+        XCTAssertNil(model.notice, "\(String(describing: model.notice))")
+
+        try await waitUntil("the Library reload") { model.sources.generation > generation }
+        let connected = await model.musicAssistant.isConnected
+        XCTAssertTrue(connected)
+        XCTAssertEqual(server.transports.count, transports)
+        XCTAssertEqual(commands(server).filter { $0 == "auth" }.count, auths)
+        XCTAssertEqual(server.transports.last?.closeCodes.isEmpty, true)
+
+        let album = MediaID(.album, "library://album/27")
+        XCTAssertTrue(model.dropLibraryItems([MediaIDTransfer([album])], replacing: false))
+        try await waitUntil("play_media on the speaker") {
+            server.receivedCommands.contains {
+                $0.command == "player_queues/play_media" && $0.args["queue_id"]?.stringValue == ScriptedMusicAssistant.speakerID
+            }
+        }
+    }
+
+    /// A real change of server still drops the connection and switches the output to This Mac.
+    func testServerChangeDisconnectsAndSwitchesToThisMac() async throws {
+        let model = try makeModel(scenario: .libraryIdle)
+        let server = try XCTUnwrap(model.scriptedMusicAssistant)
+        let (_, configuration) = try await connectedOnSpeaker(model)
+        let generation = model.sources.generation
+        model.clearNotice()
+        var other = configuration
+        other.id = UUID()
+
+        model.musicAssistantSelection.onChange?(configuration, other)
+
+        XCTAssertEqual(model.selectedOutput, OutputDevice.thisMacID)
+        XCTAssertEqual(model.outputSelection, .thisMac)
+        // "Output switched to This Mac" is posted first; the "Music Assistant: <name>" notice replaces it.
+        let prefix = "Music Assistant: "
+        XCTAssertEqual(model.notice?.text, prefix + PlayerModel.truncated(other.name, to: 31 - prefix.utf16.count))
+
+        try await waitUntil("the Library reload") { model.sources.generation > generation }
+        XCTAssertEqual(server.transports.last?.closeCodes.isEmpty, false)
+    }
 }
