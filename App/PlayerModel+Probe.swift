@@ -39,6 +39,8 @@ struct TestProbe: Codable, Equatable {
         var locked: Bool
         var audio: String
         var presetChanges: Int
+        /// In full screen, native or the Debug borderless hook (#0237).
+        var fullScreen: Bool
         var lastTransition: String?
     }
 
@@ -107,6 +109,7 @@ extension PlayerModel {
             open: vis.isOpen, rendering: vis.isRendering, renderer: vis.renderer?.kindName,
             preset: vis.currentPreset?.id, presetName: vis.currentPreset?.name, order: vis.navigator.order.rawValue,
             locked: vis.navigator.isLocked, audio: vis.audioSource.probeName, presetChanges: vis.presetChanges,
+            fullScreen: vis.isFullScreen,
             lastTransition: vis.lastTransition)
     }
 

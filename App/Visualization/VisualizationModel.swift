@@ -43,6 +43,15 @@ final class VisualizationModel {
     private(set) var navigator: PresetNavigator
     /// Low Power Mode or a serious thermal state: 30 fps whatever plays.
     private(set) var isConstrained = false
+    /// In full screen (native or the Debug borderless hook), from the window controller (#0237).
+    private(set) var isFullScreen = false
+    /// Stand-ins for the help overlay and preset list (later issues): Esc closes them before leaving full screen.
+    var isHelpOpen = false
+    var isListOpen = false
+    /// The window, for full screen (#0237).
+    @ObservationIgnored weak var fullScreenController: (any FullScreenToggling)?
+    /// `close()` while full screen leaves full screen first and closes when that completes.
+    @ObservationIgnored private var closesAfterFullScreen = false
     /// The last preset change's transition (`"blend 1.7"`, `"blend 2.7"`, `"cut"`), for the probe.
     private(set) var lastTransition: String?
     /// When the next automatic preset change is due (design §2.4).
@@ -117,12 +126,24 @@ final class VisualizationModel {
 
     func close() {
         guard isOpen else { return }
+        if isFullScreen, let fullScreenController {
+            closesAfterFullScreen = true
+            fullScreenController.toggleFullScreen()
+            return
+        }
+        closesAfterFullScreen = false
         isOpen = false
         setVisible(false)
         setWindowOpenSetting(false)
     }
 
     func toggle() { if isOpen { close() } else { open() } }
+
+    /// From the window controller when a full-screen transition completes; finishes a pending `close()`.
+    func setFullScreen(_ fullScreen: Bool) {
+        if fullScreen != isFullScreen { isFullScreen = fullScreen }
+        if !fullScreen, closesAfterFullScreen { close() }
+    }
 
     /// From the window controller: on screen, not miniaturized, `occlusionState.contains(.visible)`, app not hidden.
     func setVisible(_ visible: Bool) {
@@ -214,7 +235,7 @@ final class VisualizationModel {
         case .presetList, .showSongTitle, .help, .toggleReadout:
             break  // #0239, #0240
         case .toggleFullScreen, .escape:
-            break  // #0237
+            handleFullScreenCommand(command)
         }
     }
 

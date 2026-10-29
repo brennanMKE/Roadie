@@ -184,4 +184,68 @@ final class VisualizationUITests: RoadieUITestCase {
         popUpMenuItem("Next Preset").click()
         expectPreset("Classic Oscilloscope")
     }
+
+    // MARK: Full screen (#0237)
+
+    /// Full screen per the probe, or, when the probe can't be read (native full screen puts the vis window in its own
+    /// Space, and the probe element in the main window drops out of the accessibility tree), per the canvas filling
+    /// the screen (the window is 640 pt wide, the guest's screen 1280+).
+    private var isFullScreen: Bool? {
+        if let probe = vis.probe { return probe.fullScreen }
+        let canvas = roadie.element(AXID.Vis.canvas)
+        guard canvas.exists else { return nil }
+        return canvas.frame.width >= 1000
+    }
+
+    /// Full screen reaches `expected` within 5 s (native full screen animates).
+    private func expectFullScreen(_ expected: Bool, file: StaticString = #filePath, line: UInt = #line) {
+        let reached = roadie.wait(timeout: 5) { self.isFullScreen == expected }
+        if !reached {
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "fullScreen-\(expected)"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        XCTAssertTrue(reached, "probe fullScreen isn't \(expected): \(roadie.probeJSON)", file: file, line: line)
+        // The canvas is screen-wide before the transition ends, and AppKit ignores a toggle mid-transition: wait
+        // until its frame holds still between polls.
+        let canvas = roadie.element(AXID.Vis.canvas)
+        var last = CGRect.null
+        _ = roadie.wait(timeout: 3) {
+            let frame = canvas.exists ? canvas.frame : .null
+            defer { last = frame }
+            return frame == last
+        }
+    }
+
+    private func openForFullScreen() {
+        launchPlain()
+        vis.open()
+        expectOpen()
+        XCTAssertEqual(vis.probe?.fullScreen, false)
+    }
+
+    func testOptionReturnTogglesFullScreen() {
+        openForFullScreen()
+        roadie.app.typeKey(.return, modifierFlags: .option)
+        expectFullScreen(true)
+        roadie.app.typeKey(.return, modifierFlags: .option)
+        expectFullScreen(false)
+    }
+
+    func testEscapeLeavesFullScreen() {
+        openForFullScreen()
+        roadie.app.typeKey(.return, modifierFlags: .option)
+        expectFullScreen(true)
+        roadie.app.typeKey(.escape, modifierFlags: [])
+        expectFullScreen(false)
+    }
+
+    func testDoubleClickTogglesFullScreen() {
+        openForFullScreen()
+        roadie.element(AXID.Vis.canvas).doubleClick()
+        expectFullScreen(true)
+        roadie.app.typeKey(.return, modifierFlags: .option)
+        expectFullScreen(false)
+    }
 }

@@ -65,22 +65,46 @@ final class VisualizationHostView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    // MARK: Keys and menu
+    // MARK: Keys, mouse and menu
+
+    /// A double-click on the picture (single clicks do nothing) (#0237).
+    var onDoubleClick: (() -> Void)?
 
     override var acceptsFirstResponder: Bool { true }
 
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { onDoubleClick?() }
+    }
+
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if let key = Self.visKey(for: event),
-            let command = VisKeyMap.command(
-                for: key, command: flags.contains(.command), control: flags.contains(.control),
-                option: flags.contains(.option), shift: flags.contains(.shift), isRepeat: event.isARepeat),
-            let onCommand
+        let key = Self.visKey(for: event)
+        if let key, let onCommand,
+            let command = Self.command(for: key, flags: flags, isRepeat: event.isARepeat)
         {
             onCommand(command)
             return
         }
+        // A held command key (→, Space, a letter): its repeats do nothing, without a beep each time.
+        if let key, onCommand != nil, Self.swallowsRepeat(of: key, flags: flags, isRepeat: event.isARepeat) { return }
         super.keyDown(with: event)
+    }
+
+    private static func command(for key: VisKey, flags: NSEvent.ModifierFlags, isRepeat: Bool) -> VisCommand? {
+        VisKeyMap.command(
+            for: key, command: flags.contains(.command), control: flags.contains(.control),
+            option: flags.contains(.option), shift: flags.contains(.shift), isRepeat: isRepeat)
+    }
+
+    /// An auto-repeat that maps to nothing, of a key whose first press is a command.
+    static func swallowsRepeat(of key: VisKey, flags: NSEvent.ModifierFlags, isRepeat: Bool) -> Bool {
+        isRepeat && command(for: key, flags: flags, isRepeat: true) == nil
+            && command(for: key, flags: flags, isRepeat: false) != nil
+    }
+
+    /// Esc arrives as `cancelOperation` when the key isn't handled as a key-down first.
+    override func cancelOperation(_ sender: Any?) {
+        if let onCommand { onCommand(.escape) } else { super.cancelOperation(sender) }
     }
 
     /// The `NSEvent` as a `VisKey`: special keys by `specialKey`, else the characters ignoring modifiers.

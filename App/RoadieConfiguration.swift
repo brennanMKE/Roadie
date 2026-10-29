@@ -47,6 +47,9 @@ struct RoadieConfiguration: @unchecked Sendable {
     var visRenderer: String?
     /// `-RoadieVisSeed N` (#0235, Debug): the preset navigator's random seed; else random. Release ignores it.
     var visSeed: UInt64?
+    /// `-RoadieVisFullScreen borderless` (#0237, Debug): full screen is a screen-sized borderless window instead of a
+    /// Space. Release ignores it.
+    var visFullScreenBorderless = false
     /// `-RoadieVisAutoAdvance <seconds>` (#0236, Debug): the auto-advance interval, not varied. Release ignores it.
     var visAutoAdvance: TimeInterval?
 
@@ -69,6 +72,7 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let seedSkinsOmit = "RoadieSeedSkinsOmit"
         static let visRenderer = "RoadieVisRenderer"
         static let visSeed = "RoadieVisSeed"
+        static let visFullScreen = "RoadieVisFullScreen"
         static let visAutoAdvance = "RoadieVisAutoAdvance"
     }
 
@@ -119,6 +123,7 @@ struct RoadieConfiguration: @unchecked Sendable {
     private mutating func readVisualizationArguments(_ arguments: UserDefaults) {
         visRenderer = arguments.string(forKey: Argument.visRenderer)
         visSeed = arguments.string(forKey: Argument.visSeed).flatMap { UInt64($0) }
+        visFullScreenBorderless = arguments.string(forKey: Argument.visFullScreen) == "borderless"
         visAutoAdvance = arguments.string(forKey: Argument.visAutoAdvance).flatMap { TimeInterval($0) }.flatMap {
             $0 > 0 && $0.isFinite ? $0 : nil
         }

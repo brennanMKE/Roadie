@@ -61,6 +61,7 @@ struct ProbeState: Decodable {
         var locked: Bool
         var audio: String
         var presetChanges: Int
+        var fullScreen: Bool
         var lastTransition: String?
     }
 }

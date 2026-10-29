@@ -13,6 +13,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 - LIST › Load in the playlist editor can load a Library playlist while This Mac plays its own queue, and Playback › Load Playlist from Library… does the same from the menu bar.
 - Help › Playlists and the Queue… explains how the playlist editor, the Library's playlists and saving a queue fit together.
 - A Visualization window (⇧⌘K, or the clutter bar's V menu) with five classic visualizations in the skin's colours.
+- The Visualization window goes full screen with ⌥Return or a double-click; Escape comes back.
 - In the Visualization window, ← → (or Space and Delete) change presets, H cuts straight to the next, R switches random and in-order, ` locks the preset, and presets change on their own every 16 seconds or so, as in MilkDrop.
 
 ### Changed

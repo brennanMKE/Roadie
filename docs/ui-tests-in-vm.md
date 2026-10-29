@@ -151,6 +151,10 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   HelpTag element has no label, value or children, so its text can't be read. Test the strings in unit tests. Hovering
   several controls in a row in one launch is flaky: AppKit's tooltip timer leaves the first tag up or shows the next
   one late (#0227). Hover one control per launch.
+- **Native full screen works in the guest** (#0237): ⌥Return or a double-click takes the vis window into its own Space
+  within 5 s. While it's there the main window's elements, `state.probe` included, drop out of the accessibility tree,
+  so the probe reads `{}`. Check full screen by the window's own elements instead (`vis.canvas` as wide as the screen).
+  The probe is back once the window leaves full screen.
 
 ## Gotchas carried over from the cameron setup
 

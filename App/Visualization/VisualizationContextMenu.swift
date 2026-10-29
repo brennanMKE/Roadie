@@ -18,7 +18,9 @@ final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
     ]
 
     /// Commands that do something yet; the rest are disabled until their issue wires them.
-    static let enabledCommands: Set<VisCommand> = [.nextPreset, .previousPreset, .hardCut, .toggleOrder, .toggleLock]
+    static let enabledCommands: Set<VisCommand> = [
+        .nextPreset, .previousPreset, .hardCut, .toggleOrder, .toggleLock, .toggleFullScreen,
+    ]
 
     static func make(model: VisualizationModel) -> VisualizationContextMenu {
         let menu = VisualizationContextMenu(title: "Visualization")
@@ -31,7 +33,7 @@ final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
                 continue
             }
             let title = command == .toggleFullScreen
-                ? "Enter Full Screen" : VisKeyMap.rows.first { $0.command == command }?.title ?? "\(command)"
+                ? (model.isFullScreen ? "Exit Full Screen" : "Enter Full Screen") : VisKeyMap.rows.first { $0.command == command }?.title ?? "\(command)"
             let item = VisualizationCommandItem(title: title, command: command) { [weak model] in
                 model?.perform(command)
             }
