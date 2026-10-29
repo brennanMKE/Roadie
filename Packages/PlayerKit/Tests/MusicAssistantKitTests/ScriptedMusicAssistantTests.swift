@@ -300,4 +300,125 @@ struct ScriptedMusicAssistantTests {
         }
         #expect(!server.pushedEvents.isEmpty)
     }
+
+    // MARK: Concurrent connects (#0244)
+
+    private static func authCount(_ server: ScriptedMusicAssistant) -> Int {
+        server.receivedCommands.filter { $0.command == "auth" }.count
+    }
+
+    @Test func aPlayDuringAConcurrentConnectReachesTheSpeaker() async throws {
+        let rig = try await scripted(.libraryIdle, connect: false)
+        let server = rig.server, backend = rig.backend, speaker = speaker
+        server.holdReplies(for: "auth")
+        server.holdReplies(for: "player_queues/play_media")
+        let first = Task { try await backend.connect() }
+        #expect(await waitFor { Self.authCount(server) == 1 })
+        let second = Task { try await backend.connect() }
+        // The old code always opens a second socket here; the fixed one never does.
+        _ = await waitFor(timeout: 1) { Self.authCount(server) == 2 }
+        server.transports[0].release(command: "auth")
+        try await first.value
+        let play = Task {
+            try await backend.play([MediaID(.album, "library://album/27")], on: speaker, mode: .append)
+        }
+        #expect(await waitFor { server.receivedCommands.contains { $0.command == "player_queues/play_media" } })
+        server.release(command: "auth")
+        try await second.value
+        server.release(command: "player_queues/play_media")
+        await #expect(throws: Never.self) { try await play.value }
+        #expect(server.transports.count == 1)
+        #expect(server.transports.first?.closeCodes.isEmpty == true)
+        #expect(await backend.isConnected)
+        await backend.disconnect()
+    }
+
+    @Test func aCancelledFirstConnectLetsTheJoinedOneConnect() async throws {
+        let rig = try await scripted(.libraryIdle, connect: false)
+        let server = rig.server, backend = rig.backend
+        server.holdReplies(for: "auth")
+        let first = Task { try await backend.connect() }
+        #expect(await waitFor { Self.authCount(server) == 1 })
+        let second = Task { try await backend.connect() }
+        try? await Task.sleep(for: .milliseconds(100))
+        first.cancel()
+        _ = try? await first.value
+        server.release(command: "auth")
+        try await second.value
+        #expect(await backend.isConnected)
+        await backend.disconnect()
+    }
+
+    @Test func aFailedConnectFailsItsJoinerWithoutASecondSocket() async throws {
+        let rig = try await scripted(.badToken, connect: false)
+        let server = rig.server, backend = rig.backend
+        server.holdReplies(for: "auth")
+        let first = Task { try await backend.connect() }
+        #expect(await waitFor { Self.authCount(server) == 1 })
+        let second = Task { try await backend.connect() }
+        try? await Task.sleep(for: .milliseconds(100))
+        server.release(command: "auth")
+        await #expect(throws: MusicBackendError.unauthorized) { try await first.value }
+        await #expect(throws: MusicBackendError.unauthorized) { try await second.value }
+        #expect(server.transports.count == 1)
+    }
+
+    @Test func aConnectToAnotherServerStillReplacesAnInFlightOne() async throws {
+        final class AddressBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private var value = testAddress
+            var current: MusicAssistantServerAddress {
+                get { lock.withLock { value } }
+                set { lock.withLock { value = newValue } }
+            }
+        }
+        let clock = ManualClock()
+        let server = try ScriptedMusicAssistant(scenario: .libraryIdle, clock: clock)
+        let factory = ScriptedTransportFactory(server: server)
+        let box = AddressBox()
+        let backend = MusicAssistantBackend(
+            address: { box.current }, token: { _ in testToken }, transports: factory, http: factory.http, clock: clock)
+        server.holdReplies(for: "auth")
+        let first = Task { try await backend.connect() }
+        #expect(await waitFor { Self.authCount(server) == 1 })
+        box.current = MusicAssistantServerAddress(
+            baseURL: URL(string: "http://ma-other.example:8095")!, serverID: fixtureServerID)
+        let second = Task { try await backend.connect() }
+        #expect(await waitFor { Self.authCount(server) == 2 })
+        server.transports[0].release(command: "auth")
+        try await first.value
+        server.release(command: "auth")
+        try await second.value
+        #expect(server.transports.count == 2)
+        #expect(await waitFor { !server.transports[0].closeCodes.isEmpty })
+        #expect(await backend.isConnected)
+        await backend.disconnect()
+    }
+
+    @Test func heldRepliesApplyToLaterTransports() async throws {
+        let clock = ManualClock()
+        let server = try ScriptedMusicAssistant(scenario: .libraryIdle, clock: clock)
+        let factory = ScriptedTransportFactory(server: server)
+        // Held before any transport exists.
+        server.holdReplies(for: "auth")
+        let backends = (0..<2).map { _ in
+            MusicAssistantBackend(
+                address: { testAddress }, token: { _ in testToken }, transports: factory, http: factory.http,
+                clock: clock)
+        }
+        let first = Task { try await backends[0].connect() }
+        #expect(await waitFor { Self.authCount(server) == 1 })
+        let second = Task { try await backends[1].connect() }
+        #expect(await waitFor { Self.authCount(server) == 2 })
+        #expect(server.transports.count == 2)
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(await backends[0].isConnected == false)
+        #expect(await backends[1].isConnected == false)
+        server.release(command: "auth")
+        try await first.value
+        try await second.value
+        #expect(await backends[0].isConnected)
+        #expect(await backends[1].isConnected)
+        for backend in backends { await backend.disconnect() }
+    }
 }

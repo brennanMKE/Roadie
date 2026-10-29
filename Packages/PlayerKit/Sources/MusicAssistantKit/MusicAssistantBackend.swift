@@ -51,6 +51,8 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
     /// The token `connect()` used, kept for the Sendspin endpoint (#0109) so the app never reads the Keychain again.
     private var connectedToken: MusicAssistantToken?
     private var connectedConfiguration: MusicAssistantServerConfiguration?
+    /// The connect in flight, which same-server callers join (#0244).
+    private var connectAttempt: ConnectAttempt?
     private var counts: [String: Int] = [:]
     /// Players by id, from `outputs()`, `players/get` and the watchers: commands never list every player.
     private var players: [String: MAPlayer] = [:]
@@ -152,17 +154,50 @@ public actor MusicAssistantBackend: MusicBackend, CustomStringConvertible, Custo
         return configuration
     }
 
+    /// Concurrent connects to the same server share one attempt (#0244): a second socket would close the first
+    /// when it finished, failing whatever was in flight on it with "Can't reach the Music Assistant server".
     public func connect() async throws {
-        let configuration = try await requireConfiguration()
-        let address = configuration.address
-        // Same id, address and server id: the live connection is the right one. Two locations that both use
-        // `homeassistant.local:8095` differ by id, so a change of the active one reconnects.
-        if let client, let connected = connectedConfiguration, connected.sameIdentity(as: configuration) {
-            switch await client.state {
-            case .connected, .reconnecting: return
-            default: break
+        while true {
+            let configuration = try await requireConfiguration()
+            if let attempt = connectAttempt, attempt.configuration.sameIdentity(as: configuration) {
+                switch await attempt.gate.wait() {
+                case .succeeded: continue
+                case .failed(let error): throw error
+                case .cancelled:
+                    // The leader was cancelled and this caller was not: take over.
+                    try Task.checkCancellation()
+                    continue
+                case nil: throw CancellationError()
+                }
             }
+            // Same id, address and server id: the live connection is the right one. Two locations that both use
+            // `homeassistant.local:8095` differ by id, so a change of the active one reconnects.
+            if let client, let connected = connectedConfiguration, connected.sameIdentity(as: configuration) {
+                switch await client.state {
+                case .connected, .reconnecting: return
+                default: break
+                }
+                // An attempt may have started while this one read the state.
+                if let attempt = connectAttempt, attempt.configuration.sameIdentity(as: configuration) { continue }
+            }
+            let id = UUID()
+            let gate = ConnectGate()
+            connectAttempt = ConnectAttempt(id: id, configuration: configuration, gate: gate)
+            do {
+                try await openConnection(configuration)
+            } catch {
+                if connectAttempt?.id == id { connectAttempt = nil }
+                gate.finish(Task.isCancelled || error is CancellationError ? .cancelled : .failed(error))
+                throw error
+            }
+            if connectAttempt?.id == id { connectAttempt = nil }
+            gate.finish(.succeeded)
+            return
         }
+    }
+
+    private func openConnection(_ configuration: MusicAssistantServerConfiguration) async throws {
+        let address = configuration.address
         let token: MusicAssistantToken?
         do {
             token = try tokenProvider(configuration)
@@ -876,4 +911,58 @@ public struct MusicAssistantSendspinEndpoint: Sendable, Equatable, CustomStringC
     }
 
     public var description: String { "MusicAssistantSendspinEndpoint(token: redacted)" }
+}
+
+/// A connect attempt that other `connect()` callers wait on (#0244).
+private struct ConnectAttempt {
+    var id: UUID
+    var configuration: MusicAssistantServerConfiguration
+    var gate: ConnectGate
+}
+
+/// Wakes every caller waiting on one connect attempt with its outcome.
+private final class ConnectGate: @unchecked Sendable {
+    enum Outcome: Sendable {
+        case succeeded
+        case failed(any Error)
+        case cancelled
+    }
+
+    private let lock = NSLock()
+    private var outcome: Outcome?
+    private var waiters: [UUID: CheckedContinuation<Outcome?, Never>] = [:]
+
+    /// The attempt's outcome, or nil when the waiting task is cancelled first.
+    func wait() async -> Outcome? {
+        let id = UUID()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Outcome?, Never>) in
+                lock.lock()
+                if let outcome {
+                    lock.unlock()
+                    continuation.resume(returning: outcome)
+                } else if Task.isCancelled {
+                    lock.unlock()
+                    continuation.resume(returning: nil)
+                } else {
+                    waiters[id] = continuation
+                    lock.unlock()
+                }
+            }
+        } onCancel: {
+            lock.lock()
+            let continuation = waiters.removeValue(forKey: id)
+            lock.unlock()
+            continuation?.resume(returning: nil)
+        }
+    }
+
+    func finish(_ result: Outcome) {
+        lock.lock()
+        outcome = result
+        let woken = waiters
+        waiters = [:]
+        lock.unlock()
+        for continuation in woken.values { continuation.resume(returning: result) }
+    }
 }

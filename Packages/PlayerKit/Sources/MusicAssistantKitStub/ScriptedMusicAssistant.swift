@@ -97,6 +97,7 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         var events: [MAServerEvent] = []
         var transports: [StubWebSocketTransport] = []
         var eventOrder: EventOrder = .afterReply
+        var heldCommands: Set<String> = []
     }
 
     private enum Reply: Sendable {
@@ -167,9 +168,11 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         state.withLock { s in
             let transports = s.transports
             let order = s.eventOrder
+            let held = s.heldCommands
             s = State(scenario: scenario)
             s.transports = transports
             s.eventOrder = order
+            s.heldCommands = held
             Self.build(&s, scenario: scenario, library: library)
         }
     }
@@ -209,8 +212,32 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         let unreachable = scenario == .unreachable
         let transport = StubWebSocketTransport(
             script: script, connectError: unreachable ? .transport(.cannotConnectToHost) : nil)
-        state.withLock { $0.transports.append(transport) }
+        let held = state.withLock { s -> Set<String> in
+            s.transports.append(transport)
+            return s.heldCommands
+        }
+        for command in held { transport.holdReplies(for: command) }
         return transport
+    }
+
+    /// Holds answers to `command` on every transport made so far and on each one made later,
+    /// until `release(command:)` (#0244: a second connection's `auth` can be held before its socket exists).
+    public func holdReplies(for command: String) {
+        let transports = state.withLock { s -> [StubWebSocketTransport] in
+            s.heldCommands.insert(command)
+            return s.transports
+        }
+        for transport in transports { transport.holdReplies(for: command) }
+    }
+
+    /// Releases `command` on every transport and stops holding it on later ones.
+    /// To release one connection only, use `transports[i].release(command:)`.
+    public func release(command: String) {
+        let transports = state.withLock { s -> [StubWebSocketTransport] in
+            s.heldCommands.remove(command)
+            return s.transports
+        }
+        for transport in transports { transport.release(command: command) }
     }
 
     /// Pushes an event to the newest transport (a server-initiated change in a test).
