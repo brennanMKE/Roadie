@@ -248,4 +248,50 @@ final class VisualizationUITests: RoadieUITestCase {
         roadie.app.typeKey(.return, modifierFlags: .option)
         expectFullScreen(false)
     }
+
+    // MARK: Preset list (#0240)
+
+    /// L in the key window opens the list; the search field is clicked so the keys go to it.
+    private func openList() -> XCUIElement {
+        openKeyWindow()
+        roadie.app.typeKey("l", modifierFlags: [])
+        let browser = roadie.element(AXID.Vis.browser)
+        XCTAssertTrue(browser.waitForExistence(timeout: 5), "no \(AXID.Vis.browser)")
+        let search = roadie.element(AXID.Vis.browserSearch)
+        XCTAssertTrue(search.waitForExistence(timeout: 5), "no \(AXID.Vis.browserSearch)")
+        search.click()
+        return browser
+    }
+
+    private func row(_ index: Int) -> XCUIElement { roadie.element(AXID.Vis.browserRow(index)) }
+
+    func testLOpensTheListAndReturnLoadsTheSelection() {
+        let browser = openList()
+        XCTAssertTrue(row(0).waitForExistence(timeout: 5), "no row 0")
+        XCTAssertEqual(row(0).label, "Classic Spectrum")
+        XCTAssertTrue(roadie.wait { self.roadie.value(of: self.row(0)) == "current" }, "row 0 value is \"\(roadie.value(of: row(0)))\", expected current")
+        roadie.app.typeKey(.downArrow, modifierFlags: [])
+        roadie.app.typeKey(.downArrow, modifierFlags: [])
+        roadie.app.typeKey(.return, modifierFlags: [])
+        expectPreset("Classic Spectrum and Scope")
+        XCTAssertTrue(roadie.wait { !browser.exists }, "the list is still open")
+    }
+
+    func testTypingFiltersTheList() {
+        let browser = openList()
+        roadie.app.typeText("mirr")
+        XCTAssertTrue(roadie.wait { self.row(0).exists && self.row(0).label == "Classic Mirror" && !self.row(1).exists },
+                      "the list didn't narrow to Classic Mirror")
+        roadie.app.typeKey(.return, modifierFlags: [])
+        expectPreset("Classic Mirror")
+        XCTAssertTrue(roadie.wait { !browser.exists }, "the list is still open")
+    }
+
+    func testEscapeClosesTheList() {
+        let browser = openList()
+        roadie.app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(roadie.wait { !browser.exists }, "the list is still open")
+        XCTAssertEqual(vis.preset, "Classic Spectrum")
+        XCTAssertEqual(vis.probe?.presetChanges, 0)
+    }
 }

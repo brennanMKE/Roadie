@@ -49,6 +49,7 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         if isTest || !window.setFrameUsingName(Self.autosaveName) { placeBesideSkinnedWindows() }
         if !isTest { window.setFrameAutosaveName(Self.autosaveName) }
         observeModel()
+        observePresetList()
         let center = NotificationCenter.default
         observers.append(center.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
@@ -149,6 +150,18 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         window?.title = title.0
         hostView.setPresetName(title.1)
         applyLinkState()
+    }
+}
+
+// MARK: Preset list (#0240)
+
+extension VisualizationWindowController {
+    /// Shows or removes the list as `presetList` opens and closes; re-armed after each change.
+    func observePresetList() {
+        let list = withObservationTracking { visualization.presetList } onChange: { [weak self] in
+            Task { @MainActor in self?.observePresetList() }
+        }
+        hostView.setPresetList(list, model: visualization)
     }
 }
 
