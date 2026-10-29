@@ -158,7 +158,11 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
         if case .main = kind {
             window.onRightMouseDown = { [weak self] event in
                 guard let self else { return false }
-                popUpMainMenu(for: event)
+                if let point = visualizerMenuPoint(for: event) {
+                    popUp(VisualizerMenu.make(model: model), atSkinPoint: point)
+                } else {
+                    popUpMainMenu(for: event)
+                }
                 return true
             }
         }
@@ -186,6 +190,17 @@ final class SkinWindowController: NSObject, NSWindowDelegate, TitleBarDragging {
     func popUp(_ menu: NSMenu, atSkinPoint p: CGPoint) {
         let scale = model.scale
         menu.popUp(positioning: nil, at: NSPoint(x: p.x * scale, y: p.y * scale), in: hosting)
+    }
+
+    /// The pointer in skin pixels when a right-click lands on the main window's built-in visualizer (#0235), else nil.
+    private func visualizerMenuPoint(for event: NSEvent) -> CGPoint? {
+        let local = hosting.convert(event.locationInWindow, from: nil)
+        let scale = model.scale
+        guard scale > 0 else { return nil }
+        var point = CGPoint(x: local.x / scale, y: local.y / scale)
+        if !hosting.isFlipped { point.y = hosting.bounds.height / scale - point.y }
+        let frame = model.isMainWindowShaded ? MainShadeLayout.visualizerFrame : MainWindowLayout.visualizer
+        return frame.contains(point) ? point : nil
     }
 
     /// Opens the options menu at the pointer, for a right-click or Control-click.

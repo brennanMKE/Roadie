@@ -26,9 +26,24 @@ struct TestProbe: Codable, Equatable {
     /// The skins folder's `.wsz` files, folder-relative and sorted (#0208): the sandboxed test runner checks a trash
     /// or a download here rather than on disk. nil with no skins folder, and outside UI-test mode.
     var skinFiles: [String]? = nil
+    /// The visualization window (#0235); nil until it first opens.
+    var visualization: VisProbe? = nil
+
+    struct VisProbe: Codable, Equatable {
+        var open: Bool
+        var rendering: Bool
+        var renderer: String?
+        var preset: String?
+        var presetName: String?
+        var order: String
+        var locked: Bool
+        var audio: String
+        var presetChanges: Int
+    }
 
     private enum CodingKeys: String, CodingKey {
         case output, feed, state, currentIndex, queue, notice, lastExternalOpen, tokenStore, maRequests, skin, skinFiles
+        case visualization
     }
 
     /// Writes `null` for the absent optionals, so every key is always in the JSON.
@@ -45,6 +60,7 @@ struct TestProbe: Codable, Equatable {
         try c.encode(maRequests, forKey: .maRequests)
         try c.encode(skin, forKey: .skin)
         try c.encode(skinFiles, forKey: .skinFiles)
+        try c.encode(visualization, forKey: .visualization)
     }
 
     var json: String {
@@ -79,7 +95,17 @@ extension PlayerModel {
             tokenStore: tokenStoreKind,
             maRequests: scriptedRequestSummaries,
             skin: self.skin == nil ? nil : skinName,
-            skinFiles: configuration.isUITest ? skinLibrary.folderURL.map { Self.wszFiles(in: $0) } : nil)
+            skinFiles: configuration.isUITest ? skinLibrary.folderURL.map { Self.wszFiles(in: $0) } : nil,
+            visualization: visualizationProbe)
+    }
+
+    private var visualizationProbe: TestProbe.VisProbe? {
+        let vis = visualization
+        guard vis.hasOpened else { return nil }
+        return TestProbe.VisProbe(
+            open: vis.isOpen, rendering: vis.isRendering, renderer: vis.renderer?.kindName,
+            preset: vis.currentPreset?.id, presetName: vis.currentPreset?.name, order: vis.navigator.order.rawValue,
+            locked: vis.navigator.isLocked, audio: vis.audioSource.probeName, presetChanges: vis.presetChanges)
     }
 
     /// `.wsz` files under `folder`, as sorted folder-relative paths.

@@ -346,6 +346,15 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Legacy data cleanup | Unit `RoadieTests.LegacyDataCleanupTests` |
 | Info.plist, entitlements, bundle identifiers, website, changelog | existing steps |
 
+### 5.12 Visualization
+
+Design: [visualization.md](visualization.md) §8.4; one row per feature, added by each child of #0231 as it lands.
+
+| Feature | Test |
+|---|---|
+| Visualization window: Window › Visualization ⇧⌘K, skinned main menu › Visualization ▸ Start/Stop, clutter V menu, right-click on the built-in vis; reopens at launch (#0235) | UI `VisualizationUITests.testCommandShiftKOpensAndClosesTheWindow`, `.testWindowMenuItemOpensTheWindow`, `.testClutterBarVMenuStartsTheVisualization`, `.testMainMenuVisualizationSubmenu`, `.testRightClickOnTheBuiltInVisualizerShowsTheVisualizerMenu`, `.testWindowOpenAtLaunchWhenItWasOpen`; Unit `RoadieTests.VisualizationModelTests`, SkinKit `MainMenuTests.visualizationSubmenuHasStartStop` |
+| Rendering stops when the window is closed, minimized or hidden (#0235) | Unit `VisualizationModelTests.testOcclusionPausesRenderingAndTheStereoFeed`; *by hand* for Activity Monitor |
+
 ## 6. Runner and logging
 
 The Haiku runner (Issues.md phase 2v) doesn't change: it runs one `scripts/verify.sh …` command and returns the stdout verbatim. UI runs can exceed the 600 s foreground timeout, so a `--ui` or `--coverage` command runs in the background and the runner waits for its completion notification, as `--stress` and `--corpus` already do. Everything else is in `verify.sh` and `run-tests-vm.sh`:

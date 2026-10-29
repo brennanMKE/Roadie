@@ -10,7 +10,8 @@ extension PlayerModel {
             isMainShaded: isMainWindowShaded, isEQShaded: isEQWindowShaded, isPlaylistShaded: isPlaylistWindowShaded,
             isRepeating: isRepeating, isShuffled: isShuffled, canNavigateSkins: skinBrowser.canNavigate,
             isAlwaysOnTop: isAlwaysOnTop, isDoubleSize: isDoubleSize,
-            canCheckForUpdates: updateActions?.canCheck() ?? false)
+            canCheckForUpdates: updateActions?.canCheck() ?? false,
+            isVisualizationOpen: visualization.isOpen)
     }
 
     func perform(_ command: MainMenuCommand) {
@@ -41,6 +42,7 @@ extension PlayerModel {
         case .stop: stop()
         case .next: next()
         case .jumpToFile: showJumpToFile()
+        case .toggleVisualization: visualization.toggle()
         case .quit: if !intercepted(.quit) { NSApp.terminate(nil) }
         }
     }

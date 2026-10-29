@@ -182,6 +182,8 @@ final class PlayerModel {
     var mainWindowSkinSize: CGSize { isMainWindowShaded ? MainWindowLayout.shadeSize : MainWindowLayout.size }
     /// The main-window spectrum / oscilloscope; ticks only while audio plays.
     let visualizer: VisualizerModel
+    /// The visualization window's model (#0235): presets, the render loop and the stereo feed.
+    let visualization: VisualizationModel
     /// Replaces the marquee text while set, like Webamp's focus text. Set while a main-window slider is held.
     var marqueeOverride: String?
     /// Which slider the pointer is holding. `position` carries the scrub fraction, which the thumb follows
@@ -388,6 +390,7 @@ final class PlayerModel {
         player = stack.player
         playlist = PlaylistModel(player: stack.player, defaults: defaults)
         visualizer = VisualizerModel(player: stack.player, colors: VisRenderer.defaultColors, defaults: defaults)
+        visualization = VisualizationModel(analyzer: stack.player.analyzer, configuration: configuration)
         folderBackend = FolderBackend(
             settings: FolderBackend.settingsProvider(defaults: defaults), output: stack.output,
             cacheDirectory: configuration.folderIndexDirectory)
@@ -560,6 +563,7 @@ final class PlayerModel {
         restoreWindowState()
         visualizer.setLayout(shaded: isMainWindowShaded, scale: scale)
         visualizer.start()
+        visualization.owner = self
         observeNowPlaying()
         if let path = defaults.string(forKey: Self.lastSkinKey) {
             loadSkin(from: URL(filePath: path))
@@ -973,6 +977,7 @@ final class PlayerModel {
                 self.skin = skin
                 mainWindowBase = base
                 visualizer.setColors(skin.visColors)
+                visualization.setColors(skin.visColors)
                 skinName = url.deletingPathExtension().lastPathComponent
                 errorMessage = nil
                 defaults.set(url.path, forKey: Self.lastSkinKey)

@@ -177,9 +177,46 @@ enum AXID {
         static let all = [source, filter, random, refresh]
     }
 
+    /// The visualization window (#0235, design docs/design/visualization.md §3.5). #0235 uses `window`, `canvas` and
+    /// `preset`; the rest are declared for #0236–#0242.
+    enum Vis {
+        static let window = "vis.window"
+        static let canvas = "vis.canvas"
+        static let preset = "vis.preset"
+        static let overlay = "vis.overlay"
+        enum Overlay {
+            static let title = "vis.overlay.title"
+            static let artist = "vis.overlay.artist"
+            static let time = "vis.overlay.time"
+            static let state = "vis.overlay.state"
+            static let next = "vis.overlay.next"
+            static let output = "vis.overlay.output"
+            static let note = "vis.overlay.note"
+            static let all = [title, artist, time, state, next, output, note]
+        }
+        static let toast = "vis.toast"
+        static let songTitle = "vis.songTitle"
+        enum Readout {
+            static let title = "vis.readout.title"
+            static let time = "vis.readout.time"
+            static let preset = "vis.readout.preset"
+            static let fps = "vis.readout.fps"
+            static let all = [title, time, preset, fps]
+        }
+        static let help = "vis.help"
+        static let browser = "vis.browser"
+        static let browserSearch = "vis.browser.search"
+        static func browserRow(_ index: Int) -> String { "vis.browser.row.\(index)" }
+        static let noAudioBadge = "vis.badge.noAudio"
+        static let flashNotice = "vis.flashNotice"
+        static let flashNoticeContinue = "vis.flashNotice.continue"
+        static let all = [window, canvas, preset, overlay, toast, songTitle, help, browser, browserSearch, noAudioBadge,
+                          flashNotice, flashNoticeContinue] + Overlay.all + Readout.all
+    }
+
     static let probe = "state.probe"
 
     /// Every static identifier, for the uniqueness test.
     static let all: [String] =
-        Main.all + EQ.all + PL.all + Shade.all + Jump.all + Library.all + Skins.all + [probe]
+        Main.all + EQ.all + PL.all + Shade.all + Jump.all + Library.all + Skins.all + Vis.all + [probe]
 }

@@ -66,6 +66,7 @@ final class AXIDTests: XCTestCase {
                 notice: nil, lastExternalOpen: nil, tokenStore: "memory", maRequests: []))
         XCTAssertTrue(json.contains("\"notice\":null"), json)
         XCTAssertTrue(json.contains("\"lastExternalOpen\":null"), json)
+        XCTAssertTrue(json.contains("\"visualization\":null"), json)
     }
 
     /// With the scripted Music Assistant (#0197) the probe reports the in-memory token store, the recorded external

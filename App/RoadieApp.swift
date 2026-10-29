@@ -78,6 +78,12 @@ struct RoadieApp: App {
                 Button("Playlist Editor") { appDelegate.model.togglePlaylistWindow() }
                     .keyboardShortcut("3")
                 Toggle(
+                    "Visualization",
+                    isOn: Binding(
+                        get: { appDelegate.model.visualization.isOpen },
+                        set: { _ in appDelegate.model.visualization.toggle() }))
+                    .keyboardShortcut("k", modifiers: [.command, .shift])
+                Toggle(
                     "Always on Top",
                     isOn: Binding(
                         get: { appDelegate.model.isAlwaysOnTop }, set: { _ in appDelegate.model.toggleAlwaysOnTop() }))

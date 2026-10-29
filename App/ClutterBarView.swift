@@ -16,7 +16,7 @@ struct ClutterBarView: View {
             button(.alwaysOnTop, AXID.Main.Clutter.a, "Always on Top", selected: model.isAlwaysOnTop, action: model.toggleAlwaysOnTop)
             button(.fileInfo, AXID.Main.Clutter.i, "File Info", action: model.showFileInfo)
             button(.doubleSize, AXID.Main.Clutter.d, "Double Size", selected: model.isDoubleSize, action: model.toggleDoubleSize)
-            button(.visualizer, AXID.Main.Clutter.v, "Visualizer Menu") { window?.popUp(visualizerMenu(), atSkinPoint: Self.below(.visualizer)) }
+            button(.visualizer, AXID.Main.Clutter.v, "Visualizer Menu") { window?.popUp(VisualizerMenu.make(model: model), atSkinPoint: Self.below(.visualizer)) }
         }
     }
 
@@ -24,18 +24,6 @@ struct ClutterBarView: View {
     private static func below(_ button: MainWindowLayout.ClutterButton) -> CGPoint {
         let rect = MainWindowLayout.rect(button)
         return CGPoint(x: rect.minX, y: rect.maxY)
-    }
-
-    private func visualizerMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        let visualizer = model.visualizer
-        for mode in VisualizerModel.Mode.allCases {
-            let item = ActionMenuItem(title: mode.title) { visualizer.setMode(mode) }
-            item.state = visualizer.mode == mode ? .on : .off
-            menu.addItem(item)
-        }
-        return menu
     }
 
     private func button(

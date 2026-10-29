@@ -48,6 +48,20 @@ struct ProbeState: Decodable {
     var skin: String?
     /// The skins folder's `.wsz` files, folder-relative (#0208): the runner is sandboxed, so file checks read this.
     var skinFiles: [String]?
+    /// The visualization window (#0235), nil until it first opens.
+    var visualization: VisProbe?
+
+    struct VisProbe: Decodable {
+        var open: Bool
+        var rendering: Bool
+        var renderer: String?
+        var preset: String?
+        var presetName: String?
+        var order: String
+        var locked: Bool
+        var audio: String
+        var presetChanges: Int
+    }
 }
 
 /// The skins folder a launch indexes (#0208).
@@ -225,7 +239,24 @@ final class RoadieUIApp {
         }
     }
 
+    /// The visualization window (#0235).
+    @MainActor
+    struct Visualization {
+        let ui: RoadieUIApp
+        /// By identifier (the title changes with the preset).
+        var window: XCUIElement { ui.app.windows[AXID.Vis.window] }
+        /// The top strip's preset name.
+        var preset: String { ui.value(of: ui.element(AXID.Vis.preset)) }
+        var probe: ProbeState.VisProbe? { ui.probe?.visualization }
+
+        /// ⇧⌘K (Window › Visualization), with the main window key.
+        func open() {
+            ui.app.typeKey("k", modifierFlags: [.command, .shift])
+        }
+    }
+
     var main: Main { Main(ui: self) }
+    var visualization: Visualization { Visualization(ui: self) }
     var playlist: Playlist { Playlist(ui: self) }
 
     var probeElement: XCUIElement { element(AXID.probe) }

@@ -5,6 +5,7 @@ public enum MainMenuCommand: Hashable, Sendable, CaseIterable {
     case openSkin, nextSkin, previousSkin, randomSkin
     case timeElapsed, timeRemaining, toggleAlwaysOnTop, toggleDoubleSize, toggleMainShade, toggleEQShade, togglePlaylistShade, toggleRepeat, toggleShuffle
     case previous, play, pause, stop, next, jumpToFile
+    case toggleVisualization
     case quit
 }
 
@@ -25,13 +26,16 @@ public struct MainMenuState: Equatable, Sendable {
     public var isDoubleSize: Bool
     /// Sparkle's updater can check now (#0158); false in Debug builds, where it never starts.
     public var canCheckForUpdates: Bool
+    /// The visualization window is open (#0235).
+    public var isVisualizationOpen: Bool
 
     public init(
         timeMode: TimeMode = .elapsed, isEQWindowOpen: Bool = false, isPlaylistWindowOpen: Bool = false,
         isLibraryWindowOpen: Bool = false,
         isMainShaded: Bool = false, isEQShaded: Bool = false, isPlaylistShaded: Bool = false,
         isRepeating: Bool = false, isShuffled: Bool = false, canNavigateSkins: Bool = false,
-        isAlwaysOnTop: Bool = false, isDoubleSize: Bool = false, canCheckForUpdates: Bool = false
+        isAlwaysOnTop: Bool = false, isDoubleSize: Bool = false, canCheckForUpdates: Bool = false,
+        isVisualizationOpen: Bool = false
     ) {
         self.timeMode = timeMode
         self.isEQWindowOpen = isEQWindowOpen
@@ -46,6 +50,7 @@ public struct MainMenuState: Equatable, Sendable {
         self.isAlwaysOnTop = isAlwaysOnTop
         self.isDoubleSize = isDoubleSize
         self.canCheckForUpdates = canCheckForUpdates
+        self.isVisualizationOpen = isVisualizationOpen
     }
 }
 
@@ -118,6 +123,7 @@ public enum MainMenu {
             .submenu(title: "Skins", skinsEntries(state)),
             .submenu(title: "Options", optionsEntries(state)),
             .submenu(title: "Playback", playbackEntries(state)),
+            .submenu(title: "Visualization", visualizationEntries(state)),
             .separator,
             .item(MainMenuItem(.quit, "Exit", shortcut: MainMenuShortcut("q"))),
         ]
@@ -168,6 +174,16 @@ public enum MainMenu {
             .item(MainMenuItem(.next, "Next", shortcut: MainMenuShortcut("b", [.command, .control]))),
             .separator,
             .item(MainMenuItem(.jumpToFile, "Jump to File\u{2026}", shortcut: MainMenuShortcut("j"))),
+        ]
+    }
+
+    /// Winamp's Visualization submenu (#0235); its settings item comes in #0241.
+    public static func visualizationEntries(_ state: MainMenuState) -> [MainMenuEntry] {
+        [
+            .item(
+                MainMenuItem(
+                    .toggleVisualization, "Start/Stop Visualization", checked: state.isVisualizationOpen,
+                    shortcut: MainMenuShortcut("k", [.command, .shift]))),
         ]
     }
 }

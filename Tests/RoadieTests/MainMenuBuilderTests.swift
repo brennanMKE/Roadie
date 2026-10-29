@@ -6,7 +6,7 @@ import XCTest
 
 /// `MainMenuBuilder` turns `MainMenu.entries` into an `NSMenu` (#0193).
 @MainActor
-final class MainMenuBuilderTests: XCTestCase {
+final class MainMenuBuilderTests: PlayerModelTestCase {
     func testBuildsEveryEntryWithTitleAndShortcut() {
         let state = MainMenuState(isEQWindowOpen: true, isRepeating: true)
         let entries = MainMenu.entries(state)
@@ -21,6 +21,21 @@ final class MainMenuBuilderTests: XCTestCase {
         let action = try XCTUnwrap(item.action)
         NSApp.sendAction(action, to: item.target, from: item)
         XCTAssertEqual(received, [.jumpToFile])
+    }
+
+    /// Visualization ▸ Start/Stop Visualization calls `perform(.toggleVisualization)`, which flips the window (#0235).
+    func testVisualizationSubmenuDispatchesToggle() throws {
+        let model = try makeModel()
+        XCTAssertFalse(model.visualization.isOpen)
+        let menu = MainMenuBuilder.menu(MainMenu.entries(model.mainMenuState)) { [weak model] in model?.perform($0) }
+        let item = try XCTUnwrap(findItem(titled: "Start/Stop Visualization", in: menu))
+        XCTAssertEqual(item.state, .off)
+        let action = try XCTUnwrap(item.action)
+        NSApp.sendAction(action, to: item.target, from: item)
+        XCTAssertTrue(model.visualization.isOpen)
+        XCTAssertTrue(model.mainMenuState.isVisualizationOpen)
+        NSApp.sendAction(action, to: item.target, from: item)
+        XCTAssertFalse(model.visualization.isOpen)
     }
 
     private func assertMenu(_ menu: NSMenu, matches entries: [MainMenuEntry], file: StaticString = #filePath, line: UInt = #line) {

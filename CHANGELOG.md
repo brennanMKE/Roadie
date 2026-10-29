@@ -12,6 +12,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 - Drag an artist from the Library onto the playlist editor; right-click an artist for Play, Play Next and Add to Queue.
 - LIST › Load in the playlist editor can load a Library playlist while This Mac plays its own queue, and Playback › Load Playlist from Library… does the same from the menu bar.
 - Help › Playlists and the Queue… explains how the playlist editor, the Library's playlists and saving a queue fit together.
+- A Visualization window (⇧⌘K, or the clutter bar's V menu) with five classic visualizations in the skin's colours.
 
 ### Changed
 

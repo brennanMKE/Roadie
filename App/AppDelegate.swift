@@ -37,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return controller
     }()
 
+    /// The visualization window (#0235), built the first time it opens.
+    private var visualizationWindow: VisualizationWindowController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // #0193: as a unit-test host, no skinned windows, no Welcome, no default skins folder. SwiftUI still opens the first window
         // scene, so close the Library and Skins windows as a normal launch does.
@@ -61,6 +64,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // After the player, so a persisted-open equalizer stacks above it, as in Winamp.
         observeEQWindow()
         observePlaylistWindow()
+        // #0235: after the skinned windows, so it's placed beside them; reopens windowed when it was open at quit.
+        if model.visualization.settings.windowOpen { model.visualization.open() }
+        observeVisualizationWindow()
         docking.ensureOnScreen()
         model.openLaunchFilesForUITest()
         // The Library and Skins are the only SwiftUI window scenes, so SwiftUI opens the first at launch; they are
@@ -126,6 +132,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in self?.observeEQWindow() }
         }
         if open { equalizer.show(below: player.window) } else if equalizer.window.isVisible { equalizer.hide() }
+    }
+
+    /// Shows or closes the visualization window to follow `model.visualization.isOpen` (⇧⌘K, the menus, its close
+    /// button).
+    private func observeVisualizationWindow() {
+        let open = withObservationTracking {
+            model.visualization.isOpen
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeVisualizationWindow() }
+        }
+        if open {
+            let controller = visualizationWindow ?? VisualizationWindowController(model: model)
+            visualizationWindow = controller
+            controller.show()
+        } else if let controller = visualizationWindow, controller.window?.isVisible == true {
+            controller.window?.close()
+        }
     }
 
     /// The window the playlist sits under by default: the equalizer when it is showing, else the player (Winamp's

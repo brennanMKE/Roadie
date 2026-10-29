@@ -27,7 +27,7 @@ struct MainMenuTests {
         #expect(
             labels == [
                 "About Roadie", "Check for Updates…", "-", "Play File…", "Add to Playlist…", "-", "Equalizer", "Playlist Editor", "Media Library", "-",
-                "Skins >", "Options >", "Playback >", "-", "Exit",
+                "Skins >", "Options >", "Playback >", "Visualization >", "-", "Exit",
             ])
     }
 
@@ -80,7 +80,7 @@ struct MainMenuTests {
     @Test func everyCommandAppearsOnce() {
         let commands = items(MainMenu.entries(MainMenuState())).map(\.command)
         #expect(Set(commands).count == commands.count)
-        #expect(commands.count == 27)
+        #expect(commands.count == 28)
     }
 
     @Test func unsupportedEntriesAreAbsent() {
@@ -112,6 +112,21 @@ struct MainMenuTests {
         #expect(item(.nextSkin)?.shortcut == MainMenuShortcut("]"))
         #expect(item(.previousSkin)?.shortcut == MainMenuShortcut("["))
         #expect(item(.randomSkin)?.shortcut == MainMenuShortcut("r", [.command, .shift]))
+        #expect(item(.toggleVisualization)?.shortcut == MainMenuShortcut("k", [.command, .shift]))
+    }
+
+    @Test func visualizationSubmenuHasStartStop() {
+        let entries = MainMenu.entries(MainMenuState())
+        let titles = entries.compactMap { entry -> String? in
+            if case .submenu(let title, _) = entry { return title }
+            return nil
+        }
+        #expect(titles.contains("Visualization"))
+        let closed = item(.toggleVisualization)
+        #expect(closed?.title == "Start/Stop Visualization")
+        #expect(closed?.shortcut == MainMenuShortcut("k", [.command, .shift]))
+        #expect(closed?.state == .off)
+        #expect(item(.toggleVisualization, MainMenuState(isVisualizationOpen: true))?.state == .on)
     }
 
     @Test func jumpToFileClosesThePlaybackSubmenu() {

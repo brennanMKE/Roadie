@@ -43,6 +43,10 @@ struct RoadieConfiguration: @unchecked Sendable {
     /// `-RoadieMuseumFeatured <name>` (#0208): the fixture Museum's browse page leads with `<name>.wsz` from its skins
     /// folder (`FixtureMuseumTransport.featuredSkin`).
     var museumFeaturedSkin: String?
+    /// `-RoadieVisRenderer classic|milk` (#0235, Debug): the visualization window's renderer. Release ignores it.
+    var visRenderer: String?
+    /// `-RoadieVisSeed N` (#0235, Debug): the preset navigator's random seed; else random. Release ignores it.
+    var visSeed: UInt64?
 
     static let standard = RoadieConfiguration()
 
@@ -61,6 +65,8 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let museumFeatured = "RoadieMuseumFeatured"
         static let seedSkins = "RoadieSeedSkins"
         static let seedSkinsOmit = "RoadieSeedSkinsOmit"
+        static let visRenderer = "RoadieVisRenderer"
+        static let visSeed = "RoadieVisSeed"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -74,7 +80,9 @@ struct RoadieConfiguration: @unchecked Sendable {
         return .standard
         #else
         guard arguments.bool(forKey: Argument.uiTest) else {
-            return hostedTestRun ? .hostedUnitTests() : .standard
+            var configuration = hostedTestRun ? Self.hostedUnitTests() : Self.standard
+            configuration.readVisualizationArguments(arguments)
+            return configuration
         }
         let data = arguments.string(forKey: Argument.dataDir).map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? Self.temporaryDirectory("RoadieUITest")
@@ -99,9 +107,17 @@ struct RoadieConfiguration: @unchecked Sendable {
         if arguments.object(forKey: Argument.volume) != nil {
             configuration.launchVolume = min(max(Float(arguments.integer(forKey: Argument.volume)) / 100, 0), 1)
         }
+        configuration.readVisualizationArguments(arguments)
         return configuration
         #endif
     }
+
+    #if DEBUG
+    private mutating func readVisualizationArguments(_ arguments: UserDefaults) {
+        visRenderer = arguments.string(forKey: Argument.visRenderer)
+        visSeed = arguments.string(forKey: Argument.visSeed).flatMap { UInt64($0) }
+    }
+    #endif
 
     /// `-RoadieSeedSkins <folder>` with `-skinsFolderPath <copy>` (#0208): the copy is emptied and gets the folder's
     /// top-level `.wsz` files, except the names (without `.wsz`) listed comma-separated in `-RoadieSeedSkinsOmit`, so a
