@@ -110,6 +110,21 @@ final class VisualizationOverlayTests: PlayerModelTestCase {
         vis.stopOverlayTimer()
     }
 
+    func testThePresetListHoldsTheOverlay() throws {
+        let vis = try openVis()
+        vis.syncOverlayPlaybackHold(state: .playing)
+        vis.showOverlay()
+        vis.openList()
+        now = 10
+        vis.tickOverlay()
+        XCTAssertTrue(vis.overlay.isOverlayVisible, "hid while the preset list was open")
+        vis.closeList()
+        now = 14
+        vis.tickOverlay()
+        XCTAssertFalse(vis.overlay.isOverlayVisible, "didn't hide after the list closed")
+        vis.stopOverlayTimer()
+    }
+
     func testIdleOverrideHookSetsTheTimeout() throws {
         let suite = "co.sstools.roadie.tests.overlayIdle.\(UUID())"
         let arguments = try XCTUnwrap(UserDefaults(suiteName: suite))

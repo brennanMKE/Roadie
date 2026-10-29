@@ -251,13 +251,16 @@ final class VisualizationUITests: RoadieUITestCase {
 
     // MARK: Song overlay (#0238)
 
-    private static let overlayIdle = ["-RoadieVisOverlayIdle", "1"]
+    /// The idle timeout: long enough that the card is still up when XCUITest's query (about a second after a hover)
+    /// lands, short enough that the hide checks don't wait long. Tests that only read the card use `readIdle`.
+    private static let overlayIdle = ["-RoadieVisOverlayIdle", "3"]
+    private static let readIdle = ["-RoadieVisOverlayIdle", "60"]
 
     private var overlayCard: XCUIElement { roadie.element(AXID.Vis.overlay) }
 
     /// Opens the window with the fixture music folder queued and playing (X in the vis window).
-    private func openPlaying(extra: [String] = []) {
-        openKeyWindow(extra: ["-RoadieOpenFiles", paths.music] + Self.overlayIdle + extra)
+    private func openPlaying(idle: [String] = overlayIdle) {
+        openKeyWindow(extra: ["-RoadieOpenFiles", paths.music] + idle)
         XCTAssertTrue(roadie.wait { (self.roadie.probe?.queue.count ?? 0) > 0 }, "no queue: \(roadie.probeJSON)")
         roadie.app.typeKey("x", modifierFlags: [])
         roadie.waitForPlaying()
@@ -271,23 +274,29 @@ final class VisualizationUITests: RoadieUITestCase {
         canvas.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).hover()
     }
 
+    /// The card hides by itself once the pointer rests (the idle timeout plus the fade and a query's latency).
+    private func expectOverlayHides(_ message: String, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(roadie.wait(timeout: 10) { !self.overlayCard.exists }, message, file: file, line: line)
+    }
+
     func testOverlayShowsTheSong() {
-        openPlaying()
+        openPlaying(idle: Self.readIdle)
         hoverCanvas()
         let title = roadie.element(AXID.Vis.Overlay.title)
-        XCTAssertTrue(title.waitForExistence(timeout: 5), "no \(AXID.Vis.Overlay.title)")
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "no \(AXID.Vis.Overlay.title): \(roadie.probeJSON)")
         let current = roadie.probe?.queue.first { $0.current }?.title ?? ""
         XCTAssertFalse(title.label.isEmpty)
         XCTAssertTrue(current.contains(title.label), "overlay title \"\(title.label)\", queue row \"\(current)\"")
         XCTAssertEqual(roadie.element(AXID.Vis.Overlay.state).label, "Playing")
         XCTAssertTrue(roadie.element(AXID.Vis.Overlay.output).label.contains("Volume"))
+        XCTAssertTrue(roadie.element(AXID.Vis.Overlay.time).label.hasPrefix("Elapsed "))
     }
 
     func testOverlayHidesAfterIdleAndReturnsOnMovement() {
         openPlaying()
         hoverCanvas()
-        XCTAssertTrue(overlayCard.waitForExistence(timeout: 5), "no \(AXID.Vis.overlay)")
-        XCTAssertTrue(roadie.wait(timeout: 3) { !self.overlayCard.exists }, "the overlay didn't hide")
+        XCTAssertTrue(overlayCard.waitForExistence(timeout: 5), "no \(AXID.Vis.overlay): \(roadie.probeJSON)")
+        expectOverlayHides("the overlay didn't hide")
         XCTAssertTrue(
             roadie.wait { self.vis.probe?.overlay == "hidden" && self.vis.probe?.cursorHidden == true },
             "probe: \(roadie.probeJSON)")
@@ -299,7 +308,7 @@ final class VisualizationUITests: RoadieUITestCase {
         expectFullScreen(true)
         hoverCanvas(0.5, 0.3)
         XCTAssertTrue(overlayCard.waitForExistence(timeout: 3), "no overlay in full screen")
-        XCTAssertTrue(roadie.wait(timeout: 3) { !self.overlayCard.exists }, "the overlay didn't hide in full screen")
+        expectOverlayHides("the overlay didn't hide in full screen")
         hoverCanvas(0.4, 0.2)
         XCTAssertTrue(overlayCard.waitForExistence(timeout: 3), "the overlay didn't come back in full screen")
         roadie.app.typeKey(.escape, modifierFlags: [])
@@ -311,8 +320,8 @@ final class VisualizationUITests: RoadieUITestCase {
         roadie.app.typeKey("c", modifierFlags: [])
         XCTAssertTrue(roadie.wait { self.roadie.probe?.state == "paused" }, roadie.probeJSON)
         hoverCanvas()
-        XCTAssertTrue(overlayCard.waitForExistence(timeout: 5), "no \(AXID.Vis.overlay)")
-        Thread.sleep(forTimeInterval: 3)
+        XCTAssertTrue(overlayCard.waitForExistence(timeout: 5), "no \(AXID.Vis.overlay): \(roadie.probeJSON)")
+        Thread.sleep(forTimeInterval: 5)
         XCTAssertTrue(overlayCard.exists, "the overlay hid while paused")
         XCTAssertEqual(vis.probe?.overlay, "shown", roadie.probeJSON)
         XCTAssertEqual(roadie.element(AXID.Vis.Overlay.state).label, "Paused")
@@ -329,9 +338,55 @@ final class VisualizationUITests: RoadieUITestCase {
         XCTAssertTrue(roadie.wait { self.vis.probe?.audio == "remote" }, roadie.probeJSON)
         hoverCanvas()
         let note = roadie.element(AXID.Vis.Overlay.note)
-        XCTAssertTrue(note.waitForExistence(timeout: 5), "no \(AXID.Vis.Overlay.note)")
+        XCTAssertTrue(note.waitForExistence(timeout: 5), "no \(AXID.Vis.Overlay.note): \(roadie.probeJSON)")
         XCTAssertTrue(note.label.hasPrefix("Playing on "), "note: \(note.label)")
-        XCTAssertTrue(roadie.wait(timeout: 4) { !self.overlayCard.exists }, "the overlay didn't hide")
+        expectOverlayHides("the overlay didn't hide")
         XCTAssertTrue(roadie.element(AXID.Vis.noAudioBadge).exists, "no \(AXID.Vis.noAudioBadge)")
+    }
+
+    // MARK: Preset list (#0240)
+
+    /// L in the key window opens the list; the search field is clicked so the keys go to it.
+    private func openList() -> XCUIElement {
+        openKeyWindow()
+        roadie.app.typeKey("l", modifierFlags: [])
+        let browser = roadie.element(AXID.Vis.browser)
+        XCTAssertTrue(browser.waitForExistence(timeout: 5), "no \(AXID.Vis.browser)")
+        let search = roadie.element(AXID.Vis.browserSearch)
+        XCTAssertTrue(search.waitForExistence(timeout: 5), "no \(AXID.Vis.browserSearch)")
+        search.click()
+        return browser
+    }
+
+    private func row(_ index: Int) -> XCUIElement { roadie.element(AXID.Vis.browserRow(index)) }
+
+    func testLOpensTheListAndReturnLoadsTheSelection() {
+        let browser = openList()
+        XCTAssertTrue(row(0).waitForExistence(timeout: 5), "no row 0")
+        XCTAssertEqual(row(0).label, "Classic Spectrum")
+        XCTAssertTrue(roadie.wait { self.roadie.value(of: self.row(0)) == "current" }, "row 0 value is \"\(roadie.value(of: row(0)))\", expected current")
+        roadie.app.typeKey(.downArrow, modifierFlags: [])
+        roadie.app.typeKey(.downArrow, modifierFlags: [])
+        roadie.app.typeKey(.return, modifierFlags: [])
+        expectPreset("Classic Spectrum and Scope")
+        XCTAssertTrue(roadie.wait { !browser.exists }, "the list is still open")
+    }
+
+    func testTypingFiltersTheList() {
+        let browser = openList()
+        roadie.app.typeText("mirr")
+        XCTAssertTrue(roadie.wait { self.row(0).exists && self.row(0).label == "Classic Mirror" && !self.row(1).exists },
+                      "the list didn't narrow to Classic Mirror")
+        roadie.app.typeKey(.return, modifierFlags: [])
+        expectPreset("Classic Mirror")
+        XCTAssertTrue(roadie.wait { !browser.exists }, "the list is still open")
+    }
+
+    func testEscapeClosesTheList() {
+        let browser = openList()
+        roadie.app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(roadie.wait { !browser.exists }, "the list is still open")
+        XCTAssertEqual(vis.preset, "Classic Spectrum")
+        XCTAssertEqual(vis.probe?.presetChanges, 0)
     }
 }

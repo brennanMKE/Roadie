@@ -3,7 +3,7 @@ import VisualizationKit
 
 /// The visualization window's right-click menu (design §2.6), built from `VisKeyMap.rows`. Each item shows its key as
 /// a bare key equivalent (a pop-up menu's equivalents act only while it's open, so they don't take the key from the
-/// view). Commands still to come (the list, song title, readouts, full screen, help) are listed but disabled.
+/// view). Commands still to come (song title, readouts, full screen, help) are listed but disabled.
 /// Auto-advance pauses while it's open.
 @MainActor
 final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
@@ -19,7 +19,7 @@ final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
 
     /// Commands that do something yet; the rest are disabled until their issue wires them.
     static let enabledCommands: Set<VisCommand> = [
-        .nextPreset, .previousPreset, .hardCut, .toggleOrder, .toggleLock, .toggleFullScreen,
+        .nextPreset, .previousPreset, .hardCut, .toggleOrder, .toggleLock, .presetList, .toggleFullScreen,
     ]
 
     static func make(model: VisualizationModel) -> VisualizationContextMenu {

@@ -31,19 +31,16 @@ struct VisualizationOverlayCard: View {
             Text(content.title)
                 .font(.title2.weight(.semibold))
                 .lineLimit(1)
-                .accessibilityIdentifier(AXID.Vis.Overlay.title)
-                .accessibilityLabel(content.title)
+                .skinDisplay(AXID.Vis.Overlay.title, label: content.title, value: content.title)
             if let artist = content.artistLine {
                 Text(artist)
                     .font(.body)
                     .lineLimit(1)
-                    .accessibilityIdentifier(AXID.Vis.Overlay.artist)
-                    .accessibilityLabel(artist)
+                    .skinDisplay(AXID.Vis.Overlay.artist, label: artist, value: artist)
             }
             HStack(spacing: 8) {
                 Text(content.stateSymbol)
-                    .accessibilityIdentifier(AXID.Vis.Overlay.state)
-                    .accessibilityLabel(content.stateLabel)
+                    .skinDisplay(AXID.Vis.Overlay.state, label: content.stateLabel, value: content.stateLabel)
                 if let elapsed = content.elapsed {
                     HStack(spacing: 8) {
                         Text(VisualizationOverlayContent.clock(elapsed)).monospacedDigit()
@@ -52,9 +49,7 @@ struct VisualizationOverlayCard: View {
                         }
                         if let trailing = content.trailingTime { Text(trailing).monospacedDigit() }
                     }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityIdentifier(AXID.Vis.Overlay.time)
-                    .accessibilityLabel(content.timeLabel ?? "")
+                    .skinDisplay(AXID.Vis.Overlay.time, label: content.timeLabel ?? "", value: content.timeLabel ?? "")
                 }
             }
             .font(.callout)
@@ -62,20 +57,17 @@ struct VisualizationOverlayCard: View {
                 Text(next)
                     .font(.callout)
                     .lineLimit(1)
-                    .accessibilityIdentifier(AXID.Vis.Overlay.next)
-                    .accessibilityLabel(next)
+                    .skinDisplay(AXID.Vis.Overlay.next, label: next, value: next)
             }
             Text(content.outputLine)
                 .font(.callout)
                 .opacity(0.85)
-                .accessibilityIdentifier(AXID.Vis.Overlay.output)
-                .accessibilityLabel(content.outputLine)
+                .skinDisplay(AXID.Vis.Overlay.output, label: content.outputLine, value: content.outputLine)
             if let note = content.note {
                 Text(note)
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier(AXID.Vis.Overlay.note)
-                    .accessibilityLabel(note)
+                    .skinDisplay(AXID.Vis.Overlay.note, label: note, value: note)
             }
             if model.showsOverlayKeyHint {
                 Text("← → presets · Space next · L list · F1 help")
@@ -115,8 +107,7 @@ struct VisualizationNoAudioBadge: View {
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.6))
                 .padding(6)
-                .accessibilityIdentifier(AXID.Vis.noAudioBadge)
-                .accessibilityLabel("No audio on this Mac")
+                .skinDisplay(AXID.Vis.noAudioBadge, label: "No audio on this Mac", value: "No audio on this Mac")
                 .padding(.leading, 8)
                 .padding(.bottom, 6)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)

@@ -146,7 +146,7 @@ extension VisualizationModel {
     }
 
     /// Holds the overlay up for `hold` (`.menu`, `.pointerOnOverlay`, `.notPlaying`; later `.browser`, `.help` …).
-    /// LIST HOLD (#0240): the preset list calls `setOverlayHold(.browser, open)` when it opens and closes.
+    /// The preset list (#0240) holds `.browser` while it's open.
     func setOverlayHold(_ hold: OverlayVisibility.Hold, _ on: Bool) {
         var holds = overlay.holds
         if on { holds.insert(hold) } else { holds.remove(hold) }
