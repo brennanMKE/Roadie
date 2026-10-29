@@ -63,6 +63,8 @@ struct ProbeState: Decodable {
         var presetChanges: Int
         var fullScreen: Bool
         var lastTransition: String?
+        var overlay: String
+        var cursorHidden: Bool
     }
 }
 

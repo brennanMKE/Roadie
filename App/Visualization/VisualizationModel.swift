@@ -48,6 +48,13 @@ final class VisualizationModel {
     /// Stand-ins for the help overlay and preset list (later issues): Esc closes them before leaving full screen.
     var isHelpOpen = false
     var isListOpen = false
+    /// The song overlay's and cursor's visibility (#0238); `VisualizationModel+Overlay` drives it.
+    var overlay: OverlayVisibility
+    /// How many times the overlay has come up this launch: the key hint shows for the first three.
+    var overlayShowCount = 0
+    /// The overlay's one-shot idle timer and the window's cursor hiding (#0238).
+    @ObservationIgnored var overlayTimer: Timer?
+    @ObservationIgnored var hideCursor: (() -> Void)?
     /// The window, for full screen (#0237).
     @ObservationIgnored weak var fullScreenController: (any FullScreenToggling)?
     /// `close()` while full screen leaves full screen first and closes when that completes.
@@ -94,6 +101,8 @@ final class VisualizationModel {
             settings.autoAdvanceVaries = false
         }
         self.settings = settings
+        overlay = OverlayVisibility(
+            idleTimeout: configuration.visOverlayIdle ?? settings.overlayIdleSeconds, now: CACurrentMediaTime())
         let seed = configuration.visSeed ?? UInt64.random(in: .min ... .max)
         clock = AutoAdvanceClock(policy: settings.autoAdvancePolicy, seed: seed)
         let classics = PresetCatalog.ordered(PresetCatalog.classics)
@@ -141,7 +150,10 @@ final class VisualizationModel {
 
     /// From the window controller when a full-screen transition completes; finishes a pending `close()`.
     func setFullScreen(_ fullScreen: Bool) {
-        if fullScreen != isFullScreen { isFullScreen = fullScreen }
+        if fullScreen != isFullScreen {
+            isFullScreen = fullScreen
+            if fullScreen { showOverlay() }
+        }
         if !fullScreen, closesAfterFullScreen { close() }
     }
 

@@ -52,6 +52,8 @@ struct RoadieConfiguration: @unchecked Sendable {
     var visFullScreenBorderless = false
     /// `-RoadieVisAutoAdvance <seconds>` (#0236, Debug): the auto-advance interval, not varied. Release ignores it.
     var visAutoAdvance: TimeInterval?
+    /// `-RoadieVisOverlayIdle <seconds>` (#0238, Debug): the overlay's idle timeout, not saved. Release ignores it.
+    var visOverlayIdle: TimeInterval?
 
     static let standard = RoadieConfiguration()
 
@@ -74,6 +76,7 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let visSeed = "RoadieVisSeed"
         static let visFullScreen = "RoadieVisFullScreen"
         static let visAutoAdvance = "RoadieVisAutoAdvance"
+        static let visOverlayIdle = "RoadieVisOverlayIdle"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -126,6 +129,9 @@ struct RoadieConfiguration: @unchecked Sendable {
         visFullScreenBorderless = arguments.string(forKey: Argument.visFullScreen) == "borderless"
         visAutoAdvance = arguments.string(forKey: Argument.visAutoAdvance).flatMap { TimeInterval($0) }.flatMap {
             $0 > 0 && $0.isFinite ? $0 : nil
+        }
+        visOverlayIdle = arguments.string(forKey: Argument.visOverlayIdle).flatMap { TimeInterval($0) }.flatMap {
+            $0 >= 0 && $0.isFinite ? $0 : nil
         }
     }
     #endif

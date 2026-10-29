@@ -42,6 +42,9 @@ struct TestProbe: Codable, Equatable {
         /// In full screen, native or the Debug borderless hook (#0237).
         var fullScreen: Bool
         var lastTransition: String?
+        /// The song overlay (#0238): `shown` or `hidden`, and whether its state machine has the cursor hidden.
+        var overlay: String = "shown"
+        var cursorHidden = false
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -110,7 +113,8 @@ extension PlayerModel {
             preset: vis.currentPreset?.id, presetName: vis.currentPreset?.name, order: vis.navigator.order.rawValue,
             locked: vis.navigator.isLocked, audio: vis.audioSource.probeName, presetChanges: vis.presetChanges,
             fullScreen: vis.isFullScreen,
-            lastTransition: vis.lastTransition)
+            lastTransition: vis.lastTransition,
+            overlay: vis.overlay.isOverlayVisible ? "shown" : "hidden", cursorHidden: vis.overlay.isCursorHidden)
     }
 
     /// `.wsz` files under `folder`, as sorted folder-relative paths.

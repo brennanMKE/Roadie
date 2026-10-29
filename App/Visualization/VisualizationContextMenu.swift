@@ -72,8 +72,15 @@ final class VisualizationContextMenu: NSMenu, NSMenuDelegate {
         }
     }
 
-    func menuWillOpen(_ menu: NSMenu) { model?.setSuspended(.menu, true) }
-    func menuDidClose(_ menu: NSMenu) { model?.setSuspended(.menu, false) }
+    func menuWillOpen(_ menu: NSMenu) {
+        model?.setSuspended(.menu, true)
+        model?.setOverlayHold(.menu, true)
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        model?.setSuspended(.menu, false)
+        model?.setOverlayHold(.menu, false)
+    }
 }
 
 /// A menu item that is its own target, so the menu keeps the action alive.

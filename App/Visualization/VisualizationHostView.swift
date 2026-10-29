@@ -65,6 +65,39 @@ final class VisualizationHostView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
+    // MARK: Song overlay (#0238)
+
+    /// Pointer movement inside the view and its leaving, for the overlay's idle timer.
+    var onPointerMoved: (() -> Void)?
+    var onPointerExited: (() -> Void)?
+
+    /// Adds the overlay's views (`VisualizationOverlayView.swift`) above the renderer's view.
+    func installOverlay(card: NSView, badge: NSView) {
+        addSubview(card)
+        addSubview(badge)
+        let width = card.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -48)
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: centerXAnchor),
+            card.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -24),
+            width,
+            badge.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            badge.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
+        ])
+        card.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(
+            rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self, userInfo: nil))
+    }
+
+    override func mouseMoved(with event: NSEvent) { onPointerMoved?() }
+    override func mouseEntered(with event: NSEvent) { onPointerMoved?() }
+    override func mouseExited(with event: NSEvent) { onPointerExited?() }
+
     // MARK: Keys, mouse and menu
 
     /// A double-click on the picture (single clicks do nothing) (#0237).

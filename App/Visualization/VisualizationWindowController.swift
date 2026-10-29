@@ -44,6 +44,7 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         visualization.onKeyChange = { [weak host = hostView] in host?.showToast($0.name) }
         visualization.fullScreenController = self
         hostView.onDoubleClick = { [weak visualization] in visualization?.toggleFullScreen() }
+        installOverlay()
         // Frame autosave writes the standard defaults, so a test launch places the window fresh every time.
         let isTest = model.configuration.defaults !== UserDefaults.standard
         if isTest || !window.setFrameUsingName(Self.autosaveName) { placeBesideSkinnedWindows() }
@@ -82,12 +83,15 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         window.makeFirstResponder(hostView)
         startLink()
         updateVisibility()
+        visualization.showOverlay()
     }
 
     // MARK: NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {
         stopLink()
+        visualization.stopOverlayTimer()
+        NSCursor.setHiddenUntilMouseMoves(false)
         if let saved = borderlessSaved { restoreFromBorderless(saved) }
         visualization.setFullScreen(false)
         visualization.setVisible(false)
@@ -140,6 +144,7 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
     /// Title, preset name and the link's rate and pause follow the model; re-armed after each change.
     private func observeModel() {
         let title = withObservationTracking {
+            _ = model.playbackState
             _ = visualization.isRendering
             _ = visualization.preferredFrameRate
             return (visualization.windowTitle, visualization.currentPreset?.name ?? "")
@@ -149,6 +154,22 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         window?.title = title.0
         hostView.setPresetName(title.1)
         applyLinkState()
+        visualization.syncOverlayPlaybackHold()
+    }
+
+    /// The song overlay (#0238): the card and the No audio badge, the pointer feeding the idle timer, and the cursor
+    /// hidden only while this window is key in the active app.
+    private func installOverlay() {
+        let visualization = visualization
+        hostView.installOverlay(
+            card: VisualizationOverlayHostingView(rootView: VisualizationOverlayCard(model: visualization)),
+            badge: VisualizationOverlayHostingView(rootView: VisualizationNoAudioBadge(model: visualization)))
+        hostView.onPointerMoved = { [weak visualization] in visualization?.overlayPointerMoved(inside: true) }
+        hostView.onPointerExited = { [weak visualization] in visualization?.overlayPointerExited() }
+        visualization.hideCursor = { [weak self] in
+            guard let window = self?.window, window.isKeyWindow, NSApp.isActive else { return }
+            NSCursor.setHiddenUntilMouseMoves(true)
+        }
     }
 }
 
