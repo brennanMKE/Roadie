@@ -562,8 +562,7 @@ Debug-only launch arguments (test hooks, never in Release; `RoadieConfiguration`
 `-RoadieVisAutoAdvance <seconds>` (a short interval, no variation), `-RoadieVisReduceMotion 1`, `-RoadieVisDimFlashing 1`
 and `-RoadieVisVoiceOver 1` (stand in for the system settings, which a test can't change),
 `-RoadieVisPresetsFolder <path>` (instead of the folder panel) with `-RoadieVisSeedPresets <n>` (the app writes n tiny
-`.milk` files there; the sandboxed test runner can't), and `-RoadieVisFullScreen borderless` (only if #0237's spike
-needs it). Plain settings are passed as
+`.milk` files there; the sandboxed test runner can't). Plain settings are passed as
 `-visualization.order sequential` through `NSArgumentDomain`, as other tests do.
 
 ---
@@ -625,10 +624,9 @@ library. A `RoadieUIApp.Visualization` helper: `open()` (⇧⌘K), `window`, `pr
   (the package's own VM tests render frames), but timing is meaningless. UI tests use the classic renderer;
   #0243 adds one smoke test with `-RoadieVisRenderer milk` that skips (`XCTSkip`) when the probe says the factory
   fell back to classic (no Metal device).
-- **Full screen** may not complete in a headless guest's virtual display. #0237 spikes it first; if the window never
-  reports `.fullScreen`, the test uses the Debug `-RoadieVisFullScreen borderless` path (a screen-sized borderless
-  window driving the same overlay/cursor/Esc code) and the native transition is by hand; the finding goes in
-  docs/ui-tests-in-vm.md.
+- **Full screen** works natively in the headless guest (#0237's spike), so the UI tests drive the real transition. In
+  full screen the main window's probe leaves the accessibility tree, so the tests read full-screen state from the
+  canvas frame (docs/ui-tests-in-vm.md). The Debug borderless fallback was never needed and was removed (#0245).
 - **Cursor hiding** can't be observed by XCUITest; the probe's `cursorHidden` reports the state machine, and the real
   cursor is a by-hand check.
 - **Function keys:** `typeKey(.F1, [])` is supported by XCUITest; `?` is tested too.
