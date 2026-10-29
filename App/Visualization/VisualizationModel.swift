@@ -3,6 +3,7 @@ import AudioCore
 import Foundation
 import MusicBackendKit
 import Observation
+import QuartzCore
 import SkinKit
 import VisualizationKit
 import os
@@ -42,6 +43,16 @@ final class VisualizationModel {
     private(set) var navigator: PresetNavigator
     /// Low Power Mode or a serious thermal state: 30 fps whatever plays.
     private(set) var isConstrained = false
+    /// The last preset change's transition (`"blend 1.7"`, `"blend 2.7"`, `"cut"`), for the probe.
+    private(set) var lastTransition: String?
+    /// When the next automatic preset change is due (design §2.4).
+    @ObservationIgnored private(set) var clock: AutoAdvanceClock
+    /// The model's time source; tests replace it with a manual clock. Same base as the display link's timestamp.
+    @ObservationIgnored var currentTime: () -> TimeInterval = { CACurrentMediaTime() }
+    /// A key change's preset, for the window's toast. Automatic changes don't call it.
+    @ObservationIgnored var onKeyChange: ((VisualizationPreset) -> Void)?
+    /// Where transport and volume keys go; tests replace it to observe them.
+    @ObservationIgnored var performHotkey: ((WinampHotkey) -> Void)?
 
     /// Built lazily on first open (`makeRenderer`), so a launch that never opens the window builds nothing.
     @ObservationIgnored private(set) var renderer: (any VisualizationRenderer)?
@@ -57,20 +68,33 @@ final class VisualizationModel {
     @ObservationIgnored private var renderTime: TimeInterval = 0
     @ObservationIgnored private var lastTick: TimeInterval?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    /// Why auto-advance is paused (not rendering, the right-click menu open); the clock runs only when empty.
+    @ObservationIgnored private var suspensions: Set<Suspension> = []
+
+    enum Suspension: Hashable { case notRendering, menu }
 
     init(analyzer: AnalyzerTap, configuration: RoadieConfiguration) {
         self.analyzer = analyzer
         reader = StereoFeedReader(tap: analyzer)
         defaults = configuration.defaults
-        let settings = VisualizationSettings.load(from: configuration.defaults)
+        var settings = VisualizationSettings.load(from: configuration.defaults)
+        if let seconds = configuration.visAutoAdvance {
+            // Debug hook: not clamped and not saved, so a UI test sees a change in seconds.
+            settings.autoAdvance = true
+            settings.autoAdvanceSeconds = seconds
+            settings.autoAdvanceVaries = false
+        }
         self.settings = settings
+        let seed = configuration.visSeed ?? UInt64.random(in: .min ... .max)
+        clock = AutoAdvanceClock(policy: settings.autoAdvancePolicy, seed: seed)
         let classics = PresetCatalog.ordered(PresetCatalog.classics)
         let navigator = PresetNavigator(
             presets: classics, order: settings.order, isLocked: settings.locked, startingAt: settings.lastPreset,
-            seed: configuration.visSeed ?? UInt64.random(in: .min ... .max))
+            seed: seed)
         self.navigator = navigator
         makeRenderer = { VisualizationRendererFactory.make(configuration: configuration, colors: VisRenderer.defaultColors) }
         currentPreset = navigator.current
+        suspensions = [.notRendering]
         updateConstrained()
         let center = NotificationCenter.default
         for name in [Notification.Name.NSProcessInfoPowerStateDidChange, ProcessInfo.thermalStateDidChangeNotification] {
@@ -78,6 +102,7 @@ final class VisualizationModel {
                 MainActor.assumeIsolated { self?.updateConstrained() }
             })
         }
+        clock.suspend(at: currentTime())
     }
 
     // MARK: Open and close
@@ -107,6 +132,13 @@ final class VisualizationModel {
         isRendering = rendering
         lastTick = nil
         analyzer.setStereoEnabled(rendering)
+        setSuspended(.notRendering, !rendering)
+    }
+
+    /// Pauses or resumes auto-advance for `reason`; the clock runs only while nothing holds it.
+    func setSuspended(_ reason: Suspension, _ suspended: Bool) {
+        if suspended { suspensions.insert(reason) } else { suspensions.remove(reason) }
+        if suspensions.isEmpty { clock.resume(at: currentTime()) } else { clock.suspend(at: currentTime()) }
     }
 
     /// The renderer, built on first use, with the navigator's list filtered to what it can load and the current preset
@@ -151,10 +183,66 @@ final class VisualizationModel {
         }
         if navigator.current?.id != preset.id { _ = navigator.select(id: preset.id) }
         currentPreset = preset
-        if countsAsChange { presetChanges += 1 }
+        if countsAsChange {
+            presetChanges += 1
+            lastTransition = transition > 0 ? String(format: "blend %.1f", transition) : "cut"
+        }
+        clock.restart(at: currentTime())
         settings.lastPreset = preset.id
         defaults.set(preset.id, forKey: VisualizationSettings.Key.lastPreset)
         return true
+    }
+
+    // MARK: Commands
+
+    /// One visualization-window command (design §2.5). Full screen and Escape are #0237's; the list, song title,
+    /// help and readouts are later issues'.
+    func perform(_ command: VisCommand) {
+        switch command {
+        case .nextPreset: changeByKey(transition: VisualizationSettings.keyBlend) { $0.next() }
+        case .previousPreset: changeByKey(transition: VisualizationSettings.keyBlend) { $0.previous() }
+        case .hardCut: changeByKey(transition: 0) { $0.next() }
+        case .toggleOrder:
+            navigator.order = navigator.order == .random ? .sequential : .random
+            settings.order = navigator.order
+            defaults.set(navigator.order.rawValue, forKey: VisualizationSettings.Key.order)
+        case .toggleLock:
+            navigator.isLocked.toggle()
+            settings.locked = navigator.isLocked
+            defaults.set(navigator.isLocked, forKey: VisualizationSettings.Key.locked)
+        case .transport(let transport): hotkey(Self.hotkey(for: transport))
+        case .presetList, .showSongTitle, .help, .toggleReadout:
+            break  // #0239, #0240
+        case .toggleFullScreen, .escape:
+            break  // #0237
+        }
+    }
+
+    static func hotkey(for transport: VisTransport) -> WinampHotkey {
+        switch transport {
+        case .previous: .previous
+        case .play: .play
+        case .pause: .pause
+        case .stop: .stop
+        case .next: .next
+        case .volumeUp: .volumeUp
+        case .volumeDown: .volumeDown
+        }
+    }
+
+    private func hotkey(_ hotkey: WinampHotkey) {
+        if let performHotkey { performHotkey(hotkey) } else { owner?.perform(hotkey) }
+    }
+
+    /// A key change: `move` the navigator, load what it lands on, toast its name. With one usable preset left after the
+    /// current one failed, that one is selected (the navigator moves only between two or more).
+    private func changeByKey(transition: TimeInterval, _ move: (inout PresetNavigator) -> VisualizationPreset?) {
+        var target = move(&navigator)
+        if target == nil, navigator.usable.count == 1, let only = navigator.usable.first, only.id != currentPreset?.id {
+            target = navigator.select(id: only.id)
+        }
+        guard let target, load(target, transition: transition) else { return }
+        onKeyChange?(target)
     }
 
     var windowTitle: String {
@@ -175,6 +263,10 @@ final class VisualizationModel {
         let dt = max(lastTick.map { now - $0 } ?? 1.0 / 60, 0)
         lastTick = now
         renderTime += dt
+        if clock.isDue(at: now) {
+            if let preset = navigator.advanceAutomatically() { load(preset, transition: settings.blendSeconds) }
+            clock.restart(at: now)
+        }
         if let audio = reader.read(elapsed: dt) {
             renderer.feed(audio.samples, channels: 2, sampleRate: audio.sampleRate)
         }

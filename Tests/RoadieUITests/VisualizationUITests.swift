@@ -94,4 +94,94 @@ final class VisualizationUITests: RoadieUITestCase {
         expectOpen(showing: "Classic Mirror")
         XCTAssertEqual(vis.probe?.preset, "classic:mirror")
     }
+
+    // MARK: Keys, auto-advance and the right-click menu (#0236)
+
+    /// Opens the window (seed 1, sequential) and makes it key by clicking its title bar.
+    private func openKeyWindow(extra: [String] = []) {
+        launchPlain(extra: ["-RoadieVisSeed", "1"] + extra)
+        vis.open()
+        expectOpen()
+        vis.window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click()
+    }
+
+    private func expectPreset(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(
+            roadie.wait { self.vis.preset == name }, "vis.preset is \"\(vis.preset)\", expected \(name)",
+            file: file, line: line)
+    }
+
+    func testArrowKeysMoveBetweenPresets() {
+        openKeyWindow()
+        roadie.app.typeKey(.rightArrow, modifierFlags: [])
+        expectPreset("Classic Oscilloscope")
+        roadie.app.typeKey(.rightArrow, modifierFlags: [])
+        expectPreset("Classic Spectrum and Scope")
+        roadie.app.typeKey(.leftArrow, modifierFlags: [])
+        expectPreset("Classic Oscilloscope")
+        XCTAssertEqual(vis.probe?.lastTransition, "blend 1.7")
+    }
+
+    func testSpaceAndDeleteMoveLikeTheArrows() {
+        openKeyWindow()
+        roadie.app.typeKey(" ", modifierFlags: [])
+        expectPreset("Classic Oscilloscope")
+        roadie.app.typeKey(.delete, modifierFlags: [])
+        expectPreset("Classic Spectrum")
+    }
+
+    func testHCutsWithoutBlending() {
+        openKeyWindow()
+        roadie.app.typeKey("h", modifierFlags: [])
+        expectPreset("Classic Oscilloscope")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.lastTransition == "cut" }, roadie.probeJSON)
+    }
+
+    func testRAndBacktickToggleOrderAndLock() {
+        openKeyWindow()
+        XCTAssertEqual(vis.probe?.order, "sequential")
+        roadie.app.typeKey("r", modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.vis.probe?.order == "random" }, roadie.probeJSON)
+        roadie.app.typeKey("r", modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.vis.probe?.order == "sequential" }, roadie.probeJSON)
+        roadie.app.typeKey("`", modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.vis.probe?.locked == true }, roadie.probeJSON)
+        roadie.app.typeKey("`", modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.vis.probe?.locked == false }, roadie.probeJSON)
+    }
+
+    func testTransportKeysWorkInTheVisualizationWindow() {
+        openKeyWindow(extra: ["-RoadieOpenFiles", paths.music])
+        XCTAssertTrue(roadie.wait { (self.roadie.probe?.queue.count ?? 0) > 0 }, "no queue: \(roadie.probeJSON)")
+        roadie.app.typeKey("x", modifierFlags: [])
+        roadie.waitForPlaying()
+        roadie.app.typeKey("c", modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.roadie.probe?.state == "paused" }, roadie.probeJSON)
+        roadie.app.typeKey("v", modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.roadie.probe?.state == "stopped" }, roadie.probeJSON)
+    }
+
+    func testPresetsChangeOnTheirOwn() {
+        openKeyWindow(extra: ["-RoadieVisAutoAdvance", "2"])
+        XCTAssertTrue(
+            roadie.wait(timeout: 6) { (self.vis.probe?.presetChanges ?? 0) >= 1 }, "no automatic change: \(roadie.probeJSON)")
+        XCTAssertEqual(vis.probe?.lastTransition, "blend 2.7")
+        roadie.app.typeKey("`", modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.vis.probe?.locked == true }, roadie.probeJSON)
+        let changes = vis.probe?.presetChanges
+        Thread.sleep(forTimeInterval: 5)
+        XCTAssertEqual(vis.probe?.presetChanges, changes, "changed while locked: \(roadie.probeJSON)")
+    }
+
+    func testRightClickMenuListsTheCommands() {
+        openKeyWindow()
+        let canvas = roadie.element(AXID.Vis.canvas)
+        XCTAssertTrue(canvas.waitForExistence(timeout: 5), "no \(AXID.Vis.canvas)")
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).rightClick()
+        for title in ["Next Preset", "Random Order", "Lock Preset"] {
+            XCTAssertTrue(popUpMenuItem(title).waitForExistence(timeout: 3), "the menu has no \(title)")
+        }
+        popUpMenuItem("Next Preset").click()
+        expectPreset("Classic Oscilloscope")
+    }
 }

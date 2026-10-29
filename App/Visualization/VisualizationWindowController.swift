@@ -31,6 +31,13 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         window.contentView = hostView
         super.init(window: window)
         window.delegate = self
+        window.initialFirstResponder = hostView
+        let visualization = model.visualization
+        hostView.onCommand = { [weak visualization] in visualization?.perform($0) }
+        hostView.makeContextMenu = { [weak visualization] in
+            visualization.map { VisualizationContextMenu.make(model: $0) }
+        }
+        visualization.onKeyChange = { [weak host = hostView] in host?.showToast($0.name) }
         // Frame autosave writes the standard defaults, so a test launch places the window fresh every time.
         let isTest = model.configuration.defaults !== UserDefaults.standard
         if isTest || !window.setFrameUsingName(Self.autosaveName) { placeBesideSkinnedWindows() }
@@ -76,6 +83,10 @@ final class VisualizationWindowController: NSWindowController, NSWindowDelegate 
         stopLink()
         visualization.setVisible(false)
         visualization.close()
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        window?.makeFirstResponder(hostView)
     }
 
     func windowDidMiniaturize(_ notification: Notification) { updateVisibility() }
