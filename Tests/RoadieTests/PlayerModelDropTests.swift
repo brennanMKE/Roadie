@@ -61,9 +61,9 @@ final class PlayerModelDropTests: XCTestCase {
         return condition()
     }
 
-    /// Selects the scripted Music Assistant source, then connects and waits until connected. Selecting the source
-    /// after `connect()` starts a second connection, and a drop while that one was still authenticating failed with
-    /// "Can't reach the Music Assistant server" (run 20261027-173236-61397, #0228 Gotchas).
+    /// Selects the scripted Music Assistant source, then connects and waits until connected. `PlayerModel.init`'s
+    /// launch connect and this one share one connection (#0244); before that the later socket closed the earlier
+    /// one, and a drop sent on it failed with "Can't reach the Music Assistant server".
     private func connectMusicAssistant(_ model: PlayerModel) async throws {
         model.sources.select(model.musicAssistant.sourceID)
         try await model.musicAssistant.connect()
