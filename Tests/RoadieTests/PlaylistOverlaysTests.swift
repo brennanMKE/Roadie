@@ -3,6 +3,7 @@ import AudioCore
 import Foundation
 import MusicBackendKit
 import PlayerKitTestFixtures
+import SkinKit
 import XCTest
 
 @testable import Roadie
@@ -51,6 +52,13 @@ final class PlaylistOverlaysTests: PlayerModelTestCase {
         return view
     }
 
+    /// The middle of `row` in the container's (window-less, unflipped) coordinates, which `performDrop` takes as the
+    /// window point. The view is flipped and fills the container, so skin-y runs down from its top.
+    private func point(ofRow row: Int, in view: PlaylistListInputView, _ model: PlayerModel) -> NSPoint {
+        let skinY = (CGFloat(row - model.playlist.visibleRange.lowerBound) + 0.5) * PlaylistLayout.rowHeight
+        return NSPoint(x: 10, y: view.frame.height - skinY * model.scale)
+    }
+
     func testDropOperationByPasteboard() throws {
         let model = try makeModel()
         let view = listView(model)
@@ -91,15 +99,17 @@ final class PlaylistOverlaysTests: PlayerModelTestCase {
         let view = listView(model)
 
         // Files go into the local queue; it already has tracks, so nothing plays.
+        // Dropped on row 1's middle: inserted before it, in pasteboard order.
+        XCTAssertTrue(model.playlist.visibleRange.contains(1))
         let files = [AudioFixtures.url(.toneDalac), AudioFixtures.url(.toneFwav)]
-        XCTAssertTrue(view.performDrop(pasteboard: filePasteboard(files), at: .zero))
+        XCTAssertTrue(view.performDrop(pasteboard: filePasteboard(files), at: point(ofRow: 1, in: view, model)))
         try await waitUntil("the dropped files") { model.player.queue.tracks.count == 5 }
         let names = model.player.queue.tracks.map { track in
             switch track.source {
             case .file(let url): url.lastPathComponent
             }
         }
-        XCTAssertEqual(Set(names), ["Tone A.mp3", "Tone B.mp3", "Tone C.mp3", "04 Tone D.m4a", "06 Tone F.wav"])
+        XCTAssertEqual(names, ["Tone A.mp3", "04 Tone D.m4a", "06 Tone F.wav", "Tone B.mp3", "Tone C.mp3"])
         XCTAssertEqual(model.player.state, .stopped)
 
         // A Library album goes through the folder backend.

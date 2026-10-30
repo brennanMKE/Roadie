@@ -45,11 +45,18 @@ final class PlaylistFilesTests: PlayerModelTestCase {
         try AudioFixtures.makeLibrary(at: root)
         restoreThreeTracks(model)
 
-        // Cancelled: the queue stays.
+        // Cancelled: the queue stays. A save queued after it proves the cancelled load's Task has finished: the
+        // file it writes is still the three old tracks.
         answerPanels(model, with: nil)
         model.loadPlaylistFile()
-        try await waitUntil("the load panel") { panelRequests == [.loadPlaylistFile] }
+        let probe = root.appending(path: "AfterCancel.m3u")
+        answerPanels(model, with: probe)
+        model.savePlaylistFile()
+        try await waitUntil("the save after the cancel") { FileManager.default.fileExists(atPath: probe.path) }
+        XCTAssertEqual(panelRequests, [.loadPlaylistFile, .savePlaylistFile])
         XCTAssertEqual(fileNames(model), ["Tone A.mp3", "Tone B.mp3", "Tone C.mp3"])
+        let probeText = try String(contentsOf: probe, encoding: .utf8)
+        XCTAssertTrue(probeText.contains("Tone A.mp3") && probeText.contains("Tone C.mp3"), probeText)
 
         // The fixture M3U: three entries, relative to the playlist's folder.
         answerPanels(model, with: root.appending(path: AudioFixtures.playlistName))
@@ -135,12 +142,18 @@ final class PlaylistFilesTests: PlayerModelTestCase {
         try await waitUntil("the failure notice") { noticeText(model) == "Could not save Out.m3u" }
         XCTAssertNotNil(model.notice?.detail)
 
-        // Cancelled: nothing written, the notice stays.
+        // Cancelled: nothing written and no notice. A save queued after it proves the cancelled Task has finished.
         panelRequests = []
         answerPanels(model, with: nil)
         model.savePlaylistFile()
-        try await waitUntil("the save panel") { panelRequests == [.savePlaylistFile] }
-        XCTAssertEqual(noticeText(model), "Could not save Out.m3u")
+        let after = root.appending(path: "After.m3u")
+        answerPanels(model, with: after)
+        model.savePlaylistFile()
+        try await waitUntil("the save after the cancel") { FileManager.default.fileExists(atPath: after.path) }
+        XCTAssertEqual(panelRequests, [.savePlaylistFile, .savePlaylistFile])
+        XCTAssertEqual(noticeText(model), "Saved 1 track")
+        let written = try FileManager.default.contentsOfDirectory(atPath: root.path).sorted()
+        XCTAssertEqual(written, ["After.m3u", "One.m3u"], "the cancelled save wrote nothing")
     }
 
     func testExportImportLibraryPlaylist() async throws {

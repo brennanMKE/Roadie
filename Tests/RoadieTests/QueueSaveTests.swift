@@ -44,7 +44,7 @@ final class QueueSaveTests: PlayerModelTestCase {
         XCTAssertEqual(prompts, 1)
     }
 
-    func testSaveQueueCancelledOrRefused() async throws {
+    func testSaveQueueCancelledOrFailed() async throws {
         // `.refused` needs a remote backend without queue editing; the router's remote is always Music Assistant,
         // which has it, so that branch can't be reached from `PlayerModel` (QueueSaveTargetTests covers the choice).
         let model = try makeModel(scenario: .libraryIdle)
@@ -52,18 +52,16 @@ final class QueueSaveTests: PlayerModelTestCase {
         let speaker = try await connectedSpeaker(model)
         model.selectOutput(speaker)
 
-        // Cancelled: nothing is sent.
+        // Cancelled, then a save with a name: once the second one's reply is in, the cancelled one sent nothing.
         answerName(model, with: nil)
         model.saveQueue()
-        try await waitUntil("the name prompt") { prompts == 1 }
-        XCTAssertEqual(saves(server).count, 0)
-        XCTAssertNil(model.notice)
-
-        // The speaker's queue is empty, so the server refuses.
         answerName(model, with: "Empty")
         model.saveQueue()
+        // The speaker's queue is empty, so the server refuses.
         try await waitUntil("the failure notice") { model.notice?.text == "Couldn't save the queue" }
+        XCTAssertEqual(prompts, 2)
         XCTAssertEqual(saves(server).count, 1)
+        XCTAssertEqual(saves(server).first?.args["name"]?.stringValue, "Empty")
         XCTAssertNotNil(model.notice?.detail)
     }
 
