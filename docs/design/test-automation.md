@@ -235,7 +235,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Feature | Test |
 |---|---|
 | On/off, auto (no-op), preamp, 10 bands, +12/0/−12 labels set all bands | UI `EqualizerUITests.bandsAndToggles` (probe `eq`; band 3 dragged to +12, preamp to −6, all three labels, AUTO unchanged); Unit `EQTests`, `EQLayoutTests` (exist) |
-| Presets menu: built-ins, From EQF…, Save… | UI `EqualizerUITests.presetsMenu` (Load lists the built-ins, Rock applies, Save… to `-RoadieSaveTo` then From EQF… from `-RoadieLoadEQF` round-trips); Unit `EQFFileTests` (exists) for the format |
+| Presets menu: built-ins, From EQF…, Save… | UI `EqualizerUITests.presetsMenu` (Load lists the first three built-ins, From EQF… and Save…, Rock applies, Save… to `-RoadieSaveTo` then From EQF… from `-RoadieLoadEQF` round-trips); Unit `EQFFileTests` (exists) for the format |
 | EQ graph follows the bands | UI `EqualizerUITests.graphValue` (accessibility value is the band list, after bands 0 and 9 move); Unit `EQGraphTests` (exists) |
 | Shade mode, close, docking under the main window | UI `EqualizerUITests.shadeAndClose` (shade shows `shade.eq.volume` and `shade.eq.balance`, ⌃⌘E unshades, close, ⌘2 reopens docked) |
 | EQ state persists across launches | UI `EqualizerUITests.eqPersistsAcrossRelaunch` (band 0, preamp, on); Unit `RoadieTests.PlayerModelPersistenceTests` |

@@ -94,8 +94,15 @@ final class EqualizerUITests: RoadieUITestCase {
         roadie.click(element(AXID.EQ.on))
         expectEQ("eq.on didn't toggle back") { $0.isEnabled == wasOn }
 
+        let gainsBefore = eq?.gains ?? []
+        XCTAssertEqual(gainsBefore.count, 10, "probe gains: \(roadie.probeJSON)")
         dragBand(3, to: 100)
-        expectEQ("band 3 dragged to the top isn't +12") { Self.near($0.gains[3], 12) }
+        expectEQ("band 3 dragged to the top isn't +12") { $0.gains.count == 10 && Self.near($0.gains[3], 12) }
+        if let gains = eq?.gains, gains.count == 10, gainsBefore.count == 10 {
+            for i in 0..<10 where i != 3 {
+                XCTAssertEqual(gains[i], gainsBefore[i], "band \(i) moved with band 3")
+            }
+        }
         dragPreamp(to: 25)
         expectEQ("preamp at a quarter isn't -6") { Self.near($0.preamp, -6, 0.3) }
 
@@ -132,18 +139,31 @@ final class EqualizerUITests: RoadieUITestCase {
             roadie.wait { self.graphValue == Self.graphText(Self.rock) },
             "eq.graph is \"\(graphValue)\", not Rock's \(Self.graphText(Self.rock))")
 
-        // Save… writes Rock to the stand-in path; From EQF… reads it back after the bands are zeroed.
+        // Rock's preamp is 0, the default, so move it to -6 first: the round trip then proves the preamp too.
+        // The first pointer press after the PRESETS menu closes didn't reach the window (run 20261029-203010-55326):
+        // click the title strip to make the window key again, then drag, retrying once.
+        clickTitleStrip(eqWindow, dx: 0.4)
+        dragPreamp(to: 25)
+        if !roadie.wait(timeout: 2, { self.eq.map { Self.near($0.preamp, -6, 0.3) } ?? false }) { dragPreamp(to: 25) }
+        expectEQ("preamp at a quarter isn't -6") { Self.near($0.preamp, -6, 0.3) }
+        // Save… writes the bands and preamp to the stand-in path; From EQF… reads them back after a reset.
         let savedPreamp = eq?.preamp ?? 0
         openPresets(load: false)
         menuItem("Save…").click()
         expectPanelRequest("saveEQF")
+        clickTitleStrip(eqWindow, dx: 0.4)
         roadie.click(element(AXID.EQ.levelZero))
-        expectEQ("eq.level.zero didn't zero the bands") { $0.gains.allSatisfy { Self.near($0, 0) } }
+        dragPreamp(to: 50)
+        expectEQ("the bands and preamp didn't reset to 0") {
+            $0.gains.allSatisfy { Self.near($0, 0) } && Self.near($0.preamp, 0)
+        }
         openPresets(load: true)
         menuItem("From EQF…").click()
         expectPanelRequest("loadEQF")
         expectEQ("From EQF… didn't load the saved file's bands") {
-            zip($0.gains, Self.rock).allSatisfy { Self.near($0, $1) } && Self.near($0.preamp, savedPreamp, 0.4)
+            // EQF stores 6-bit Winamp values: about 0.4 dB per step.
+            $0.gains.count == 10 && zip($0.gains, Self.rock).allSatisfy { Self.near($0, $1) }
+                && Self.near($0.preamp, savedPreamp, 0.5) && Self.near($0.preamp, -6, 0.6)
         }
         XCTAssertNil(roadie.probe?.notice, "loading the saved EQF posted a notice")
     }
@@ -153,11 +173,13 @@ final class EqualizerUITests: RoadieUITestCase {
         roadie.click(element(AXID.EQ.levelZero))
         XCTAssertTrue(roadie.wait { self.graphValue == Self.graphText(Array(repeating: 0, count: 10)) }, graphValue)
         dragBand(0, to: 100)
-        expectEQ("band 0 isn't +12") { Self.near($0.gains[0], 12) }
-        XCTAssertTrue(roadie.wait { self.graphValue.hasPrefix("12.0 0.0 ") }, "eq.graph after band 0: \(graphValue)")
+        expectEQ("band 0 isn't +12") { $0.gains.count == 10 && Self.near($0.gains[0], 12) }
+        let afterBand0 = "12.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0"
+        XCTAssertTrue(roadie.wait { self.graphValue == afterBand0 }, "eq.graph after band 0: \(graphValue)")
         dragBand(9, to: 0)
-        expectEQ("band 9 isn't -12") { Self.near($0.gains[9], -12) }
-        XCTAssertTrue(roadie.wait { self.graphValue.hasSuffix(" 0.0 -12.0") }, "eq.graph after band 9: \(graphValue)")
+        expectEQ("band 9 isn't -12") { $0.gains.count == 10 && Self.near($0.gains[9], -12) }
+        let afterBand9 = "12.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -12.0"
+        XCTAssertTrue(roadie.wait { self.graphValue == afterBand9 }, "eq.graph after band 9: \(graphValue)")
         if let gains = eq?.gains { XCTAssertEqual(graphValue, Self.graphText(gains), "eq.graph doesn't match the bands") }
     }
 
@@ -203,7 +225,9 @@ final class EqualizerUITests: RoadieUITestCase {
         dragBand(0, to: 100)
         dragPreamp(to: 25)
         if eq?.isEnabled != true { roadie.click(element(AXID.EQ.on)) }
-        expectEQ("band 0 +12, preamp -6, on") { Self.near($0.gains[0], 12) && Self.near($0.preamp, -6, 0.3) && $0.isEnabled }
+        expectEQ("band 0 +12, preamp -6, on") {
+            $0.gains.count == 10 && Self.near($0.gains[0], 12) && Self.near($0.preamp, -6, 0.3) && $0.isEnabled
+        }
         let set = eq
 
         roadie.terminate()
