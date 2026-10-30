@@ -15,6 +15,7 @@ final class LibraryUITests: RoadieUITestCase {
     private let toneAlbumRow = AXID.Library.row("album", "Tone Artist/Tone Album")
     private let twoDiscs = AXID.Library.row("album", "Tone Artist/Two Discs")
     private let singles = AXID.Library.row("album", "Other Artist")
+    private let toneA = AXID.Library.row("track", "Tone Artist/Tone Album/01 Tone A.mp3")
     private let toneB = AXID.Library.row("track", "Tone Artist/Tone Album/02 Tone B.mp3")
     private let toneD = AXID.Library.row("track", "Tone Artist/Two Discs/Disc 1/04 Tone D.m4a")
     private let toneE = AXID.Library.row("track", "Tone Artist/Two Discs/Disc 1/05 Tone E.flac")
@@ -55,6 +56,12 @@ final class LibraryUITests: RoadieUITestCase {
     private func shows(_ text: String) -> Bool {
         libraryWindow.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.exists
             || libraryWindow.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", text)).firstMatch.exists
+    }
+
+    /// Whether the Library window has an element whose label or (static text) value is exactly `text`.
+    private func showsExactly(_ text: String) -> Bool {
+        libraryWindow.descendants(matching: .any).matching(NSPredicate(format: "label == %@", text)).firstMatch.exists
+            || libraryWindow.staticTexts.matching(NSPredicate(format: "value == %@", text)).firstMatch.exists
     }
 
     /// A control in the Library window by its label. The status view's `.accessibilityIdentifier("library.status")`
@@ -150,7 +157,7 @@ final class LibraryUITests: RoadieUITestCase {
     func testCommandLOpensTheLibraryWithSearchFocused() {
         launchQueued()
         openLibrary()
-        XCTAssertTrue(libraryWindow.exists, "no window titled Library")
+        XCTAssertTrue(libraryWindow.exists, "no window with the identifier library")
         // The folder backend's capabilities are search, artwork and local output: Artists and Albums only.
         XCTAssertTrue(element(AXID.Library.sidebar("albums")).exists, "no Albums section")
         for absent in ["playlists", "favorites", "radio", "discover"] {
@@ -204,7 +211,9 @@ final class LibraryUITests: RoadieUITestCase {
         XCTAssertTrue(roadie.wait(timeout: 10) { shows("Tone Album") }, "Albums lacks Tone Album")
         // The sidebar also says Artists and Albums, so only the Tracks header proves a section.
         XCTAssertTrue(shows("Tracks"), "no Tracks section: \(roadie.describe(results))")
-        XCTAssertTrue(shows("Tone A"), "Tracks lacks Tone A")
+        // Exact: "Tone A" is also a prefix of Tone Album and Tone Artist. Search result rows have no identifiers of
+        // their own (the list's library.results overrides them).
+        XCTAssertTrue(showsExactly("Tone A"), "Tracks lacks Tone A")
         for absent in ["Two Discs", "Tone B", "Singles"] {
             XCTAssertFalse(shows(absent), "\(absent) matched \"tone a\"")
         }
@@ -229,14 +238,37 @@ final class LibraryUITests: RoadieUITestCase {
         XCTAssertEqual(roadie.probe?.currentIndex, 0, "the album didn't play from row 0: \(roadie.probeJSON)")
         XCTAssertTrue(roadie.playlist.row(0).exists && roadie.playlist.row(2).exists, "the editor doesn't show 3 rows")
 
-        // A track row plays within its album: the queue is the album, current that track.
-        select(toneAlbumRow)
-        let row = element(toneB)
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Tone Album never showed Tone B")
+        // A track row plays within its album: with Tone Album queued, double-clicking Two Discs' Tone E makes the
+        // queue Two Discs, current Tone E (row 1).
+        select(twoDiscs)
+        let row = element(toneE)
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Two Discs never showed Tone E")
         roadie.doubleClick(row)
+        XCTAssertTrue(
+            roadie.wait {
+                titles.count == 3 && titles[0].contains("Tone D") && titles[1].contains("Tone E")
+                    && titles[2].contains("Tone F")
+            }, "double-clicking Tone E didn't queue its album: \(titles)")
         roadie.expectCurrentRow(1)
-        XCTAssertEqual(titles.count, 3, "playing a track changed the queue: \(titles)")
-        XCTAssertTrue(titles[1].contains("Tone B"), "row 1 isn't Tone B: \(titles)")
+    }
+
+    /// #0205 regression: in an artist's albums (a NavigationStack), a click opens the album by pushing its tracks. The
+    /// push mustn't take the double-click's second click, which has to reach the album list's primary action.
+    func testDoubleClickAlbumInArtistDetailPlays() {
+        launchQueued()
+        openLibrary()
+        clickTitle(toneArtist)
+        let title = roadie.app.staticTexts.matching(identifier: twoDiscs).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "Tone Artist didn't list Two Discs")
+        roadie.doubleClick(title)
+        XCTAssertTrue(
+            roadie.wait(timeout: 10) {
+                titles.count == 3 && titles[0].contains("Tone D") && titles[1].contains("Tone E")
+                    && titles[2].contains("Tone F")
+            }, "double-clicking Two Discs in Tone Artist didn't queue it: \(titles); probe: \(roadie.probeJSON)")
+        roadie.expectCurrentRow(0)
+        // The click also opened the album.
+        XCTAssertTrue(element(toneD).waitForExistence(timeout: 10), "Two Discs didn't open")
     }
 
     func testContextMenus() {
@@ -264,6 +296,18 @@ final class LibraryUITests: RoadieUITestCase {
         XCTAssertTrue(
             roadie.wait { titles.count == 5 && titles[4].contains("Tone E") }, "Add to Queue didn't append Tone E: \(titles)")
         XCTAssertEqual(queue.dropFirst(4).first?.marker, "", "Add to Queue put Tone E in up-next: \(roadie.probeJSON)")
+
+        // The album menu acts on the clicked row, not the selection: with Tone Album selected, Two Discs' Add to Queue
+        // appends Two Discs.
+        select(toneAlbumRow)
+        XCTAssertTrue(element(toneB).waitForExistence(timeout: 10), "Tone Album didn't open")
+        openMenu(twoDiscs)
+        roadie.click(menuItem("Add to Queue"))
+        XCTAssertTrue(
+            roadie.wait {
+                titles.count == 8 && titles[5].contains("Tone D") && titles[6].contains("Tone E")
+                    && titles[7].contains("Tone F")
+            }, "Two Discs' Add to Queue didn't append Two Discs: \(titles)")
     }
 
     /// #0188: the drop from the Library onto the skinned editor's track list, at the row under the pointer. #0205
@@ -303,6 +347,8 @@ final class LibraryUITests: RoadieUITestCase {
             "Other Artist's single wasn't inserted at row 0: \(titles)")
     }
 
+    /// Only that nothing changes: the test can't see that the drag began (the drag image isn't in the accessibility
+    /// tree), so it also passes if the drag never starts. The other drag tests show the same drag does start.
     func testDragWithoutDropLeavesTheQueue() {
         launchQueued()
         let before = titles
