@@ -121,16 +121,12 @@ final class PlayerModelDispatchTests: PlayerModelTestCase {
         table[.toggleVisualization] = becomes { $0.visualization.isOpen }
         table[.visualizationSettings] = requested(.settings)
         table[.quit] = requested(.quit)
-        // CRASH CHECKS ONLY, not dispatch checks: no skins are indexed in a test model, so next, previous and random
-        // skin are no-ops whatever they're wired to. Seeding an index is a follow-up (issues/0211.md ## Follow-ups).
-        let crashChecksOnly: [MainMenuCommand] = [.nextSkin, .previousSkin, .randomSkin]
+        // Next, previous and random skin need an indexed skins folder: SkinLibraryModelTests
+        // .testMainMenuNextPreviousRandomSkin dispatches them (#0217).
+        let checkedElsewhere: [MainMenuCommand] = [.nextSkin, .previousSkin, .randomSkin]
 
-        let missing = MainMenuCommand.allCases.filter { table[$0] == nil && !crashChecksOnly.contains($0) }
+        let missing = MainMenuCommand.allCases.filter { table[$0] == nil && !checkedElsewhere.contains($0) }
         XCTAssertEqual(missing, [], "commands without a row")
-        for command in crashChecksOnly {
-            model.perform(command)
-            XCTAssertFalse(model.skinBrowser.canNavigate)
-        }
         let rows = MainMenuCommand.allCases.compactMap { command in table[command].map { (command, $0) } }
         try await run(rows, local: model, speaker: speaker) { $0.perform($1) }
         XCTAssertEqual(updateChecks, 1)

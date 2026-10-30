@@ -325,12 +325,12 @@ The panel's rows and selection (and the row height a double-click aims by) are r
 | Feature | Test |
 |---|---|
 | Skin Library grid from the skins folder: thumbnails, status filter, count label, Random, Refresh, click applies, trash | UI `SkinsUITests.libraryGrid`; Unit `SkinBrowserModelTests`, `SkinTrashTests` (exist) |
-| Next / Previous / Random skin from the menu bar and pop-up | UI `SkinsUITests.nextPreviousRandom`; Unit `SkinBrowserModelTests` (incl. a skin loaded before its row was indexed) |
+| Next / Previous / Random skin from the menu bar and pop-up | UI `SkinsUITests.nextPreviousRandom`; Unit `SkinBrowserModelTests` (incl. a skin loaded before its row was indexed), `RoadieTests.SkinLibraryModelTests.mainMenuNextPreviousRandomSkin` (through `PlayerModel.perform`, wrap-around) |
 | Open Skin… / Finder `.wsz` open / drop | Unit `RoadieTests.PlayerModelSkinTests`; UI `SkinsUITests.openWszViaOpenCommand` (`open -a`) |
-| Museum tab: search, grid, Download, Apply, Retry, Open in Skin Museum, Show in Finder, Move to Trash | UI `SkinsUITests.museumTab` (stub transport, fixtures); Unit `MuseumBrowserModelTests`, `MuseumClientTests`, `MuseumDownloaderTests` (exist) |
+| Museum tab: search, grid, Download, Apply, Retry, Open in Skin Museum, Show in Finder, Move to Trash | UI `SkinsUITests.museumTab` (stub transport, fixtures); Unit `MuseumBrowserModelTests`, `MuseumClientTests`, `MuseumDownloaderTests` (exist), `RoadieTests.SkinWindowContentTests` (offline / failed / empty / no-results content, folder prompt, load-more footer) |
 | NSFW setting hides flagged skins | UI `SkinsUITests.nsfwToggle`; Unit `MuseumBrowserModelTests` |
 | Browse the Museum from the no-skin placeholder and the Welcome window | UI `SkinsUITests.noSkinPlaceholder`, `FirstLaunchUITests.welcomeOpensMuseum` |
-| Settings › Skins: folder, counts, Scan / Rescan / Cancel, Reset Index | UI `SkinsUITests.settingsSkinsTab`; Unit `RoadieTests.SkinLibraryModelTests` |
+| Settings › Skins: folder, counts, Scan / Rescan / Cancel, Reset Index | UI `SkinsUITests.settingsSkinsTab`; Unit `RoadieTests.SkinLibraryModelTests` (incl. `countsTextBeforeAndAfterScan`, `addDownloadedIndexesOnlyInsideFolder`); the Skins window's no-folder / failed states and grid footer: `RoadieTests.SkinWindowContentTests` |
 | Every manifest skin renders all three windows and both shade modes | UI `SkinSmokeUITests.smokeEverySkin` (`--ui-skins all`, milestone; base skin otherwise) |
 
 ### 5.9 Settings, first launch, updates

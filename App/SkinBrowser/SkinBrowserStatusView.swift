@@ -1,13 +1,28 @@
 import SkinBrowser
 import SwiftUI
 
+/// What `SkinBrowserStatusView` shows for a phase (#0217).
+enum SkinBrowserStatusContent: Equatable {
+    case needsFolder
+    case failed(String)
+    case progress
+
+    static func content(for phase: SkinBrowserPhase) -> Self {
+        switch phase {
+        case .needsFolder: .needsFolder
+        case .failed(let message): .failed(message)
+        case .idle, .loading, .loaded: .progress
+        }
+    }
+}
+
 /// The window's non-grid states: no folder, loading, failed.
 struct SkinBrowserStatusView: View {
     @Environment(PlayerModel.self) private var player
     let phase: SkinBrowserPhase
 
     var body: some View {
-        switch phase {
+        switch SkinBrowserStatusContent.content(for: phase) {
         case .needsFolder:
             ContentUnavailableView {
                 Label("No skins folder", systemImage: "folder.badge.questionmark")
@@ -26,7 +41,7 @@ struct SkinBrowserStatusView: View {
                 Button("Retry") { player.skinBrowser.reload() }
                     .accessibilityIdentifier("skins.retry")
             }
-        case .idle, .loading, .loaded:
+        case .progress:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
