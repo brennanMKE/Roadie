@@ -328,6 +328,11 @@ Test design for a headless, silent guest:
     ignoring the saved layout; any other window (Library, Skins, Jump to File, Welcome) that overlaps the column moves
     right of it when it becomes key.
   - `-RoadieVolume N` (#0200): the player's launch volume, 0…100 percent.
+  - `-RoadieVanishingFile N` (#0202): entry N of `-RoadieOpenFiles` is copied into the data directory, queued from
+    there and the copy deleted once queued (a missing file without the sandboxed, read-only test runner writing
+    anything). In test mode the open and save panels with no stand-in are recorded in the probe's `panelRequests`
+    instead of shown.
+  - `-RoadieKeepDefaults 1` (#0202): a relaunch within one test keeps the defaults suite, to check what persists.
   The hosted unit-test run (`RoadieTests`) picks an isolated configuration of its own (temp data directory, fresh
   defaults suite, no Music Assistant, no discovery), so `⌘U` on a dev Mac leaves the real state alone.
 - **No user skins or music.** `Skins/`, `*.wsz` and `*.mp3` are gitignored, and third-party skins

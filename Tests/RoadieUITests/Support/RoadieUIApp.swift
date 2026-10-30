@@ -50,6 +50,14 @@ struct ProbeState: Decodable {
     var skinFiles: [String]?
     /// The visualization window (#0235), nil until it first opens.
     var visualization: VisProbe?
+    /// #0202's test-mode panel hook: `openFiles replace=true`, `saveEQF`, … Optional so an older app still decodes.
+    var panelRequests: [String]?
+    var alwaysOnTop: Bool?
+    var doubleSize: Bool?
+    /// The model state behind main.shuffle, main.repeat and main.time (#0202).
+    var shuffle: Bool?
+    var repeatAll: Bool?
+    var timeMode: String?
 
     struct VisProbe: Decodable {
         var open: Bool
@@ -125,10 +133,20 @@ final class RoadieUIApp {
         testName: String, paths: Paths, skin: TestSkin = .base291, library: TestLibrary = .folder,
         scenario: String? = nil, firstRun: Bool = false, windows: Windows = [.main, .playlist], volume: Int = 50,
         skinsFolder: SkinsFolder = .testSkins, loadsSkin: Bool = true, seedOmitting: [TestSkin]? = nil,
-        museumFeatured: TestSkin? = nil, extra: [String] = []
+        museumFeatured: TestSkin? = nil, openFiles: [String] = [], keepingDefaults: Bool = false, extra: [String] = []
     ) {
         if let reason = Self.notGuestReason {
             XCTFail(reason)
+            return
+        }
+        let args = launchArguments(
+            testName: testName, paths: paths, skin: skin, library: library, scenario: scenario, firstRun: firstRun,
+            windows: windows, volume: volume, skinsFolder: skinsFolder, loadsSkin: loadsSkin,
+            seedOmitting: seedOmitting, museumFeatured: museumFeatured, openFiles: openFiles)
+        if keepingDefaults {
+            // A relaunch within one test (#0202): same data dir, same defaults suite, so what persists is checked.
+            app.launchArguments = args + ["-RoadieKeepDefaults", "1"] + extra
+            app.launch()
             return
         }
         // A fresh install each launch. Test mode empties the app's own suite; this was meant to clear the `.standard`
@@ -141,9 +159,17 @@ final class RoadieUIApp {
         defaults.standardError = FileHandle.nullDevice
         if (try? defaults.run()) != nil { defaults.waitUntilExit() }
 
-        // The app creates it: the sandboxed runner can't write outside its container (#0202, #0208).
-        let dataDir = (paths.data as NSString).appendingPathComponent(testName)
+        app.launchArguments = args + extra
+        app.launch()
+    }
 
+    private func launchArguments(
+        testName: String, paths: Paths, skin: TestSkin, library: TestLibrary, scenario: String?, firstRun: Bool,
+        windows: Windows, volume: Int, skinsFolder: SkinsFolder, loadsSkin: Bool, seedOmitting: [TestSkin]?,
+        museumFeatured: TestSkin?, openFiles: [String]
+    ) -> [String] {
+        // The app creates it: the sandboxed runner can't write outside its container (#0202, #0208).
+        let dataDir = Self.dataDirectory(testName: testName, paths: paths)
         var args = [
             "-RoadieUITest", "1",
             "-RoadieDataDir", dataDir,
@@ -187,8 +213,9 @@ final class RoadieUIApp {
             args += ["-LibraryFolderPath", paths.music, "-LibrarySource", "folder"]
         }
         if let scenario { args += ["-RoadieMAScenario", scenario] }
-        app.launchArguments = args + extra
-        app.launch()
+        // The queue at launch, stopped at row 0, and File › Open…'s answer (#0203's `PanelStandIns`).
+        if !openFiles.isEmpty { args += ["-RoadieOpenFiles", openFiles.joined(separator: "|")] }
+        return args
     }
 
     func terminate() { app.terminate() }
@@ -491,11 +518,13 @@ class RoadieUITestCase: XCTestCase {
     /// first such launch (`-RoadieSeedSkins`; the sandboxed runner can't write it); it survives relaunches.
     /// `withoutSkins` leaves those manifest skins out of the copy (a Museum download then adds one back).
     /// `museumFeatured`: the fixture Museum's browse page leads with that skin (`-RoadieMuseumFeatured`).
+    /// `openFiles`: the queue at launch, stopped at row 0 (`-RoadieOpenFiles`); don't also pass `-RoadieOpenFiles` in
+    /// `extra`, since the later value would win and the test would read the wrong queue.
     func launch(
         skin: TestSkin = .base291, library: TestLibrary = .folder, scenario: String? = nil, firstRun: Bool = false,
         windows: Windows = [.main, .playlist], volume: Int = 50, skinsFolder: SkinsFolder = .testSkins,
         mutatesSkins: Bool = false, withoutSkins: [TestSkin] = [], loadsSkin: Bool = true,
-        museumFeatured: TestSkin? = nil, extra: [String] = []
+        museumFeatured: TestSkin? = nil, openFiles: [String] = [], keepingDefaults: Bool = false, extra: [String] = []
     ) {
         var skinsFolder = skinsFolder
         var seedOmitting: [TestSkin]?
@@ -514,6 +543,15 @@ class RoadieUITestCase: XCTestCase {
         roadie.launch(
             testName: testName, paths: paths, skin: skin, library: library, scenario: scenario, firstRun: firstRun,
             windows: windows, volume: volume, skinsFolder: skinsFolder, loadsSkin: loadsSkin,
-            seedOmitting: seedOmitting, museumFeatured: museumFeatured, extra: extra)
+            seedOmitting: seedOmitting, museumFeatured: museumFeatured, openFiles: openFiles,
+            keepingDefaults: keepingDefaults, extra: extra)
     }
+
+    /// A file in the fixture music folder (`scripts/make-test-library.sh`'s layout), e.g. `Tone Artist/Tone Album/01 Tone A.mp3`.
+    func music(_ relative: String) -> String {
+        (paths.music as NSString).appendingPathComponent(relative)
+    }
+
+    /// This test's data directory (`-RoadieDataDir`).
+    var dataDirectory: String { RoadieUIApp.dataDirectory(testName: testName, paths: paths) }
 }

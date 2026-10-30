@@ -31,13 +31,40 @@ extension PlayerModel {
         #endif
     }
 
-    /// `-RoadieOpenFiles` at launch: replaces the queue with those files, stopped (nothing plays).
+    /// `-RoadieOpenFiles` at launch: replaces the queue with those files, stopped (nothing plays). With
+    /// `-RoadieVanishingFile N` (#0202), entry N is copied into the data directory, queued from there and the copy
+    /// deleted once queued: the sandboxed UI-test runner can't stage a file that goes missing itself.
     func openLaunchFilesForUITest() {
-        guard let urls = panelStandIn(.openFiles) else { return }
+        guard var urls = panelStandIn(.openFiles) else { return }
+        var vanishing: URL?
+        #if DEBUG
+        if let n = configuration.vanishingOpenFile, urls.indices.contains(n), let data = configuration.dataDirectory {
+            let copy = data.appending(path: "Vanishing \(urls[n].lastPathComponent)")
+            try? FileManager.default.removeItem(at: copy)
+            if (try? FileManager.default.copyItem(at: urls[n], to: copy)) != nil {
+                urls[n] = copy
+                vanishing = copy
+            }
+        }
+        #endif
         Task {
             let result = await LocalTrackLoader.load(urls)
             player.clearQueue()
             player.enqueue(result.tracks)
+            if let vanishing { try? FileManager.default.removeItem(at: vanishing) }
+        }
+    }
+}
+
+extension PlayerModel.SystemRequest {
+    /// The stand-in that answers this panel in a UI test, if any.
+    var standIn: PlayerModel.PanelStandIn? {
+        switch self {
+        case .openFiles(let replace): replace ? .openFiles : .addFiles
+        case .openFolder: .addFolder
+        case .openPlaylistFile: .loadList
+        case .savePlaylistFile: .saveTo
+        default: nil
         }
     }
 }

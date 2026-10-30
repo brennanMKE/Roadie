@@ -73,6 +73,7 @@ extension PlayerModel {
             post(StatusNotice(text: "Nothing to save"))
             return
         }
+        if intercepted(.savePlaylistFile) { return }
         if let url = panelStandIn(.saveTo)?.first {
             writePlaylistFile(tracks, to: url)
             return
