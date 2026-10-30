@@ -117,12 +117,12 @@ Current measurement (run `20261029-202842-54408`, `--full --ui --coverage`, main
 | `SkinBrowser` | 742 | 91.1 % | 85 % | 85 % |
 | `SkinMuseum` | 457 | 93.4 % | 85 % | 85 % |
 | `WindowDocking` | 585 | 97.1 % | 85 % | 85 % |
-| `MusicBackendKit` | 544 | 78.7 % | 85 % | **78 %** (#0214) |
+| `MusicBackendKit` | 544 | 78.7 % | 85 % | 85 % |
 | `LibraryBrowser` | 2,626 | 90.7 % | 85 % | 85 % |
 | `MusicAssistantKit` | 5,069 | 90.6 % | 85 % | 85 % |
 | `FolderBackendKit` | 1,272 | 92.6 % | 85 % | 85 % |
 | `LocalPlayback` | 410 | 97.1 % | 85 % | 85 % |
-| `SendspinKit` | 687 | 85.3 % | 85 % | **84 %** (#0214) |
+| `SendspinKit` | 687 | 85.3 % | 85 % | 85 % |
 | `SendspinPlayback` | 195 | 92.3 % | 85 % | 85 % |
 | `AudioCore` (full) | 4,210 | 94.0 % | 80 % | 80 % |
 | `VisualizationKit` | 470 | 98.3 % | 85 % | 85 % |

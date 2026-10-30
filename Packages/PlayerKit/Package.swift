@@ -50,11 +50,11 @@ let package = Package(
         .target(name: "MusicAssistantKit", dependencies: ["MusicBackendKit"]),
         // Scripted WebSocket/HTTP transports replaying #0060's recorded frames, plus an in-memory token store.
         .target(name: "MusicAssistantKitStub", dependencies: ["MusicAssistantKit", "MusicBackendKit"], resources: [.copy("Fixtures")]),
-        .testTarget(name: "MusicAssistantKitTests", dependencies: ["MusicAssistantKit", "MusicAssistantKitStub", "MusicBackendKit"]),
+        .testTarget(name: "MusicAssistantKitTests", dependencies: ["MusicAssistantKit", "MusicAssistantKitStub", "MusicBackendKit", "PlayerKitTestFixtures"]),
         // Sendspin player protocol client (#0066). Foundation only: no AudioCore, no MusicAssistantKit; the token and
         // URL come in through `SendspinConnectionConfiguration`.
         .target(name: "SendspinKit"),
-        .testTarget(name: "SendspinKitTests", dependencies: ["SendspinKit"], resources: [.copy("Fixtures")]),
+        .testTarget(name: "SendspinKitTests", dependencies: ["SendspinKit", "PlayerKitTestFixtures"], resources: [.copy("Fixtures")]),
         // The bridge from a Sendspin session to AudioCore's stream input (#0108). Built by LocalPlaybackStack.
         .target(name: "SendspinPlayback", dependencies: ["SendspinKit", "AudioCore"]),
         .testTarget(name: "SendspinPlaybackTests", dependencies: ["SendspinPlayback", "SendspinKit", "AudioCore"]),
