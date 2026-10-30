@@ -12,13 +12,21 @@ struct PlaylistPickerSheet: View {
 
     private var list: PagedList<LibraryPlaylist> { library.playlists }
 
-    private var matching: [LibraryPlaylist] {
+    private var matching: [LibraryPlaylist] { Self.matching(list.items, search: search) }
+
+    private var chosen: LibraryPlaylist? { Self.chosen(in: matching, selection: selection) }
+
+    /// The playlists whose names contain the trimmed search, ignoring case; all of them for a blank search (#0218).
+    static func matching(_ items: [LibraryPlaylist], search: String) -> [LibraryPlaylist] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return list.items }
-        return list.items.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        guard !query.isEmpty else { return items }
+        return items.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 
-    private var chosen: LibraryPlaylist? { matching.first { $0.id == selection } }
+    /// The selected playlist when it is still among `matching`.
+    static func chosen(in matching: [LibraryPlaylist], selection: MediaID?) -> LibraryPlaylist? {
+        matching.first { $0.id == selection }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

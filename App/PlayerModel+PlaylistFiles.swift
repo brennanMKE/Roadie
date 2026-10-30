@@ -48,6 +48,13 @@ extension PlayerModel {
             post(StatusNotice(text: text))
             return
         }
+        if let choose = panelChooser {
+            Task {
+                guard let url = await choose(.loadPlaylistFile) else { return }
+                importLocalFiles([url], replace: true)
+            }
+            return
+        }
         if intercepted(.openPlaylistFile) { return }
         if let urls = panelStandIn(.loadList) {
             importLocalFiles(urls, replace: true)
@@ -73,6 +80,13 @@ extension PlayerModel {
             post(StatusNotice(text: "Nothing to save"))
             return
         }
+        if let choose = panelChooser {
+            Task {
+                guard let url = await choose(.savePlaylistFile) else { return }
+                writePlaylistFile(tracks, to: url)
+            }
+            return
+        }
         if intercepted(.savePlaylistFile) { return }
         if let url = panelStandIn(.saveTo)?.first {
             writePlaylistFile(tracks, to: url)
@@ -90,6 +104,15 @@ extension PlayerModel {
             guard response == .OK, let url = panel.url else { return }
             writePlaylistFile(tracks, to: url)
         }
+    }
+
+    /// `panelChooserOverride` (#0218): set only by unit tests, never in Release.
+    var panelChooser: ((PanelRequest) async -> URL?)? {
+        #if DEBUG
+        panelChooserOverride
+        #else
+        nil
+        #endif
     }
 
     private func writePlaylistFile(_ tracks: [Track], to url: URL) {
@@ -118,16 +141,24 @@ extension PlayerModel {
 /// The Library's playlist context menu: M3U8 export and import through Music Assistant (#0148).
 extension PlayerModel {
     /// Saves the server's M3U8 for `playlist`; its entries are paths and URIs on the server.
-    func exportLibraryPlaylist(_ playlist: LibraryPlaylist) {
-        let model = library.playlistsModel
+    /// `playlists` is the Library's playlists model unless a test passes its own (#0218).
+    func exportLibraryPlaylist(_ playlist: LibraryPlaylist, in playlists: PlaylistsModel? = nil) {
+        let model = playlists ?? library.playlistsModel
+        let choose = panelChooser
         Task {
             guard let text = await model.exportM3U(playlist) else { return }
-            let panel = NSSavePanel()
-            panel.allowedContentTypes = [UTType(filenameExtension: "m3u8", conformingTo: .data) ?? .data]
-            panel.nameFieldStringValue = playlist.name + ".m3u8"
-            panel.message = "Entries refer to paths and URIs on the Music Assistant server"
-            panel.prompt = "Export"
-            guard await panel.begin() == .OK, let url = panel.url else { return }
+            let chosen: URL?
+            if let choose {
+                chosen = await choose(.exportLibraryPlaylist(name: playlist.name))
+            } else {
+                let panel = NSSavePanel()
+                panel.allowedContentTypes = [UTType(filenameExtension: "m3u8", conformingTo: .data) ?? .data]
+                panel.nameFieldStringValue = playlist.name + ".m3u8"
+                panel.message = "Entries refer to paths and URIs on the Music Assistant server"
+                panel.prompt = "Export"
+                chosen = await panel.begin() == .OK ? panel.url : nil
+            }
+            guard let url = chosen else { return }
             do {
                 try Data(text.utf8).write(to: url, options: .atomic)
                 post(StatusNotice(text: "Exported \u{201C}\(playlist.name)\u{201D}"))
@@ -138,17 +169,24 @@ extension PlayerModel {
     }
 
     /// Sends an M3U/M3U8 file to Music Assistant, which makes a new playlist and matches entries to the library.
-    func importLibraryPlaylist() {
-        let model = library.playlistsModel
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = ["m3u8", "m3u"].compactMap { UTType(filenameExtension: $0, conformingTo: .data) }
-        panel.message = "Choose an M3U playlist to import into Music Assistant"
-        panel.prompt = "Import"
+    func importLibraryPlaylist(in playlists: PlaylistsModel? = nil) {
+        let model = playlists ?? library.playlistsModel
+        let choose = panelChooser
         Task {
-            guard await panel.begin() == .OK, let url = panel.url else { return }
+            let chosen: URL?
+            if let choose {
+                chosen = await choose(.importLibraryPlaylist)
+            } else {
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = true
+                panel.canChooseDirectories = false
+                panel.allowsMultipleSelection = false
+                panel.allowedContentTypes = ["m3u8", "m3u"].compactMap { UTType(filenameExtension: $0, conformingTo: .data) }
+                panel.message = "Choose an M3U playlist to import into Music Assistant"
+                panel.prompt = "Import"
+                chosen = await panel.begin() == .OK ? panel.url : nil
+            }
+            guard let url = chosen else { return }
             let text: String
             do {
                 let data = try Data(contentsOf: url)
@@ -166,7 +204,7 @@ extension PlayerModel {
 
 /// The save panel's format popup. Changing it sets `allowedContentTypes`, which rewrites the name's extension.
 @MainActor
-private final class PlaylistFormatChooser: NSObject {
+final class PlaylistFormatChooser: NSObject {
     private static let choices: [(title: String, ext: String)] = [
         ("M3U8 playlist", "m3u8"), ("M3U playlist", "m3u"), ("PLS playlist", "pls"),
     ]
@@ -193,7 +231,7 @@ private final class PlaylistFormatChooser: NSObject {
 
     @objc private func formatChanged() { apply(index: popup.indexOfSelectedItem) }
 
-    private func apply(index: Int) {
+    func apply(index: Int) {
         guard Self.choices.indices.contains(index),
               let type = UTType(filenameExtension: Self.choices[index].ext, conformingTo: .data) else { return }
         panel?.allowedContentTypes = [type]

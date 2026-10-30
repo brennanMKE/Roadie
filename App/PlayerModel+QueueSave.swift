@@ -14,6 +14,14 @@ extension PlayerModel {
 
     var canSaveQueue: Bool { queueSaveTarget != .refused }
 
+    /// The name prompt: `SaveQueueSheet.askName`, or `queueNameOverride` in a unit test (#0218).
+    private var queueNamePrompt: () async -> String? {
+        #if DEBUG
+        if let queueNameOverride { return queueNameOverride }
+        #endif
+        return { await SaveQueueSheet.askName() }
+    }
+
     func saveQueue() {
         switch queueSaveTarget {
         case .file:
@@ -23,8 +31,9 @@ extension PlayerModel {
         case .remote(let output):
             let backend = router.backend(for: output)
             let library = library
+            let askName = queueNamePrompt
             Task {
-                guard let name = await SaveQueueSheet.askName() else { return }
+                guard let name = await askName() else { return }
                 do {
                     try await backend.saveQueueAsPlaylist(on: output, named: name)
                     post(StatusNotice(text: "Saved queue as \u{201C}\(name)\u{201D}"))

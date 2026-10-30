@@ -230,6 +230,9 @@ targets:
       # #0210, #0211: the fixture audio library for the model tests. Linked by the test bundle only, never the app.
       - package: PlayerKit
         product: PlayerKitTestFixtures
+      # #0218: the stub backend behind the Library playlist export and import tests. Test bundle only.
+      - package: PlayerKit
+        product: MusicBackendStub
     settings:
       base:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Roadie.app/Contents/MacOS/Roadie
