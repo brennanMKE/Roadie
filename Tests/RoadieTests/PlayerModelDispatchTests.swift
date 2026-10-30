@@ -121,8 +121,8 @@ final class PlayerModelDispatchTests: PlayerModelTestCase {
         table[.toggleVisualization] = becomes { $0.visualization.isOpen }
         table[.visualizationSettings] = requested(.settings)
         table[.quit] = requested(.quit)
-        // Next, previous and random skin need an indexed skins folder: SkinLibraryModelTests
-        // .testMainMenuNextPreviousRandomSkin dispatches them (#0217).
+        // Next, previous and random skin need an indexed skins folder; #0217's
+        // SkinLibraryModelTests.testMainMenuNextPreviousRandomSkin dispatches them.
         let checkedElsewhere: [MainMenuCommand] = [.nextSkin, .previousSkin, .randomSkin]
 
         let missing = MainMenuCommand.allCases.filter { table[$0] == nil && !checkedElsewhere.contains($0) }

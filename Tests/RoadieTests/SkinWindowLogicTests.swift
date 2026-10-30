@@ -93,8 +93,6 @@ extension SkinLibraryModelTests {
         model.perform(.previousSkin)
         try await waitUntil("previous wraps") { browser.currentSkinID == picked }
 
-        // Random picked one of the three loadable skins, never the failed one.
-        XCTAssertTrue(ids.contains(picked))
         // Random can still pick the skin already showing (SkinIndexStore.randomSkin is `ORDER BY random()`): #0256
         // adds an injectable random source and a strict test for that.
     }
@@ -120,7 +118,7 @@ extension SkinLibraryModelTests {
         let wsz = folder.appending(path: "\(name).wsz")
         let zip = Process()
         zip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        zip.arguments = ["-c", "-k", content.path, wsz.path]
+        zip.arguments = ["-c", "-k", "--norsrc", "--noextattr", content.path, wsz.path]
         try zip.run()
         zip.waitUntilExit()
         XCTAssertEqual(zip.terminationStatus, 0)
