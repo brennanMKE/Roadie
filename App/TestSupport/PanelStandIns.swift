@@ -10,6 +10,7 @@ import Foundation
 /// - `-RoadieAddFolder`: ADD › Add Folder.
 /// - `-RoadieLoadList`: LIST › Load / File › Load Playlist….
 /// - `-RoadieSaveTo`: LIST › Save / File › Save Playlist…'s destination (the format follows the extension).
+/// - `-RoadieLoadEQF` (#0207): the equalizer's Presets › Load › From EQF…; Save… writes to `-RoadieSaveTo`.
 /// - `-RoadieChooseFolder` (#0209): the music-folder panel (Settings › Library, the Welcome); read by
 ///   `chooseMusicFolder(startingAt:)`, which has no `PlayerModel`.
 extension PlayerModel {
@@ -19,6 +20,7 @@ extension PlayerModel {
         case addFolder = "RoadieAddFolder"
         case loadList = "RoadieLoadList"
         case saveTo = "RoadieSaveTo"
+        case loadEQF = "RoadieLoadEQF"
     }
 
     /// The URLs a stand-in gives, or nil (show the real panel). Always nil in Release and outside test mode.
@@ -65,7 +67,8 @@ extension PlayerModel.SystemRequest {
         case .openFiles(let replace): replace ? .openFiles : .addFiles
         case .openFolder: .addFolder
         case .openPlaylistFile: .loadList
-        case .savePlaylistFile: .saveTo
+        case .savePlaylistFile, .saveEQF: .saveTo
+        case .loadEQF: .loadEQF
         default: nil
         }
     }
