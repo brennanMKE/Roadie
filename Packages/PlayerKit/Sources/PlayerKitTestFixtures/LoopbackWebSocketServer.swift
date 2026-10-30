@@ -113,6 +113,10 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
         let continuation = connectionsContinuation
         let accepted = accepted
         listener.newConnectionHandler = { connection in
+            guard !accepted.isStopped else {
+                connection.cancel()
+                return
+            }
             let wrapped = Connection(connection, queue: queue)
             accepted.append(wrapped)
             continuation.yield(wrapped)
@@ -140,26 +144,77 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
         return await iterator.next()
     }
 
-    public func stop() {
-        listener.cancel()
+    /// Stops listening and waits until the listener is cancelled; later clients are dropped.
+    public func stop() async {
+        accepted.stop()
         connectionsContinuation.finish()
-        accepted.cancelAll()
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            queue.async { [listener] in
+                if case .cancelled = listener.state {
+                    done.resume()
+                    return
+                }
+                listener.stateUpdateHandler = { [weak listener] state in
+                    switch state {
+                    case .cancelled, .failed:
+                        listener?.stateUpdateHandler = nil
+                        done.resume()
+                    default:
+                        break
+                    }
+                }
+                listener.cancel()
+            }
+        }
     }
 
-    deinit { stop() }
+    deinit {
+        accepted.stop()
+        listener.cancel()
+    }
 
     private final class Accepted: @unchecked Sendable {
         private let lock = NSLock()
         private var connections: [Connection] = []
+        private var stopped = false
+
+        var isStopped: Bool { lock.withLock { stopped } }
 
         func append(_ connection: Connection) { lock.withLock { connections.append(connection) } }
 
-        func cancelAll() {
+        /// Cancels every accepted client; after this the listener drops new ones.
+        func stop() {
             let all = lock.withLock { () -> [Connection] in
+                stopped = true
                 defer { connections = [] }
                 return connections
             }
             all.forEach { $0.cancel() }
         }
+    }
+}
+
+/// A 127.0.0.1 port with nothing bound to it, so a connection gets a RST (#0214): bound to port 0 for a free port,
+/// then closed. Another test could take the port in between; that race is accepted.
+public struct RefusingPort: Sendable {
+    public let port: UInt16
+
+    public init() throws {
+        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { throw POSIXError(.EMFILE) }
+        defer { close(fd) }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        address.sin_port = 0
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let bound = withUnsafeMutablePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { raw in
+                Darwin.bind(fd, raw, length) == 0 && getsockname(fd, raw, &length) == 0
+            }
+        }
+        guard bound else { throw POSIXError(.EADDRINUSE) }
+        port = UInt16(bigEndian: address.sin_port)
     }
 }

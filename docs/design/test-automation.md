@@ -117,7 +117,7 @@ Current measurement (run `20261029-202842-54408`, `--full --ui --coverage`, main
 | `SkinBrowser` | 742 | 91.1 % | 85 % | 85 % |
 | `SkinMuseum` | 457 | 93.4 % | 85 % | 85 % |
 | `WindowDocking` | 585 | 97.1 % | 85 % | 85 % |
-| `MusicBackendKit` | 544 | 78.7 % | 85 % | 85 % |
+| `MusicBackendKit` | 544 | 78.7 % (re-measure at the milestone, #0214) | 85 % | 85 % |
 | `LibraryBrowser` | 2,626 | 90.7 % | 85 % | 85 % |
 | `MusicAssistantKit` | 5,069 | 90.6 % | 85 % | 85 % |
 | `FolderBackendKit` | 1,272 | 92.6 % | 85 % | 85 % |
