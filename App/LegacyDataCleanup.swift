@@ -16,7 +16,13 @@ enum LegacyDataCleanup {
 
     private static let log = Logger(subsystem: "co.sstools.roadie", category: "LegacyCleanup")
 
-    static func run(defaults: UserDefaults = .standard, bundleIdentifier: String? = Bundle.main.bundleIdentifier) {
+    /// `removeKeychain` and `cachesRoot` are seams for tests (#0219): the real Keychain query and `URL.cachesDirectory`
+    /// by default. `onCacheRemoved` runs after the detached cache removal finishes (or fails).
+    static func run(
+        defaults: UserDefaults = .standard, bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+        removeKeychain: () -> String = { removeKeychainItems() }, cachesRoot: URL = .cachesDirectory,
+        onCacheRemoved: (@Sendable () -> Void)? = nil
+    ) {
         guard defaults.integer(forKey: versionKey) < version else { return }
 
         // Defaults: Plex's keys, and a stored Library choice of the removed source (the controller then picks
@@ -32,10 +38,10 @@ enum LegacyDataCleanup {
         }
 
         // Keychain: an attribute-only query (no data, so it never prompts or decrypts), then delete. The token is never read.
-        let keychain = removeKeychainItems()
+        let keychain = removeKeychain()
 
         // The track cache directory, off the main actor. Not retried: macOS purges Caches anyway.
-        let cacheDir = URL.cachesDirectory
+        let cacheDir = cachesRoot
             .appending(path: bundleIdentifier ?? "co.sstools.roadie", directoryHint: .isDirectory)
             .appending(path: "Tracks", directoryHint: .isDirectory)
         let cacheExists = FileManager.default.fileExists(atPath: cacheDir.path)
@@ -48,6 +54,7 @@ enum LegacyDataCleanup {
                     Logger(subsystem: "co.sstools.roadie", category: "LegacyCleanup")
                         .error("could not remove the cache directory: \(error.localizedDescription, privacy: .public)")
                 }
+                onCacheRemoved?()
             }
         }
 
@@ -57,7 +64,7 @@ enum LegacyDataCleanup {
     }
 
     /// "absent", "removed", or the failing status. Never asks for the item's data.
-    private static func removeKeychainItems() -> String {
+    static func removeKeychainItems() -> String {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: keychainService,

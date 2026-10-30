@@ -97,17 +97,26 @@ final class SkinCursorController {
         guard let (name, cursor) = animating else { return }
         let nsCursors = self.nsCursors(for: name, cursor)
         guard !nsCursors.isEmpty else { return }
-        let index = stepIndex % cursor.steps.count
-        let current = cursor.steps[index]
-        nsCursors[min(current.frame, nsCursors.count - 1)].set()
+        let (index, frame, interval) = Self.stepFrame(at: stepIndex, steps: cursor.steps, frameCount: nsCursors.count)
+        nsCursors[frame].set()
         timer?.invalidate()
-        let next = Timer(timeInterval: max(current.duration, 1.0 / 60), repeats: false) { [weak self] _ in
+        let next = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.step(at: index + 1)
             }
         }
         RunLoop.main.add(next, forMode: .common)
         timer = next
+    }
+
+    /// Step `stepIndex` of an animation (wrapping past the last step): its index, the frame to show (clamped to the
+    /// frames built) and how long to show it (at least one 60 Hz frame). Pure, so tests drive it with explicit steps.
+    nonisolated static func stepFrame(
+        at stepIndex: Int, steps: [SkinCursor.Step], frameCount: Int
+    ) -> (index: Int, frame: Int, interval: TimeInterval) {
+        let index = stepIndex % steps.count
+        let current = steps[index]
+        return (index, min(current.frame, frameCount - 1), max(current.duration, 1.0 / 60))
     }
 
     private func stopTimer() {
