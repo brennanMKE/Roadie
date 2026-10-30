@@ -52,12 +52,15 @@ struct FavoritesDetailView: View {
     let favorites: FavoritesModel
     @Environment(PlayerModel.self) private var player
     @State private var selectedTrack: MediaID?
+    /// The album or playlist on the stack, a double-click interval after its selection (`pushAfterDoubleClick`).
+    @State private var pushed: MediaID?
 
     var body: some View {
         let path = Binding<[MediaID]>(
-            get: { (library.selectedAlbum?.id ?? library.selectedPlaylist?.id).map { [$0] } ?? [] },
+            get: { pushed.map { [$0] } ?? [] },
             set: { ids in
                 if ids.isEmpty {
+                    pushed = nil
                     library.selectedAlbum = nil
                     library.selectedPlaylist = nil
                 }
@@ -75,6 +78,7 @@ struct FavoritesDetailView: View {
                 TrackListView(library: library)
             }
         }
+        .pushAfterDoubleClick(library.selectedAlbum?.id ?? library.selectedPlaylist?.id, into: $pushed)
         .accessibilityIdentifier("library.favorites.detail")
         .onChange(of: favorites.selectedKind) {
             library.selectedAlbum = nil

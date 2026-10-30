@@ -1,3 +1,4 @@
+import AppKit
 import LibraryBrowser
 import MusicBackendKit
 import SwiftUI
@@ -60,12 +61,17 @@ struct AlbumListView: View {
 struct ArtistAlbumsView: View {
     let library: LibraryBrowserModel
     let artistName: String
+    /// The album on the stack: `library.selectedAlbum`, a double-click interval late (`pushAfterDoubleClick`).
+    @State private var pushed: LibraryAlbum?
 
     var body: some View {
         @Bindable var library = library
         let path = Binding<[LibraryAlbum]>(
-            get: { library.selectedAlbum.map { [$0] } ?? [] },
-            set: { library.selectedAlbum = $0.last })
+            get: { pushed.map { [$0] } ?? [] },
+            set: {
+                pushed = $0.last
+                library.selectedAlbum = $0.last
+            })
         NavigationStack(path: path) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(artistName)
@@ -79,5 +85,25 @@ struct ArtistAlbumsView: View {
                 TrackListView(library: library)
             }
         }
+        .pushAfterDoubleClick(library.selectedAlbum, into: $pushed)
+    }
+}
+
+extension View {
+    /// Moves `pushed` (what a NavigationStack shows) to `selection` (what a list's click selected). It clears at once
+    /// and starts as `selection`, but a new selection is pushed only after the double-click interval: pushed at once,
+    /// the destination took the double-click's second click, so the list's primary action (play the album) never saw
+    /// it (#0205).
+    func pushAfterDoubleClick<Value: Hashable & Sendable>(_ selection: Value?, into pushed: Binding<Value?>) -> some View {
+        onAppear { pushed.wrappedValue = selection }
+            .task(id: selection) {
+                guard let selection else {
+                    pushed.wrappedValue = nil
+                    return
+                }
+                guard pushed.wrappedValue != selection else { return }
+                try? await Task.sleep(for: .seconds(NSEvent.doubleClickInterval))
+                if !Task.isCancelled { pushed.wrappedValue = selection }
+            }
     }
 }
