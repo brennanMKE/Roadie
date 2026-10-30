@@ -57,6 +57,30 @@ struct MuseumModeView: View {
     }
 }
 
+/// What `MuseumStatusView` shows (#0217): the folder prompt above the content when no skins folder is set.
+enum MuseumStatusContent: Equatable {
+    case loading
+    case offline(String)
+    case failed(String)
+    case noSkins
+    case noResults(String)
+    case grid
+
+    static func content(for phase: MuseumBrowserPhase, isEmpty: Bool, searchText: String) -> Self {
+        switch phase {
+        case .idle, .loading: return .loading
+        case .offline(let message): return .offline(message)
+        case .failed(let message): return .failed(message)
+        case .loaded:
+            guard isEmpty else { return .grid }
+            let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? .noSkins : .noResults(text)
+        }
+    }
+
+    static func showsFolderPrompt(hasFolder: Bool) -> Bool { !hasFolder }
+}
+
 /// The Museum content area: the grid, or the loading/offline/failed/empty states with Retry.
 struct MuseumStatusView: View {
     @Environment(PlayerModel.self) private var player
@@ -64,7 +88,7 @@ struct MuseumStatusView: View {
     var body: some View {
         let museum = player.museumBrowser
         VStack(spacing: 0) {
-            if !player.skinLibrary.hasFolder {
+            if MuseumStatusContent.showsFolderPrompt(hasFolder: player.skinLibrary.hasFolder) {
                 folderPrompt
                 Divider()
             }
@@ -75,8 +99,8 @@ struct MuseumStatusView: View {
 
     @ViewBuilder
     private func content(_ museum: MuseumBrowserModel) -> some View {
-        switch museum.phase {
-        case .idle, .loading:
+        switch MuseumStatusContent.content(for: museum.phase, isEmpty: museum.items.isEmpty, searchText: museum.searchText) {
+        case .loading:
             ProgressView("Loading the Skin Museum…")
         case .offline(let message):
             ContentUnavailableView {
@@ -94,17 +118,12 @@ struct MuseumStatusView: View {
             } actions: {
                 Button("Retry") { museum.retry() }.accessibilityIdentifier("skins.museum.retry")
             }
-        case .loaded:
-            if museum.items.isEmpty {
-                let text = museum.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if text.isEmpty {
-                    ContentUnavailableView("No skins", systemImage: "square.grid.2x2")
-                } else {
-                    ContentUnavailableView.search(text: text)
-                }
-            } else {
-                MuseumGridView()
-            }
+        case .noSkins:
+            ContentUnavailableView("No skins", systemImage: "square.grid.2x2")
+        case .noResults(let text):
+            ContentUnavailableView.search(text: text)
+        case .grid:
+            MuseumGridView()
         }
     }
 

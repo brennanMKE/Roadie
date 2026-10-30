@@ -22,14 +22,29 @@ struct SkinGridView: View {
 
     @ViewBuilder
     private func footer(_ browser: SkinBrowserModel) -> some View {
-        if let message = browser.loadMoreError {
+        switch GridFooterContent.content(loadMoreError: browser.loadMoreError, isLoadingMore: browser.isLoadingMore) {
+        case .error(let message):
             HStack {
                 Text(message).foregroundStyle(.secondary)
                 Button("Retry") { browser.retryLoadMore() }
             }
             .padding(.bottom)
-        } else if browser.isLoadingMore {
+        case .loading:
             ProgressView().padding(.bottom)
+        case .nothing:
+            EmptyView()
         }
+    }
+}
+
+/// The load-more footer under the Skins and Museum grids (#0217): the error with Retry, a spinner, or nothing.
+enum GridFooterContent: Equatable {
+    case error(String)
+    case loading
+    case nothing
+
+    static func content(loadMoreError: String?, isLoadingMore: Bool) -> Self {
+        if let loadMoreError { return .error(loadMoreError) }
+        return isLoadingMore ? .loading : .nothing
     }
 }

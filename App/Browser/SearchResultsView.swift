@@ -26,7 +26,8 @@ struct SearchResultsView: View {
                     ContentUnavailableView.search(text: library.searchText)
                 } else {
                     List(selection: $selection) {
-                        if !results.artists.isEmpty {
+                        let sections = Self.sections(results)
+                        if sections.contains(.artists) {
                             Section("Artists") {
                                 ForEach(ArtistGrouper.group(results.artists)) { group in
                                     Button { library.select(group) } label: {
@@ -40,7 +41,7 @@ struct SearchResultsView: View {
                                 }
                             }
                         }
-                        if !results.albums.isEmpty {
+                        if sections.contains(.albums) {
                             Section("Albums") {
                                 ForEach(results.albums) { album in
                                     Button { library.select(album) } label: {
@@ -52,7 +53,7 @@ struct SearchResultsView: View {
                                 }
                             }
                         }
-                        if !results.tracks.isEmpty {
+                        if sections.contains(.tracks) {
                             Section("Tracks") {
                                 ForEach(results.tracks) { track in
                                     VStack(alignment: .leading, spacing: 2) {
@@ -69,5 +70,20 @@ struct SearchResultsView: View {
             }
         }
         .accessibilityIdentifier("library.results")
+    }
+
+    enum ResultSection: String, CaseIterable {
+        case artists = "Artists", albums = "Albums", tracks = "Tracks"
+    }
+
+    /// The sections a result set shows, in order: each kind with at least one result (#0215).
+    static func sections(_ results: SearchResults) -> [ResultSection] {
+        ResultSection.allCases.filter {
+            switch $0 {
+            case .artists: !results.artists.isEmpty
+            case .albums: !results.albums.isEmpty
+            case .tracks: !results.tracks.isEmpty
+            }
+        }
     }
 }

@@ -38,14 +38,26 @@ struct TrackListView: View {
     @Environment(PlayerModel.self) private var player
     @State private var selection = Set<MediaID>()
 
-    private var heading: String {
-        library.selectedAlbum?.title ?? library.selectedPlaylist?.name ?? ""
+    private var heading: String { Self.heading(album: library.selectedAlbum, playlist: library.selectedPlaylist) }
+
+    private var albumArtist: String? { Self.albumArtist(album: library.selectedAlbum) }
+
+    private var openPlaylist: LibraryPlaylist? {
+        Self.openPlaylist(album: library.selectedAlbum, playlist: library.selectedPlaylist)
     }
 
-    private var albumArtist: String? { library.selectedAlbum?.artistName }
+    /// The album's title, else the playlist's name.
+    static func heading(album: LibraryAlbum?, playlist: LibraryPlaylist?) -> String {
+        album?.title ?? playlist?.name ?? ""
+    }
 
-    /// The playlist shown here, which drops add to (#0136).
-    private var openPlaylist: LibraryPlaylist? { library.selectedAlbum == nil ? library.selectedPlaylist : nil }
+    /// Rows by this artist hide their artist line.
+    static func albumArtist(album: LibraryAlbum?) -> String? { album?.artistName }
+
+    /// The playlist shown here, which drops add to (#0136): none while an album is selected.
+    static func openPlaylist(album: LibraryAlbum?, playlist: LibraryPlaylist?) -> LibraryPlaylist? {
+        album == nil ? playlist : nil
+    }
 
     var body: some View {
         Group {

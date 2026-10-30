@@ -70,8 +70,10 @@ struct PlaylistEditingModifier: ViewModifier {
             }
     }
 
-    private var deleteTitle: String {
-        "Delete \u{201C}\(model.pendingDelete?.name ?? "")\u{201D}?"
+    private var deleteTitle: String { Self.deleteTitle(model.pendingDelete) }
+
+    static func deleteTitle(_ playlist: LibraryPlaylist?) -> String {
+        "Delete \u{201C}\(playlist?.name ?? "")\u{201D}?"
     }
 
     private var deleteBinding: Binding<Bool> {

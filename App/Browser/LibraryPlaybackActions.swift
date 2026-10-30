@@ -11,12 +11,12 @@ extension View {
         remove: ((Set<MediaID>) -> Void)? = nil
     ) -> some View {
         contextMenu(forSelectionType: MediaID.self) { ids in
-            Button("Play") { model.playFromLibrary(.play(ids, in: rows, album: album)) }
+            Button("Play") { model.playFromLibrary(LibraryPlayAction.play.request(ids, in: rows, album: album)) }
                 .disabled(ids.isEmpty)
-            Button("Play Next") { model.playFromLibrary(.next(ids, in: rows)) }
+            Button("Play Next") { model.playFromLibrary(LibraryPlayAction.next.request(ids, in: rows, album: album)) }
                 .disabled(ids.isEmpty)
             // The queue is Winamp's playlist; real playlists get the submenu (#0136).
-            Button("Add to Queue") { model.playFromLibrary(.append(ids, in: rows)) }
+            Button("Add to Queue") { model.playFromLibrary(LibraryPlayAction.append.request(ids, in: rows, album: album)) }
                 .disabled(ids.isEmpty)
             Divider()
             AddToPlaylistMenu(items: Array(ids), model: model)
@@ -37,7 +37,7 @@ extension View {
                 }
             }
         } primaryAction: { ids in
-            model.playFromLibrary(.play(ids, in: rows, album: album))
+            model.playFromLibrary(LibraryPlayAction.play.request(ids, in: rows, album: album))
         }
     }
 
@@ -70,13 +70,36 @@ struct LibraryContainerMenuItems: View {
     var addsToPlaylists = true
 
     var body: some View {
-        Button("Play") { model.playFromLibrary(.play(container: id)) }
-        Button("Play Next") { model.playFromLibrary(.next(container: id)) }
-        Button("Add to Queue") { model.playFromLibrary(.append(container: id)) }
+        Button("Play") { model.playFromLibrary(LibraryPlayAction.play.request(container: id)) }
+        Button("Play Next") { model.playFromLibrary(LibraryPlayAction.next.request(container: id)) }
+        Button("Add to Queue") { model.playFromLibrary(LibraryPlayAction.append.request(container: id)) }
         if addsToPlaylists {
             Divider()
             AddToPlaylistMenu(items: [id], model: model)
         }
         FavoriteMenuItem(items: [id: favorite])
+    }
+}
+
+/// The three playback items of the Library's menus, and the `PlayRequest` each builds (#0215).
+enum LibraryPlayAction: CaseIterable {
+    case play, next, append
+
+    /// Track rows, `rows` in display order; `album` only matters to Play (see `PlayRequest.play(_:in:album:)`).
+    func request(_ ids: Set<MediaID>, in rows: [LibraryTrack], album: MediaID?) -> PlayRequest? {
+        switch self {
+        case .play: .play(ids, in: rows, album: album)
+        case .next: .next(ids, in: rows)
+        case .append: .append(ids, in: rows)
+        }
+    }
+
+    /// A container row: album, artist or playlist.
+    func request(container id: MediaID) -> PlayRequest {
+        switch self {
+        case .play: .play(container: id)
+        case .next: .next(container: id)
+        case .append: .append(container: id)
+        }
     }
 }
