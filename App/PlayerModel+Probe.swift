@@ -60,7 +60,7 @@ struct TestProbe: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case output, feed, state, currentIndex, queue, notice, lastExternalOpen, tokenStore, maRequests, skin, skinFiles
         case visualization, panelRequests, alwaysOnTop, doubleSize, shuffle, repeatAll, timeMode, sendspinEnabled,
-            firstRunVersion, maResolutions
+            firstRunVersion, maResolutions, eq
     }
 
     /// The open and save panels a UI test asked for (#0202): `openFiles replace=true`, `saveEQF`, … in order.
@@ -79,6 +79,16 @@ struct TestProbe: Codable, Equatable {
     var firstRunVersion: Int? = nil
     /// Music Assistant server resolutions started (#0209: Settings' Check Now ran one); nil outside UI-test mode.
     var maResolutions: Int? = nil
+    /// The equalizer (#0207): on/off, dB values, and its window; nil outside UI-test mode.
+    var eq: EQProbe? = nil
+
+    struct EQProbe: Codable, Equatable {
+        var isEnabled: Bool
+        var preamp: Float
+        var gains: [Float]
+        var windowOpen: Bool
+        var shaded: Bool
+    }
 
     /// Writes `null` for the absent optionals, so every key is always in the JSON.
     func encode(to encoder: any Encoder) throws {
@@ -104,6 +114,7 @@ struct TestProbe: Codable, Equatable {
         try c.encode(sendspinEnabled, forKey: .sendspinEnabled)
         try c.encode(firstRunVersion, forKey: .firstRunVersion)
         try c.encode(maResolutions, forKey: .maResolutions)
+        try c.encode(eq, forKey: .eq)
     }
 
     var json: String {
@@ -148,7 +159,12 @@ extension PlayerModel {
             timeMode: timeMode.rawValue,
             sendspinEnabled: sendspinController.isEnabled,
             firstRunVersion: storedFirstRunVersion,
-            maResolutions: configuration.isUITest ? musicAssistantSelection.resolutionCount : nil)
+            maResolutions: configuration.isUITest ? musicAssistantSelection.resolutionCount : nil,
+            eq: configuration.isUITest
+                ? TestProbe.EQProbe(
+                    isEnabled: eq.isEnabled, preamp: eq.preamp, gains: eq.gains, windowOpen: isEQWindowOpen,
+                    shaded: isEQWindowShaded)
+                : nil)
     }
 
     /// The suite's persisted value: a read through `defaults` would return the `-firstRunVersion` argument instead.

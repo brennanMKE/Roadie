@@ -63,6 +63,16 @@ struct ProbeState: Decodable {
     var firstRunVersion: Int?
     /// Music Assistant server resolutions started (#0209); nil outside UI-test mode.
     var maResolutions: Int?
+    /// The equalizer (#0207); nil from an older app.
+    var eq: EQProbe?
+
+    struct EQProbe: Decodable {
+        var isEnabled: Bool
+        var preamp: Float
+        var gains: [Float]
+        var windowOpen: Bool
+        var shaded: Bool
+    }
 
     struct VisProbe: Decodable {
         var open: Bool
