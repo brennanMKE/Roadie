@@ -75,11 +75,11 @@ struct DiscoverRowView: View {
                         DiscoverItemRow(item: item)
                     }
                     .contextMenu(forSelectionType: RecommendationItem.ID.self) { ids in
-                        let picked = playable(ids, in: items)
+                        let picked = Self.playable(ids, in: items)
                         Button("Play") { play(picked) }.disabled(picked.isEmpty)
-                        Button("Play Next") { player.playFromLibrary(request(picked, mode: .next)) }
+                        Button("Play Next") { player.playFromLibrary(Self.request(picked, mode: .next)) }
                             .disabled(picked.isEmpty)
-                        Button("Add to Queue") { player.playFromLibrary(request(picked, mode: .append)) }
+                        Button("Add to Queue") { player.playFromLibrary(Self.request(picked, mode: .append)) }
                             .disabled(picked.isEmpty)
                         // Tracks and albums only (#0132 decision 3).
                         let addable = picked.filter { $0.kind == .track || $0.kind == .album }
@@ -88,7 +88,7 @@ struct DiscoverRowView: View {
                             AddToPlaylistMenu(items: addable, model: player)
                         }
                     } primaryAction: { ids in
-                        play(playable(ids, in: items))
+                        play(Self.playable(ids, in: items))
                     }
                 }
             }
@@ -116,17 +116,17 @@ struct DiscoverRowView: View {
     }
 
     /// The selected items' ids in display order, skipping kinds that can't be played.
-    private func playable(_ ids: Set<RecommendationItem.ID>, in items: [RecommendationItem]) -> [MediaID] {
+    static func playable(_ ids: Set<RecommendationItem.ID>, in items: [RecommendationItem]) -> [MediaID] {
         items.filter { ids.contains($0.id) }.compactMap(\.mediaID)
     }
 
     private func play(_ ids: [MediaID]) {
-        player.playFromLibrary(request(ids, mode: .replace()))
+        player.playFromLibrary(Self.request(ids, mode: .replace()))
         // Played rows (recently played) change; the hint refreshes them after a quiet moment.
         if !ids.isEmpty { discover.scheduleRefresh() }
     }
 
-    private func request(_ ids: [MediaID], mode: PlayMode) -> PlayRequest? {
+    static func request(_ ids: [MediaID], mode: PlayMode) -> PlayRequest? {
         ids.isEmpty ? nil : PlayRequest(items: ids, mode: mode)
     }
 }

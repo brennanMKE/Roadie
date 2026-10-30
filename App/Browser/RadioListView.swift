@@ -30,9 +30,13 @@ struct RadioListView: View {
     }
 
     private func play(_ ids: Set<MediaID>) {
-        // One station plays at a time: the first selected in list order.
-        guard let id = (list ?? library.radios).items.first(where: { ids.contains($0.id) })?.id else { return }
-        player.playFromLibrary(PlayRequest(items: [id], mode: .replace()))
+        player.playFromLibrary(Self.request(ids, in: (list ?? library.radios).items))
+    }
+
+    /// One station plays at a time: the first selected in list order. nil when none is in `stations`.
+    static func request(_ ids: Set<MediaID>, in stations: [LibraryRadio]) -> PlayRequest? {
+        guard let id = stations.first(where: { ids.contains($0.id) })?.id else { return nil }
+        return PlayRequest(items: [id], mode: .replace())
     }
 }
 
@@ -72,11 +76,16 @@ struct AddRadioSheet: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Add") { add() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(adding || RadioURLInput.parse(url) == nil)
+                    .disabled(!Self.canAdd(url: url, adding: adding))
             }
         }
         .padding()
         .frame(width: 380)
+    }
+
+    /// Add is on for an http(s) URL with a host, while no add is in flight.
+    static func canAdd(url: String, adding: Bool) -> Bool {
+        !adding && RadioURLInput.parse(url) != nil
     }
 
     private func add() {

@@ -67,16 +67,47 @@ where ListItem.ID: Sendable, Item.ID: Hashable {
 
     @ViewBuilder
     private var footer: some View {
-        if list.isLoadingMore {
+        switch PagedListFooter(list) {
+        case .loading:
             HStack { Spacer(); ProgressView().controlSize(.small); Spacer() }
-        } else if let error = list.loadMoreError {
+        case .error(let error):
             HStack {
                 Text(error).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Retry") { list.retryLoadMore() }
             }
-        } else if let label = LibraryFormat.countLabel(list) {
+        case .count(let label):
             Text(label).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+        case .nothing:
+            EmptyView()
         }
+    }
+}
+
+/// The last row of a paged list (#0215): a spinner while the next page loads, its failure with Retry, the
+/// "n of m" count, or nothing when the total is unknown.
+enum PagedListFooter: Equatable {
+    case loading
+    case error(String)
+    case count(String)
+    case nothing
+
+    init(isLoadingMore: Bool, loadMoreError: String?, countLabel: String?) {
+        if isLoadingMore {
+            self = .loading
+        } else if let loadMoreError {
+            self = .error(loadMoreError)
+        } else if let countLabel {
+            self = .count(countLabel)
+        } else {
+            self = .nothing
+        }
+    }
+
+    @MainActor
+    init<Item>(_ list: PagedList<Item>) {
+        self.init(
+            isLoadingMore: list.isLoadingMore, loadMoreError: list.loadMoreError,
+            countLabel: LibraryFormat.countLabel(list))
     }
 }
