@@ -63,6 +63,17 @@ struct ProbeState: Decodable {
     var firstRunVersion: Int?
     /// Music Assistant server resolutions started (#0209); nil outside UI-test mode.
     var maResolutions: Int?
+    /// The Jump to File panel while on screen (#0204); nil when closed.
+    var jump: JumpProbe?
+
+    struct JumpProbe: Decodable {
+        var results: [Int]
+        var selected: [Int]
+        var empty: String?
+        var queueTitle: String
+        var rowHeight: Double
+    }
+
     /// The equalizer (#0207); nil from an older app.
     var eq: EQProbe?
 

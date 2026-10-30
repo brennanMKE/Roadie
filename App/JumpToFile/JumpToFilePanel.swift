@@ -61,6 +61,16 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         rebuild()
     }
 
+    /// What the state probe reports while the panel is on screen (#0204); nil when it is closed.
+    var probe: TestProbe.JumpProbe? {
+        guard let panel, panel.isVisible, let controller else { return nil }
+        return TestProbe.JumpProbe(
+            results: controller.results.map(\.index),
+            selected: controller.selectedRows.compactMap { controller.results.indices.contains($0) ? controller.results[$0].index : nil },
+            empty: controller.emptyStateText, queueTitle: queueButton.title,
+            rowHeight: Double(table.rowHeight + table.intercellSpacing.height))
+    }
+
     // MARK: Data
 
     private func observe(_ id: Int) {
