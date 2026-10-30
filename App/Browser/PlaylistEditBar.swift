@@ -5,11 +5,25 @@ import SwiftUI
 struct PlaylistEditBar: View {
     let editor: PlaylistEditor
 
+    /// What the bar shows: the edit in flight wins over an older refusal (#0215).
+    enum Content: Equatable {
+        case pending(String)
+        case error(String)
+        case nothing
+    }
+
+    static func content(pending: String?, error: String?) -> Content {
+        if let pending { return .pending(pending) }
+        if let error { return .error(error) }
+        return .nothing
+    }
+
     var body: some View {
-        if let pending = editor.pending {
+        switch Self.content(pending: editor.pending?.text, error: editor.error) {
+        case .pending(let text):
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text(pending.text)
+                Text(text)
                 Spacer()
             }
             .font(.caption)
@@ -17,7 +31,7 @@ struct PlaylistEditBar: View {
             .padding(.vertical, 6)
             .background(.bar)
             .accessibilityIdentifier("library.playlist.editBar")
-        } else if let error = editor.error {
+        case .error(let error):
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary).accessibilityHidden(true)
                 Text(error).lineLimit(2)
@@ -30,6 +44,8 @@ struct PlaylistEditBar: View {
             .padding(.vertical, 6)
             .background(.bar)
             .accessibilityIdentifier("library.playlist.editBar")
+        case .nothing:
+            EmptyView()
         }
     }
 }

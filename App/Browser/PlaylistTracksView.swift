@@ -66,8 +66,10 @@ struct PlaylistTracksView: View {
         }
     }
 
-    private var confirmTitle: String {
-        "Remove \(confirmRemoving?.count ?? 0) tracks from \u{201C}\(playlist.name)\u{201D}?"
+    private var confirmTitle: String { Self.confirmTitle(count: confirmRemoving?.count ?? 0, playlist: playlist.name) }
+
+    static func confirmTitle(count: Int, playlist name: String) -> String {
+        "Remove \(count) tracks from \u{201C}\(name)\u{201D}?"
     }
 
     private func askToRemove(_ ids: Set<MediaID>) {
