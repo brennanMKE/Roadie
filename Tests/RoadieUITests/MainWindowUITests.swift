@@ -50,12 +50,17 @@ final class MainWindowUITests: RoadieUITestCase {
             "main.position after seeking to 50 %: \(roadie.describe(element(AXID.Main.position)))")
 
         XCTAssertTrue(timeValue.hasPrefix("elapsed"), "time \(timeValue)")
-        roadie.click(element(AXID.Main.time))
-        XCTAssertTrue(roadie.waitForValue(element(AXID.Main.time)) { $0.hasPrefix("remaining") }, "time \(timeValue)")
-        XCTAssertTrue(roadie.wait { self.roadie.probe?.timeMode == "remaining" }, "probe: \(roadie.probeJSON)")
-        roadie.click(element(AXID.Main.time))
-        XCTAssertTrue(roadie.waitForValue(element(AXID.Main.time)) { $0.hasPrefix("elapsed") }, "time \(timeValue)")
-        XCTAssertTrue(roadie.wait { self.roadie.probe?.timeMode == "elapsed" }, "probe: \(roadie.probeJSON)")
+        // Paused, the digits blink once a second; five clicks about 0.5 s apart land in both phases every run (#0202's
+        // bug: a click while the digits were hidden missed).
+        for i in 1...5 {
+            let mode = i % 2 == 1 ? "remaining" : "elapsed"
+            roadie.click(element(AXID.Main.time))
+            XCTAssertTrue(
+                roadie.wait(timeout: 2) { self.roadie.probe?.timeMode == mode },
+                "click \(i) didn't switch to \(mode); probe: \(roadie.probeJSON)")
+            XCTAssertTrue(roadie.waitForValue(element(AXID.Main.time)) { $0.hasPrefix(mode) }, "time \(timeValue)")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
     }
 
     func testVolumeAndBalance() {

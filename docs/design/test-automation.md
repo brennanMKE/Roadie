@@ -179,7 +179,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 
 | Feature | Test |
 |---|---|
-| Roadie › About, Settings… (⌘,), Quit (⌘Q; stops a Music Assistant target first, #0121) | UI `MenuBarUITests` (about panel appears; Settings opens; quit stop: `QuitStopTests` unit) |
+| Roadie › About, Settings… (⌘,), Quit (⌘Q; stops a Music Assistant target first, #0121) | UI `MenuBarUITests` (items exist; about panel appears; ⌘Q quits and writes the queue); Settings opens in `SkinsUITests`; quit stop: `QuitStopTests` unit |
 | Check for Updates… (Sparkle; disabled in Debug) | UI `MenuBarUITests.checkForUpdatesIsDisabledInDebug`; release-side `check-sparkle.sh` |
 | File › Open… ⌘O, Add to Playlist… ⌥⌘O, Open Skin… ⇧⌘O, Load Playlist…, Save Playlist… ⌘S | UI `MenuBarUITests` (item exists and enabled); the panel path through `-RoadieOpenFiles` in `PlaylistUITests.openFilesReplacesTheQueue`; Unit `RoadieTests.PlayerModelFilesTests` (M3U/PLS round trip via `PlaylistFileTests`) |
 | Skins › Skin Library… ⌘K, Next ⌘], Previous ⌘[, Random ⇧⌘R | UI `SkinsUITests` |
@@ -187,7 +187,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Playback › Previous/Play/Pause/Stop/Next ⌃⌘Z X C V B | UI `MenuBarUITests.menuBarTransport` |
 | Playback › Jump to File… ⌘J | UI `JumpToFileUITests` |
 | Playback › Seek ±5 s ⌃⌘←/→, Volume ⌃⌘↑/↓ | UI `MenuBarUITests.seekAndVolumeShortcuts` |
-| Playback › Shuffle ⌃⌘S, Repeat ⌃⌘R (check marks) | UI `MainWindowUITests.shuffleRepeatToggles` |
+| Playback › Shuffle ⌃⌘S, Repeat ⌃⌘R (check marks) | UI `MainWindowUITests.shuffleRepeatToggles` (the probe's `shuffle`/`repeatAll` is the assertion; XCUITest may not expose the check mark) |
 | Playback › Save Queue as Playlist…, Load Playlist from Library… (#0190) | UI `MusicAssistantUITests.saveQueueAsPlaylist`, `.loadPlaylistFromLibraryMenuItem`; Unit `QueueSaveTargetTests` |
 | Playback › Favorite Current Track ⌃⌘L | UI `MusicAssistantUITests.favoriteCurrentTrack`; Unit `BackendFavoritesTests` |
 | Playlist › Add File… / Add Folder… / Add URL…, Remove Selected, Crop, Clear Playlist, Select All / None / Invert, Sort by Title / File Name / Path ⌥⌘1–3, Reverse List, Randomize List, File Info…, Generate HTML Playlist, Load Playlist… ⌥⌘L, Save Playlist… ⌥⌘S; enabled as the shown queue allows (#0226) | UI `PlaylistUITests.testPlaylistMenuBarHasEveryCommand`, `.testPlaylistMenuBarEditsTheQueue`, `.testPlaylistMenuBarLoadsAndSaves`; Unit SkinKit `PlaylistMenuTests`, `RoadieTests.PlaylistCommandTests`, `.PlaylistMenuBuilderTests` |
@@ -201,7 +201,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Opens from the title-bar button and right-click | UI `MainWindowUITests.popUpMenuOpens` |
 | About Roadie, Check for Updates… (enabled state) | UI `MainWindowUITests.popUpMenuItems`; Unit `RoadieTests.MainMenuBuilderTests` |
 | Play File…, Add to Playlist… | Unit `MainMenuBuilderTests` (dispatch to `openFiles(replace:)`) |
-| Equalizer / Playlist Editor / Media Library with check marks | UI `MainWindowUITests.popUpTogglesWindows` |
+| Equalizer / Playlist Editor with check marks (Media Library: present only, `popUpMenuOpens`) | UI `MainWindowUITests.popUpTogglesWindows` |
 | Skins ▸ Open Skin…, Next, Previous, Random (enabled with an index) | UI `SkinsUITests.popUpSkinsSubmenu` |
 | Options ▸ Time Elapsed / Remaining, Always On Top, Double Size, Windowshade ×3, Repeat, Shuffle | UI `MainWindowUITests.optionsSubmenu`; Unit `MainMenuTests` (SkinKit) |
 | Playback ▸ transport, Jump to File… | UI `MainWindowUITests.playbackSubmenu` |
@@ -222,7 +222,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Visualizer (spectrum / oscilloscope / off via the clutter bar `V` menu) | UI `MainWindowUITests.visualizerMenu`; Unit `VisBarsTests`, `VisRendererTests` (exist) |
 | Clutter bar: O (options menu), A (always on top), I (file info), D (double size) | UI `MainWindowUITests.clutterBar`; Unit `ClutterBarLayoutTests` (exists) |
 | Title bar: menu, minimize, shade, close; double-click title shades | UI `MainWindowUITests.titleBar` |
-| Shade mode: transport, position, time, marquee | UI `MainWindowUITests.shadeMode`, `SkinSmokeUITests` |
+| Shade mode: transport, time (position and marquee untested) | UI `MainWindowUITests.shadeMode`, `SkinSmokeUITests` |
 | Always on top, double size (persist across launches) | UI `MainWindowUITests.alwaysOnTopAndDoubleSize`; Unit `RoadieTests.WindowLayoutTests` |
 | Window drag, docking, snapping, group raise; layout restored at launch | UI `MainWindowUITests.dragDocksTheEqualizer`; Unit `WindowDockingTests` (exist), `RoadieTests.WindowLayoutTests` |
 | Drop audio files / folders / a `.wsz` on the window | Unit `RoadieTests.DropDecoderTests`, `PlayerModelSkinTests`; `open -a` path in `PlaylistUITests.openFilesReplacesTheQueue` |
@@ -342,7 +342,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 |---|---|
 | Quick Look thumbnail and preview for `.wsz` | `app-quicklook` step (exists) |
 | Now Playing / media keys | Unit `NowPlayingTests` (full tier); *by hand* |
-| Dock reopen shows the windows | UI `MainWindowUITests.reopenShowsWindows` (`open -a` while running) |
+| Dock reopen shows the windows | UI `MainWindowUITests.reopenShowsWindows` (`open -b` while running) |
 | Legacy data cleanup | Unit `RoadieTests.LegacyDataCleanupTests` |
 | Info.plist, entitlements, bundle identifiers, website, changelog | existing steps |
 

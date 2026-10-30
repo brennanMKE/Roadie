@@ -180,9 +180,17 @@ final class MenuBarUITests: RoadieUITestCase {
 
     func testQuitStopsTheApp() {
         launchPlaying()
+        let queue = (dataDirectory as NSString).appendingPathComponent("queue.json")
+        func modified() -> Date? {
+            (try? FileManager.default.attributesOfItem(atPath: queue))?[.modificationDate] as? Date
+        }
+        let before = modified()
+        RunLoop.current.run(until: Date().addingTimeInterval(1.1))
         roadie.app.typeKey("q", modifierFlags: .command)
         XCTAssertTrue(roadie.app.wait(for: .notRunning, timeout: 5), "⌘Q didn't quit")
-        let queue = (dataDirectory as NSString).appendingPathComponent("queue.json")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: queue), "no queue.json after quit at \(queue)")
+        // Quit writes the queue: the file is new, or newer than before the quit.
+        let after = modified()
+        XCTAssertNotNil(after, "no queue.json after quit at \(queue)")
+        if let before, let after { XCTAssertGreaterThan(after, before, "quit didn't rewrite queue.json") }
     }
 }

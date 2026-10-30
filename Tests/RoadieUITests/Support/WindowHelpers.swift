@@ -214,11 +214,6 @@ extension RoadieUITestCase {
         if (try? open.run()) != nil { open.waitUntilExit() }
     }
 
-    func assertClose(_ a: CGFloat, _ b: CGFloat, _ what: String, tolerance: CGFloat = 1.5,
-                     file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertLessThanOrEqual(abs(a - b), tolerance, "\(what): \(a) vs \(b)", file: file, line: line)
-    }
-
     /// Whether `below`'s top edge sits on `above`'s bottom edge, left edges aligned (docked).
     func isDocked(_ below: XCUIElement, under above: XCUIElement) -> Bool {
         let a = above.frame, b = below.frame

@@ -518,6 +518,8 @@ class RoadieUITestCase: XCTestCase {
     /// first such launch (`-RoadieSeedSkins`; the sandboxed runner can't write it); it survives relaunches.
     /// `withoutSkins` leaves those manifest skins out of the copy (a Museum download then adds one back).
     /// `museumFeatured`: the fixture Museum's browse page leads with that skin (`-RoadieMuseumFeatured`).
+    /// `openFiles`: the queue at launch, stopped at row 0 (`-RoadieOpenFiles`); don't also pass `-RoadieOpenFiles` in
+    /// `extra`, since the later value would win and the test would read the wrong queue.
     func launch(
         skin: TestSkin = .base291, library: TestLibrary = .folder, scenario: String? = nil, firstRun: Bool = false,
         windows: Windows = [.main, .playlist], volume: Int = 50, skinsFolder: SkinsFolder = .testSkins,
