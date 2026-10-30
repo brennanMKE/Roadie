@@ -143,7 +143,7 @@ final class LibraryViewLogicTests: XCTestCase {
         XCTAssertEqual(PagedListFooter(isLoadingMore: false, loadMoreError: nil, countLabel: nil), .nothing)
 
         // From a real list: the first page loaded with a known total shows the count.
-        let ids = (0..<3).map { MediaID(.track, "t\($0)") }
+        let ids = (0..<3).map { MediaID(.radio, "r\($0)") }
         let list = PagedList<LibraryRadio>(loader: { _ in
             Page(items: ids.prefix(2).map { LibraryRadio(id: $0, name: $0.rawValue) }, offset: 0, total: 3, nextOffset: nil)
         })

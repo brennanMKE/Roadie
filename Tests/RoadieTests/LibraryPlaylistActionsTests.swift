@@ -33,7 +33,7 @@ final class LibraryPlaylistActionsTests: PlayerModelTestCase {
             tracks += try await model.backend.tracks(of: album.id)
         }
         let first = try XCTUnwrap(tracks.first, "the recording has no album tracks")
-        return (model, server, [first.id, MediaID(.track, "library://track/987654")])
+        return (model, server, [first.id, MediaID(.track, "library://track/synthetic-2")])
     }
 
     /// A folder-backend model (nothing to edit or favourite) and one of its tracks.
@@ -59,8 +59,7 @@ final class LibraryPlaylistActionsTests: PlayerModelTestCase {
         let add = try XCTUnwrap(sent(server, "music/playlists/add_playlist_tracks").last)
         XCTAssertEqual(add.args["db_playlist_id"]?.stringValue, playlist.libraryID ?? playlist.id.rawValue)
         XCTAssertEqual((add.args["uris"]?.arrayValue ?? []).compactMap(\.stringValue), ids.map(\.rawValue))
-        let expected = LibraryBrowser.AddToPlaylistMenu.notice(adding: ids, to: playlist)
-        try await waitUntil("the notice") { model.notice?.text == expected }
+        try await waitUntil("the notice") { model.notice?.text == "Added 2 tracks to Road Trip" }
         XCTAssertEqual(model.library.playlistsModel.recentTargets.first, playlist.id)
         XCTAssertNil(model.library.playlistsModel.message)
     }
@@ -81,7 +80,8 @@ final class LibraryPlaylistActionsTests: PlayerModelTestCase {
         model.createPlaylist(named: "Empty", adding: [])
         try await waitUntil("the second create") { self.sent(server, "music/playlists/create_playlist").count == 2 }
         try await Task.sleep(for: .milliseconds(100))
-        XCTAssertFalse(model.notice?.text.hasPrefix("Added") ?? false, "\(String(describing: model.notice))")
+        XCTAssertNil(model.notice)
+        XCTAssertNil(model.library.playlistsModel.message)
         XCTAssertEqual(sent(server, "music/playlists/add_playlist_tracks").count, 1)
     }
 
@@ -94,6 +94,8 @@ final class LibraryPlaylistActionsTests: PlayerModelTestCase {
         model.createPlaylist(named: "Nope", adding: [track.id])
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertTrue(model.notice == nil || model.notice == before, "\(String(describing: model.notice))")
+        XCTAssertNil(model.library.playlistsModel.message)
+        XCTAssertTrue(model.library.playlistsModel.recentTargets.isEmpty)
 
         let refused = try XCTUnwrap(MusicBackendError.unsupported(.playlistEditing).errorDescription)
         model.addToPlaylist([track.id], LibraryPlaylist(id: MediaID(.playlist, "nowhere"), name: "Nowhere"))
