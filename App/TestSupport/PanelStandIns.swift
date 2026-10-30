@@ -10,6 +10,8 @@ import Foundation
 /// - `-RoadieAddFolder`: ADD › Add Folder.
 /// - `-RoadieLoadList`: LIST › Load / File › Load Playlist….
 /// - `-RoadieSaveTo`: LIST › Save / File › Save Playlist…'s destination (the format follows the extension).
+/// - `-RoadieChooseFolder` (#0209): the music-folder panel (Settings › Library, the Welcome); read by
+///   `chooseMusicFolder(startingAt:)`, which has no `PlayerModel`.
 extension PlayerModel {
     enum PanelStandIn: String {
         case openFiles = "RoadieOpenFiles"

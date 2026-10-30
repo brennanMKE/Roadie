@@ -58,6 +58,9 @@ struct ProbeState: Decodable {
     var shuffle: Bool?
     var repeatAll: Bool?
     var timeMode: String?
+    var sendspinEnabled: Bool?
+    /// The UI-test suite's stored `firstRunVersion` (#0209); nil when unset.
+    var firstRunVersion: Int?
 
     struct VisProbe: Decodable {
         var open: Bool
@@ -230,6 +233,14 @@ final class RoadieUIApp {
     /// Any element with this identifier (skinned controls aren't all buttons).
     func element(_ id: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: id).firstMatch
+    }
+
+    /// Whether a static text under `root` has `text` in its label or its value, as two queries: a SwiftUI section header
+    /// has only a label, a row's text only a value, and one OR-ed predicate missed the headers (#0209).
+    func textExists(_ text: String, in root: XCUIElement) -> Bool {
+        let texts = root.descendants(matching: .staticText)
+        return texts.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.exists
+            || texts.matching(NSPredicate(format: "value CONTAINS %@", text)).firstMatch.exists
     }
 
     func count(_ id: String) -> Int {

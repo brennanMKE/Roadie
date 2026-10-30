@@ -310,7 +310,9 @@ Test design for a headless, silent guest:
   come from the app. `RoadieConfiguration.fromProcess()` (#0194) reads these launch arguments; test mode is on only
   with `-RoadieUITest 1`, and only in Debug builds (Release ignores them and ships no stub fixtures):
   - `-RoadieDataDir <path>`: queue, skin index, thumbnails, folder index and Museum caches go here (default: a new
-    temp folder). Defaults go to the emptied `co.sstools.roadie.uitest` suite, which still sees `-key value` arguments.
+    temp folder), and so does the default skins folder a fresh install creates (`<data>/Roadie/Skins`, not
+    `~/Roadie/Skins`; #0209). Defaults go to the emptied `co.sstools.roadie.uitest` suite, which still sees `-key value`
+    arguments (so read a value the app stored, like `firstRunVersion`, from the probe, not through the suite).
   - `-RoadieMAScenario <name>`: #0197's scripted Music Assistant (`ScriptedMusicAssistant`; `libraryIdle`, `queueLoaded`,
     `playingOnSpeaker`, `thisMacIsASendspinPlayer`, `unreachable`, `badToken`) with one verified server at
     `http://ma.example:8095` and an in-memory token. An unknown name stops the app. Without it, Music Assistant is
@@ -333,6 +335,8 @@ Test design for a headless, silent guest:
     anything). In test mode the open and save panels with no stand-in are recorded in the probe's `panelRequests`
     instead of shown.
   - `-RoadieKeepDefaults 1` (#0202): a relaunch within one test keeps the defaults suite, to check what persists.
+  - `-RoadieChooseFolder <path>` (#0209): the music-folder panel (Settings › Library, the Welcome) answers with this
+    folder instead of opening.
   The hosted unit-test run (`RoadieTests`) picks an isolated configuration of its own (temp data directory, fresh
   defaults suite, no Music Assistant, no discovery), so `⌘U` on a dev Mac leaves the real state alone.
 - **No user skins or music.** `Skins/`, `*.wsz` and `*.mp3` are gitignored, and third-party skins

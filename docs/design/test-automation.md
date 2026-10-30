@@ -315,9 +315,13 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 |---|---|
 | Welcome window on a fresh install: Skins (Browse Museum / Choose Folder / Open Skin), Music Folder (Choose / Open Library), Music Assistant (Set Up…), Continue marks `firstRunVersion` | UI `FirstLaunchUITests.welcomeOnFreshDefaults`; Unit `FirstRunPolicyTests` (exists), `RoadieTests.FirstRunStateTests` |
 | Existing user: no Welcome, version recorded | UI `FirstLaunchUITests.existingUserSkipsWelcome` |
+| Welcome › Browse the Skin Museum… opens the Skins window on the Museum tab | UI `FirstLaunchUITests.welcomeOpensMuseum` |
+| Welcome › Choose Music Folder… (`-RoadieChooseFolder` stand-in) sets the folder and indexes it | UI `FirstLaunchUITests.chooseMusicFolderFromWelcome` |
+| Help › Welcome to Roadie… reopens the Welcome; Help topics open the help site | UI `FirstLaunchUITests.helpMenu` |
 | Settings › Library: source picker (Music Assistant / folder), status and Retry Now, folder Choose/Clear, index status, Reindex | UI `SettingsUITests.libraryTab`; Unit `FolderSettingsModelTests`, `LibrarySourceControllerTests` (exist) |
 | Settings › Music Assistant: servers add/remove, name, address, token, Remove Token, Test Connection / Cancel, Check Now, Replace With This Server…, Play on this Mac, Stop when quitting, Wi-Fi networks, Find Servers | UI `SettingsUITests.musicAssistantTab` (scripted server answers the test); Unit `SettingsModelTests`, `ServerStoreTests`, `DiscoveryTests`, `AddressInputTests` (exist) |
 | Settings › Updates: toggles, Check Now, last check, "off in development builds" | UI `SettingsUITests.updatesTab` (Debug: controls disabled) |
+| Settings' five tabs exist; the selected tab persists across close and reopen | UI `SettingsUITests.settingsTabPersists` (Visualization's own rows: `VisualizationUITests`, #0241) |
 | Sparkle appcast, EdDSA, feed URL in Release | `app-sparkle`, `app-release-plist` steps and `scripts/verify-dmg.sh` (exist); *by hand*: the update prompt on a real install |
 
 ### 5.10 Music Assistant flows

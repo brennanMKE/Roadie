@@ -24,6 +24,8 @@ final class SkinLibraryModel {
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let databaseURL: URL
+    /// Where `applyDefaultFolderIfNeeded` creates the folder: `~/Roadie/Skins`, or inside a test data directory.
+    @ObservationIgnored private let defaultFolderURL: URL
     @ObservationIgnored private var store: SkinIndexStore?
     @ObservationIgnored private var opening: Task<SkinIndexStore, Error>?
     @ObservationIgnored private var indexer: SkinIndexer?
@@ -35,10 +37,11 @@ final class SkinLibraryModel {
 
     init(
         defaults: UserDefaults = .standard, databaseURL: URL = SkinIndexStore.defaultURL,
-        startupDelay: Duration = .seconds(2)
+        defaultFolderURL: URL = DefaultSkinsFolder.url(), startupDelay: Duration = .seconds(2)
     ) {
         self.defaults = defaults
         self.databaseURL = databaseURL
+        self.defaultFolderURL = defaultFolderURL
         folderPath = defaults.string(forKey: Self.folderKey)
         // The window comes up first; with no folder set nothing opens.
         if folderPath != nil {
@@ -115,12 +118,12 @@ final class SkinLibraryModel {
         setFolder(url.path)
     }
 
-    /// #0169: with no folder configured, creates `~/Roadie/Skins`, stores it and starts the index. Returns false when
-    /// the folder couldn't be created (logged; the Welcome window then offers Choose Folder…).
+    /// #0169: with no folder configured, creates `defaultFolderURL` (`~/Roadie/Skins`), stores it and starts the index.
+    /// Returns false when the folder couldn't be created (logged; the Welcome window then offers Choose Folder…).
     @discardableResult
     func applyDefaultFolderIfNeeded() -> Bool {
         guard folderPath == nil else { return true }
-        let url = DefaultSkinsFolder.url()
+        let url = defaultFolderURL
         do {
             try DefaultSkinsFolder.ensure(at: url)
             setFolder(url.path(percentEncoded: false))

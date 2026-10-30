@@ -69,7 +69,7 @@ struct WelcomeView: View {
                     .accessibilityIdentifier("welcome.skins.open")
             }
         } header: {
-            Text("Skins")
+            Text("Skins").accessibilityIdentifier("welcome.header.skins")
         } footer: {
             Text("Download skins from the Winamp Skin Museum into this folder, or open a .wsz you already have.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -90,7 +90,7 @@ struct WelcomeView: View {
                     .accessibilityIdentifier("welcome.music.openLibrary")
             }
         } header: {
-            Text("Music Folder")
+            Text("Music Folder").accessibilityIdentifier("welcome.header.music")
         }
     }
 
@@ -103,7 +103,7 @@ struct WelcomeView: View {
             }
             .accessibilityIdentifier("welcome.ma.setup")
         } header: {
-            Text("Music Assistant (optional)")
+            Text("Music Assistant (optional)").accessibilityIdentifier("welcome.header.ma")
         }
     }
 

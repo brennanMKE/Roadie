@@ -1,6 +1,7 @@
 import FolderBackendKit
 import Foundation
 import LocalPlayback
+import SkinBrowser
 import SkinLibrary
 
 /// What `PlayerModel` wires to (#0194): the real Keychain, network and disk (`.standard`), or the stubs each package
@@ -66,6 +67,9 @@ struct RoadieConfiguration: @unchecked Sendable {
 
     static let standard = RoadieConfiguration()
 
+    /// UI-test mode's defaults suite, emptied at each launch (`fromProcess`).
+    static let uiTestSuite = "co.sstools.roadie.uitest"
+
     /// The launch-argument keys (`-key value` lands in `NSArgumentDomain`, so `open --args` and
     /// `XCUIApplication.launchArguments` both work).
     enum Argument {
@@ -92,6 +96,8 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let visVoiceOver = "RoadieVisVoiceOver"
         static let keepDefaults = "RoadieKeepDefaults"
         static let vanishingFile = "RoadieVanishingFile"
+        /// `-RoadieChooseFolder <path>` (#0209): the music-folder panel's answer in UI-test mode.
+        static let chooseFolder = "RoadieChooseFolder"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -120,8 +126,8 @@ struct RoadieConfiguration: @unchecked Sendable {
         // A suite still reads `NSArgumentDomain`, so `-firstRunVersion 1` and friends reach it.
         // `-RoadieKeepDefaults 1` (#0202): a relaunch within one test keeps the suite, to check what persists.
         configuration.defaults = arguments.bool(forKey: Argument.keepDefaults)
-            ? UserDefaults(suiteName: "co.sstools.roadie.uitest") ?? .standard
-            : Self.freshDefaults("co.sstools.roadie.uitest")
+            ? UserDefaults(suiteName: Self.uiTestSuite) ?? .standard
+            : Self.freshDefaults(Self.uiTestSuite)
         configuration.musicAssistant = arguments.string(forKey: Argument.maScenario).map { .scripted(scenario: $0) } ?? .none
         if arguments.string(forKey: Argument.museum) == "fixtures" {
             let skins = arguments.string(forKey: Argument.museumSkins).map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -220,6 +226,12 @@ struct RoadieConfiguration: @unchecked Sendable {
     var folderIndexDirectory: URL {
         dataDirectory.map { $0.appending(path: "FolderIndex", directoryHint: .isDirectory) }
             ?? FolderIndexCache.defaultDirectory()
+    }
+
+    /// The skins folder created when none is set (#0169): `~/Roadie/Skins`, or `<data>/Roadie/Skins` in a test
+    /// configuration (#0209), so a UI test's fresh install never creates or reads a folder under the real home.
+    var defaultSkinsFolder: URL {
+        dataDirectory.map { DefaultSkinsFolder.url(home: $0) } ?? DefaultSkinsFolder.url()
     }
 
     var museumCachesDirectory: URL {
