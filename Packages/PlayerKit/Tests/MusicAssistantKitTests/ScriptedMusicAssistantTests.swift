@@ -33,6 +33,17 @@ struct ScriptedMusicAssistantTests {
         rig.server.pushedEvents.last { $0.event == name }
     }
 
+    /// The recorder scrubs every `display_name` to "user"; the server restores the player's own name (#0206).
+    @Test func playersAreNamedAfterTheirRecordedNames() async throws {
+        let rig = try await scripted(.libraryIdle)
+        let names = try await rig.backend.outputs().map(\.name)
+        #expect(names.contains("4K Apple TV"))
+        #expect(names.contains("Living Room"))
+        #expect(names.contains("Kitchen"))
+        #expect(!names.contains("user"))
+        await rig.backend.disconnect()
+    }
+
     @Test func queueLoadedRowsHaveIndexZeroAndPositionsFromPaging() async throws {
         let rig = try await scripted(.queueLoaded)
         let queue = try #require(rig.server.queue(for: queueID))
