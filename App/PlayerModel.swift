@@ -367,7 +367,17 @@ final class PlayerModel {
     /// are reported here instead of shown, so a hosted test never blocks on a panel or writes a frame to `.standard`.
     /// Debug only, like #0194's stubs: Release has no hook.
     @ObservationIgnored var systemRequestOverride: ((SystemRequest) -> Void)?
+    /// Unit tests only (#0218): answers the playlist open and save panels (nil: cancelled) instead of showing them.
+    /// Checked before `systemRequestOverride`. Debug only.
+    @ObservationIgnored var panelChooserOverride: ((PanelRequest) async -> URL?)?
+    /// Unit tests only (#0218): answers Save Queue as Playlist…'s name prompt (nil: cancelled). Debug only.
+    @ObservationIgnored var queueNameOverride: (() async -> String?)?
     #endif
+
+    /// The playlist panels `panelChooserOverride` answers (#0218).
+    enum PanelRequest: Equatable {
+        case loadPlaylistFile, savePlaylistFile, exportLibraryPlaylist(name: String), importLibraryPlaylist
+    }
 
     enum SystemRequest: Equatable {
         case openFiles(replace: Bool), openFolder, openSkin, openPlaylistFile, about, quit, jumpToFile, library, settings

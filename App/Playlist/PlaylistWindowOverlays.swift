@@ -194,15 +194,20 @@ final class PlaylistListInputView: NSView {
     private static let dropLog = Logger(subsystem: "co.sstools.roadie", category: "LibraryDrop")
 
     private func dragOperation(_ sender: NSDraggingInfo) -> NSDragOperation {
-        let plan = LibraryDropDecoder.plan(
-            pasteboard: sender.draggingPasteboard, mask: sender.draggingSourceOperationMask, replacing: isOptionDown())
+        dragOperation(pasteboard: sender.draggingPasteboard, mask: sender.draggingSourceOperationMask)
+    }
+
+    /// The operation offered for a drag of `pasteboard`, setting or clearing the drop cue (#0218: testable without an
+    /// `NSDraggingInfo`).
+    func dragOperation(pasteboard: NSPasteboard, mask: NSDragOperation) -> NSDragOperation {
+        let plan = LibraryDropDecoder.plan(pasteboard: pasteboard, mask: mask, replacing: isOptionDown())
         MainActor.assumeIsolated {
             if model.playlist.dropCue != plan?.cue { model.playlist.dropCue = plan?.cue }
         }
         return plan?.operation ?? []
     }
 
-    private func clearDropCue() {
+    func clearDropCue() {
         MainActor.assumeIsolated { model.playlist.dropCue = nil }
     }
 
@@ -223,8 +228,12 @@ final class PlaylistListInputView: NSView {
     /// Files and folders go in before the row under the pointer, or at the end below the last row (Winamp). A remote
     /// queue's row means nothing in the local queue, so there the drop appends as before.
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        performDrop(pasteboard: sender.draggingPasteboard, at: sender.draggingLocation)
+    }
+
+    /// The drop of `pasteboard` at `location` (window coordinates); #0218 tests call it without an `NSDraggingInfo`.
+    func performDrop(pasteboard: NSPasteboard, at location: NSPoint) -> Bool {
         clearDropCue()
-        let pasteboard = sender.draggingPasteboard
         let replacing = isOptionDown()
         if LibraryDropDecoder.hasMediaID(pasteboard) {
             guard let ids = LibraryDropDecoder.mediaIDs(from: pasteboard), !ids.isEmpty else {
@@ -235,7 +244,7 @@ final class PlaylistListInputView: NSView {
             return MainActor.assumeIsolated {
                 // Library items go through the selected output's backend and its gates (a folder library on a speaker
                 // is refused with a notice). Music Assistant can't place items, so there they append (#0173 decision 4).
-                let row = row(atY: skinPoint(windowPoint: sender.draggingLocation).y) ?? model.playlist.count
+                let row = row(atY: skinPoint(windowPoint: location).y) ?? model.playlist.count
                 Self.dropLog.info("drop: \(ids.count) id(s) at row \(row), \(replacing ? "replace" : "insert", privacy: .public)")
                 model.dropLibraryItems(ids, at: row, replacing: replacing)
                 return true
@@ -247,7 +256,7 @@ final class PlaylistListInputView: NSView {
             let playlist = model.playlist
             let row: Int? = playlist.remote != nil || replacing
                 ? nil
-                : (row(atY: skinPoint(windowPoint: sender.draggingLocation).y) ?? playlist.count)
+                : (row(atY: skinPoint(windowPoint: location).y) ?? playlist.count)
             Self.dropLog.info("drop: \(urls.count) file(s), \(replacing ? "replace" : "insert", privacy: .public)")
             return model.open(urls, replace: replacing, at: row)
         }

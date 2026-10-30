@@ -24,7 +24,12 @@ enum SaveQueueSheet {
             response = alert.runModal()
         }
         guard response == .alertFirstButtonReturn else { return nil }
-        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return playlistName(from: field.stringValue)
+    }
+
+    /// The typed name trimmed, or nil when nothing but whitespace is left (#0218).
+    nonisolated static func playlistName(from typed: String) -> String? {
+        let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? nil : name
     }
 }
