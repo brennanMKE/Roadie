@@ -1,0 +1,20 @@
+# target	floor (percent line coverage). Read by scripts/coverage-report.sh (#0212); fails only --coverage (milestone) runs.
+# AudioCore is 80 in a --full run (coverage_report.py TIER_FLOORS).
+# Baseline floors (#0212): a goal above the first measured number is lowered to that number, rounded down; the goals
+# (85 packages, 70/80 AudioCore, App 60 rising to 80) are in docs/design/test-automation.md §2.4 and come back with the
+# backfill issues.
+SkinKit	85
+SkinLibrary	85
+SkinBrowser	85
+SkinMuseum	85
+WindowDocking	85
+MusicBackendKit	78	# goal 85; baseline 78.7% (run 20261024-234000-43501), backfill #0214
+LibraryBrowser	85
+MusicAssistantKit	85
+FolderBackendKit	85
+LocalPlayback	85
+SendspinKit	84	# goal 85; baseline 85.0% (584/687 lines, less than one line over 85, so the floor has no margin at 85), backfill #0214
+SendspinPlayback	85
+VisualizationKit	85	# goal 85; measured 98.5% (run 20261029-191545-21712)
+AudioCore	70
+App	60	# goal 60, then +10 per milestone to 80; measured 69.4% on main 5db3b3d (run 20261029-191545-21712; 40.5% before #0202/#0203/#0208/M17/M18)

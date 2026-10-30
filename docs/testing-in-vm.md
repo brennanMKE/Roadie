@@ -23,6 +23,7 @@ scripts/verify.sh --expect-fail newTestName  # bug fix, before the fix: passes o
 scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, app unit tests (RoadieTests), Info.plist check (slow tests skipped)
 scripts/run-tests-vm.sh --build-only   # compile check only: both packages with their tests, then the app; no tests run, not verification
 scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)
+scripts/run-tests-vm.sh --coverage # also measure line coverage (#0212): step coverage-report, coverage/{report.md,lowest.txt,summary.txt} in the results, a COVERAGE line; fails under scripts/coverage-floors.tsv, so milestone-end runs only
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s (with -firstRunVersion 1, so no Welcome window), then quit it
 scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
 scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
@@ -250,9 +251,21 @@ consolidated on 2026-10-11.
    `stress: <fails>/<N> failed`; it also saves the guest's CoreAudio log as `guest-coreaudio.log`. `set -o pipefail` is set **inside the guest's
    shell**; without it the status is `tee`'s, which is always 0. Changeover reported false passes
    that way until 2026-10-04.
-8. **Pull results** with `tart exec … tar -cf - . | tar -x`, into `build/vm-tests/<run-id>/`.
-9. **Check the host's audio log**, then print the summary and write it to `summary.txt`.
-10. **Clean up in the `EXIT` trap.** Release the lease first, so a waiting run starts sooner, then
+8. **Coverage** (`--coverage`, #0212). The package builds and tests add `--enable-code-coverage`, and the app and UI
+   `xcodebuild` steps `-enableCodeCoverage YES`. A `coverage-report` step after the tests runs
+   `scripts/coverage-report.sh ~/results/coverage`. For each package, one `llvm-cov report` call takes all of the
+   package's test binaries (SwiftPM builds one `<TestTarget>.xctest` per test target; each is one `-object`) against its
+   `default.profdata`. For the app, `xccov` reads the unit and UI result bundles: the max per file across bundles,
+   `App/` only, a file's `Roadie.app` row only when a test bundle compiles it too, and `App/TestSupport/` left out.
+   `scripts/coverage_report.py` aggregates per target into `report.md`, `lowest.txt` (the twenty least-covered files
+   over 40 lines), `summary.txt` and `packages.txt`. The step fails with `coverage: FLOOR <target> <pct> < <floor>`
+   when a target is under `scripts/coverage-floors.tsv` (AudioCore 80 in `--full`), or `coverage: MISSING <target>`
+   when a floored target has no files measured, so only the milestone-end run passes `--coverage`. Without a complete
+   UI run (no `--ui`, or `ui-tests` failed or timed out) the App number is partial: `coverage: PARTIAL App …`, its
+   floor not checked (the run fails on `ui-tests` anyway; see "Time limit" under UI tests).
+9. **Pull results** with `tart exec … tar -cf - . | tar -x`, into `build/vm-tests/<run-id>/`.
+10. **Check the host's audio log**, then print the summary and write it to `summary.txt`.
+11. **Clean up in the `EXIT` trap.** Release the lease first, so a waiting run starts sooner, then
     the memory-signal request; `tart stop` and `tart delete` the clone; `rm -rf` the export.
     The last line printed is `==> Summary: <path>`.
 
@@ -282,9 +295,30 @@ scripts/verify.sh --ui --expect playsTheFixtureLibrary
 - **Flags:** `--ui`, `--ui-filter Class[,Class]` (`-only-testing:RoadieUITests/Class`), `--ui-skins base|all`
   (`ROADIE_TEST_SKIN_SET`, default `base`). `--build-only` rejects `--ui`.
 - **Steps:** `ui-build` (after `app-build`: `build-for-testing` with the UI scheme) and `ui-tests`
-  (`test-without-building`, `-retry-tests-on-failure -test-iterations 2`, under `scripts/with-timeout.sh 1200`; a
-  timeout exits 124 and the report says "a blocked prompt in the guest?"). The paths reach the test runner as
+  (`test-without-building`, `-retry-tests-on-failure -test-iterations 2`, under `scripts/with-timeout.sh`). The paths reach the test runner as
   `TEST_RUNNER_ROADIE_TEST_SKINS` / `_MUSIC` / `_DATA` / `_SKIN_SET`, plus `TEST_RUNNER_ROADIE_UI_GUEST=1`.
+- **Time limit** (#0212): `ui-tests` runs under a limit sized from the work by `scripts/ui_timeout.py`, so a real hang
+  (a blocked prompt) still fails but a long suite doesn't. The run prints it before the step (`ui-tests limit: 4050 s
+  (all classes, skins base, --coverage)`).
+
+  | Run | Limit |
+  |---|---|
+  | `--ui-filter …` (per issue) | 20 min (1200 s) |
+  | the whole suite | 45 min (2700 s) |
+  | `--coverage` | × 1.5 (instrumented tests are slower) |
+  | `--ui-skins all` | + 15 min (the other six skins' smoke tests) |
+  | cap | 90 min (5400 s) |
+
+  So a per-issue run gets 20 min (30 with `--coverage`), `--full --ui --coverage` 67.5 min (4050 s) and the
+  milestone-end run (`--ui-skins all --coverage`) 82.5 min (4950 s). For scale: run 20261029-191545-21712 ran 102
+  tests with coverage in 1143 s, and the 1200 s limit it had then stopped the next run's 111 tests during test 95 (94 finished). Raise
+  the numbers in `ui_timeout.py` when a passing suite's time nears its limit. A timed-out step exits 124, and the
+  summary says so in a `TIMEOUT` line, which `verify.sh` passes through: `==> TIMEOUT  ui-tests ran out of time:
+  stopped after 1203 s at its 1200 s limit, 94 tests finished, running
+  VisualizationUITests.testOverlayStaysUpWhilePaused. Not a test failure; …`. With `--coverage`, a UI step that
+  failed or timed out (or a run without `--ui`) makes the App number partial: `coverage-report` prints
+  `coverage: PARTIAL App <pct> (floor 60% not checked: ui-tests timed out)` instead of a floor failure, `report.md`
+  marks the row `partial`, and the `COVERAGE` line reads `App 27% (partial)`.
 - **Display:** the clone (never the golden) gets `tart set --display 2560x1300px` before it boots.
 - **What comes back:** `build/vm-tests/<id>/ui/UITests.xcresult`, `ui/summary.json` (`xcresulttool get test-results
   summary`) and `ui/attachments/<testName>/` (a screenshot and the state probe's JSON, kept for failed tests). The
