@@ -166,6 +166,13 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
 - **Short idle timeouts race the query.** XCUITest's first query after a `hover()` lands about a second later; with
   the overlay's idle timeout at 1 s the card was already gone (#0238). Give the hook room (3 s), find the element
   first, then wait on the condition for it to go.
+- **The Library's Output popover dumps empty but its rows answer queries (#0206).** `describe(popover)` (and a
+  failure's accessibility dump) lists the popover under `library.output` as `Disabled` with no children (run
+  20261029-225156-6686), yet `popover.checkBoxes` and `popover.buttons` find "This Mac", "Speakers", each speaker's
+  checkbox and the `Only` buttons. Don't debug it from the dump; query the controls. The
+  `library.output.<player id>` identifier is on each row's `HStack` and doesn't reach its Toggle or its Only button,
+  so find a row's checkbox by its label (the player's name) and take the Only button at the same index
+  (`MusicAssistantUITests.selectOnly`).
 
 ## Gotchas carried over from the cameron setup
 

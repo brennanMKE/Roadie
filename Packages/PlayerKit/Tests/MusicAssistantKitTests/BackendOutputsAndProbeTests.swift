@@ -107,4 +107,24 @@ struct BackendOutputsAndProbeTests {
         #expect(rig.backend.sourceID == "musicAssistant")
         #expect(rig.backend.displayName == "Music Assistant")
     }
+
+    /// An output shows the player's `display_name` (its user-facing name on the live server) over `name` (#0206).
+    @Test func outputNameIsTheDisplayName() throws {
+        let device = OutputDevice(ma: try player(name: "Kitchen", displayName: "Den"))
+        #expect(device.name == "Den")
+    }
+
+    /// An empty or missing `display_name` falls back to `name` (#0206).
+    @Test func outputNameFallsBackToNameWithoutADisplayName() throws {
+        let empty = OutputDevice(ma: try player(name: "Kitchen", displayName: ""))
+        let missing = OutputDevice(ma: try player(name: "Kitchen", displayName: nil))
+        #expect(empty.name == "Kitchen")
+        #expect(missing.name == "Kitchen")
+    }
+
+    private func player(name: String, displayName: String?) throws -> MAPlayer {
+        var object: [String: Any] = ["player_id": "p1", "name": name, "available": true]
+        if let displayName { object["display_name"] = displayName }
+        return try JSONDecoder().decode(MAPlayer.self, from: JSONSerialization.data(withJSONObject: object))
+    }
 }

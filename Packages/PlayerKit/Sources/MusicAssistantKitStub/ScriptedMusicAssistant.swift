@@ -18,6 +18,8 @@ import os
 ///   unhandled exception), with details that don't read as the buffered-track refusal;
 /// - the order of a command's reply and its events is unverified, so it is a setting (`eventOrder`);
 /// - every queue keeps `player-queue-get.json`'s `display_name` ("user");
+/// - every player's `display_name` is its recorded `name` (#0206): the recorder scrubs every `display_name` to
+///   "user", while the live server sends the player's own name there, so every speaker would read "user";
 /// - user playlists' `owner` ("Music Assistant") is the live server's value, 2026-10-27 (#0221); the recorded
 ///   `owner` is scrubbed.
 public final class ScriptedMusicAssistant: @unchecked Sendable {
@@ -361,7 +363,7 @@ public final class ScriptedMusicAssistant: @unchecked Sendable {
         let players = scenario == .thisMacIsASendspinPlayer ? library.playersAllSendspin : library.playersAll
         for player in players {
             guard let id = player["player_id"]?.stringValue else { continue }
-            s.players[id] = player
+            s.players[id] = player["name"].map { set(player, ["display_name": $0]) } ?? player
             s.playerOrder.append(id)
             s.queues[id] = Queue(queueID: id, items: [], currentIndex: nil, state: "idle", repeatMode: "off", shuffleEnabled: false)
         }
