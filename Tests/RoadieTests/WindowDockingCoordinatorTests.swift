@@ -6,9 +6,9 @@ import XCTest
 @testable import Roadie
 
 /// `WindowDockingCoordinator` (#0219) with the three skinned windows on an isolated model: the first-launch stack, the
-/// legacy frame seed, off-screen recovery and the end of a drag. The geometry itself is `WindowDocking`'s tests'.
-/// Also `SkinCursorController.stepFrame`, the animated cursor's step, driven with explicit steps.
-final class WindowDockingTests: PlayerModelTestCase {
+/// legacy frame seed, off-screen recovery and the end of a drag, plus `SkinWindowController`'s backing change and
+/// `show()` with no reference window. The geometry itself is the `WindowDocking` package's `WindowDockingTests`.
+final class WindowDockingCoordinatorTests: PlayerModelTestCase {
     private var controllers: [SkinWindowController] = []
 
     override func tearDown() async throws {
@@ -42,6 +42,11 @@ final class WindowDockingTests: PlayerModelTestCase {
         XCTAssertEqual(eq.window.frame.minY, playlist.window.frame.maxY, accuracy: 0.5)
         XCTAssertEqual(main.window.frame.minX, eq.window.frame.minX, accuracy: 0.5)
         XCTAssertEqual(main.window.frame.minX, playlist.window.frame.minX, accuracy: 0.5)
+        // The group is centred on the primary screen's work area (`LayoutRules.stackedAndCentered` rounds up).
+        let screen = try XCTUnwrap(NSScreen.screens.first).visibleFrame
+        let group = main.window.frame.union(eq.window.frame).union(playlist.window.frame)
+        XCTAssertEqual(group.midX, screen.midX, accuracy: 1)
+        XCTAssertEqual(group.midY, screen.midY, accuracy: 1)
     }
 
     func testLegacyFramesSeedLayout() throws {
@@ -128,26 +133,8 @@ final class WindowDockingTests: PlayerModelTestCase {
         main.show()
         XCTAssertTrue(main.isPositioned)
         XCTAssertTrue(main.window.isVisible)
-        XCTAssertTrue(NSScreen.screens.contains { $0.visibleFrame.intersects(main.window.frame) })
-    }
-
-    func testCursorStepWrapsAndClampsFrames() {
-        let steps = [
-            SkinCursor.Step(frame: 0, duration: 0.1), SkinCursor.Step(frame: 1, duration: 0.25),
-            SkinCursor.Step(frame: 5, duration: 0),
-        ]
-        let first = SkinCursorController.stepFrame(at: 0, steps: steps, frameCount: 2)
-        XCTAssertEqual(first.index, 0)
-        XCTAssertEqual(first.frame, 0)
-        XCTAssertEqual(first.interval, 0.1, accuracy: 1e-9)
-        let second = SkinCursorController.stepFrame(at: 1, steps: steps, frameCount: 2)
-        XCTAssertEqual(second.frame, 1)
-        XCTAssertEqual(second.interval, 0.25, accuracy: 1e-9)
-        let clamped = SkinCursorController.stepFrame(at: 2, steps: steps, frameCount: 2)
-        XCTAssertEqual(clamped.frame, 1, "a step past the last frame shows the last one")
-        XCTAssertEqual(clamped.interval, 1.0 / 60, accuracy: 1e-9, "a zero duration waits one 60 Hz frame")
-        let wrapped = SkinCursorController.stepFrame(at: 4, steps: steps, frameCount: 2)
-        XCTAssertEqual(wrapped.index, 1)
-        XCTAssertEqual(wrapped.frame, 1)
+        // `NSWindow.center()`: horizontally centred on the screen it lands on.
+        let screen = try XCTUnwrap(NSScreen.screens.first { $0.visibleFrame.intersects(main.window.frame) })
+        XCTAssertEqual(main.window.frame.midX, screen.visibleFrame.midX, accuracy: 1)
     }
 }

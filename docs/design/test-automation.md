@@ -246,8 +246,8 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Title bar: menu, minimize, shade, close; double-click title shades | UI `MainWindowUITests.titleBar` |
 | Shade mode: transport, time (position and marquee untested) | UI `MainWindowUITests.shadeMode`, `SkinSmokeUITests` |
 | Always on top, double size (persist across launches) | UI `MainWindowUITests.alwaysOnTopAndDoubleSize`; Unit `RoadieTests.WindowLayoutTests` |
-| Window drag, docking, snapping, group raise; layout restored at launch | UI `MainWindowUITests.dragDocksTheEqualizer`; Unit `WindowDockingTests` (exist), `RoadieTests.WindowLayoutTests`, `RoadieTests.WindowDockingTests` (first-launch stack, legacy frame seed, off-screen recovery, end-of-drag docking, backing change, `show()` without a reference window; #0219) |
-| Animated skin cursors: step wrap, frame clamp, minimum interval | Unit `RoadieTests.WindowDockingTests.testCursorStepWrapsAndClampsFrames` (`SkinCursorController.stepFrame`; #0219); the timer and `NSCursor.set()` *by hand* |
+| Window drag, docking, snapping, group raise; layout restored at launch | UI `MainWindowUITests.dragDocksTheEqualizer`; Unit `WindowDockingTests` (exist), `RoadieTests.WindowLayoutTests`, `RoadieTests.WindowDockingCoordinatorTests` (first-launch stack centred on the primary screen, legacy frame seed, off-screen recovery, end-of-drag docking, backing change, `show()` without a reference window centres it; #0219) |
+| Animated skin cursors: step wrap, frame clamp, minimum interval | Unit `RoadieTests.SkinCursorControllerTests.testCursorStepWrapsAndClampsFrames` (`SkinCursorController.stepFrame`; #0219); the timer and `NSCursor.set()` *by hand* |
 | Drop audio files / folders / a `.wsz` on the window | Unit `RoadieTests.DropDecoderTests`, `PlayerModelSkinTests`; `open -a` path in `PlaylistUITests.openFilesReplacesTheQueue` |
 | Bare hotkeys Z X C V B, arrows, S R L J while a skinned window is key | UI `MainWindowUITests.bareHotkeys`; Unit `WinampHotkeysTests` (exists) |
 | "No Skin Loaded" placeholder with Browse Museum / Open Skin | UI `SkinsUITests.noSkinPlaceholder` |
