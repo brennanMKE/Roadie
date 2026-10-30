@@ -8,12 +8,12 @@ SkinLibrary	85
 SkinBrowser	85
 SkinMuseum	85
 WindowDocking	85
-MusicBackendKit	78	# goal 85; baseline 78.7% (run 20261024-234000-43501), backfill #0214
+MusicBackendKit	85
 LibraryBrowser	85
 MusicAssistantKit	85
 FolderBackendKit	85
 LocalPlayback	85
-SendspinKit	84	# goal 85; baseline 85.0% (584/687 lines, less than one line over 85, so the floor has no margin at 85), backfill #0214
+SendspinKit	85
 SendspinPlayback	85
 VisualizationKit	85	# goal 85; measured 98.5% (run 20261029-191545-21712)
 AudioCore	70

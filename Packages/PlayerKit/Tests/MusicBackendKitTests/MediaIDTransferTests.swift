@@ -23,4 +23,11 @@ struct MediaIDTransferTests {
         #expect(MediaIDTransfer.decode(data)?.ids == transfer.ids)
         #expect(MediaIDTransfer.decode(Data("nope".utf8)) == nil)
     }
+
+    /// The drag representation is the exported type (#0214).
+    @Test func mediaIDTransferExportsItsType() {
+        _ = MediaIDTransfer.transferRepresentation
+        #expect(UTType.roadieMediaID.identifier == "co.sstools.roadie.media-id")
+        #expect(MediaIDTransfer([]).ids.isEmpty)
+    }
 }
