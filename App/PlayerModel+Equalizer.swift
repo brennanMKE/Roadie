@@ -63,6 +63,10 @@ extension PlayerModel {
     /// Webamp's "From EQF…": the first preset in the chosen file.
     func loadEQF() {
         if intercepted(.loadEQF) { return }
+        if let url = panelStandIn(.loadEQF)?.first {
+            applyEQF(at: url)
+            return
+        }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.allowedContentTypes = Self.presetFileTypes
@@ -70,22 +74,30 @@ extension PlayerModel {
         panel.prompt = "Load"
         Task {
             guard await panel.begin() == .OK, let url = panel.url else { return }
-            do {
-                let presets = try EQFFile.parse(try Data(contentsOf: url))
-                guard let first = presets.first else {
-                    post(StatusNotice(text: "No preset in \(url.lastPathComponent)"))
-                    return
-                }
-                applyEQPreset(first)
-            } catch {
-                post(StatusNotice(text: "Could not read \(url.lastPathComponent)", detail: String(describing: error)))
+            applyEQF(at: url)
+        }
+    }
+
+    private func applyEQF(at url: URL) {
+        do {
+            let presets = try EQFFile.parse(try Data(contentsOf: url))
+            guard let first = presets.first else {
+                post(StatusNotice(text: "No preset in \(url.lastPathComponent)"))
+                return
             }
+            applyEQPreset(first)
+        } catch {
+            post(StatusNotice(text: "Could not read \(url.lastPathComponent)", detail: String(describing: error)))
         }
     }
 
     /// Webamp's "Save": one preset named "Entry1" with the current bands and preamp, default file name `entry.eqf`.
     func saveEQF() {
         if intercepted(.saveEQF) { return }
+        if let url = panelStandIn(.saveTo)?.first {
+            writeEQF(player.eq, to: url)
+            return
+        }
         let panel = NSSavePanel()
         panel.allowedContentTypes = Self.presetFileTypes.first.map { [$0] } ?? []
         panel.nameFieldStringValue = "entry.eqf"
@@ -93,10 +105,14 @@ extension PlayerModel {
         let current = player.eq
         Task {
             guard await panel.begin() == .OK, let url = panel.url else { return }
-            let data = EQFFile.serialize([EQPreset(name: "Entry1", preamp: current.preamp, gains: current.gains)])
-            do { try data.write(to: url) } catch {
-                post(StatusNotice(text: "Could not save \(url.lastPathComponent)", detail: error.localizedDescription))
-            }
+            writeEQF(current, to: url)
+        }
+    }
+
+    private func writeEQF(_ eq: EQState, to url: URL) {
+        let data = EQFFile.serialize([EQPreset(name: "Entry1", preamp: eq.preamp, gains: eq.gains)])
+        do { try data.write(to: url) } catch {
+            post(StatusNotice(text: "Could not save \(url.lastPathComponent)", detail: error.localizedDescription))
         }
     }
 }

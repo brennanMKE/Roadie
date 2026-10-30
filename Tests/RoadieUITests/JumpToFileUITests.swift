@@ -172,6 +172,7 @@ final class JumpToFileUITests: RoadieUITestCase {
         openWithJ()
         type("tone c")
         expectResults([0, c, 5])
+        XCTAssertTrue(roadie.wait { self.jump?.selected == [0] }, "table row 0 isn't selected; probe: \(roadie.probeJSON)")
         let second = tableRow(1)
         second.click()
         XCTAssertTrue(roadie.wait { self.jump?.selected == [c] }, "the click didn't select row \(c); probe: \(roadie.probeJSON)")

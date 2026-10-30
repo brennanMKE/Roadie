@@ -74,6 +74,17 @@ struct ProbeState: Decodable {
         var rowHeight: Double
     }
 
+    /// The equalizer (#0207); nil from an older app.
+    var eq: EQProbe?
+
+    struct EQProbe: Decodable {
+        var isEnabled: Bool
+        var preamp: Float
+        var gains: [Float]
+        var windowOpen: Bool
+        var shaded: Bool
+    }
+
     struct VisProbe: Decodable {
         var open: Bool
         var rendering: Bool
