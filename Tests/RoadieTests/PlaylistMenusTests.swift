@@ -123,8 +123,8 @@ final class PlaylistMenusTests: PlayerModelTestCase {
     }
 }
 
-/// The skins folder setting (#0211). The real default folder (`applyDefaultFolderIfNeeded`) is under the user's home,
-/// so only an already-set folder is checked here.
+/// The skins folder setting (#0211). The default folder (`applyDefaultFolderIfNeeded`, #0169) is checked at a
+/// `defaultFolderURL` inside the test's data directory (#0209), never under the user's home.
 @MainActor
 final class SkinLibraryModelTests: PlayerModelTestCase {
     func testFolderSetAndClear() throws {
@@ -154,5 +154,34 @@ final class SkinLibraryModelTests: PlayerModelTestCase {
             startupDelay: .seconds(3600))
         XCTAssertTrue(library.applyDefaultFolderIfNeeded())
         XCTAssertEqual(library.folderPath, folder.path)
+    }
+
+    /// #0209: with no folder set, the default folder is created and stored.
+    func testApplyDefaultFolderCreatesAndStoresTheDefault() throws {
+        let configuration = try testConfiguration()
+        let data = try XCTUnwrap(configuration.dataDirectory)
+        let folder = data.appending(path: "Home/Roadie/Skins", directoryHint: .isDirectory)
+        let path = folder.path(percentEncoded: false)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: path))
+        let library = SkinLibraryModel(
+            defaults: configuration.defaults, databaseURL: data.appending(path: "skins.sqlite"),
+            defaultFolderURL: folder, startupDelay: .seconds(3600))
+        XCTAssertTrue(library.applyDefaultFolderIfNeeded())
+        library.cancel()
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), "\(path) wasn't created")
+        XCTAssertTrue(isDirectory.boolValue)
+        XCTAssertEqual(library.folderPath, path)
+        XCTAssertEqual(configuration.defaults.string(forKey: SkinLibraryModel.folderKey), path)
+    }
+
+    /// #0209: a test configuration's default skins folder is `<data>/Roadie/Skins`, so a UI test's fresh install never
+    /// creates `~/Roadie/Skins`.
+    func testTestConfigurationDefaultSkinsFolderIsInItsDataDirectory() throws {
+        let configuration = try testConfiguration()
+        let data = try XCTUnwrap(configuration.dataDirectory)
+        XCTAssertEqual(
+            configuration.defaultSkinsFolder.standardizedFileURL.path(percentEncoded: false),
+            data.appending(path: "Roadie/Skins", directoryHint: .isDirectory).standardizedFileURL.path(percentEncoded: false))
     }
 }

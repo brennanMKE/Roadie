@@ -3,8 +3,10 @@ import XCTest
 /// Settings' tabs (#0209; design docs/design/test-automation.md §5.9, the Updates rows of §5.1). Visualization's own
 /// tests are in VisualizationUITests (#0241). Run only in the Tart guest: scripts/verify.sh --ui. Every launch uses test mode's own defaults suite and data directory.
 final class SettingsUITests: RoadieUITestCase {
-    private func launchReady(library: TestLibrary = .folder, scenario: String? = nil) {
-        launch(library: library, scenario: scenario)
+    private func launchReady(
+        library: TestLibrary = .folder, scenario: String? = nil, keepingDefaults: Bool = false, extra: [String] = []
+    ) {
+        launch(library: library, scenario: scenario, keepingDefaults: keepingDefaults, extra: extra)
         XCTAssertTrue(roadie.main.play.waitForExistence(timeout: 10), "main.play never appeared")
     }
 
@@ -107,7 +109,7 @@ final class SettingsUITests: RoadieUITestCase {
     }
 
     func testLibraryTab() {
-        launchReady()
+        launchReady(extra: ["-RoadieChooseFolder", paths.music])
         openSettings(tab: "Library", marker: "library.source")
         let folder = sourceOption("Local Folder")
         var ma = sourceOption("Music Assistant")
@@ -127,6 +129,13 @@ final class SettingsUITests: RoadieUITestCase {
         XCTAssertTrue(
             roadie.wait { text("library.folder").contains("No folder chosen") }, "Clear left \(text("library.folder"))")
         XCTAssertFalse(roadie.element("library.reindex").isEnabled, "Reindex enabled with no folder")
+        // Choose… (answered by -RoadieChooseFolder) sets the folder again and indexes it.
+        tap(roadie.element("library.choose"))
+        XCTAssertTrue(
+            roadie.wait { text("library.folder").contains(paths.music) }, "Choose… left \(text("library.folder"))")
+        XCTAssertTrue(
+            roadie.wait(timeout: 60) { text("library.status").contains("track") },
+            "Choose… never indexed: \(text("library.status"))")
 
         // Relaunch with the scripted server: switching the source to Music Assistant changes the Library's sidebar.
         roadie.terminate()
@@ -157,6 +166,22 @@ final class SettingsUITests: RoadieUITestCase {
             roadie.element("library.sourceStatus").waitForExistence(timeout: 15),
             "no library.sourceStatus with Music Assistant unreachable; source: \(roadie.describe(settingsWindow))")
         XCTAssertTrue(roadie.element("library.sourceRetry").exists, "no Retry Now with Music Assistant unreachable")
+
+        // No server configured, Music Assistant preferred: the Library offers Find Servers on This Network. Bonjour is
+        // off (-RoadieNoDiscovery), but the well-known host homeassistant.local is still probed, through the stub
+        // transport that answers `/info` for any host, so the search finds one server to add.
+        roadie.terminate()
+        launchReady(library: .none, extra: ["-LibrarySource", "musicAssistant"])
+        roadie.app.typeKey("l", modifierFlags: .command)
+        let find = roadie.element("library.findServers")
+        XCTAssertTrue(find.waitForExistence(timeout: 15), "no Find Servers with no Music Assistant server")
+        roadie.click(find)
+        XCTAssertTrue(
+            roadie.element("ma.discovered.add").waitForExistence(timeout: 15),
+            "Find Servers offered nothing: \(roadie.describe(find))")
+        XCTAssertTrue(
+            roadie.wait { roadie.textExists("homeassistant.local", in: roadie.app) },
+            "the offered server isn't homeassistant.local")
     }
 
     func testMusicAssistantTab() {
@@ -177,25 +202,64 @@ final class SettingsUITests: RoadieUITestCase {
             roadie.wait { (token.placeholderValue ?? "").contains("Saved in Keychain") },
             "token prompt: \(token.placeholderValue ?? "nil")")
 
-        tap(roadie.element("ma.test"))
-        XCTAssertTrue(hasText("Verified: ", timeout: 15), "Test Connection never verified")
+        // The seeded server already reads "Verified: …"; ma.status only shows once a test has run.
+        let status = roadie.element("ma.status")
+        XCTAssertFalse(status.exists, "ma.status before Test Connection: \(text("ma.status"))")
+        // The recordings' host, http://ma.example:8095, is neither local nor Tailscale, so the editor flags it ("Use
+        // https…") and Test Connection is disabled (run 20261029-193431-29071's screenshot). Move the server to a
+        // `.local` name first: the stub answers `/info` for any host with the same server id, so it stays this server.
+        replaceText(address, with: "ma.local:8095\r")
+        XCTAssertTrue(roadie.waitForValue(address) { $0.contains("ma.local") }, "address: \(roadie.value(of: address))")
+        let test = roadie.element("ma.test")
+        XCTAssertTrue(roadie.wait { test.isEnabled }, "Test Connection disabled at ma.local:8095")
+        tap(test)
+        XCTAssertTrue(
+            roadie.wait(timeout: 15) { text("ma.status").contains("Connected to Scripted Music Assistant") },
+            "Test Connection never connected: \(text("ma.status"))")
+
+        // Check Now runs a server resolution: the probe counts them (the scripted one finishes too fast to see the
+        // button disabled).
+        // The address change above re-resolves on its own: let that finish before counting.
         let checkNow = roadie.element("ma.checkNow")
+        XCTAssertTrue(roadie.wait(timeout: 15) { checkNow.isEnabled }, "a resolution never finished")
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        let resolutions = roadie.probe?.maResolutions
+        XCTAssertNotNil(resolutions, "probe lacks maResolutions: \(roadie.probeJSON)")
         tap(checkNow)
-        XCTAssertTrue(roadie.wait(timeout: 15) { checkNow.isEnabled }, "Check Now never finished")
+        XCTAssertTrue(
+            roadie.wait(timeout: 15) { (roadie.probe?.maResolutions ?? 0) > (resolutions ?? 0) && checkNow.isEnabled },
+            "Check Now ran no resolution; probe: \(roadie.probeJSON)")
         XCTAssertFalse(text("ma.reason").trimmingCharacters(in: .whitespaces).isEmpty, "ma.reason is empty")
 
-        // Add a second server; the scripted factory answers for any host.
+        // Add a second server; the scripted factory answers for any host, and accepts any token.
         let before = serverRows(servers).count
         tap(roadie.element("ma.add"))
         XCTAssertTrue(roadie.wait { serverRows(servers).count == before + 1 },
             "Add Server added no row: \(roadie.describe(servers))")
         replaceText(name, with: "Second")
-        replaceText(address, with: "ma2.example:8095\r")
-        XCTAssertTrue(roadie.waitForValue(address) { $0.contains("ma2.example") }, "address: \(roadie.value(of: address))")
-        tap(roadie.element("ma.test"))
+        replaceText(address, with: "ma2.local:8095\r")
+        XCTAssertTrue(roadie.waitForValue(address) { $0.contains("ma2.local") }, "address: \(roadie.value(of: address))")
+        XCTAssertTrue(roadie.wait { test.isEnabled }, "Test Connection disabled at ma2.local:8095")
+        // No token stored for it: the server is found, and asks for one.
+        tap(test)
         XCTAssertTrue(
-            roadie.wait(timeout: 15) { !text("ma.status").trimmingCharacters(in: .whitespaces).isEmpty },
-            "Test Connection on the second server reported nothing")
+            roadie.wait(timeout: 15) { text("ma.status").contains("Enter a token.") },
+            "Test Connection without a token: \(text("ma.status"))")
+        // A typed token: Test Connection connects and saves it, which enables Remove Token.
+        replaceText(token, with: "second-server-token")
+        tap(test)
+        XCTAssertTrue(
+            roadie.wait(timeout: 15) { text("ma.status").contains("Connected to Second") },
+            "Test Connection with a token: \(text("ma.status"))")
+        let removeToken = roadie.element("ma.removeToken")
+        XCTAssertTrue(roadie.wait { removeToken.isEnabled }, "Remove Token disabled after the token was saved")
+        XCTAssertTrue(
+            roadie.wait { (token.placeholderValue ?? "").contains("Saved in Keychain") },
+            "token prompt after saving: \(token.placeholderValue ?? "nil")")
+        tap(removeToken)
+        XCTAssertTrue(
+            roadie.wait { (token.placeholderValue ?? "").contains("Long-lived token") && !removeToken.isEnabled },
+            "Remove Token left the token; prompt: \(token.placeholderValue ?? "nil")")
         tap(roadie.element("ma.remove"))
         XCTAssertTrue(roadie.wait { serverRows(servers).count == before }, "Remove Server left the row")
 
@@ -225,13 +289,7 @@ final class SettingsUITests: RoadieUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(1))
         XCTAssertTrue(roadie.main.play.exists, "the app went away after Use Current Network")
         XCTAssertFalse(remove.exists, "Use Current Network added a network in the guest")
-
-        // Discovery is off (-RoadieNoDiscovery): Find Servers, where shown, finds none.
-        let find = roadie.element("library.findServers")
-        if find.exists {
-            tap(find)
-            XCTAssertTrue(hasText("No servers found", timeout: 15), "Find Servers didn't report none")
-        }
+        // Find Servers lives in the Library window; libraryTab covers it.
     }
 
     func testUpdatesTab() {
@@ -241,6 +299,7 @@ final class SettingsUITests: RoadieUITestCase {
         XCTAssertFalse(roadie.element("updates.autoDownload").isEnabled, "auto-download enabled in Debug")
         XCTAssertFalse(roadie.element("updates.checkNow").isEnabled, "Check Now enabled in Debug")
         XCTAssertTrue(hasText("Updates are off in development builds."), "no development-build note")
+        XCTAssertTrue(hasText("Last checked"), "no last-check row")
         let appMenu = roadie.app.menuBars.menuBarItems.element(boundBy: 1)
         appMenu.click()
         let item = appMenu.menuItems["Check for Updates…"]
@@ -264,5 +323,13 @@ final class SettingsUITests: RoadieUITestCase {
         XCTAssertTrue(roadie.wait { !roadie.element("skins.folder").exists }, "⌘W didn't close Settings")
         roadie.app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(roadie.element("skins.folder").waitForExistence(timeout: 10), "Settings didn't reopen on Skins")
+
+        // The choice is stored (`settingsSelectedTab`): a relaunch on the same defaults opens Settings on Skins.
+        roadie.terminate()
+        launchReady(keepingDefaults: true)
+        roadie.app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(
+            roadie.element("skins.folder").waitForExistence(timeout: 10), "Settings didn't open on Skins after a relaunch")
+        XCTAssertFalse(roadie.element("library.source").exists, "Settings opened on Library after a relaunch")
     }
 }

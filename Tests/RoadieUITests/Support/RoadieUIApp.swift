@@ -61,6 +61,8 @@ struct ProbeState: Decodable {
     var sendspinEnabled: Bool?
     /// The UI-test suite's stored `firstRunVersion` (#0209); nil when unset.
     var firstRunVersion: Int?
+    /// Music Assistant server resolutions started (#0209); nil outside UI-test mode.
+    var maResolutions: Int?
 
     struct VisProbe: Decodable {
         var open: Bool

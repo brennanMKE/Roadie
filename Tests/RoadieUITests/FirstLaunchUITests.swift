@@ -73,12 +73,15 @@ final class FirstLaunchUITests: RoadieUITestCase {
         XCTAssertTrue(hasText(defaultFolder, timeout: 5), "skins folder isn't <data>/\(defaultFolder)")
         XCTAssertTrue(hasText("0 skins", timeout: 10), "the default folder doesn't count 0 skins")
         XCTAssertNil(roadie.probe?.firstRunVersion, "firstRunVersion stored before Continue; probe: \(roadie.probeJSON)")
-        // No skins in the default folder: the Welcome opened the Museum at once.
+        // No skins in the default folder: the Welcome opened the Museum at once (the button: welcomeOpensMuseum).
         expectMuseum()
 
+        // Open Skin… asks for the open panel (recorded, not shown, in test mode).
         bringWelcomeForward()
-        roadie.click(button("welcome.skins.museum"))
-        expectMuseum()
+        roadie.click(button("welcome.skins.open"))
+        XCTAssertTrue(
+            roadie.wait { roadie.probe?.panelRequests?.contains("openSkin") == true },
+            "Open Skin… asked for no panel; probe: \(roadie.probeJSON)")
 
         // Open Library is disabled with no music folder; the Music Assistant button opens Settings on its tab.
         bringWelcomeForward()
@@ -102,8 +105,15 @@ final class FirstLaunchUITests: RoadieUITestCase {
 
     func testWelcomeOpensMuseum() {
         launchFresh()
-        // The empty default folder opens the Museum with the Welcome.
+        // The empty default folder opens the Museum with the Welcome (welcomeOnFreshDefaults checks that); close it, so
+        // the button's own Museum is what the check below sees.
         expectMuseum()
+        let skinsWindow = roadie.app.windows.containing(NSPredicate(format: "identifier == %@", AXID.Skins.source)).firstMatch
+        let close = skinsWindow.buttons[XCUIIdentifierCloseWindow]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "the Skins window has no close button")
+        close.click()
+        XCTAssertTrue(
+            roadie.wait { !roadie.element(AXID.Skins.source).exists }, "the Skins window didn't close")
         bringWelcomeForward()
         roadie.click(button("welcome.skins.museum"))
         expectMuseum()
@@ -136,5 +146,9 @@ final class FirstLaunchUITests: RoadieUITestCase {
         XCTAssertTrue(hasText("track", timeout: 60), "the status never read the indexing result")
         XCTAssertTrue(
             roadie.wait(timeout: 5) { button("welcome.music.openLibrary").isEnabled }, "Open Library still disabled")
+        roadie.click(button("welcome.music.openLibrary"))
+        XCTAssertTrue(
+            roadie.element(AXID.Library.sidebar("albums")).waitForExistence(timeout: 10),
+            "Open Library didn't open the Library window")
     }
 }
