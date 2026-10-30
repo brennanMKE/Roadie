@@ -23,14 +23,17 @@ struct MuseumGridView: View {
 
     @ViewBuilder
     private func footer(_ museum: MuseumBrowserModel) -> some View {
-        if let message = museum.loadMoreError {
+        switch GridFooterContent.content(loadMoreError: museum.loadMoreError, isLoadingMore: museum.isLoadingMore) {
+        case .error(let message):
             HStack {
                 Text(message).foregroundStyle(.secondary)
                 Button("Retry") { museum.retryLoadMore() }
             }
             .padding(.bottom)
-        } else if museum.isLoadingMore {
+        case .loading:
             ProgressView().padding(.bottom)
+        case .nothing:
+            EmptyView()
         }
     }
 }
