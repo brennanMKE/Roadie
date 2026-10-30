@@ -108,29 +108,29 @@ Targets (line coverage). These are the goals; `scripts/coverage-floors.tsv` hold
 | `AudioCore` | 70 % (fast) / 80 % (full) | Real-time paths only run in the full tier |
 | `App` (Roadie target, `RoadieTests` + UI tests) | 60 %, rising 10 points per milestone to 80 % | Views are covered by UI tests; the composition root has start-up paths (Keychain, Sparkle) that tests must not run |
 
-Current measurement (run `20261029-191545-21712`, `--full --ui --coverage`, main at 5db3b3d after #0202, #0203, #0208 and M17–M18; the full report and the first baseline, run `20261024-234000-43501`, are in `issues/0212.md` ## Notes). Enforced floor in bold where it is below the goal:
+Current measurement (run `20261029-202842-54408`, `--full --ui --coverage`, main at 8d452b1 after #0202, #0203, #0208, #0209 and M17–M18, with the report counting as below; the full report and the earlier runs, the first baseline `20261024-234000-43501` and `20261029-191545-21712`, are in `issues/0212.md` ## Notes). Enforced floor in bold where it is below the goal:
 
 | Target | Lines | Measured | Goal | Floor |
 |---|---|---|---|---|
 | `SkinKit` | 3,589 | 97.2 % | 85 % | 85 % |
 | `SkinLibrary` | 1,656 | 95.6 % | 85 % | 85 % |
 | `SkinBrowser` | 742 | 91.1 % | 85 % | 85 % |
-| `SkinMuseum` | 457 | 93.0 % | 85 % | 85 % |
+| `SkinMuseum` | 457 | 93.4 % | 85 % | 85 % |
 | `WindowDocking` | 585 | 97.1 % | 85 % | 85 % |
 | `MusicBackendKit` | 544 | 78.7 % | 85 % | **78 %** (#0214) |
 | `LibraryBrowser` | 2,626 | 90.7 % | 85 % | 85 % |
 | `MusicAssistantKit` | 5,069 | 90.6 % | 85 % | 85 % |
 | `FolderBackendKit` | 1,272 | 92.6 % | 85 % | 85 % |
 | `LocalPlayback` | 410 | 97.1 % | 85 % | 85 % |
-| `SendspinKit` | 687 | 85.0 % | 85 % | **84 %** (#0214) |
+| `SendspinKit` | 687 | 85.3 % | 85 % | **84 %** (#0214) |
 | `SendspinPlayback` | 195 | 92.3 % | 85 % | 85 % |
-| `AudioCore` (full) | 4,210 | 93.9 % | 80 % | 80 % |
-| `VisualizationKit` | 470 | 98.5 % | 85 % | 85 % |
-| `App` | 16,768 | 69.4 % | 60 % → 80 % | 60 % |
+| `AudioCore` (full) | 4,210 | 94.0 % | 80 % | 80 % |
+| `VisualizationKit` | 470 | 98.3 % | 85 % | 85 % |
+| `App` | 16,734 | 75.9 % | 60 % → 80 % | 60 % |
 
-Per package (`COVERAGE` line): SkinKit 96 %, PlayerKit 91 %, App 69 %. In the first baseline App was 40.5 % of 13,368 lines; the UI tests of #0202, #0203 and #0208 account for most of the rise. The App row still counts `App/TestSupport/` (61 lines, 53 covered); without it, as the report now counts, App is 69.3 % of 16,707 lines. The `COVERAGE` line shows package totals only; each target's floor is enforced per target and listed next to its measurement in `coverage/report.md`. `MusicLibraryKit` (95.7 %) has no floor yet; stub, fixture, `skintool` and `CAtomics` targets are reported but not counted.
+Per package (`COVERAGE` line): SkinKit 96 %, PlayerKit 92 %, App 76 %. App was 40.5 % of 13,368 lines in the first baseline and 69.4 % of 16,768 in run `20261029-191545-21712` (which still counted `App/TestSupport/`). The UI tests of #0202, #0203, #0208 and #0209 account for most of the rise. The `COVERAGE` line shows package totals only; each target's floor is enforced per target and listed next to its measurement in `coverage/report.md`. `MusicLibraryKit` (95.7 %) has no floor yet; stub, fixture, `skintool` and `CAtomics` targets are reported but not counted.
 
-The floors fail only the milestone run (`--coverage` sets them; per-issue runs don't measure). Gaps are picked from `lowest.txt` and the per-file numbers in `app-1`/`app-2.xccov.json` and `<Package>.llvm-cov.txt`: each file under its target's floor that holds user-facing logic becomes a row in a backfill issue, highest-risk first (anything on the play, queue, drag or Music Assistant paths). The first set was filed from the baseline run as #0214–#0219 and refreshed from run `20261029-191545-21712`: each now names only the files still under the goal there (the App is over its 60 % floor; these are the files that hold it under 80 %), and the gaps no area issue owned went to #0214 (`MAWebSocketTransport`), #0215 (`PlayerModel+Favorites`), #0218 (`PlayerModel+QueueSave`) and #0207 (`PlayerModel+Equalizer`).
+The floors fail only the milestone run (`--coverage` sets them; per-issue runs don't measure). Gaps are picked from `lowest.txt` and the per-file numbers in `app-1`/`app-2.xccov.json` and `<Package>.llvm-cov.txt`: each file under its target's floor that holds user-facing logic becomes a row in a backfill issue, highest-risk first (anything on the play, queue, drag or Music Assistant paths). The first set was filed from the baseline run as #0214–#0219, refreshed from run `20261029-191545-21712` and checked against `20261029-202842-54408` (which closed most of #0216 and `LibraryStatusView` in #0215): each now names only the files still under the goal (the App is over its 60 % floor; these are the files that hold it under 80 %), and the gaps no area issue owned went to #0214 (`MAWebSocketTransport`), #0215 (`PlayerModel+Favorites`), #0218 (`PlayerModel+QueueSave`) and #0207 (`PlayerModel+Equalizer`).
 
 ## 3. UI tests
 
