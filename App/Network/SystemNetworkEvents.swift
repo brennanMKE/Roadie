@@ -20,18 +20,28 @@ struct SystemNetworkEvents: NetworkChangeSource {
 private final class MonitorBox: @unchecked Sendable {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "co.sstools.roadie.network-path")
-    private var sawInitialPath = false
+    private var filter = PathChangeFilter()
 
     func start(_ onChange: @escaping @Sendable () -> Void) {
         monitor.pathUpdateHandler = { [self] _ in
-            guard sawInitialPath else {
-                sawInitialPath = true
-                return
-            }
-            onChange()
+            if filter.isChange() { onChange() }
         }
         monitor.start(queue: queue)
     }
 
     func cancel() { monitor.cancel() }
+}
+
+/// The current path when monitoring starts is not a change; every later update is (#0216).
+struct PathChangeFilter {
+    private var sawInitialPath = false
+
+    /// Call once per path update; true when it should be yielded.
+    mutating func isChange() -> Bool {
+        guard sawInitialPath else {
+            sawInitialPath = true
+            return false
+        }
+        return true
+    }
 }

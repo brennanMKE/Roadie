@@ -200,7 +200,7 @@ struct MusicAssistantSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
                     .accessibilityIdentifier("ma.status")
-                if case .failed(.serverMismatch) = model.selectedStatus {
+                if Self.offersReplace(model.selectedStatus) {
                     Text("Replacing forgets this server's token. Enter the token of the server that answers now.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -209,6 +209,12 @@ struct MusicAssistantSettingsView: View {
                 }
             }
         }
+    }
+
+    /// The status line adds the mismatch explanation and Replace only for a server mismatch (#0216).
+    static func offersReplace(_ status: MusicAssistantSettingsModel.Status) -> Bool {
+        if case .failed(.serverMismatch) = status { return true }
+        return false
     }
 
     private var failed: Bool {

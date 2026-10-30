@@ -14,6 +14,19 @@ struct SystemServiceBrowser: MusicAssistantServiceBrowser {
         continuation.onTermination = { _ in box.cancel() }
         return stream
     }
+
+    /// A resolved endpoint as a discovered host; IPv6 and non-host-port endpoints give nil (#0216).
+    static func host(of endpoint: NWEndpoint?, type: String) -> MusicAssistantDiscoveredHost? {
+        guard case .hostPort(let host, let port) = endpoint else { return nil }
+        let name: String
+        switch host {
+        case .ipv4(let address): name = address.rawValue.map(String.init).joined(separator: ".")
+        case .name(let n, _): name = n
+        default: return nil  // IPv6 skipped
+        }
+        return MusicAssistantDiscoveredHost(
+            host: name, port: MusicAssistantDiscovery.port(forServiceType: type, advertised: Int(port.rawValue)))
+    }
 }
 
 /// Owns the browsers and pending connections; their state is touched only on `queue`.
@@ -75,7 +88,8 @@ private final class BrowserBox: @unchecked Sendable {
         connection.stateUpdateHandler = { [self] state in
             switch state {
             case .ready:
-                if let host = Self.host(of: connection.currentPath?.remoteEndpoint, type: type) { yield(host) }
+                let endpoint = connection.currentPath?.remoteEndpoint
+                if let host = SystemServiceBrowser.host(of: endpoint, type: type) { yield(host) }
                 finish(key)
             case .failed, .waiting:
                 finish(key)
@@ -91,17 +105,5 @@ private final class BrowserBox: @unchecked Sendable {
         guard let connection = connections.removeValue(forKey: key) else { return }
         connection.stateUpdateHandler = nil
         connection.cancel()
-    }
-
-    private static func host(of endpoint: NWEndpoint?, type: String) -> MusicAssistantDiscoveredHost? {
-        guard case .hostPort(let host, let port) = endpoint else { return nil }
-        let name: String
-        switch host {
-        case .ipv4(let address): name = address.rawValue.map(String.init).joined(separator: ".")
-        case .name(let n, _): name = n
-        default: return nil  // IPv6 skipped
-        }
-        return MusicAssistantDiscoveredHost(
-            host: name, port: MusicAssistantDiscovery.port(forServiceType: type, advertised: Int(port.rawValue)))
     }
 }
