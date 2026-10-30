@@ -12,6 +12,11 @@ where ListItem.ID: Sendable, Item.ID: Hashable {
     let emptyText: String
     let selectedID: Item.ID?
     let onSelect: (Item) -> Void
+    /// Double-click or Return on a row, and the row's context menu, as the List's `contextMenu(forSelectionType:)`. A
+    /// row-level double-click gesture took single clicks from the selection and blocked the row's drag (#0205), so
+    /// container lists (albums) use this instead. nil: no list-level menu (rows bring their own).
+    var primaryAction: ((Item) -> Void)? = nil
+    var menu: ((Item) -> AnyView)? = nil
     @ViewBuilder let row: (Item) -> Row
 
     var body: some View {
@@ -35,15 +40,29 @@ where ListItem.ID: Sendable, Item.ID: Hashable {
                     set: { id in
                         if let id, let item = rows.first(where: { $0.id == id }) { onSelect(item) }
                     })
-                List(selection: selection) {
+                let table = List(selection: selection) {
                     ForEach(rows) { item in
                         row(item)
                             .onAppear { list.loadMoreIfNeeded(id: pagingID(item)) }
                     }
                     footer
                 }
+                if let primaryAction {
+                    table.contextMenu(forSelectionType: Item.ID.self) { ids in
+                        if let menu, let picked = entry(ids) { menu(picked) }
+                    } primaryAction: { ids in
+                        if let picked = entry(ids) { primaryAction(picked) }
+                    }
+                } else {
+                    table
+                }
             }
         }
+    }
+
+    /// The row a list-level menu or primary action is for: the one of `ids` (a single-selection list).
+    private func entry(_ ids: Set<Item.ID>) -> Item? {
+        ids.first.flatMap { id in rows.first { $0.id == id } }
     }
 
     @ViewBuilder

@@ -43,10 +43,12 @@ struct AlbumListView: View {
     var body: some View {
         PagedListView(
             list: list, rows: list.items, pagingID: \.id, emptyText: "No albums",
-            selectedID: library.selectedAlbum?.id, onSelect: { library.select($0) }
+            selectedID: library.selectedAlbum?.id, onSelect: { library.select($0) },
+            // Double-click plays the album, replacing the queue; a click opens it (#0205).
+            primaryAction: { player.playFromLibrary(.play(container: $0.id)) },
+            menu: { AnyView(LibraryContainerMenuItems(id: $0.id, favorite: $0.isFavorite, model: player)) }
         ) { album in
             AlbumRow(album: album, showsArtist: showsArtist)
-                .libraryContainerActions(album.id, favorite: album.isFavorite, model: player)
                 .libraryDraggable([album.id])
                 .accessibilityIdentifier(AXID.Library.row("album", album.id.rawValue))
         }

@@ -47,16 +47,6 @@ extension View {
         draggable(MediaIDTransfer(ids))
     }
 
-    /// Container rows (albums) in a selectable list: double-click plays the container, replacing the queue; the context
-    /// menu is `libraryContainerMenu`. Single click keeps selecting (opening) the row: the double-click is a simultaneous
-    /// gesture so it never takes the click from the List's selection.
-    func libraryContainerActions(
-        _ id: MediaID, favorite: Bool? = nil, model: PlayerModel, addsToPlaylists: Bool = true
-    ) -> some View {
-        libraryContainerMenu(id, favorite: favorite, model: model, addsToPlaylists: addsToPlaylists)
-            .simultaneousGesture(TapGesture(count: 2).onEnded { model.playFromLibrary(.play(container: id)) })
-    }
-
     /// Context menu only, for container rows (albums, artists, playlists): Play, Play Next, Add to Queue, then Add to
     /// Playlist when `addsToPlaylists`, then the favourite, then `extra` (a Library playlist's edit items, #0189).
     func libraryContainerMenu<Extra: View>(
@@ -65,15 +55,28 @@ extension View {
     ) -> some View {
         let extra = extra()
         return contextMenu {
-            Button("Play") { model.playFromLibrary(.play(container: id)) }
-            Button("Play Next") { model.playFromLibrary(.next(container: id)) }
-            Button("Add to Queue") { model.playFromLibrary(.append(container: id)) }
-            if addsToPlaylists {
-                Divider()
-                AddToPlaylistMenu(items: [id], model: model)
-            }
-            FavoriteMenuItem(items: [id: favorite])
+            LibraryContainerMenuItems(id: id, favorite: favorite, model: model, addsToPlaylists: addsToPlaylists)
             extra
         }
+    }
+}
+
+/// A container's menu items: Play, Play Next, Add to Queue, then Add to Playlist when `addsToPlaylists`, then the
+/// favourite. A row's own `libraryContainerMenu`, or a list's `contextMenu(forSelectionType:)` (album lists, #0205).
+struct LibraryContainerMenuItems: View {
+    let id: MediaID
+    var favorite: Bool?
+    let model: PlayerModel
+    var addsToPlaylists = true
+
+    var body: some View {
+        Button("Play") { model.playFromLibrary(.play(container: id)) }
+        Button("Play Next") { model.playFromLibrary(.next(container: id)) }
+        Button("Add to Queue") { model.playFromLibrary(.append(container: id)) }
+        if addsToPlaylists {
+            Divider()
+            AddToPlaylistMenu(items: [id], model: model)
+        }
+        FavoriteMenuItem(items: [id: favorite])
     }
 }
