@@ -23,6 +23,7 @@ scripts/verify.sh --expect-fail newTestName  # bug fix, before the fix: passes o
 scripts/run-tests-vm.sh            # fast tier: SkinKit tests, PlayerKit tests, app build, app unit tests (RoadieTests), Info.plist check (slow tests skipped)
 scripts/run-tests-vm.sh --build-only   # compile check only: both packages with their tests, then the app; no tests run, not verification
 scripts/run-tests-vm.sh --full     # full tier: also the 100k SkinLibrary scale tests and the real-time audio tests (milestone end, or a change they guard)
+scripts/run-tests-vm.sh --coverage # also measure line coverage (#0212): step coverage-report, coverage/{report.md,lowest.txt,summary.txt} in the results, a COVERAGE line; fails under scripts/coverage-floors.tsv, so milestone-end runs only
 scripts/run-tests-vm.sh --launch   # also launch the built app in the guest for 5 s (with -firstRunVersion 1, so no Welcome window), then quit it
 scripts/run-tests-vm.sh --skins "untitled folder"  # copy a folder of .wsz into the guest: runs sampleSkinsAreOk and the skintool report (#0020)
 scripts/fetch-webamp-references.sh "untitled folder"   # host, once: public Webamp screenshots into build/webamp-reference (#0026)
@@ -247,7 +248,7 @@ consolidated on 2026-10-11.
    the PlayerKit tests: `scripts/stress-realtime-gapless.sh` repeats the real-time gapless test N times
    (or, with `--stress-filter F`, the tests matching the `swift test --filter` F, without `AUDIOCORE_REALTIME=1`; #0083; with `--stress-package SkinKit` it tests SkinKit and the step is `skinkit-stress`, #0094)
    against the built binary (`--load` adds four `yes` hogs, killed by an `EXIT` trap) and prints
-   `stress: <fails>/<N> failed`; it also saves the guest's CoreAudio log as `guest-coreaudio.log`. `set -o pipefail` is set **inside the guest's
+   `stress: <fails>/<N> failed`; it also saves the guest's CoreAudio log as `guest-coreaudio.log`. With `--coverage` (#0212) the package builds and tests add `--enable-code-coverage`, the app and UI `xcodebuild` steps `-enableCodeCoverage YES`, and a `coverage-report` step after the tests runs `scripts/coverage-report.sh ~/results/coverage`: `llvm-cov report` of each package's test binary, `xccov` of the unit and UI result bundles (max per file, `App/` only), aggregated per target by `scripts/coverage_report.py` into `report.md`, `lowest.txt` (the twenty least-covered files over 40 lines) and `summary.txt`. It fails with `coverage: FLOOR <target> <pct> < <floor>` when a target is under `scripts/coverage-floors.tsv` (AudioCore 80 in `--full`), so only the milestone-end run passes `--coverage`. `set -o pipefail` is set **inside the guest's
    shell**; without it the status is `tee`'s, which is always 0. Changeover reported false passes
    that way until 2026-10-04.
 8. **Pull results** with `tart exec … tar -cf - . | tar -x`, into `build/vm-tests/<run-id>/`.

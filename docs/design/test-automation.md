@@ -97,18 +97,40 @@ struct RoadieConfiguration {
 
 ### 2.4 Coverage: measuring and picking the gaps
 
-`scripts/run-tests-vm.sh --coverage` (#0212) turns on `swift test --enable-code-coverage` for both packages and `-enableCodeCoverage YES` on the `xcodebuild test` steps (the UI tests' coverage of the app counts too), then a `coverage-report` step runs `scripts/coverage-report.sh` in the guest: `llvm-cov report` per SwiftPM target (via `swift test --show-codecov-path`) and `xcrun xccov view --report --json` for the app, writing `coverage/report.md` (one row per target: lines, covered, %) and `coverage/lowest.txt` (the twenty least-covered source files with their line %) into the results. The summary prints one `COVERAGE` line per package; `verify.sh` passes it through on a pass.
+`scripts/run-tests-vm.sh --coverage` (#0212) turns on `swift test --enable-code-coverage` for both packages and `-enableCodeCoverage YES` on the `xcodebuild test` steps (the UI tests' coverage of the app counts too), then a `coverage-report` step runs `scripts/coverage-report.sh` in the guest: `llvm-cov report` of every test binary of a package (SwiftPM builds one `<TestTarget>.xctest` per test target; all of them go to one `llvm-cov report … -object …` call) against its `default.profdata` (via `swift test --show-codecov-path`), keyed per target by path and `xcrun xccov view --report --json` for the app, writing `coverage/report.md` (one row per target: lines, covered, %) and `coverage/lowest.txt` (the twenty least-covered source files with their line %) into the results. The summary prints one `COVERAGE` line per package; `verify.sh` passes it through on a pass.
 
-Targets (line coverage, measured in the milestone run; the first `--coverage` run sets the baseline in `issues/0212.md`):
+Targets (line coverage). These are the goals; `scripts/coverage-floors.tsv` holds the enforced floor, which is the goal or, where the first `--coverage` run measured less, that baseline rounded down to a whole percent (also lowered when the baseline is less than one line over its goal, so the floor has a margin). The backfill issues raise a lowered floor back to its goal. A floored target with no files measured fails the run (`coverage: MISSING`).
 
-| Scope | Floor | Rationale |
+| Scope | Goal | Rationale |
 |---|---|---|
 | `SkinKit`, `SkinLibrary`, `SkinBrowser`, `SkinMuseum`, `WindowDocking` | 85 % | Pure logic, already well tested |
 | `MusicBackendKit`, `LibraryBrowser`, `MusicAssistantKit`, `FolderBackendKit`, `LocalPlayback`, `SendspinKit`, `SendspinPlayback` | 85 % | Pure logic plus stubs |
 | `AudioCore` | 70 % (fast) / 80 % (full) | Real-time paths only run in the full tier |
 | `App` (Roadie target, `RoadieTests` + UI tests) | 60 %, rising 10 points per milestone to 80 % | Views are covered by UI tests; the composition root has start-up paths (Keychain, Sparkle) that tests must not run |
 
-The floors fail only the milestone run (`--coverage` sets them; per-issue runs don't measure). Gaps are picked from `lowest.txt`: each file under its target's floor that holds user-facing logic becomes a row in the backfill issue (#0212 lists the first set), highest-risk first (anything on the play, queue, drag or Music Assistant paths).
+Baseline (run `20261024-234000-43501`, `--full --ui --coverage`, M16; the full report is in `issues/0212.md` ## Notes). Enforced floor in bold where it is below the goal:
+
+| Target | Lines | Baseline | Goal | Floor |
+|---|---|---|---|---|
+| `SkinKit` | 3,490 | 97.1 % | 85 % | 85 % |
+| `SkinLibrary` | 1,656 | 95.6 % | 85 % | 85 % |
+| `SkinBrowser` | 718 | 90.8 % | 85 % | 85 % |
+| `SkinMuseum` | 457 | 92.6 % | 85 % | 85 % |
+| `WindowDocking` | 585 | 97.1 % | 85 % | 85 % |
+| `MusicBackendKit` | 544 | 78.7 % | 85 % | **78 %** (#0214) |
+| `LibraryBrowser` | 2,626 | 90.7 % | 85 % | 85 % |
+| `MusicAssistantKit` | 4,971 | 90.7 % | 85 % | 85 % |
+| `FolderBackendKit` | 1,272 | 92.6 % | 85 % | 85 % |
+| `LocalPlayback` | 410 | 97.1 % | 85 % | 85 % |
+| `SendspinKit` | 687 | 85.0 % | 85 % | **84 %** (#0214) |
+| `SendspinPlayback` | 195 | 92.3 % | 85 % | 85 % |
+| `AudioCore` (full) | 4,148 | 93.8 % | 80 % | 80 % |
+| `VisualizationKit` | 470 | 98.5 % | 85 % | 85 % |
+| `App` | 16,768 | 69.4 % | 60 % → 80 % | 60 % (#0215–#0219 still name the gaps) |
+
+Per package (`COVERAGE` line): SkinKit 96 %, PlayerKit 91 %, App 69 %. The package rows are from run 20261024-234000-43501 and the App and `VisualizationKit` rows from run 20261029-191545-21712 (main at 5db3b3d; App was 40.5 % of 13,368 lines before #0202, #0203, #0208 and M17–M18). The `COVERAGE` line shows package totals only; each target's floor is enforced per target and listed next to its measurement in `coverage/report.md`. `MusicLibraryKit` (95.7 %) has no floor yet; stub, fixture, `skintool` and `CAtomics` targets are reported but not counted.
+
+The floors fail only the milestone run (`--coverage` sets them; per-issue runs don't measure). Gaps are picked from `lowest.txt`: each file under its target's floor that holds user-facing logic becomes a row in the backfill issue (the first set, from the baseline run: #0214–#0219), highest-risk first (anything on the play, queue, drag or Music Assistant paths).
 
 ## 3. UI tests
 

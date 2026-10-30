@@ -7,7 +7,7 @@
 # output muted, runs the checks, pulls the logs back to build/vm-tests/<run-id>/,
 # and deletes the clone.
 #
-# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike] [--dmg [--build-number N]] [--ui [--ui-filter C[,C]] [--ui-skins base|all] [--test-skins DIR]]
+# Usage: scripts/run-tests-vm.sh [--head] [--build-only] [--full] [--launch] [--skins DIR [--references DIR]] [--stress N [--stress-filter F] [--stress-package P] [--load]] [--corpus DIR [--corpus-sample N]] [--spike] [--dmg [--build-number N]] [--ui [--ui-filter C[,C]] [--ui-skins base|all] [--test-skins DIR]] [--coverage]
 #   --head    test the last commit (git archive HEAD) instead of the working tree
 #   --build-only  stop after the build stage (both packages with their tests, the app; with --spike the spike too):
 #                 a quick compile check before a full run, never verification
@@ -41,6 +41,9 @@
 #            release/sparkle-bin/{sign_update,generate_keys} (#0158); then checks the Release bundle: steps
 #            app-release-plist (check-info-plist.sh --release), app-sparkle (check-sparkle.sh) and
 #            app-release-fixtures (no MusicAssistantKitStub / SkinMuseumStub bundle, #0194)
+#   --coverage  build and test with code coverage and add step coverage-report (scripts/coverage-report.sh, #0212):
+#               coverage/{report.md,lowest.txt,summary.txt} come back; fails when a target is under
+#               scripts/coverage-floors.tsv. Milestone-end runs only, so floors never block an issue
 #   --build-number N  the Release build's CFBundleVersion, YYYYMMDD.HHMM (#0157); default: now, in UTC
 #
 # In the guest, in order:
@@ -61,9 +64,11 @@
 #      scripts/tests/test_release_tools.py: preflight.sh with stubbed credentials, appcast-item.sh on a fixture DMG
 #      scripts/tests/test_fetch_test_skins.py: test_skins.py, the manifest reader behind fetch-test-skins.sh (#0198)
 #      scripts/tests/test_verify_report.py: verify.sh --report --expect-fail (#0201)
+#      scripts/tests/test_coverage_report.py: coverage_report.py, the math behind coverage-report.sh (#0212)
 #      scripts/check-website.sh: website/ lint, appcast XML and every local reference resolves (#0163)
 #   7. optional: launch Roadie.app, check it stays up, quit it
 #   8. optional (--ui): ui-build after app-build, ui-tests (XCUITests under with-timeout.sh 1200) after the checks
+#   9. optional (--coverage): coverage-report after the tests, a COVERAGE summary line
 # Exit codes:
 #   0  everything passed and the host stayed silent
 #   1  a build/test/check step failed, the host's coreaudiod logged "Starting IO" during
@@ -94,6 +99,7 @@ CORPUS_DIR=""
 CORPUS_SAMPLE=""
 TEST_SKINS_DIR="$HOME/Library/Caches/co.sstools.roadie-test-skins"
 UI=0  # set by --ui (#0200)
+COVERAGE=0  # set by --coverage (#0212)
 UI_FILTER=""
 UI_SKINS=base
 args=("$@")
@@ -117,6 +123,7 @@ while (( $#args )); do
     --corpus) CORPUS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$CORPUS_DIR" && -d "$CORPUS_DIR" ]] || { print -r -- "--corpus needs a directory of .wsz/.zip files" >&2; exit 2 } ;;
     --test-skins) TEST_SKINS_DIR=${args[1]:-}; shift args 2>/dev/null; [[ -n "$TEST_SKINS_DIR" ]] || { print -r -- "--test-skins needs a directory" >&2; exit 2 } ;;
     --ui) UI=1 ;;
+    --coverage) COVERAGE=1 ;;
     --ui-filter) UI_FILTER=${args[1]:-}; shift args 2>/dev/null; [[ -n "$UI_FILTER" ]] || { print -r -- "--ui-filter needs Class[,Class]" >&2; exit 2 } ;;
     --ui-skins) UI_SKINS=${args[1]:-}; shift args 2>/dev/null; [[ "$UI_SKINS" == (base|all) ]] || { print -r -- "--ui-skins needs base or all" >&2; exit 2 } ;;
     --corpus-sample) CORPUS_SAMPLE=${args[1]:-}; shift args 2>/dev/null; [[ "$CORPUS_SAMPLE" == <1-> ]] || { print -r -- "--corpus-sample needs a positive count" >&2; exit 2 } ;;
@@ -131,11 +138,14 @@ done
 [[ -n "$STRESS_PACKAGE" ]] && (( ! STRESS )) && { print -r -- "--stress-package needs --stress N" >&2; exit 2 }
 if (( BUILD_ONLY )); then
   for f v in --stress "$STRESS" --stress-package "$STRESS_PACKAGE" --load "$LOAD" --launch "$LAUNCH" --corpus "$CORPUS_DIR" --corpus-sample "$CORPUS_SAMPLE" \
-             --skins "$SKINS_DIR" --references "$REFS_DIR" --full "$FULL" --ui "$UI"; do
+             --skins "$SKINS_DIR" --references "$REFS_DIR" --full "$FULL" --ui "$UI" --coverage "$COVERAGE"; do
     [[ -n "$v" && "$v" != 0 ]] && { print -r -- "--build-only runs no tests; drop $f" >&2; exit 2 }
   done
 fi
 TIER=fast; slow_env=""; rt_env=""
+# --coverage (#0212): instrumented builds and test runs; off by default so the fast tier is unchanged.
+cov_spm=""; cov_xc=""
+(( COVERAGE )) && { cov_spm=" --enable-code-coverage"; cov_xc=" -enableCodeCoverage YES" }
 (( FULL )) && { TIER=full; slow_env="ROADIE_SLOW_TESTS=1 "; rt_env="AUDIOCORE_REALTIME=1 " }
 (( BUILD_ONLY )) && TIER=build-only
 [[ -n "$REFS_DIR" && -z "$SKINS_DIR" ]] && { print -r -- "--references needs --skins DIR" >&2; exit 2 }
@@ -365,11 +375,11 @@ skip_step() {
 
 # --- Build stage -------------------------------------------------------------
 # Build everything once; the tests below reuse it. Both packages always build so one run reports both.
-run_step skinkit-build   "swift build --build-tests --package-path Packages/SkinKit" build
-run_step playerkit-build "swift build --build-tests --package-path Packages/PlayerKit" build
-APP_BUILD="xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData build-for-testing"
+run_step skinkit-build   "swift build --build-tests$cov_spm --package-path Packages/SkinKit" build
+run_step playerkit-build "swift build --build-tests$cov_spm --package-path Packages/PlayerKit" build
+APP_BUILD="xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData$cov_xc build-for-testing"
 if (( build_failed )); then skip_step app-build; else run_step app-build "$APP_BUILD" build; fi
-UI_XCODEBUILD="xcodebuild -project Roadie.xcodeproj -scheme 'Roadie UI Tests' -configuration Debug -derivedDataPath build/DerivedData"
+UI_XCODEBUILD="xcodebuild -project Roadie.xcodeproj -scheme 'Roadie UI Tests' -configuration Debug -derivedDataPath build/DerivedData$cov_xc"
 if (( UI )); then
   if (( build_failed )); then skip_step ui-build; else run_step ui-build "$UI_XCODEBUILD build-for-testing" build; fi
 fi
@@ -388,20 +398,20 @@ fi
 
 if (( ! BUILD_ONLY )); then
 if [[ -n "$SKINS_DIR" ]]; then
-  run_step skinkit-tests "${slow_env}SKIN_SAMPLES_DIR=$GUEST_SRC/Skins swift test --skip-build --package-path Packages/SkinKit"
+  run_step skinkit-tests "${slow_env}SKIN_SAMPLES_DIR=$GUEST_SRC/Skins swift test --skip-build$cov_spm --package-path Packages/SkinKit"
   run_step skintool      "swift run --skip-build --package-path Packages/SkinKit skintool -v Skins/"
   # Headless render of every skin to PNG (and, with --references, a diff against the Webamp screenshots).
   compare=""
   [[ -n "$REFS_DIR" ]] && compare="--compare $GUEST_SRC/Skins/reference"
   run_step skintool-png  "swift run --skip-build --package-path Packages/SkinKit skintool --png $GUEST_RESULTS/png $compare Skins/"
 else
-  run_step skinkit-tests "${slow_env}swift test --skip-build --package-path Packages/SkinKit"
+  run_step skinkit-tests "${slow_env}swift test --skip-build$cov_spm --package-path Packages/SkinKit"
 fi
 # With --full the real-time tests run here too: the guest's virtual output device has no path to
 # the host (--no-audio), the guest is muted, and the tests mute their own mixer.
-run_step playerkit-tests "${slow_env}${rt_env}swift test --skip-build --package-path Packages/PlayerKit"
+run_step playerkit-tests "${slow_env}${rt_env}swift test --skip-build$cov_spm --package-path Packages/PlayerKit"
 # The app's hosted unit tests (RoadieTests, #0193). Raw xcodebuild output: verify.sh reads the `Test Case` lines.
-run_step app-unit-tests "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData test-without-building -only-testing:RoadieTests 2>&1 | grep -vE '^$'"
+run_step app-unit-tests "xcodebuild -project Roadie.xcodeproj -scheme Roadie -configuration Debug -derivedDataPath build/DerivedData$cov_xc test-without-building -only-testing:RoadieTests 2>&1 | grep -vE '^$'"
 if (( STRESS )); then
   STRESS_PACKAGE=${STRESS_PACKAGE:-PlayerKit}
   stress_filter_arg="''"; [[ -n "$STRESS_FILTER" ]] && stress_filter_arg=${(q)STRESS_FILTER}
@@ -413,7 +423,7 @@ run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Pro
 run_step identifiers     "scripts/check-identifiers.sh"
 run_step fixtures        "scripts/check-fixtures.sh"
 run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p 'test_render_changelog.py'"
-run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_fetch_test_skins.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_verify_report.py'"
+run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_fetch_test_skins.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_verify_report.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_coverage_report.py'"
 run_step recorder-tests  "python3 -B -m unittest discover -v -s scripts/tests -p 'test_record_*.py'"
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
@@ -434,6 +444,11 @@ if (( UI )); then
     ui_env+="$k=$v TEST_RUNNER_$k=$v "
   done
   run_step ui-tests "mkdir -p $GUEST_RESULTS/ui && ${ui_env}scripts/with-timeout.sh 1200 $UI_XCODEBUILD -resultBundlePath $GUEST_RESULTS/ui/UITests.xcresult -retry-tests-on-failure -test-iterations 2$only_testing test-without-building 2>&1 | grep -vE '^$'"
+fi
+
+if (( COVERAGE )); then
+  # #0212: per-target line coverage of the steps above (the UI run's coverage of the app counts); floors fail it.
+  run_step coverage-report "scripts/coverage-report.sh $GUEST_RESULTS/coverage"
 fi
 
 if (( SPIKE )); then
@@ -585,9 +600,10 @@ else
 fi
 step_logs=("$RESULTS_DIR"/*.log(N))  # none when the guest was lost before the results pull
 if (( ${#step_logs} )); then
-  grep -hE 'Build complete!|Test run with|Executed [1-9][0-9]* tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|Test Suite .RoadieUITests. (passed|failed)|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) ' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
+  grep -hE 'Build complete!|Test run with|Executed [1-9][0-9]* tests|smoke: ok|quicklook:|stress:|^corpus:|gate:|main window complete|Test Suite .RoadieUITests. (passed|failed)|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|^(diff|noref) |^coverage:' "${step_logs[@]}" 2>/dev/null | sed 's/^/    /' | tee -a "$SUMMARY_FILE" || true
 fi
 [[ -n "$UI_LINE" ]] && log "$UI_LINE"
+if (( COVERAGE )) && [[ -s "$RESULTS_DIR/coverage/packages.txt" ]]; then log "COVERAGE  $(<"$RESULTS_DIR/coverage/packages.txt")"; fi
 (( UI )) && [[ "${step_rc[ui-tests]:-}" == 124 ]] && log "UI  ui-tests timed out (a blocked prompt in the guest?)"
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"

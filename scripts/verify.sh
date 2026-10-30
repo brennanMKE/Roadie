@@ -21,6 +21,7 @@
 #
 # Output:
 #   pass  ==> VERIFY PASS …, the TIER / AUDIO / BUILD-ONLY lines, a test total, the --expect result (≤ 8 lines)
+#   --coverage runs (#0212) add the COVERAGE line on pass; a floor breach fails with the `coverage: FLOOR …` lines.
 #   --ui runs (#0200) add the UI summary line on pass; on a failed ui-tests/app-unit-tests step, a `screenshots:` line
 #         per failed test (results/ui/attachments/<testName>/) and the xcresult path; exit 124 there is a timeout.
 #   fail  ==> VERIFY FAIL …, the FAIL/BUILD/ERRORS/INFRA/AUDIO lines from summary.txt, then from each failed
@@ -167,7 +168,7 @@ if (( RC == 0 )); then
   fi
   retry_note=""
   (( ${#retried} )) && retry_note=" (${#retried} passed on retry: ${(j:, :)retried})"
-  grep -E '^==> (TIER|UI|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null \
+  grep -E '^==> (TIER|UI|COVERAGE|AUDIO|BUILD-ONLY|SKIP)' "$SUMMARY" 2>/dev/null \
     | while IFS= read -r l; do [[ $l == "==> UI  "[0-9]* ]] && l+=$retry_note; print -r -- "$l"; done
   [[ -n "$expect_report" ]] && print -r -- "$expect_report"
   [[ -n "$expect_fail_report" ]] && print -r -- "$expect_fail_report"
@@ -210,6 +211,14 @@ report=$(
         print "==> $step: no error lines found; last lines of its log:"
         strip <"$f" | grep -vE '^[[:space:]]*$|Failed frontend command' | tail -10 | sed 's/^/    /'
       fi
+      continue
+    fi
+    if [[ $step == coverage-report ]]; then
+      # #0212: floor breaches (or why nothing was measured), never test-failure lines.
+      lines=$(strip <"$f" | grep -E '^coverage: (FLOOR|NO DATA|MISSING|nothing|llvm-cov|xccov)' | awk '!seen[$0]++')
+      print "==> coverage-report failures:"
+      if [[ -n "$lines" ]]; then print -r -- "$lines" | sed 's/^/    /'
+      else strip <"$f" | grep -v '^[[:space:]]*$' | tail -10 | sed 's/^/    /'; fi
       continue
     fi
     lines=$(strip <"$f" | grep -E '^✘ Test .*(recorded an issue|failed)|^↳ |Fatal error|unexpected signal|error: -\[|Test Case .* failed|: error: |Assertion failed|Precondition failed' \
