@@ -65,9 +65,12 @@
 #      scripts/tests/test_fetch_test_skins.py: test_skins.py, the manifest reader behind fetch-test-skins.sh (#0198)
 #      scripts/tests/test_verify_report.py: verify.sh --report --expect-fail (#0201)
 #      scripts/tests/test_coverage_report.py: coverage_report.py, the math behind coverage-report.sh (#0212)
+#      scripts/tests/test_ui_timeout.py: ui_timeout.py, the ui-tests limit and its TIMEOUT line (#0212)
 #      scripts/check-website.sh: website/ lint, appcast XML and every local reference resolves (#0163)
 #   7. optional: launch Roadie.app, check it stays up, quit it
-#   8. optional (--ui): ui-build after app-build, ui-tests (XCUITests under with-timeout.sh 1200) after the checks
+#   8. optional (--ui): ui-build after app-build, ui-tests (XCUITests under with-timeout.sh) after the checks; the limit
+#      is sized from the work by scripts/ui_timeout.py (20 min filtered, 45 min the whole suite, x1.5 with --coverage,
+#      +15 min with --ui-skins all, at most 90 min); a timeout prints a TIMEOUT summary line
 #   9. optional (--coverage): coverage-report after the tests, a COVERAGE summary line
 # Exit codes:
 #   0  everything passed and the host stayed silent
@@ -423,7 +426,7 @@ run_step app-quicklook   "scripts/check-quicklook.sh build/DerivedData/Build/Pro
 run_step identifiers     "scripts/check-identifiers.sh"
 run_step fixtures        "scripts/check-fixtures.sh"
 run_step changelog       "python3 -B -m unittest discover -v -s scripts/tests -p 'test_render_changelog.py'"
-run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_fetch_test_skins.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_verify_report.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_coverage_report.py'"
+run_step release-tools   "python3 -B -m unittest discover -v -s scripts/tests -p 'test_release_tools.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_fetch_test_skins.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_verify_report.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_coverage_report.py' && python3 -B -m unittest discover -v -s scripts/tests -p 'test_ui_timeout.py'"
 run_step recorder-tests  "python3 -B -m unittest discover -v -s scripts/tests -p 'test_record_*.py'"
 run_step website         "scripts/check-website.sh"
 if (( LAUNCH )); then
@@ -432,7 +435,8 @@ fi
 
 if (( UI )); then
   # XCUITests, in the guest only (docs/ui-tests-in-vm.md). xcodebuild hands TEST_RUNNER_<name> to the test runner as
-  # <name>. scripts/with-timeout.sh turns a blocked prompt into exit 124 rather than a hang.
+  # <name>. scripts/with-timeout.sh turns a hang (a blocked prompt) into exit 124; its limit is sized from the work
+  # (scripts/ui_timeout.py, #0212: the whole suite with coverage needs far more than a filtered run).
   # ROADIE_UI_GUEST=1 is the harness's guest guard: without it (and the admin user) it won't launch Roadie or run
   # `defaults delete co.sstools.roadie`.
   only_testing=""
@@ -443,12 +447,23 @@ if (( UI )); then
              ROADIE_UI_GUEST 1; do
     ui_env+="$k=$v TEST_RUNNER_$k=$v "
   done
-  run_step ui-tests "mkdir -p $GUEST_RESULTS/ui && ${ui_env}scripts/with-timeout.sh 1200 $UI_XCODEBUILD -resultBundlePath $GUEST_RESULTS/ui/UITests.xcresult -retry-tests-on-failure -test-iterations 2$only_testing test-without-building 2>&1 | grep -vE '^$'"
+  ui_limit_args=(--skins "$UI_SKINS"); [[ -n "$UI_FILTER" ]] && ui_limit_args+=(--filtered); (( COVERAGE )) && ui_limit_args+=(--coverage)
+  UI_TIMEOUT_SECS=$(python3 -I "$REPO/scripts/ui_timeout.py" limit "${ui_limit_args[@]}")
+  log "ui-tests limit: ${UI_TIMEOUT_SECS} s (${UI_FILTER:-all classes}, skins $UI_SKINS$( (( COVERAGE )) && print -n ', --coverage'))"
+  ui_started=$SECONDS
+  run_step ui-tests "mkdir -p $GUEST_RESULTS/ui && ${ui_env}scripts/with-timeout.sh $UI_TIMEOUT_SECS $UI_XCODEBUILD -resultBundlePath $GUEST_RESULTS/ui/UITests.xcresult -retry-tests-on-failure -test-iterations 2$only_testing test-without-building 2>&1 | grep -vE '^$'"
+  ui_elapsed=$(( SECONDS - ui_started ))
 fi
 
 if (( COVERAGE )); then
   # #0212: per-target line coverage of the steps above (the UI run's coverage of the app counts); floors fail it.
-  run_step coverage-report "scripts/coverage-report.sh $GUEST_RESULTS/coverage"
+  # Without a complete UI run the App number is partial (#0212): reported as such, its floor not checked.
+  app_partial=""
+  if (( ! UI )); then app_partial="no UI tests in this run (--ui)"
+  elif [[ "${step_rc[ui-tests]:-}" == 124 ]]; then app_partial="ui-tests timed out"
+  elif [[ "${step_rc[ui-tests]:-0}" != 0 ]]; then app_partial="ui-tests failed (${step_rc[ui-tests]})"
+  fi
+  run_step coverage-report "scripts/coverage-report.sh ${app_partial:+--app-partial '$app_partial' }$GUEST_RESULTS/coverage"
 fi
 
 if (( SPIKE )); then
@@ -604,7 +619,9 @@ if (( ${#step_logs} )); then
 fi
 [[ -n "$UI_LINE" ]] && log "$UI_LINE"
 if (( COVERAGE )) && [[ -s "$RESULTS_DIR/coverage/packages.txt" ]]; then log "COVERAGE  $(<"$RESULTS_DIR/coverage/packages.txt")"; fi
-(( UI )) && [[ "${step_rc[ui-tests]:-}" == 124 ]] && log "UI  ui-tests timed out (a blocked prompt in the guest?)"
+if (( UI )) && [[ "${step_rc[ui-tests]:-}" == 124 ]]; then
+  log "$(python3 -I "$REPO/scripts/ui_timeout.py" report "$RESULTS_DIR/ui-tests.log" "$UI_TIMEOUT_SECS" "$ui_elapsed")"
+fi
 if (( io_events > 0 )); then
   log "AUDIO  host coreaudiod logged $io_events 'Starting IO' event(s) since $START_STAMP -- something reached a speaker (could be another app)"
   (( overall == 3 )) || overall=1

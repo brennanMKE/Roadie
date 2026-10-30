@@ -79,11 +79,11 @@ class ExpectFailTests(unittest.TestCase):
 class UIReportTests(unittest.TestCase):
     """#0200: a failed ui-tests step names the test, its assertion, the screenshot folder and the xcresult."""
 
-    def results(self, failed_name="testFoo", with_attachments=True, rc=1):
+    def results(self, failed_name="testFoo", with_attachments=True, rc=1, extra_summary=""):
         d = Path(tempfile.mkdtemp())
         (d / "summary.txt").write_text(
             "==> PASS  app-build\n==> PASS  ui-build\n==> FAIL  ui-tests (exit %d)\n"
-            "==> TIER  fast\n==> Cleaning up (exit 1)\n" % rc)
+            "==> TIER  fast\n%s==> Cleaning up (exit 1)\n" % (rc, extra_summary))
         (d / "ui-tests.log").write_text(
             "Test Case '-[RoadieUITests.SmokeUITests testBar]' passed (3.1 seconds).\n"
             "/Users/admin/src/Tests/RoadieUITests/SmokeUITests.swift:41: warning: unused variable 'x'\n"
@@ -116,8 +116,16 @@ class UIReportTests(unittest.TestCase):
         self.assertIn("screenshots: none exported (testFoo)", r.stdout)
 
     def test_timeout_is_reported(self):
-        r = self.run_verify(self.results(rc=124))
-        self.assertIn("ui-tests timed out (a blocked prompt in the guest?)", r.stdout)
+        # #0212: run-tests-vm.sh writes the TIMEOUT line (scripts/ui_timeout.py); verify passes it through, with the
+        # partial COVERAGE line, and no longer guesses at a blocked prompt.
+        timeout = ("==> TIMEOUT  ui-tests ran out of time: stopped after 1203 s at its 1200 s limit, 94 tests finished, "
+                   "running VisualizationUITests.testOverlayStaysUpWhilePaused. Not a test failure\n")
+        coverage = "==> COVERAGE  SkinKit 96%  PlayerKit 91%  App 27% (partial)\n"
+        r = self.run_verify(self.results(rc=124, extra_summary=timeout + coverage))
+        self.assertIn("==> TIMEOUT  ui-tests ran out of time: stopped after 1203 s at its 1200 s limit", r.stdout)
+        self.assertIn("running VisualizationUITests.testOverlayStaysUpWhilePaused", r.stdout)
+        self.assertIn("App 27% (partial)", r.stdout)
+        self.assertNotIn("blocked prompt", r.stdout)
 
     def test_expect_accepts_names_with_or_without_the_test_prefix(self):
         d = self.results()

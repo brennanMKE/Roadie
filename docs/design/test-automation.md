@@ -97,7 +97,7 @@ struct RoadieConfiguration {
 
 ### 2.4 Coverage: measuring and picking the gaps
 
-`scripts/run-tests-vm.sh --coverage` (#0212) turns on `swift test --enable-code-coverage` for both packages and `-enableCodeCoverage YES` on the `xcodebuild test` steps (the UI tests' coverage of the app counts too), then a `coverage-report` step runs `scripts/coverage-report.sh` in the guest: `llvm-cov report` of every test binary of a package (SwiftPM builds one `<TestTarget>.xctest` per test target; all of them go to one `llvm-cov report … -object …` call) against its `default.profdata` (via `swift test --show-codecov-path`), keyed per target by path and `xcrun xccov view --report --json` for the app, writing `coverage/report.md` (one row per target: lines, covered, %) and `coverage/lowest.txt` (the twenty least-covered source files with their line %) into the results. The summary prints one `COVERAGE` line per package; `verify.sh` passes it through on a pass.
+`scripts/run-tests-vm.sh --coverage` (#0212) turns on `swift test --enable-code-coverage` for both packages and `-enableCodeCoverage YES` on the `xcodebuild test` steps (the UI tests' coverage of the app counts too), then a `coverage-report` step runs `scripts/coverage-report.sh` in the guest. For each package it runs `llvm-cov report` against the package's `default.profdata` (via `swift test --show-codecov-path`) with every test binary of the package (SwiftPM builds one `<TestTarget>.xctest` per test target; each is one `-object` of the same call), and keys each source file to its target by its `Sources/<Target>/` path. For the app it reads `xcrun xccov view --report --json` of each xcresult bundle (unit and UI), counting a file under the `Roadie.app` target only (a file compiled into the app and a test bundle, such as `App/Accessibility/AXID.swift`, counts once) and taking the higher of the two bundles; `App/TestSupport/` is test-only code and is left out. It writes `coverage/report.md` (one row per target: lines, covered, %) and `coverage/lowest.txt` (the twenty least-covered source files with their line %) into the results. The summary prints one `COVERAGE` line per package; `verify.sh` passes it through on a pass.
 
 Targets (line coverage). These are the goals; `scripts/coverage-floors.tsv` holds the enforced floor, which is the goal or, where the first `--coverage` run measured less, that baseline rounded down to a whole percent (also lowered when the baseline is less than one line over its goal, so the floor has a margin). The backfill issues raise a lowered floor back to its goal. A floored target with no files measured fails the run (`coverage: MISSING`).
 
@@ -108,29 +108,29 @@ Targets (line coverage). These are the goals; `scripts/coverage-floors.tsv` hold
 | `AudioCore` | 70 % (fast) / 80 % (full) | Real-time paths only run in the full tier |
 | `App` (Roadie target, `RoadieTests` + UI tests) | 60 %, rising 10 points per milestone to 80 % | Views are covered by UI tests; the composition root has start-up paths (Keychain, Sparkle) that tests must not run |
 
-Baseline (run `20261024-234000-43501`, `--full --ui --coverage`, M16; the full report is in `issues/0212.md` ## Notes). Enforced floor in bold where it is below the goal:
+Current measurement (run `20261029-191545-21712`, `--full --ui --coverage`, main at 5db3b3d after #0202, #0203, #0208 and M17–M18; the full report and the first baseline, run `20261024-234000-43501`, are in `issues/0212.md` ## Notes). Enforced floor in bold where it is below the goal:
 
-| Target | Lines | Baseline | Goal | Floor |
+| Target | Lines | Measured | Goal | Floor |
 |---|---|---|---|---|
-| `SkinKit` | 3,490 | 97.1 % | 85 % | 85 % |
+| `SkinKit` | 3,589 | 97.2 % | 85 % | 85 % |
 | `SkinLibrary` | 1,656 | 95.6 % | 85 % | 85 % |
-| `SkinBrowser` | 718 | 90.8 % | 85 % | 85 % |
-| `SkinMuseum` | 457 | 92.6 % | 85 % | 85 % |
+| `SkinBrowser` | 742 | 91.1 % | 85 % | 85 % |
+| `SkinMuseum` | 457 | 93.0 % | 85 % | 85 % |
 | `WindowDocking` | 585 | 97.1 % | 85 % | 85 % |
 | `MusicBackendKit` | 544 | 78.7 % | 85 % | **78 %** (#0214) |
 | `LibraryBrowser` | 2,626 | 90.7 % | 85 % | 85 % |
-| `MusicAssistantKit` | 4,971 | 90.7 % | 85 % | 85 % |
+| `MusicAssistantKit` | 5,069 | 90.6 % | 85 % | 85 % |
 | `FolderBackendKit` | 1,272 | 92.6 % | 85 % | 85 % |
 | `LocalPlayback` | 410 | 97.1 % | 85 % | 85 % |
 | `SendspinKit` | 687 | 85.0 % | 85 % | **84 %** (#0214) |
 | `SendspinPlayback` | 195 | 92.3 % | 85 % | 85 % |
-| `AudioCore` (full) | 4,148 | 93.8 % | 80 % | 80 % |
+| `AudioCore` (full) | 4,210 | 93.9 % | 80 % | 80 % |
 | `VisualizationKit` | 470 | 98.5 % | 85 % | 85 % |
-| `App` | 16,768 | 69.4 % | 60 % → 80 % | 60 % (#0215–#0219 still name the gaps) |
+| `App` | 16,768 | 69.4 % | 60 % → 80 % | 60 % |
 
-Per package (`COVERAGE` line): SkinKit 96 %, PlayerKit 91 %, App 69 %. The package rows are from run 20261024-234000-43501 and the App and `VisualizationKit` rows from run 20261029-191545-21712 (main at 5db3b3d; App was 40.5 % of 13,368 lines before #0202, #0203, #0208 and M17–M18). The `COVERAGE` line shows package totals only; each target's floor is enforced per target and listed next to its measurement in `coverage/report.md`. `MusicLibraryKit` (95.7 %) has no floor yet; stub, fixture, `skintool` and `CAtomics` targets are reported but not counted.
+Per package (`COVERAGE` line): SkinKit 96 %, PlayerKit 91 %, App 69 %. In the first baseline App was 40.5 % of 13,368 lines; the UI tests of #0202, #0203 and #0208 account for most of the rise. The App row still counts `App/TestSupport/` (61 lines, 53 covered); without it, as the report now counts, App is 69.3 % of 16,707 lines. The `COVERAGE` line shows package totals only; each target's floor is enforced per target and listed next to its measurement in `coverage/report.md`. `MusicLibraryKit` (95.7 %) has no floor yet; stub, fixture, `skintool` and `CAtomics` targets are reported but not counted.
 
-The floors fail only the milestone run (`--coverage` sets them; per-issue runs don't measure). Gaps are picked from `lowest.txt`: each file under its target's floor that holds user-facing logic becomes a row in the backfill issue (the first set, from the baseline run: #0214–#0219), highest-risk first (anything on the play, queue, drag or Music Assistant paths).
+The floors fail only the milestone run (`--coverage` sets them; per-issue runs don't measure). Gaps are picked from `lowest.txt` and the per-file numbers in `app-1`/`app-2.xccov.json` and `<Package>.llvm-cov.txt`: each file under its target's floor that holds user-facing logic becomes a row in a backfill issue, highest-risk first (anything on the play, queue, drag or Music Assistant paths). The first set was filed from the baseline run as #0214–#0219 and refreshed from run `20261029-191545-21712`: each now names only the files still under the goal there (the App is over its 60 % floor; these are the files that hold it under 80 %), and the gaps no area issue owned went to #0214 (`MAWebSocketTransport`), #0215 (`PlayerModel+Favorites`), #0218 (`PlayerModel+QueueSave`) and #0207 (`PlayerModel+Equalizer`).
 
 ## 3. UI tests
 
@@ -450,7 +450,7 @@ In `docs/testing-in-vm.md`: the "UI tests (not built yet)" section is replaced w
 
 ## 8. Risks and open questions
 
-- **XCUITest in the Tart guest.** The golden image bakes in admin auto-login, "Automation Mode without authentication" and developer mode (testing-in-vm.md), which is what Changeover's UI tests needed. Still unproven for Roadie: the first `--ui` run (#0200's smoke test) is the gate; if a TCC prompt blocks it, the fix is in the golden image (`tart-golden stage/validate/promote`), not in Roadie. A blocked prompt shows as a timeout, so `ui-tests` gets a 20 min step timeout and `verify.sh` reports it as `FAIL ui-tests (timeout)`.
+- **XCUITest in the Tart guest.** The golden image bakes in admin auto-login, "Automation Mode without authentication" and developer mode (testing-in-vm.md), which is what Changeover's UI tests needed. Still unproven for Roadie: the first `--ui` run (#0200's smoke test) is the gate; if a TCC prompt blocks it, the fix is in the golden image (`tart-golden stage/validate/promote`), not in Roadie. A blocked prompt shows as a timeout, so `ui-tests` runs under a step limit sized from the run (`scripts/ui_timeout.py`, #0212: 20 min for a filtered run, up to 90 min for the whole suite with coverage and every skin), and a timed-out step prints a `TIMEOUT` line (elapsed time, limit, the test that was running).
 - **Headless display.** `--no-graphics` still gives the guest a WindowServer and a display; `make-screenshots.sh` already captures windows that way. The display is set to 2560×1300 so nothing overlaps; if `XCUIElement.click()` misses because a window is off screen, the test fails with a screenshot that shows it.
 - **Audio in test mode.** v1 plays through the guest's muted virtual device (no path to the host, `--no-audio`), as `make-screenshots.sh` does, so time advances and the visualizer moves. If the virtual device turns out to stall or to vary between boots, `RoadieConfiguration.silentOutput` switches the engine to manual rendering driven by a timer; that is the reserved field, not built in M16 unless needed.
 - **Flakiness budget.** A UI test may be retried once by `xcodebuild -retry-tests-on-failure -test-iterations 2`; a test that needs the retry twice in a milestone is filed as a flaky-test issue under the tooling milestone and marked `XCTSkip` until fixed, never left to fail intermittently. Target: zero retries needed in the per-issue runs over a milestone.

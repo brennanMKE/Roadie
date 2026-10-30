@@ -27,9 +27,12 @@ def llvm(rows):
     return HEADER + "".join(row(*r) for r in rows) + "-" * 80 + "\nTOTAL  10  2  80.00%  5  1  80.00%  1  1  0.00%  0  0  -\n"
 
 
-def xccov(files):
-    return json.dumps({"targets": [{"name": "Roadie.app", "files": [
-        {"path": p, "name": Path(p).name, "executableLines": l, "coveredLines": c} for p, l, c in files]}]})
+def xccov(files, *more_targets):
+    """`files` are Roadie.app's; each of `more_targets` is (target name, files)."""
+    targets = [("Roadie.app", files), *more_targets]
+    return json.dumps({"targets": [{"name": name, "files": [
+        {"path": p, "name": Path(p).name, "executableLines": l, "coveredLines": c} for p, l, c in fs]}
+        for name, fs in targets]})
 
 
 class CoverageReportTests(unittest.TestCase):
@@ -122,6 +125,71 @@ class CoverageReportTests(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("coverage: MISSING WindowDocking (no files measured)", out)
         self.assertNotIn("FLOOR", out)
+
+    def test_app_test_support_is_left_out(self):
+        app = xccov([("/src/App/PlayerModel.swift", 100, 50), ("/src/App/TestSupport/PanelStandIns.swift", 100, 100)])
+        rc, out, d = self.run_main({}, [app], "App\t40\n")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("coverage: App 50.0%", out)              # 66.7% if the test-only stand-ins counted
+        self.assertIn("| App | App | 100 | 50 | 50.0% | 40% | ok |", (d / "report.md").read_text())
+
+    def test_file_in_app_and_test_bundle_counts_under_app(self):
+        # Run 20261029-191545-21712: AXID.swift is under Roadie.app and RoadieUITests.xctest in the UI bundle.
+        axid = "/src/App/Accessibility/AXID.swift"
+        after = xccov([(axid, 15, 5)], ("RoadieUITests.xctest", [(axid, 15, 14)]))
+        before = json.dumps({"targets": list(reversed(json.loads(after)["targets"]))})
+        self.assertEqual(cr.parse_xccov(after)[axid], (15, 5))
+        self.assertEqual(cr.parse_xccov(before)[axid], (15, 5))
+        only_test = xccov([], ("RoadieUITests.xctest", [(axid, 15, 14)]), ("Other.xctest", [(axid, 15, 3)]))
+        self.assertEqual(cr.parse_xccov(only_test)[axid], (15, 14))  # no app row: the first one
+        rc, out, _ = self.run_main({}, [after], "App\t30\n")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("coverage: App 33.3%", out)
+
+    def run_partial(self, reason, app_floor="60"):
+        skin = llvm([("/src/Packages/SkinKit/Sources/SkinKit/A.swift", 100, 10)])
+        app = xccov([("/src/App/PlayerModel.swift", 100, 28)])   # the unit tests' share only
+        d = Path(tempfile.mkdtemp())
+        (d / "s.txt").write_text(skin)
+        (d / "a.json").write_text(app)
+        (d / "f.tsv").write_text(f"SkinKit\t85\nApp\t{app_floor}\n")
+        args = ["--out", str(d / "coverage"), "--llvm", f"SkinKit={d / 's.txt'}", "--xccov", str(d / "a.json"),
+                "--floors", str(d / "f.tsv")]
+        if reason:
+            args += ["--partial", f"App={reason}"]
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = cr.main(args)
+        return rc, buf.getvalue(), d / "coverage"
+
+    def test_partial_app_is_reported_not_a_floor_breach(self):
+        # Run 20261029-195714-39620: ui-tests timed out, so the UI bundle had no coverage and App came out at 27.5%.
+        rc, out, d = self.run_partial("ui-tests timed out")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("coverage: PARTIAL App 28.0% (floor 60% not checked: ui-tests timed out)", out)
+        self.assertNotIn("FLOOR App", out)
+        self.assertIn("App 28% (partial)", (d / "packages.txt").read_text())
+        report = (d / "report.md").read_text()
+        self.assertIn("| App | App | 100 | 28 | 28.0% | 60% | partial |", report)
+        self.assertIn("**Partial:** App's number is incomplete (ui-tests timed out)", report)
+
+    def test_partial_app_keeps_other_floors(self):
+        d = Path(tempfile.mkdtemp())
+        (d / "s.txt").write_text(llvm([("/src/Packages/SkinKit/Sources/SkinKit/A.swift", 100, 50)]))
+        (d / "f.tsv").write_text("SkinKit\t85\nApp\t60\n")
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = cr.main(["--out", str(d / "c"), "--llvm", f"SkinKit={d / 's.txt'}", "--floors", str(d / "f.tsv"),
+                          "--partial", "App=ui-tests failed (1)"])
+        self.assertEqual(rc, 1, buf.getvalue())
+        self.assertIn("coverage: FLOOR SkinKit 50.0% < 85%", buf.getvalue())
+        self.assertNotIn("MISSING App", buf.getvalue())   # no App rows at all: partial, not MISSING
+        self.assertIn("coverage: PARTIAL App (nothing measured; floor not checked: ui-tests failed (1))", buf.getvalue())
+
+    def test_without_partial_the_app_floor_still_fails(self):
+        rc, out, _ = self.run_partial(None)
+        self.assertEqual(rc, 1)
+        self.assertIn("coverage: FLOOR App 28.0% < 60%", out)
 
 
 if __name__ == "__main__":

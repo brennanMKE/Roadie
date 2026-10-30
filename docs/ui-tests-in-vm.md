@@ -86,8 +86,10 @@ The flow is `run-tests-vm.sh`'s (export → `tart-lease` → clone → `tart run
   both hold: `ROADIE_UI_GUEST=1`, which only `run-tests-vm.sh --ui` sets (as `ROADIE_UI_GUEST` and
   `TEST_RUNNER_ROADIE_UI_GUEST`, like the `ROADIE_TEST_*` paths), and `NSUserName() == "admin"`, the guest's user.
   Setting `ROADIE_TEST_SKINS`/`ROADIE_TEST_MUSIC` by hand on the host isn't enough.
-- **A timeout around the UI step** (`timeout 1200` in the guest). A blocking prompt shows up as a hang, never as a
-  pass, and a timed-out step reports "a blocked prompt in the guest?".
+- **A timeout around the UI step** (`scripts/with-timeout.sh` in the guest, with a limit sized from the run by
+  `scripts/ui_timeout.py`: 20 min filtered up to 90 min; [testing-in-vm.md](testing-in-vm.md) has the table). A
+  blocking prompt shows up as a hang, never as a pass. A timed-out step prints a `TIMEOUT` line with the elapsed time,
+  the limit and the test that was running.
 - **Results:** `UITests.xcresult` with `XCTAttachment` screenshots comes back under `build/vm-tests/<run-id>/ui/`.
   Screenshots are the main way to see what a headless run rendered.
 

@@ -21,10 +21,12 @@
 #
 # Output:
 #   pass  ==> VERIFY PASS …, the TIER / AUDIO / BUILD-ONLY lines, a test total, the --expect result (≤ 8 lines)
-#   --coverage runs (#0212) add the COVERAGE line on pass; a floor breach fails with the `coverage: FLOOR …` lines.
+#   --coverage runs (#0212) add the COVERAGE line (pass and fail); a floor breach fails with the `coverage: FLOOR …`
+#         lines, and an App number without a complete UI run shows as `coverage: PARTIAL App …` (floor not checked).
 #   --ui runs (#0200) add the UI summary line on pass; on a failed ui-tests/app-unit-tests step, a `screenshots:` line
-#         per failed test (results/ui/attachments/<testName>/) and the xcresult path; exit 124 there is a timeout.
-#   fail  ==> VERIFY FAIL …, the FAIL/BUILD/ERRORS/INFRA/AUDIO lines from summary.txt, then from each failed
+#         per failed test (results/ui/attachments/<testName>/) and the xcresult path; a timed-out ui-tests step (exit
+#         124) has a TIMEOUT line: the elapsed time against the step's limit and the test that was running.
+#   fail  ==> VERIFY FAIL …, the FAIL/BUILD/ERRORS/INFRA/TIMEOUT/COVERAGE/AUDIO lines from summary.txt, then from each failed
 #         step's log the failing tests (✘ lines with their ↳ details), crashes and XCTest failures; at most
 #         MAX_LINES (60) lines. Also written to build/vm-tests/<run-id>/failure.txt.
 #   The last line names the results directory, for a human; agents should not read the logs.
@@ -182,7 +184,7 @@ report=$(
   print "==> VERIFY  FAIL (exit $RC)${RESULTS:+ ${RESULTS:t}}"
   if [[ -f "$SUMMARY" ]]; then
     # The summary's own failure lines, with the indented compiler-error block that follows ERRORS.
-    awk '/^==> (FAIL|BUILD|INFRA|AUDIO)/ {print; next}
+    awk '/^==> (FAIL|BUILD|INFRA|TIMEOUT|COVERAGE|AUDIO)/ {print; next}
          /^==> ERRORS  no file:line:col/ {e=0; next}
          /^==> ERRORS/ {print; e=1; next}
          /^==> / {e=0}
@@ -215,7 +217,7 @@ report=$(
     fi
     if [[ $step == coverage-report ]]; then
       # #0212: floor breaches (or why nothing was measured), never test-failure lines.
-      lines=$(strip <"$f" | grep -E '^coverage: (FLOOR|NO DATA|MISSING|nothing|llvm-cov|xccov)' | awk '!seen[$0]++')
+      lines=$(strip <"$f" | grep -E '^coverage: (FLOOR|PARTIAL|NO DATA|MISSING|nothing|llvm-cov|xccov)' | awk '!seen[$0]++')
       print "==> coverage-report failures:"
       if [[ -n "$lines" ]]; then print -r -- "$lines" | sed 's/^/    /'
       else strip <"$f" | grep -v '^[[:space:]]*$' | tail -10 | sed 's/^/    /'; fi
@@ -237,7 +239,6 @@ report=$(
       strip <"$f" | grep -v '^[[:space:]]*$' | tail -10 | sed 's/^/    /'
     fi
     if [[ $step == ui-tests ]]; then
-      grep -q "^==> FAIL  $step (exit 124)" "$SUMMARY" 2>/dev/null && print "==> $step timed out (a blocked prompt in the guest?)"
       attach="$RESULTS/ui/attachments"
       for t in ${(u)${(f)"$(strip <"$f" | perl -ne "print \"\$1\\n\" if /Test Case '-\\[\\S+ (\\w+)\\]' failed/")"}}; do
         if [[ -d "$attach/$t" ]]; then print "    screenshots: $attach/$t/"

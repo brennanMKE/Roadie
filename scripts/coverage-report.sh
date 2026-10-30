@@ -1,7 +1,9 @@
 #!/bin/zsh
 # coverage-report.sh — per-target line coverage of a --coverage VM run (#0212). Runs in the guest, from the repo root.
 #
-# Usage: scripts/coverage-report.sh <out> [xcresult…]
+# Usage: scripts/coverage-report.sh [--app-partial REASON] <out> [xcresult…]
+#   --app-partial: the UI tests didn't run or didn't finish (run-tests-vm.sh passes why), so the App number is
+#        partial: it is reported as `coverage: PARTIAL App …` and its floor isn't checked.
 #   Packages: llvm-cov report of each package's test binaries (one .xctest per test target) against its default.profdata (swift test --enable-code-coverage).
 #   App: xccov reports of the given xcresult bundles (default: build/DerivedData/Logs/Test/*.xcresult and
 #        <out>/../ui/UITests.xcresult), max per file, App/ only.
@@ -10,13 +12,16 @@
 #   files measured (`coverage: MISSING …`), or nothing was measured.
 
 set -uo pipefail
-OUT=${1:?usage: coverage-report.sh <out> [xcresult…]}; shift
+APP_PARTIAL=""
+if [[ ${1:-} == --app-partial ]]; then APP_PARTIAL=${2:?--app-partial needs a reason}; shift 2; fi
+OUT=${1:?usage: coverage-report.sh [--app-partial REASON] <out> [xcresult…]}; shift
 mkdir -p "$OUT"
 OUT=${OUT:A}
 REPO=${0:A:h:h}
 TIER=$(cat "$OUT/../tier.txt" 2>/dev/null || print fast)
 IGNORE='Tests/|\.build/|/checkouts/'
 args=(--out "$OUT" --floors "$REPO/scripts/coverage-floors.tsv" --tier "$TIER")
+[[ -n "$APP_PARTIAL" ]] && args+=(--partial "App=$APP_PARTIAL")
 measured=0
 
 for pkg in SkinKit PlayerKit; do
