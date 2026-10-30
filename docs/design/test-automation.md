@@ -205,7 +205,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Check for Updates… (Sparkle; disabled in Debug) | UI `MenuBarUITests.checkForUpdatesIsDisabledInDebug`; release-side `check-sparkle.sh` |
 | File › Open… ⌘O, Add to Playlist… ⌥⌘O, Open Skin… ⇧⌘O, Load Playlist…, Save Playlist… ⌘S | UI `MenuBarUITests` (item exists and enabled); the panel path through `-RoadieOpenFiles` in `PlaylistUITests.openFilesReplacesTheQueue`; Unit `RoadieTests.PlayerModelFilesTests` (M3U/PLS round trip via `PlaylistFileTests`) |
 | Skins › Skin Library… ⌘K, Next ⌘], Previous ⌘[, Random ⇧⌘R | UI `SkinsUITests` |
-| Playback › Library ⌘L (opens on the search field, #0185) | UI `LibraryUITests.commandLOpensTheLibraryWithSearchFocused` |
+| Playback › Library ⌘L (opens on the search field, #0185) | UI `LibraryUITests.testCommandLOpensTheLibraryWithSearchFocused` (⌘L only; exists, #0205) |
 | Playback › Previous/Play/Pause/Stop/Next ⌃⌘Z X C V B | UI `MenuBarUITests.menuBarTransport` |
 | Playback › Jump to File… ⌘J | UI `JumpToFileUITests` |
 | Playback › Seek ±5 s ⌃⌘←/→, Volume ⌃⌘↑/↓ | UI `MenuBarUITests.seekAndVolumeShortcuts` |
@@ -303,22 +303,22 @@ The panel's rows and selection (and the row height a double-click aims by) are r
 
 | Feature | Test |
 |---|---|
-| Opens from ⌘L / Playback / Window / the pop-up's Media Library, search focused | UI `LibraryUITests.commandLOpensTheLibraryWithSearchFocused` |
-| Sidebar: Artists, Albums, Playlists (Music Assistant only), Discover rows, Favorites, Radio | UI `LibraryUITests.sidebarSections` (folder), `MusicAssistantUITests.sidebarSections` |
-| Artists → albums → tracks; album art; paging | UI `LibraryUITests.browseArtistAlbumTracks`; Unit `LibraryBrowserModelTests`, `PagedListTests` (exist) |
-| Search (debounced, sections) | UI `LibraryUITests.search`; Unit `LibraryBrowserModelTests.search…` |
-| Double-click album / track / playlist plays | UI `LibraryUITests.doubleClickAlbumPlays`, `MusicAssistantUITests.doubleClickPlaylistPlays` (#0189) |
-| Context menus: Play, Play Next, Add to Queue, Add to Playlist ▸, Favorite; artist and playlist containers (#0188, #0189) | UI `LibraryUITests.contextMenus`, `MusicAssistantUITests.playlistRowMenu`; Unit `PlayRequestTests`, `AddToPlaylistMenuTests` (exist) |
-| Drag album / track / artist / playlist to the playlist editor | UI `LibraryUITests.dragAlbumOntoPlaylistRow`…, `MusicAssistantUITests.dragPlaylistAppendsToQueue` |
+| Opens from ⌘L / Playback / Window / the pop-up's Media Library, search focused | UI `LibraryUITests.testCommandLOpensTheLibraryWithSearchFocused` (⌘L only; exists, #0205) |
+| Sidebar: Artists, Albums, Playlists (Music Assistant only), Discover rows, Favorites, Radio | UI `LibraryUITests.testCommandLOpensTheLibraryWithSearchFocused` (folder: Artists and Albums only; exists, #0205), `MusicAssistantUITests.sidebarSections` |
+| Artists → albums → tracks; album art; paging | UI `LibraryUITests.testBrowseArtistAlbumTracks` (exists, #0205; not album art or paging); Unit `LibraryBrowserModelTests`, `PagedListTests` (exist) |
+| Search (debounced, sections) | UI `LibraryUITests.testSearch` (sections and clearing, not the debounce; exists, #0205); Unit `LibraryBrowserModelTests.search…` |
+| Double-click album / track / playlist plays; Return on a selected album plays it (#0205) | UI `LibraryUITests.testDoubleClickAlbumPlays` (an album in the Albums section, and a track from another album than the queue's; exists, #0205), `LibraryUITests.testDoubleClickAlbumInArtistDetailPlays` (an album in an artist's detail, where a click pushes its tracks after the double-click interval; exists, #0205), `MusicAssistantUITests.doubleClickPlaylistPlays` (#0189). Return isn't tested |
+| Context menus: Play, Play Next, Add to Queue, Add to Playlist ▸, Favorite; artist and playlist containers (#0188, #0189) | UI `LibraryUITests.testContextMenus` (folder: no Add to Playlist or Favorite; an unselected album's Add to Queue acts on that album; exists, #0205), `MusicAssistantUITests.playlistRowMenu`; Unit `PlayRequestTests`, `AddToPlaylistMenuTests` (exist) |
+| Drag album / track / artist / playlist to the playlist editor | UI `LibraryUITests.testDragAlbumOntoPlaylistRow`, `testDragTrackOntoBottomBar`, `testDragArtistOntoPlaylist`, `testDragWithoutDropLeavesTheQueue` (exist, #0205; the last only checks that nothing changes, and would also pass if the drag never started), `MusicAssistantUITests.dragPlaylistAppendsToQueue` |
 | Drag tracks/albums onto a playlist row (adds to that playlist) | UI `MusicAssistantUITests.dropOntoPlaylistAdds`; Unit `PlaylistEditorTests` (exist) |
-| Toolbar: New Playlist, Import Playlist…, Refresh, Add Radio URL…, output picker | UI `MusicAssistantUITests.toolbar`, `LibraryUITests.addRadioURL` |
+| Toolbar: New Playlist, Import Playlist…, Refresh, Add Radio URL…, output picker | UI `MusicAssistantUITests.toolbar`, `MusicAssistantUITests.addRadioURL` (#0206: the folder library has no Radio) |
 | Playlists: create, rename, delete (confirmation), export/import, reorder tracks, remove track, edit bar errors | UI `MusicAssistantUITests.playlistCRUD`, `PlaylistGroupsUITests.testCreatedPlaylistIsUnderMyPlaylists` (exists, #0221); Unit `PlaylistsModelTests`, `PlaylistMappingTests`, `PlaylistWriteTests`, `PlaylistEditorTests` (exist) |
 | Favorites section, favorite button and menu | UI `MusicAssistantUITests.favorites`; Unit `FavoritesModelTests` (exists) |
 | Discover rows, Play All, Refresh, Show all rows | UI `MusicAssistantUITests.discover`; Unit `DiscoverTests`, `RecommendationDecodingTests` (exist) |
 | Radio list, play a station | UI `MusicAssistantUITests.radio`; Unit `RadioTests`, `RadioSectionTests` (exist) |
-| Status view: connecting, failed with Open Settings… / Retry | UI `LibraryUITests.unreachableSourceShowsRetry` (scenario `unreachable`); Unit `LibraryFallbackControllerTests` (exists) |
+| Status view: connecting, failed with Open Settings… / Retry | UI `LibraryUITests.testUnreachableSourceShowsRetry` (unreadable folder → Retry, no folder → Open Settings…; not connecting; exists, #0205); Unit `LibraryFallbackControllerTests` (exists) |
 | Output picker: This Mac, speakers, groups, toggle members, Only, leader | UI `MusicAssistantUITests.outputPicker`; Unit `OutputPickerModelTests`, `OutputSelectionTests` (exist) |
-| Library source fallback to the folder when Music Assistant fails, with notice | UI `LibraryUITests.fallbackToFolderNotice`; Unit `LibraryFallbackPolicyTests` (exists) |
+| Library source fallback to the folder when Music Assistant fails, with notice | UI `LibraryUITests.testFallbackToFolderNotice` (exists, #0205); Unit `LibraryFallbackPolicyTests` (exists) |
 
 ### 5.8 Skins window and Skin Museum
 
