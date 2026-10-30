@@ -210,8 +210,8 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Playback › Jump to File… ⌘J | UI `JumpToFileUITests` |
 | Playback › Seek ±5 s ⌃⌘←/→, Volume ⌃⌘↑/↓ | UI `MenuBarUITests.seekAndVolumeShortcuts` |
 | Playback › Shuffle ⌃⌘S, Repeat ⌃⌘R (check marks) | UI `MainWindowUITests.shuffleRepeatToggles` (the probe's `shuffle`/`repeatAll` is the assertion; XCUITest may not expose the check mark) |
-| Playback › Save Queue as Playlist…, Load Playlist from Library… (#0190) | UI `MusicAssistantUITests.saveQueueAsPlaylist`, `.loadPlaylistFromLibraryMenuItem`; Unit `QueueSaveTargetTests` |
-| Playback › Favorite Current Track ⌃⌘L | UI `MusicAssistantUITests.favoriteCurrentTrack`; Unit `BackendFavoritesTests` |
+| Playback › Save Queue as Playlist…, Load Playlist from Library… (#0190) | UI `MusicAssistantUITests.testSaveQueueAsPlaylist` (`save_as_playlist`), `.testListLoadOffersLibraryPlaylist` (the Playback menu item is enabled, opens the picker and loads on a speaker; #0206); Unit `QueueSaveTargetTests` |
+| Playback › Favorite Current Track ⌃⌘L | UI `MusicAssistantUITests.testFavorites` (⌃⌘L sends `players/add_currently_playing_to_favorites` on a speaker; #0206); Unit `BackendFavoritesTests` |
 | Playlist › Add File… / Add Folder… / Add URL…, Remove Selected, Crop, Clear Playlist, Select All / None / Invert, Sort by Title / File Name / Path ⌥⌘1–3, Reverse List, Randomize List, File Info…, Generate HTML Playlist, Load Playlist… ⌥⌘L, Save Playlist… ⌥⌘S; enabled as the shown queue allows (#0226) | UI `PlaylistUITests.testPlaylistMenuBarHasEveryCommand`, `.testPlaylistMenuBarEditsTheQueue`, `.testPlaylistMenuBarLoadsAndSaves`; Unit SkinKit `PlaylistMenuTests`, `RoadieTests.PlaylistCommandTests`, `.PlaylistMenuBuilderTests` |
 | Window › Library, Player ⌘1, Windowshade ⌃⌘W, Equalizer ⌘2, EQ Windowshade ⌃⌘E, Playlist Windowshade ⌃⌘P, Playlist Editor ⌘3, Always on Top, Double Size | UI `MenuBarUITests.windowMenu`; Visualization ⇧⌘K and Visualization Settings… ⌥⌘K exist there, driven by `VisualizationUITests` (§5.12) |
 | Help › Welcome to Roadie…, Playlists and the Queue… (opens the help URL) | UI `FirstLaunchUITests.helpMenu` (URL recorded by `-RoadieExternalOpens record`) |
@@ -234,7 +234,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 
 | Feature | Test |
 |---|---|
-| Transport buttons (previous, play, pause, stop, next, eject = open files) | UI `MainWindowUITests.transportButtons` (folder library); `MusicAssistantUITests.transportOnSpeaker` (stub receives `players/cmd/*`) |
+| Transport buttons (previous, play, pause, stop, next, eject = open files) | UI `MainWindowUITests.transportButtons` (folder library); `MusicAssistantUITests.testTransportOnSpeaker` (pause, next, Volume Up on a speaker; #0206) |
 | Position slider: scrub and seek; time display elapsed/remaining (click toggles) | UI `MainWindowUITests.seekAndTimeMode`; Unit `MainWindowStatusTests`, `MiniTimeTests` (exist) |
 | Volume and balance sliders, marquee shows the value while dragging | UI `MainWindowUITests.volumeAndBalance`; Unit `MainSlidersTests` (exists) |
 | Shuffle, repeat toggles | UI `MainWindowUITests.shuffleRepeatToggles`; Unit `PlayQueueTests` |
@@ -269,14 +269,14 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Rows: number, `Artist - Title`, `[n]` marker, duration; current row colour | UI `PlaylistUITests.rowsShowTheQueue`; Unit `PlaylistTextTests`, `QueueRowsTests` (exist), `RoadieTests.PlaylistModelTests.rows` |
 | Click / ⌘-click / ⇧-click / ⌘A selection | UI `PlaylistUITests.selection`; Unit `PlaylistSelectionTests` (exists) |
 | **Double-click plays that row; Return plays the first selected (local queue)** | UI `PlaylistUITests.doubleClickPlaysThatRow`; Unit `RoadieTests.PlaylistModelTests.playRowLocalSelectsTheRow` |
-| **Double-click plays that row on a Music Assistant queue (#0187)** | UI `MusicAssistantUITests.doubleClickRowSendsItsPosition` (probe: `play_index index=3`); Unit `BackendQueueTests.queueRowsUsePositionWhenTheServerSendsIndexZero` (exists), `RoadieTests.PlaylistModelTests.playRowRemoteSendsTheRowNumber` |
+| **Double-click plays that row on a Music Assistant queue (#0187)** | UI `MusicAssistantUITests.testDoubleClickRowSendsItsPosition` (double-click, Return, row menu Play: `play_index index=5/7/1`; #0206); Unit `BackendQueueTests.queueRowsUsePositionWhenTheServerSendsIndexZero` (exists), `RoadieTests.PlaylistModelTests.playRowRemoteSendsTheRowNumber` |
 | Delete removes selected; REM › crop / all | UI `PlaylistUITests.removeCropClear`; Unit `PlayQueueTests` |
 | Drag rows to reorder | UI `PlaylistUITests.dragReordersRows` |
 | Scroll wheel, scrollbar, arrow buttons; resize corner; shade mode | UI `PlaylistUITests.scrollResizeShade`; Unit `PlaylistScrollTests`, `PlaylistLayoutTests` (exist) |
 | ADD › file / dir / URL (panels: unit; URL sheet: UI) | UI `PlaylistUITests.addURL` (folder library: Add URL adds nothing, the URL sheet needs a radio source, #0147), `.scrollResizeShade` (ADD › dir via `-RoadieAddFolder`); Unit `RoadieTests.PlayerModelFilesTests` |
 | SEL › invert / zero / all | UI `PlaylistUITests.selectMenu` |
 | MISC › file info, sort (Sort by Title / File Name / Path and File Name, Reverse List, Randomize List; titles shared with the Playlist menu, #0226), options › Generate HTML Playlist | UI `PlaylistUITests.sortMenu`, `.miscOptionsMenu` (entries clicked in the pop-up, found under the window, #0230), `.fileInfoPanel`; Unit `PlaylistMenusTests.popUpViewPrefersTheVisiblePlaylistWindow`, `.popUpPointIsThePointerInTheHostView`; Unit `PlaylistSortKeyTests`, `PlaylistHTMLTests` (exist) |
-| LIST › new, save (M3U/PLS or a server playlist), load (file / Library playlist, #0190) | UI `PlaylistUITests.listMenuLocal` (save via `-RoadieSaveTo`, load via `-RoadieLoadList`), `MusicAssistantUITests.listLoadOffersLibraryPlaylist`; Unit `QueueSaveTargetTests` (exists) |
+| LIST › new, save (M3U/PLS or a server playlist), load (file / Library playlist, #0190) | UI `PlaylistUITests.listMenuLocal` (save via `-RoadieSaveTo`, load via `-RoadieLoadList`), `MusicAssistantUITests.testListLoadOffersLibraryPlaylist` (#0206: LIST › Load's Library Playlist… is offered and its picker lists the server's playlists only; the load itself goes through Playback › Load Playlist from Library… on a speaker); Unit `QueueSaveTargetTests` (exists) |
 | ADD / REM / SEL / MISC / LIST tooltips name the button and its entries (#0227) | UI `PlaylistUITests.testMenuButtonsHaveTooltips` (one hover: a help tag appears beside ADD; its text isn't readable in the guest); Unit `RoadieTests.PlaylistTooltipTests` (the five strings), SkinKit `PlaylistLayoutTests.entrySpritesMatchMenuEntries`; *by hand* for the visible text, double size, resize and docking |
 | Bottom transport buttons, running time, mini time | UI `PlaylistUITests.bottomBar` |
 | Right-click menu on a row: Play, Queue/Dequeue, Clear Queue, Remove, File Info…, Load Playlist…, Clear Playlist; below the rows: Load Playlist…, Clear Playlist (#0229) | UI `PlaylistUITests.testRowMenu`, `.testRowMenuLoadsAndClears`, `.testEmptyAreaRightClickMenu`; Unit `RoadieTests.PlaylistMenusTests`, SkinKit `PlaylistMenuTests.contextEntriesAreLoadAndClear` |
@@ -284,7 +284,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Finder files dropped at a row (inserted there), on the bottom bar (appended) | Unit `RoadieTests.DropDecoderTests`, `FolderBackendTests.playInsert…` (exist); *by hand* for the real Finder drag |
 | **⌥-drop on the list replaces the queue and plays (Library items: local and Music Assistant; Finder files: local), with the REPLACE PLAYLIST cue (#0228)** | UI *by hand* (a Library → playlist drag can't be driven in the guest, `docs/ui-tests-in-vm.md`); Unit `RoadieTests.PlayerModelDropTests.testOptionDrop…` (6), `DropDecoderTests.testPlan…` (3) |
 | **Library rows dropped at a row / bottom bar (#0188)** | UI `LibraryUITests.dragAlbumOntoPlaylistRow`, `.dragTrackOntoBottomBar`, `.dragArtistOntoPlaylist`; Unit `RoadieTests.DropDecoderTests.readsEveryPasteboardItem` |
-| Remote queue: edits go to the server, refusals show "Not for Music Assistant queues" | UI `MusicAssistantUITests.sortIsRefusedOnARemoteQueue`; Unit `QueueEditPlanTests`, `BackendQueueTests` (exist) |
+| Remote queue: edits go to the server, refusals show "Not for Music Assistant queues" | UI `MusicAssistantUITests.testSortIsRefusedOnARemoteQueue`, `.testQueueEdits` (#0206); Unit `QueueEditPlanTests`, `BackendQueueTests` (exist) |
 | Queue restored at launch (stopped on the saved track) | UI `PlaylistUITests.queueSurvivesRelaunch`; Unit `QueueAutosaverTests`, `QueueSnapshotTests` (exist) |
 
 ### 5.6 Jump to File
@@ -293,7 +293,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 |---|---|
 | `J` and ⌘J open the panel over the playlist's rows (⌘J also from the Library window); Playback › Jump to File… and the pop-up's Playback › Jump to File… | UI `JumpToFileUITests.opensWithJAndCommandJ`, `.menuBarItemOpensIt` |
 | Typing filters (substring words over artist, title, album and file name, in playlist order; no match shows "No matches") | UI `JumpToFileUITests.typingFilters`; Unit `JumpToFileMatcherTests` (exists) |
-| **Return / double-click / ↓ + Return plays the chosen row (local and Music Assistant, #0187)** | UI `JumpToFileUITests.returnPlaysTheChosenRow` (local), `MusicAssistantUITests.jumpToFilePlaysTheChosenRow`; Unit `RoadieTests.JumpToFileControllerTests` |
+| **Return / double-click / ↓ + Return plays the chosen row (local and Music Assistant, #0187)** | UI `JumpToFileUITests.returnPlaysTheChosenRow` (local), `MusicAssistantUITests.testJumpToFilePlaysTheChosenRow` (Return only; #0206); Unit `RoadieTests.JumpToFileControllerTests` |
 | Queue button adds `[1]` and the panel stays open; it then reads Dequeue and removes it; Esc closes | UI `JumpToFileUITests.queueButtonAndEscape` |
 | Empty playlist: the panel points at the Library (#0190) | UI `JumpToFileUITests.emptyStateMentionsTheLibrary` |
 
@@ -304,20 +304,20 @@ The panel's rows and selection (and the row height a double-click aims by) are r
 | Feature | Test |
 |---|---|
 | Opens from ⌘L / Playback / Window / the pop-up's Media Library, search focused | UI `LibraryUITests.testCommandLOpensTheLibraryWithSearchFocused` (⌘L only; exists, #0205) |
-| Sidebar: Artists, Albums, Playlists (Music Assistant only), Discover rows, Favorites, Radio | UI `LibraryUITests.testCommandLOpensTheLibraryWithSearchFocused` (folder: Artists and Albums only; exists, #0205), `MusicAssistantUITests.sidebarSections` |
+| Sidebar: Artists, Albums, Playlists (Music Assistant only), Discover rows, Favorites, Radio | UI `LibraryUITests.testCommandLOpensTheLibraryWithSearchFocused` (folder: Artists and Albums only; exists, #0205), `MusicAssistantUITests.testSidebarSections` (Artists, Albums, Playlists, Favorites; Discover and Radio have no recordings, so they aren't asserted; #0206) |
 | Artists → albums → tracks; album art; paging | UI `LibraryUITests.testBrowseArtistAlbumTracks` (exists, #0205; not album art or paging); Unit `LibraryBrowserModelTests`, `PagedListTests` (exist) |
 | Search (debounced, sections) | UI `LibraryUITests.testSearch` (sections and clearing, not the debounce; exists, #0205); Unit `LibraryBrowserModelTests.search…` |
-| Double-click album / track / playlist plays; Return on a selected album plays it (#0205) | UI `LibraryUITests.testDoubleClickAlbumPlays` (an album in the Albums section, and a track from another album than the queue's; exists, #0205), `LibraryUITests.testDoubleClickAlbumInArtistDetailPlays` (an album in an artist's detail, where a click pushes its tracks after the double-click interval; exists, #0205), `MusicAssistantUITests.doubleClickPlaylistPlays` (#0189). Return isn't tested |
-| Context menus: Play, Play Next, Add to Queue, Add to Playlist ▸, Favorite; artist and playlist containers (#0188, #0189) | UI `LibraryUITests.testContextMenus` (folder: no Add to Playlist or Favorite; an unselected album's Add to Queue acts on that album; exists, #0205), `MusicAssistantUITests.playlistRowMenu`; Unit `PlayRequestTests`, `AddToPlaylistMenuTests` (exist) |
-| Drag album / track / artist / playlist to the playlist editor | UI `LibraryUITests.testDragAlbumOntoPlaylistRow`, `testDragTrackOntoBottomBar`, `testDragArtistOntoPlaylist`, `testDragWithoutDropLeavesTheQueue` (exist, #0205; the last only checks that nothing changes, and would also pass if the drag never started), `MusicAssistantUITests.dragPlaylistAppendsToQueue` |
-| Drag tracks/albums onto a playlist row (adds to that playlist) | UI `MusicAssistantUITests.dropOntoPlaylistAdds`; Unit `PlaylistEditorTests` (exist) |
-| Toolbar: New Playlist, Import Playlist…, Refresh, Add Radio URL…, output picker | UI `MusicAssistantUITests.toolbar`, `MusicAssistantUITests.addRadioURL` (#0206: the folder library has no Radio) |
-| Playlists: create, rename, delete (confirmation), export/import, reorder tracks, remove track, edit bar errors | UI `MusicAssistantUITests.playlistCRUD`, `PlaylistGroupsUITests.testCreatedPlaylistIsUnderMyPlaylists` (exists, #0221); Unit `PlaylistsModelTests`, `PlaylistMappingTests`, `PlaylistWriteTests`, `PlaylistEditorTests` (exist) |
-| Favorites section, favorite button and menu | UI `MusicAssistantUITests.favorites`; Unit `FavoritesModelTests` (exists) |
-| Discover rows, Play All, Refresh, Show all rows | UI `MusicAssistantUITests.discover`; Unit `DiscoverTests`, `RecommendationDecodingTests` (exist) |
-| Radio list, play a station | UI `MusicAssistantUITests.radio`; Unit `RadioTests`, `RadioSectionTests` (exist) |
+| Double-click album / track / playlist plays; Return on a selected album plays it (#0205) | UI `LibraryUITests.testDoubleClickAlbumPlays` (an album in the Albums section, and a track from another album than the queue's; exists, #0205), `LibraryUITests.testDoubleClickAlbumInArtistDetailPlays` (an album in an artist's detail, where a click pushes its tracks after the double-click interval; exists, #0205), `MusicAssistantUITests.testDoubleClickPlaylistPlays` (#0189, #0206), `.testPlayAlbumShowsRemoteQueue`, `.testThisMacPlaysMusicAssistant` (#0206). Return isn't tested |
+| Context menus: Play, Play Next, Add to Queue, Add to Playlist ▸, Favorite; artist and playlist containers (#0188, #0189) | UI `LibraryUITests.testContextMenus` (folder: no Add to Playlist or Favorite; an unselected album's Add to Queue acts on that album; exists, #0205), `MusicAssistantUITests.testPlaylistRowMenu` (Play Next `option=next`, Add to Queue `option=add`; #0206), `.testFavorites` (a track's Favorite); Unit `PlayRequestTests`, `AddToPlaylistMenuTests` (exist) |
+| Drag album / track / artist / playlist to the playlist editor | UI `LibraryUITests.testDragAlbumOntoPlaylistRow`, `testDragTrackOntoBottomBar`, `testDragArtistOntoPlaylist`, `testDragWithoutDropLeavesTheQueue` (exist, #0205; the last only checks that nothing changes, and would also pass if the drag never started), `MusicAssistantUITests.testDragPlaylistAppendsToQueue` (an expected failure until #0251: the playlist row's double-click gesture blocks the drag; #0206) |
+| Drag tracks/albums onto a playlist row (adds to that playlist) | UI none: an album row and a playlist row are never on screen together in the Library window (#0206); Unit `PlaylistEditorTests` (exist) |
+| Toolbar: New Playlist, Import Playlist…, Refresh, Add Radio URL…, output picker | UI `MusicAssistantUITests.testPlaylistCRUD` (New Playlist), `.testOutputPicker` (#0206); Import, Refresh and Add Radio URL… aren't driven (no radio recordings) |
+| Playlists: create, rename, delete (confirmation), export/import, reorder tracks, remove track, edit bar errors | UI `MusicAssistantUITests.testPlaylistCRUD` (create, rename, Add to Playlist ▸, delete with confirmation; not export/import, reorder or remove; #0206), `PlaylistGroupsUITests.testCreatedPlaylistIsUnderMyPlaylists` (exists, #0221); Unit `PlaylistsModelTests`, `PlaylistMappingTests`, `PlaylistWriteTests`, `PlaylistEditorTests` (exist) |
+| Favorites section, favorite button and menu | UI `MusicAssistantUITests.testFavorites` (menu Favorite, Favorites › Tracks; #0206); Unit `FavoritesModelTests` (exists) |
+| Discover rows, Play All, Refresh, Show all rows | UI none yet (#0254: no recommendation recordings in the scripted server); Unit `DiscoverTests`, `RecommendationDecodingTests` (exist) |
+| Radio list, play a station | UI none yet (#0254: no radio recordings in the scripted server); Unit `RadioTests`, `RadioSectionTests` (exist) |
 | Status view: connecting, failed with Open Settings… / Retry | UI `LibraryUITests.testUnreachableSourceShowsRetry` (unreadable folder → Retry, no folder → Open Settings…; not connecting; exists, #0205); Unit `LibraryFallbackControllerTests` (exists) |
-| Output picker: This Mac, speakers, groups, toggle members, Only, leader | UI `MusicAssistantUITests.outputPicker`; Unit `OutputPickerModelTests`, `OutputSelectionTests` (exist) |
+| Output picker: This Mac, speakers, groups, toggle members, Only, leader | UI `MusicAssistantUITests.testOutputPicker` (no groups recorded; #0206); Unit `OutputPickerModelTests`, `OutputSelectionTests` (exist) |
 | Library source fallback to the folder when Music Assistant fails, with notice | UI `LibraryUITests.testFallbackToFolderNotice` (exists, #0205); Unit `LibraryFallbackPolicyTests` (exists) |
 
 ### 5.8 Skins window and Skin Museum
@@ -352,16 +352,16 @@ The panel's rows and selection (and the row height a double-click aims by) are r
 
 | Feature | Test |
 |---|---|
-| Connect at launch when a verified server exists; reconnect; server re-pick on failure | UI `MusicAssistantUITests.connectsAtLaunch`; Unit `ClientConnectionTests`, `SelectionControllerTests` (exist), `RoadieTests.PlayerModelOutputTests.testFirstServerResolutionKeepsTheConnectionAndTheSpeaker`, `.testServerChangeDisconnectsAndSwitchesToThisMac` (#0246) |
-| Browse the server's library (all sections) | UI `MusicAssistantUITests.sidebarSections` |
-| Play on This Mac (Sendspin feed) and on a speaker; the playlist editor shows the server queue | UI `MusicAssistantUITests.playAlbumShowsRemoteQueue`; Unit `MusicAssistantThisMacTests`, `SendspinPlayerTests` (exist) |
-| Transport and volume on a speaker; balance refused quietly | UI `MusicAssistantUITests.transportOnSpeaker`; Unit `BackendTransportTests` (exists) |
-| Queue edits: play row, remove, move, queue (`Q` moves after current), clear | UI `MusicAssistantUITests.queueEdits`; Unit `BackendQueueTests`, `QueueEditPlanTests` (exist) |
-| Save queue as a server playlist; load a server playlist from LIST › Load and the Playback menu | UI `MusicAssistantUITests.saveQueueAsPlaylist`, `.listLoadOffersLibraryPlaylist`; Unit `BackendSaveQueueTests` (exists) |
-| Output selection, groups, moving playback between outputs | UI `MusicAssistantUITests.outputPicker`; Unit `OutputMoveTests`, `PlaybackOwnershipTests` (exist) |
-| Now playing follows the server (title, position, artwork) | UI `MusicAssistantUITests.nowPlayingFollowsTheServer` (event push); Unit `NowPlayingMappingTests`, `BackendNowPlayingTests` (exist) |
+| Connect at launch when a verified server exists; reconnect; server re-pick on failure | UI `MusicAssistantUITests.testConnectsAtLaunch`, `.testBadTokenShowsTheRefusalInTheLibrary` (#0206: connecting at launch and a refused token only; reconnect and server re-pick aren't driven); Unit `ClientConnectionTests`, `SelectionControllerTests` (exist), `RoadieTests.PlayerModelOutputTests.testFirstServerResolutionKeepsTheConnectionAndTheSpeaker`, `.testServerChangeDisconnectsAndSwitchesToThisMac` (#0246) |
+| Browse the server's library (all sections) | UI `MusicAssistantUITests.testSidebarSections` (not Discover or Radio; #0206) |
+| Play on This Mac (Sendspin feed) and on a speaker; the playlist editor shows the server queue | UI `MusicAssistantUITests.testPlayAlbumShowsRemoteQueue`, `.testThisMacPlaysMusicAssistant` (an expected failure until #0254: no scripted Sendspin, so This Mac sends no play_media; #0206); Unit `MusicAssistantThisMacTests`, `SendspinPlayerTests` (exist) |
+| Transport and volume on a speaker; balance refused quietly | UI `MusicAssistantUITests.testTransportOnSpeaker` (balance not driven; #0206); Unit `BackendTransportTests` (exists) |
+| Queue edits: play row, remove, move, queue (`Q` moves after current), clear | UI `MusicAssistantUITests.testDoubleClickRowSendsItsPosition` (play row), `.testQueueEdits` (remove, move, Q, clear) (#0206); Unit `BackendQueueTests`, `QueueEditPlanTests` (exist) |
+| Save queue as a server playlist; load a server playlist from LIST › Load and the Playback menu | UI `MusicAssistantUITests.testSaveQueueAsPlaylist`, `.testListLoadOffersLibraryPlaylist` (#0206: LIST › Load offers and lists the server playlists only; the load itself goes through Playback › Load Playlist from Library…); Unit `BackendSaveQueueTests` (exists) |
+| Output selection, groups, moving playback between outputs | UI `MusicAssistantUITests.testOutputPicker` (#0206: `set_members` add and remove of a second speaker, and switching to This Mac leaves the speaker's queue; no groups, no transfer); Unit `OutputMoveTests`, `PlaybackOwnershipTests` (exist) |
+| Now playing follows the server (title, position, artwork) | UI `MusicAssistantUITests.testNowPlayingFollowsTheServer` (the marquee after Next (event or poll) only; elapsed time isn't checked, since the scripted server's `elapsed_time_last_updated` pins main.time at the track's length, #0254; no unprompted server event; #0206); Unit `NowPlayingMappingTests`, `BackendNowPlayingTests` (exist) |
 | Fallback to the folder library when the server is unreachable | UI `LibraryUITests.fallbackToFolderNotice` |
-| Quit stops the Music Assistant target | Unit `QuitStopTests` (exists); UI `MusicAssistantUITests.quitSendsStop` (probe after ⌘Q) |
+| Quit stops the Music Assistant target | Unit `QuitStopTests` (exists); UI none yet (#0254: the scripted server writes no received log the test could read after quit) |
 | Bonjour discovery, Wi-Fi network preference | Unit `DiscoveryTests`, `ServerRankingTests` (exist); *by hand* on a real network |
 
 ### 5.11 System integration

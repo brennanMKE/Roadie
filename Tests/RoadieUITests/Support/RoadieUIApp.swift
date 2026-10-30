@@ -25,6 +25,9 @@ enum TestLibrary {
     case folder
     /// No music folder configured.
     case none
+    /// Music Assistant as the Library's source (`-LibrarySource musicAssistant`), no folder; with a `scenario` it is
+    /// #0197's scripted server (#0206).
+    case musicAssistant
 }
 
 /// What `state.probe` reports (the app's `TestProbe`, #0199).
@@ -235,8 +238,10 @@ final class RoadieUIApp {
         if let museumFeatured {
             args += ["-RoadieMuseumSkins", paths.skins, "-RoadieMuseumFeatured", museumFeatured.rawValue]
         }
-        if case .folder = library {
-            args += ["-LibraryFolderPath", paths.music, "-LibrarySource", "folder"]
+        switch library {
+        case .folder: args += ["-LibraryFolderPath", paths.music, "-LibrarySource", "folder"]
+        case .musicAssistant: args += ["-LibrarySource", "musicAssistant"]
+        case .none: break
         }
         if let scenario { args += ["-RoadieMAScenario", scenario] }
         // The queue at launch, stopped at row 0, and File › Open…'s answer (#0203's `PanelStandIns`).
