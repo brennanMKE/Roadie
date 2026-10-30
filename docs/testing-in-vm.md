@@ -311,7 +311,7 @@ scripts/verify.sh --ui --expect playsTheFixtureLibrary
 
   So a per-issue run gets 20 min (30 with `--coverage`), `--full --ui --coverage` 67.5 min (4050 s) and the
   milestone-end run (`--ui-skins all --coverage`) 82.5 min (4950 s). For scale: run 20261029-191545-21712 ran 102
-  tests with coverage in 1143 s, and the 1200 s limit it had then cut off the next run's 111 tests at test 95. Raise
+  tests with coverage in 1143 s, and the 1200 s limit it had then stopped the next run's 111 tests during test 95 (94 finished). Raise
   the numbers in `ui_timeout.py` when a passing suite's time nears its limit. A timed-out step exits 124, and the
   summary says so in a `TIMEOUT` line, which `verify.sh` passes through: `==> TIMEOUT  ui-tests ran out of time:
   stopped after 1203 s at its 1200 s limit, 94 tests finished, running
