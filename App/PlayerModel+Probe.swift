@@ -92,6 +92,8 @@ struct TestProbe: Codable, Equatable {
         var empty: String?
         /// The Queue button's title: Queue or Dequeue.
         var queueTitle: String
+        /// A table row's height in points, spacing included: where a test clicks row N.
+        var rowHeight: Double
     }
 
     /// Writes `null` for the absent optionals, so every key is always in the JSON.

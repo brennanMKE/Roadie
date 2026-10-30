@@ -80,16 +80,29 @@ final class JumpToFileUITests: RoadieUITestCase {
         expectResults("rows \(rows)", file: file, line: line) { $0 == rows }
     }
 
-    /// Double-clicks the panel's first listed row, by position (its rows aren't in the accessibility tree).
-    private func doubleClickFirstResult() {
-        let table = element(AXID.Jump.table)
-        table.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0)).withOffset(CGVector(dx: 0, dy: 9)).doubleClick()
+    /// The middle of table row `row`, by position (the rows aren't in the accessibility tree, #0249): the table's top
+    /// plus (row + 0.5) row heights, the height from the probe. The table isn't scrolled with a few results.
+    private func tableRow(_ row: Int) -> XCUICoordinate {
+        let height = jump?.rowHeight ?? 0
+        XCTAssertGreaterThan(height, 0, "no row height; probe: \(roadie.probeJSON)")
+        return element(AXID.Jump.table).coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: (Double(row) + 0.5) * height))
     }
 
-    /// Checks the panel closed and the probe and `pl.row.i` call row `i` current.
+    /// The Queue button's title as accessibility reads it (what's on screen).
+    private var queueButtonTitle: String {
+        let button = element(AXID.Jump.queue)
+        guard button.exists else { return "" }
+        return button.title.isEmpty ? button.label : button.title
+    }
+
+    /// Checks the panel closed, row `i` is current and playing (a short track can auto-advance, so `playing` shows
+    /// the play started), and `pl.row.i` says current.
     private func expectPlayed(_ i: Int, _ how: String, file: StaticString = #filePath, line: UInt = #line) {
         expectClosed(how, file: file, line: line)
-        roadie.expectCurrentRow(i, file: file, line: line)
+        XCTAssertTrue(
+            roadie.wait { self.roadie.probe?.currentIndex == i && self.roadie.probe?.state == "playing" },
+            "\(how): row \(i) isn't current and playing; probe: \(roadie.probeJSON)", file: file, line: line)
         XCTAssertTrue(
             roadie.waitForValue(roadie.playlist.row(i), timeout: 2) { $0.contains("current=true") },
             "\(how): pl.row.\(i) isn't current: \(roadie.value(of: roadie.playlist.row(i)))", file: file, line: line)
@@ -149,14 +162,21 @@ final class JumpToFileUITests: RoadieUITestCase {
         XCTAssertTrue(
             roadie.waitForValue(marquee, timeout: 2) { $0.hasPrefix("\(b + 1). ") }, "marquee \"\(roadie.value(of: marquee))\"")
 
-        let a = queueIndex("- Tone A")
-        XCTAssertEqual(a, 1, "fixture titles: \(queue.map(\.title))")
+        // Double-click the second listed row. `doubleAction` plays the selection (else the first result) and ignores
+        // the clicked row, so the click must select it: "tone c" lists [0, 3, 5] with table row 0 selected, so a
+        // miss plays row 0 and a wrong row plays row 5.
+        // Rows 0 (the Single, a copy of Tone C) and 3 share the title "Tone Artist - Tone C"; row 3 is the real one.
+        let c = 3
+        XCTAssertEqual(rows(titled: "- Tone C"), [0, c], "fixture titles: \(queue.map(\.title))")
         roadie.stopPlayback()
         openWithJ()
-        type("01")
-        expectResults([a])
-        doubleClickFirstResult()
-        expectPlayed(a, "double-click")
+        type("tone c")
+        expectResults([0, c, 5])
+        let second = tableRow(1)
+        second.click()
+        XCTAssertTrue(roadie.wait { self.jump?.selected == [c] }, "the click didn't select row \(c); probe: \(roadie.probeJSON)")
+        second.doubleClick()
+        expectPlayed(c, "double-click")
 
         // Arrows with an empty query: ↑ to the top (the last pick stays selected), then ↓ twice.
         roadie.stopPlayback()
@@ -186,10 +206,10 @@ final class JumpToFileUITests: RoadieUITestCase {
         XCTAssertTrue(
             roadie.waitForValue(roadie.playlist.row(e)) { $0.contains("marker=[1]") },
             "pl.row.\(e): \(roadie.value(of: roadie.playlist.row(e)))")
-        XCTAssertTrue(roadie.wait { self.jump?.queueTitle == "Dequeue" }, "button title; probe: \(roadie.probeJSON)")
+        XCTAssertTrue(roadie.wait { self.queueButtonTitle == "Dequeue" }, "jump.queue: \(roadie.describe(button))")
         roadie.click(button)
         XCTAssertTrue(roadie.wait { self.queue[e].marker == "" }, "Dequeue left a marker; probe: \(roadie.probeJSON)")
-        XCTAssertTrue(roadie.wait { self.jump?.queueTitle == "Queue" }, "button title; probe: \(roadie.probeJSON)")
+        XCTAssertTrue(roadie.wait { self.queueButtonTitle == "Queue" }, "jump.queue: \(roadie.describe(button))")
         roadie.app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
         expectClosed("Esc")
     }

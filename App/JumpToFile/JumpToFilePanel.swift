@@ -67,7 +67,8 @@ final class JumpToFilePanel: NSObject, NSSearchFieldDelegate, NSTableViewDataSou
         return TestProbe.JumpProbe(
             results: controller.results.map(\.index),
             selected: controller.selectedRows.compactMap { controller.results.indices.contains($0) ? controller.results[$0].index : nil },
-            empty: controller.emptyStateText, queueTitle: queueButton.title)
+            empty: controller.emptyStateText, queueTitle: queueButton.title,
+            rowHeight: Double(table.rowHeight + table.intercellSpacing.height))
     }
 
     // MARK: Data

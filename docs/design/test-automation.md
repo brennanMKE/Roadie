@@ -275,6 +275,8 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Queue button adds `[1]` and the panel stays open; it then reads Dequeue and removes it; Esc closes | UI `JumpToFileUITests.queueButtonAndEscape` |
 | Empty playlist: the panel points at the Library (#0190) | UI `JumpToFileUITests.emptyStateMentionsTheLibrary` |
 
+The panel's rows and selection (and the row height a double-click aims by) are read through the UI-test probe (`jump`), because they aren't in the accessibility tree (#0249). `jump.search`, `jump.empty` and the Queue button (`jump.queue`, its Queue/Dequeue title) are driven and read through accessibility.
+
 ### 5.7 Library window
 
 | Feature | Test |

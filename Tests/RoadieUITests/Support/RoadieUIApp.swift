@@ -71,6 +71,7 @@ struct ProbeState: Decodable {
         var selected: [Int]
         var empty: String?
         var queueTitle: String
+        var rowHeight: Double
     }
 
     struct VisProbe: Decodable {
