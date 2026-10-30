@@ -269,10 +269,10 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 
 | Feature | Test |
 |---|---|
-| `J` and ⌘J open the panel over the playlist's rows | UI `JumpToFileUITests.opensWithJAndCommandJ` |
-| Typing filters (artist, title, file name words) | UI `JumpToFileUITests.typingFilters`; Unit `JumpToFileMatcherTests` (exists) |
-| **Return / double-click plays the chosen row (local and Music Assistant, #0187)** | UI `JumpToFileUITests.returnPlaysTheChosenRow`, `MusicAssistantUITests.jumpToFilePlaysTheChosenRow`; Unit `RoadieTests.JumpToFileControllerTests` |
-| Queue button adds `[n]`; Esc closes | UI `JumpToFileUITests.queueButtonAndEscape` |
+| `J` and ⌘J open the panel over the playlist's rows (⌘J also from the Library window); Playback › Jump to File… and the pop-up's Playback › Jump to File… | UI `JumpToFileUITests.opensWithJAndCommandJ`, `.menuBarItemOpensIt` |
+| Typing filters (substring words over artist, title, album and file name, in playlist order; no match shows "No matches") | UI `JumpToFileUITests.typingFilters`; Unit `JumpToFileMatcherTests` (exists) |
+| **Return / double-click / ↓ + Return plays the chosen row (local and Music Assistant, #0187)** | UI `JumpToFileUITests.returnPlaysTheChosenRow` (local), `MusicAssistantUITests.jumpToFilePlaysTheChosenRow`; Unit `RoadieTests.JumpToFileControllerTests` |
+| Queue button adds `[1]` and the panel stays open; it then reads Dequeue and removes it; Esc closes | UI `JumpToFileUITests.queueButtonAndEscape` |
 | Empty playlist: the panel points at the Library (#0190) | UI `JumpToFileUITests.emptyStateMentionsTheLibrary` |
 
 ### 5.7 Library window

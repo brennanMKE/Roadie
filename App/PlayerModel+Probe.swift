@@ -60,7 +60,7 @@ struct TestProbe: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case output, feed, state, currentIndex, queue, notice, lastExternalOpen, tokenStore, maRequests, skin, skinFiles
         case visualization, panelRequests, alwaysOnTop, doubleSize, shuffle, repeatAll, timeMode, sendspinEnabled,
-            firstRunVersion, maResolutions
+            firstRunVersion, maResolutions, jump
     }
 
     /// The open and save panels a UI test asked for (#0202): `openFiles replace=true`, `saveEQF`, … in order.
@@ -79,6 +79,20 @@ struct TestProbe: Codable, Equatable {
     var firstRunVersion: Int? = nil
     /// Music Assistant server resolutions started (#0209: Settings' Check Now ran one); nil outside UI-test mode.
     var maResolutions: Int? = nil
+    /// The Jump to File panel while it is on screen (#0204); nil when closed and outside UI-test mode. XCUITest
+    /// doesn't expose the panel's table rows (run 20261029-200200-41710), so the tests read its results here.
+    var jump: JumpProbe? = nil
+
+    struct JumpProbe: Codable, Equatable {
+        /// The listed matches' playlist rows, in list order.
+        var results: [Int]
+        /// The selected matches' playlist rows.
+        var selected: [Int]
+        /// The text under the table, nil with results.
+        var empty: String?
+        /// The Queue button's title: Queue or Dequeue.
+        var queueTitle: String
+    }
 
     /// Writes `null` for the absent optionals, so every key is always in the JSON.
     func encode(to encoder: any Encoder) throws {
@@ -104,6 +118,7 @@ struct TestProbe: Codable, Equatable {
         try c.encode(sendspinEnabled, forKey: .sendspinEnabled)
         try c.encode(firstRunVersion, forKey: .firstRunVersion)
         try c.encode(maResolutions, forKey: .maResolutions)
+        try c.encode(jump, forKey: .jump)
     }
 
     var json: String {
@@ -148,7 +163,8 @@ extension PlayerModel {
             timeMode: timeMode.rawValue,
             sendspinEnabled: sendspinController.isEnabled,
             firstRunVersion: storedFirstRunVersion,
-            maResolutions: configuration.isUITest ? musicAssistantSelection.resolutionCount : nil)
+            maResolutions: configuration.isUITest ? musicAssistantSelection.resolutionCount : nil,
+            jump: configuration.isUITest ? JumpToFilePanel.shared.probe : nil)
     }
 
     /// The suite's persisted value: a read through `defaults` would return the `-firstRunVersion` argument instead.
