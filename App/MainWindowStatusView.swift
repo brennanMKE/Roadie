@@ -30,6 +30,9 @@ struct MainWindowStatusLayer: View {
                 } else {
                     time
                 }
+                // Outside the blinking digits: at opacity 0 a view isn't hit-testable, so while paused a click on the
+                // time missed every other second (#0202).
+                timeHitArea
             }
             mediaInfo
             accessibilityMarkers
@@ -59,13 +62,16 @@ struct MainWindowStatusLayer: View {
             digit(status.digits.minutesOnes, x: MainWindowLayout.digitXs[1])
             digit(status.digits.secondsTens, x: MainWindowLayout.digitXs[2])
             digit(status.digits.secondsOnes, x: MainWindowLayout.digitXs[3])
-            // The 59x13 click area of #time.
-            Color.clear
-                .frame(width: MainWindowLayout.timeHitArea.width, height: MainWindowLayout.timeHitArea.height)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: toggleTimeMode)
-                .offset(x: MainWindowLayout.timeHitArea.minX, y: MainWindowLayout.timeHitArea.minY)
         }
+    }
+
+    /// The 59x13 click area of #time.
+    private var timeHitArea: some View {
+        Color.clear
+            .frame(width: MainWindowLayout.timeHitArea.width, height: MainWindowLayout.timeHitArea.height)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: toggleTimeMode)
+            .offset(x: MainWindowLayout.timeHitArea.minX, y: MainWindowLayout.timeHitArea.minY)
     }
 
     @ViewBuilder private func digit(_ value: Int?, x: CGFloat) -> some View {

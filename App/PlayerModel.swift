@@ -371,14 +371,38 @@ final class PlayerModel {
 
     enum SystemRequest: Equatable {
         case openFiles(replace: Bool), openFolder, openSkin, openPlaylistFile, about, quit, jumpToFile, library, settings
+        case savePlaylistFile, loadEQF, saveEQF
+
+        /// The open and save panels: in a UI test (#0202) they are recorded in the probe instead of shown.
+        var probeName: String? {
+            switch self {
+            case .openFiles(let replace): "openFiles replace=\(replace)"
+            case .openFolder: "openFolder"
+            case .openSkin: "openSkin"
+            case .openPlaylistFile: "loadPlaylistFile"
+            case .savePlaylistFile: "savePlaylistFile"
+            case .loadEQF: "loadEQF"
+            case .saveEQF: "saveEQF"
+            case .about, .quit, .jumpToFile, .library, .settings: nil
+            }
+        }
     }
 
-    /// true when `systemRequestOverride` took `request`; always false in Release.
+    /// The panels `intercepted` recorded in UI-test mode (#0202), for the probe.
+    @ObservationIgnored private(set) var panelRequests: [String] = []
+
+    /// true when `systemRequestOverride` took `request`, or, in UI-test mode (`-RoadieUITest 1`), when it is a panel:
+    /// recorded in `panelRequests` (#0202) and not shown, unless a `PanelStandIn` answers it (the caller then acts on
+    /// the stand-in's paths, #0203); always false in Release.
     func intercepted(_ request: SystemRequest) -> Bool {
         #if DEBUG
-        guard let override = systemRequestOverride else { return false }
-        override(request)
-        return true
+        if let override = systemRequestOverride {
+            override(request)
+            return true
+        }
+        guard configuration.isUITest, let name = request.probeName else { return false }
+        panelRequests.append(name)
+        return request.standIn.flatMap(panelStandIn) == nil
         #else
         return false
         #endif

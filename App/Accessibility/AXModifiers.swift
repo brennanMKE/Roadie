@@ -1,12 +1,14 @@
 import SwiftUI
 
 extension View {
-    /// A skinned control's identifier and label, and `.isSelected` when on. Accessibility modifiers draw nothing and
-    /// don't change hit-testing (#0199).
-    func skinControl(_ id: String, label: String, selected: Bool = false) -> some View {
+    /// A skinned control's identifier and label; a toggle (`selected` non-nil) also gets `.isSelected` when on and the
+    /// value `on`/`off`, since XCUITest doesn't read the selected trait off a macOS button (#0202). Accessibility
+    /// modifiers draw nothing and don't change hit-testing (#0199).
+    func skinControl(_ id: String, label: String, selected: Bool? = nil) -> some View {
         accessibilityIdentifier(id)
             .accessibilityLabel(label)
-            .accessibilityAddTraits(selected ? .isSelected : [])
+            .accessibilityAddTraits(selected == true ? .isSelected : [])
+            .accessibilityValue(selected.map { $0 ? "on" : "off" } ?? "")
     }
 
     /// One accessibility element for a display: its identifier, label and value. It's static text because SwiftUI

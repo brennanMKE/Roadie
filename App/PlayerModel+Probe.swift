@@ -58,8 +58,18 @@ struct TestProbe: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case output, feed, state, currentIndex, queue, notice, lastExternalOpen, tokenStore, maRequests, skin, skinFiles
-        case visualization
+        case visualization, panelRequests, alwaysOnTop, doubleSize, shuffle, repeatAll, timeMode
     }
+
+    /// The open and save panels a UI test asked for (#0202): `openFiles replace=true`, `saveEQF`, … in order.
+    var panelRequests: [String] = []
+    var alwaysOnTop = false
+    var doubleSize = false
+    /// The model state behind the shuffle and repeat toggles and the time display (#0202): XCUITest reads neither a
+    /// skinned button's selected trait nor a menu item's check mark.
+    var shuffle = false
+    var repeatAll = false
+    var timeMode = "elapsed"
 
     /// Writes `null` for the absent optionals, so every key is always in the JSON.
     func encode(to encoder: any Encoder) throws {
@@ -76,6 +86,12 @@ struct TestProbe: Codable, Equatable {
         try c.encode(skin, forKey: .skin)
         try c.encode(skinFiles, forKey: .skinFiles)
         try c.encode(visualization, forKey: .visualization)
+        try c.encode(panelRequests, forKey: .panelRequests)
+        try c.encode(alwaysOnTop, forKey: .alwaysOnTop)
+        try c.encode(doubleSize, forKey: .doubleSize)
+        try c.encode(shuffle, forKey: .shuffle)
+        try c.encode(repeatAll, forKey: .repeatAll)
+        try c.encode(timeMode, forKey: .timeMode)
     }
 
     var json: String {
@@ -111,7 +127,13 @@ extension PlayerModel {
             maRequests: scriptedRequestSummaries,
             skin: self.skin == nil ? nil : skinName,
             skinFiles: configuration.isUITest ? skinLibrary.folderURL.map { Self.wszFiles(in: $0) } : nil,
-            visualization: visualizationProbe)
+            visualization: visualizationProbe,
+            panelRequests: panelRequests,
+            alwaysOnTop: isAlwaysOnTop,
+            doubleSize: isDoubleSize,
+            shuffle: isShuffled,
+            repeatAll: isRepeating,
+            timeMode: timeMode.rawValue)
     }
 
     private var visualizationProbe: TestProbe.VisProbe? {

@@ -184,14 +184,14 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | File › Open… ⌘O, Add to Playlist… ⌥⌘O, Open Skin… ⇧⌘O, Load Playlist…, Save Playlist… ⌘S | UI `MenuBarUITests` (item exists and enabled); the panel path through `-RoadieOpenFiles` in `PlaylistUITests.openFilesReplacesTheQueue`; Unit `RoadieTests.PlayerModelFilesTests` (M3U/PLS round trip via `PlaylistFileTests`) |
 | Skins › Skin Library… ⌘K, Next ⌘], Previous ⌘[, Random ⇧⌘R | UI `SkinsUITests` |
 | Playback › Library ⌘L (opens on the search field, #0185) | UI `LibraryUITests.commandLOpensTheLibraryWithSearchFocused` |
-| Playback › Previous/Play/Pause/Stop/Next ⌃⌘Z X C V B | UI `MainWindowUITests.menuBarTransport` |
+| Playback › Previous/Play/Pause/Stop/Next ⌃⌘Z X C V B | UI `MenuBarUITests.menuBarTransport` |
 | Playback › Jump to File… ⌘J | UI `JumpToFileUITests` |
-| Playback › Seek ±5 s ⌃⌘←/→, Volume ⌃⌘↑/↓ | UI `MainWindowUITests.seekAndVolumeShortcuts` |
+| Playback › Seek ±5 s ⌃⌘←/→, Volume ⌃⌘↑/↓ | UI `MenuBarUITests.seekAndVolumeShortcuts` |
 | Playback › Shuffle ⌃⌘S, Repeat ⌃⌘R (check marks) | UI `MainWindowUITests.shuffleRepeatToggles` |
 | Playback › Save Queue as Playlist…, Load Playlist from Library… (#0190) | UI `MusicAssistantUITests.saveQueueAsPlaylist`, `.loadPlaylistFromLibraryMenuItem`; Unit `QueueSaveTargetTests` |
 | Playback › Favorite Current Track ⌃⌘L | UI `MusicAssistantUITests.favoriteCurrentTrack`; Unit `BackendFavoritesTests` |
 | Playlist › Add File… / Add Folder… / Add URL…, Remove Selected, Crop, Clear Playlist, Select All / None / Invert, Sort by Title / File Name / Path ⌥⌘1–3, Reverse List, Randomize List, File Info…, Generate HTML Playlist, Load Playlist… ⌥⌘L, Save Playlist… ⌥⌘S; enabled as the shown queue allows (#0226) | UI `PlaylistUITests.testPlaylistMenuBarHasEveryCommand`, `.testPlaylistMenuBarEditsTheQueue`, `.testPlaylistMenuBarLoadsAndSaves`; Unit SkinKit `PlaylistMenuTests`, `RoadieTests.PlaylistCommandTests`, `.PlaylistMenuBuilderTests` |
-| Window › Library, Player ⌘1, Windowshade ⌃⌘W, Equalizer ⌘2, EQ Windowshade ⌃⌘E, Playlist Windowshade ⌃⌘P, Playlist Editor ⌘3, Always on Top, Double Size | UI `MainWindowUITests.windowMenu` |
+| Window › Library, Player ⌘1, Windowshade ⌃⌘W, Equalizer ⌘2, EQ Windowshade ⌃⌘E, Playlist Windowshade ⌃⌘P, Playlist Editor ⌘3, Always on Top, Double Size | UI `MenuBarUITests.windowMenu`; Visualization ⇧⌘K and Visualization Settings… ⌥⌘K exist there, driven by `VisualizationUITests` (§5.12) |
 | Help › Welcome to Roadie…, Playlists and the Queue… (opens the help URL) | UI `FirstLaunchUITests.helpMenu` (URL recorded by `-RoadieExternalOpens record`) |
 
 ### 5.2 Skinned pop-up menu (main window)
@@ -228,7 +228,7 @@ Everything a user can do, and the test that proves it. **UI** names a class in `
 | Drop audio files / folders / a `.wsz` on the window | Unit `RoadieTests.DropDecoderTests`, `PlayerModelSkinTests`; `open -a` path in `PlaylistUITests.openFilesReplacesTheQueue` |
 | Bare hotkeys Z X C V B, arrows, S R L J while a skinned window is key | UI `MainWindowUITests.bareHotkeys`; Unit `WinampHotkeysTests` (exists) |
 | "No Skin Loaded" placeholder with Browse Museum / Open Skin | UI `SkinsUITests.noSkinPlaceholder` |
-| Playback failure notice (missing file) | UI `PlaylistUITests.missingFileShowsANotice`; Unit `PlaybackFailureTests` (exists) |
+| Playback failure notice (missing file) | UI `MainWindowUITests.missingFileShowsANotice`; Unit `PlaybackFailureTests` (exists) |
 
 ### 5.4 Equalizer window
 

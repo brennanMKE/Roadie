@@ -62,6 +62,7 @@ extension PlayerModel {
 
     /// Webamp's "From EQF…": the first preset in the chosen file.
     func loadEQF() {
+        if intercepted(.loadEQF) { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.allowedContentTypes = Self.presetFileTypes
@@ -84,6 +85,7 @@ extension PlayerModel {
 
     /// Webamp's "Save": one preset named "Entry1" with the current bands and preamp, default file name `entry.eqf`.
     func saveEQF() {
+        if intercepted(.saveEQF) { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = Self.presetFileTypes.first.map { [$0] } ?? []
         panel.nameFieldStringValue = "entry.eqf"

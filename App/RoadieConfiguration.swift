@@ -60,6 +60,9 @@ struct RoadieConfiguration: @unchecked Sendable {
     var visReduceMotion: Bool?
     var visDimFlashing: Bool?
     var visVoiceOver: Bool?
+    /// `-RoadieVanishingFile N` (#0202): entry N of `-RoadieOpenFiles` (`PanelStandIns`) is copied into the data
+    /// directory, queued from there and the copy deleted once queued, so playing it fails as a file gone missing would.
+    var vanishingOpenFile: Int?
 
     static let standard = RoadieConfiguration()
 
@@ -87,6 +90,8 @@ struct RoadieConfiguration: @unchecked Sendable {
         static let visReduceMotion = "RoadieVisReduceMotion"
         static let visDimFlashing = "RoadieVisDimFlashing"
         static let visVoiceOver = "RoadieVisVoiceOver"
+        static let keepDefaults = "RoadieKeepDefaults"
+        static let vanishingFile = "RoadieVanishingFile"
     }
 
     /// Test mode switches on only with `-RoadieUITest 1` (a stray `-RoadieDataDir` alone does nothing), or when the
@@ -113,7 +118,10 @@ struct RoadieConfiguration: @unchecked Sendable {
         configuration.isUITest = true
         configuration.dataDirectory = data
         // A suite still reads `NSArgumentDomain`, so `-firstRunVersion 1` and friends reach it.
-        configuration.defaults = Self.freshDefaults("co.sstools.roadie.uitest")
+        // `-RoadieKeepDefaults 1` (#0202): a relaunch within one test keeps the suite, to check what persists.
+        configuration.defaults = arguments.bool(forKey: Argument.keepDefaults)
+            ? UserDefaults(suiteName: "co.sstools.roadie.uitest") ?? .standard
+            : Self.freshDefaults("co.sstools.roadie.uitest")
         configuration.musicAssistant = arguments.string(forKey: Argument.maScenario).map { .scripted(scenario: $0) } ?? .none
         if arguments.string(forKey: Argument.museum) == "fixtures" {
             let skins = arguments.string(forKey: Argument.museumSkins).map { URL(fileURLWithPath: $0, isDirectory: true) }
@@ -128,6 +136,9 @@ struct RoadieConfiguration: @unchecked Sendable {
             configuration.launchVolume = min(max(Float(arguments.integer(forKey: Argument.volume)) / 100, 0), 1)
         }
         configuration.readVisualizationArguments(arguments)
+        if arguments.object(forKey: Argument.vanishingFile) != nil {
+            configuration.vanishingOpenFile = arguments.integer(forKey: Argument.vanishingFile)
+        }
         return configuration
         #endif
     }
