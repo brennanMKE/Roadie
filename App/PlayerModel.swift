@@ -413,7 +413,9 @@ final class PlayerModel {
         let defaults = configuration.defaults
         // Plex's leftovers live in the real defaults and Keychain only; a test configuration has neither.
         if !configuration.isIsolated { LegacyDataCleanup.run() }
-        skinLibrary = SkinLibraryModel(defaults: defaults, databaseURL: configuration.skinsDatabaseURL)
+        skinLibrary = SkinLibraryModel(
+            defaults: defaults, databaseURL: configuration.skinsDatabaseURL,
+            defaultFolderURL: configuration.defaultSkinsFolder)
         skinThumbnails = SkinThumbnailCache(directory: configuration.thumbnailsDirectory)
         let stack = LocalPlaybackStack.standard()
         player = stack.player

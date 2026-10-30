@@ -103,6 +103,14 @@ struct LibrarySettingsView: View {
 /// The music-folder picker shared by Settings › Library and the Welcome window (#0169).
 @MainActor
 func chooseMusicFolder(startingAt folder: URL?) -> URL? {
+    #if DEBUG
+    // UI tests (#0209): `-RoadieUITest 1 -RoadieChooseFolder <path>` answers the panel with that folder.
+    if UserDefaults.standard.bool(forKey: RoadieConfiguration.Argument.uiTest),
+        let path = UserDefaults.standard.string(forKey: RoadieConfiguration.Argument.chooseFolder)
+    {
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
+    #endif
     let panel = NSOpenPanel()
     panel.canChooseDirectories = true
     panel.canChooseFiles = false

@@ -1,6 +1,7 @@
 import AudioCore
 import Foundation
 import LibraryBrowser
+import MusicAssistantKit
 import MusicBackendKit
 import SkinKit
 import VisualizationKit
@@ -58,7 +59,8 @@ struct TestProbe: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case output, feed, state, currentIndex, queue, notice, lastExternalOpen, tokenStore, maRequests, skin, skinFiles
-        case visualization, panelRequests, alwaysOnTop, doubleSize, shuffle, repeatAll, timeMode
+        case visualization, panelRequests, alwaysOnTop, doubleSize, shuffle, repeatAll, timeMode, sendspinEnabled,
+            firstRunVersion, maResolutions
     }
 
     /// The open and save panels a UI test asked for (#0202): `openFiles replace=true`, `saveEQF`, … in order.
@@ -70,6 +72,13 @@ struct TestProbe: Codable, Equatable {
     var shuffle = false
     var repeatAll = false
     var timeMode = "elapsed"
+    /// Settings › Music Assistant › "Play Music Assistant on this Mac" (#0209).
+    var sendspinEnabled = false
+    /// `firstRunVersion` as stored in the UI-test suite's own domain (#0209), not the `-firstRunVersion` launch
+    /// argument that overrides it on reads; nil when unset or outside UI-test mode.
+    var firstRunVersion: Int? = nil
+    /// Music Assistant server resolutions started (#0209: Settings' Check Now ran one); nil outside UI-test mode.
+    var maResolutions: Int? = nil
 
     /// Writes `null` for the absent optionals, so every key is always in the JSON.
     func encode(to encoder: any Encoder) throws {
@@ -92,6 +101,9 @@ struct TestProbe: Codable, Equatable {
         try c.encode(shuffle, forKey: .shuffle)
         try c.encode(repeatAll, forKey: .repeatAll)
         try c.encode(timeMode, forKey: .timeMode)
+        try c.encode(sendspinEnabled, forKey: .sendspinEnabled)
+        try c.encode(firstRunVersion, forKey: .firstRunVersion)
+        try c.encode(maResolutions, forKey: .maResolutions)
     }
 
     var json: String {
@@ -133,7 +145,16 @@ extension PlayerModel {
             doubleSize: isDoubleSize,
             shuffle: isShuffled,
             repeatAll: isRepeating,
-            timeMode: timeMode.rawValue)
+            timeMode: timeMode.rawValue,
+            sendspinEnabled: sendspinController.isEnabled,
+            firstRunVersion: storedFirstRunVersion,
+            maResolutions: configuration.isUITest ? musicAssistantSelection.resolutionCount : nil)
+    }
+
+    /// The suite's persisted value: a read through `defaults` would return the `-firstRunVersion` argument instead.
+    private var storedFirstRunVersion: Int? {
+        guard configuration.isUITest else { return nil }
+        return defaults.persistentDomain(forName: RoadieConfiguration.uiTestSuite)?[FirstRunPolicy.defaultsKey] as? Int
     }
 
     private var visualizationProbe: TestProbe.VisProbe? {

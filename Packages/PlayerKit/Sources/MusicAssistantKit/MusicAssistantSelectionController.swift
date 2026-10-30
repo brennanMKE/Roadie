@@ -58,8 +58,9 @@ public final class MusicAssistantSelectionController {
     @ObservationIgnored private var hasResolvedOnce = false
     /// The stored list the last resolution ranked; a later list differing only in names needs no re-check.
     @ObservationIgnored private var resolvedServers: [MusicAssistantServerConfiguration]?
-    /// For tests: resolutions started and network changes received.
-    @ObservationIgnored private(set) var resolutionCount = 0
+    /// For tests: resolutions started and network changes received. `resolutionCount` is public for the app's UI-test
+    /// probe (#0209: Check Now ran a resolution).
+    @ObservationIgnored public private(set) var resolutionCount = 0
     @ObservationIgnored private(set) var networkChangesSeen = 0
     /// `current` still stands: nothing invalidated it since the last resolution.
     @ObservationIgnored private var isValid = false

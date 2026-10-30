@@ -63,10 +63,12 @@ final class AXIDTests: XCTestCase {
                     .init(title: "Tone Artist - Tone B", marker: "", current: true),
                     .init(title: "Tone Artist - Tone C", marker: "", current: false),
                 ],
-                notice: nil, lastExternalOpen: nil, tokenStore: "memory", maRequests: []))
+                notice: nil, lastExternalOpen: nil, tokenStore: "memory", maRequests: [],
+                sendspinEnabled: model.sendspinController.isEnabled, firstRunVersion: nil))
         XCTAssertTrue(json.contains("\"notice\":null"), json)
         XCTAssertTrue(json.contains("\"lastExternalOpen\":null"), json)
         XCTAssertTrue(json.contains("\"visualization\":null"), json)
+        XCTAssertTrue(json.contains("\"firstRunVersion\":null"), json)
     }
 
     /// With the scripted Music Assistant (#0197) the probe reports the in-memory token store, the recorded external
