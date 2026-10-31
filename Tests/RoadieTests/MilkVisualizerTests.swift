@@ -112,6 +112,7 @@ final class MilkVisualizerTests: XCTestCase {
         for frame in 0..<10 {
             vis.draw(at: Double(frame) / 60)
         }
+        XCTAssertEqual(vis.framesDrawn, 10, "draw returned early instead of committing a frame")
         let queue = try XCTUnwrap(vis.renderer.device.makeCommandQueue())
         let buffer = try XCTUnwrap(queue.makeCommandBuffer())
         let done = expectation(description: "command buffer completed")

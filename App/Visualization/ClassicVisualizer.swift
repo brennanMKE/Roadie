@@ -4,6 +4,11 @@ import QuartzCore
 import SkinKit
 import VisualizationKit
 
+enum ClassicVisualizerError: Error {
+    /// A `.milk` preset; only `MilkVisualizer` draws those.
+    case notClassic
+}
+
 /// Roadie's own full-window take on Winamp's built-in visualizer (design §3.3): five `ClassicStyle`s drawn into a
 /// small bitmap (240 pixels wide, aspect-matched to the view) shown nearest-neighbour, in the skin's `viscolor.txt`
 /// colours. Deterministic for a given input, no Metal.
@@ -58,23 +63,15 @@ final class ClassicVisualizer: VisualizationRenderer {
 
     func setReducedMotion(_ on: Bool) { reducedMotion = on }
 
-    /// Classic presets; in Debug also `.milk` ones (drawn as Spectrum) so catalogue behaviour is testable before #0243.
+    /// Classic presets only; `.milk` ones go to `MilkVisualizer` through `MixedVisualizer` (#0257).
     func canLoad(_ preset: VisualizationPreset) -> Bool {
-        switch preset.kind {
-        case .classic: return true
-        case .milk:
-            #if DEBUG
-            return true
-            #else
-            return false
-            #endif
-        }
+        if case .classic = preset.kind { return true }
+        return false
     }
 
     func load(_ preset: VisualizationPreset, transition: TimeInterval) throws {
+        guard case .classic(let next) = preset.kind else { throw ClassicVisualizerError.notClassic }
         problems = []
-        let next: ClassicStyle
-        if case .classic(let s) = preset.kind { next = s } else { next = .spectrum }
         if transition > 0 { canvas.crossfade(duration: transition) }
         style = next
         render()
