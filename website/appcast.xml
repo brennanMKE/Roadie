@@ -6,6 +6,44 @@
     <description>Updates for Roadie, a Winamp-skinned player for Music Assistant.</description>
     <language>en</language>
     <item>
+      <title>Version 0.0.5</title>
+      <pubDate>Sat, 31 Oct 2026 06:01:01 +0000</pubDate>
+      <sparkle:version>20261031.0554</sparkle:version>
+      <sparkle:shortVersionString>0.0.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://roadie.sstools.co/changelog.html#v0-0-5</sparkle:releaseNotesLink>
+      <description><![CDATA[
+<h3>Added</h3>
+<ul>
+  <li>MilkDrop presets in the Visualization window: 42 presets from MilkDropMetalKit, and your own folder of .milk files in Settings › Visualization. The classic visualizations stay in the list.</li>
+  <li>Play a Library playlist: double-click it, right-click › Play / Play Next / Add to Queue, or drag it onto the playlist editor.</li>
+  <li>Drag an artist from the Library onto the playlist editor; right-click an artist for Play, Play Next and Add to Queue.</li>
+  <li>LIST › Load in the playlist editor can load a Library playlist while This Mac plays its own queue, and Playback › Load Playlist from Library… does the same from the menu bar.</li>
+  <li>Help › Playlists and the Queue… explains how the playlist editor, the Library&#x27;s playlists and saving a queue fit together.</li>
+  <li>A Visualization window (⇧⌘K, or the clutter bar&#x27;s V menu) with five classic visualizations in the skin&#x27;s colours.</li>
+  <li>Settings › Visualization (⌥⌘K): how often presets change, blend time, order, your own presets folder, overlay timing and opening the visualization when playback starts.</li>
+  <li>The Visualization window goes full screen with ⌥Return or a double-click; Escape comes back.</li>
+  <li>In the Visualization window, ← → (or Space and Delete) change presets, H cuts straight to the next, R switches random and in-order, ` locks the preset, and presets change on their own every 16 seconds or so, as in MilkDrop.</li>
+  <li>L in the Visualization window lists the presets; type to search, Return to switch.</li>
+  <li>The Visualization window shows the song, artist, time and what&#x27;s next over the picture; it and the pointer hide after 3 seconds without mouse movement.</li>
+  <li>MilkDrop&#x27;s song title on track change (T shows it), F2–F5 corner readouts, and F1 for the keyboard shortcuts in the Visualization window.</li>
+  <li>The Visualization window respects Reduce Motion and Dim Flashing Lights, keeps its overlay up for VoiceOver, and warns about flashing the first time it opens.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Jump to File on an empty playlist says how to add music.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>A Music Assistant connection made right at launch could drop again a moment later.</li>
+  <li>Right after launch, a play or drop on a Music Assistant speaker no longer fails with &quot;Can&#x27;t reach the Music Assistant server&quot;.</li>
+  <li>Dragging albums and tracks from the Library onto the playlist editor adds them.</li>
+  <li>Double-clicking a track in the playlist editor, or choosing one in Jump to File, plays that track on a Music Assistant queue instead of restarting the first one.</li>
+</ul>
+      ]]></description>
+      <enclosure url="https://roadie.sstools.co/downloads/Roadie-0.0.5.dmg" length="18226071" type="application/octet-stream" sparkle:edSignature="aOPYu0XAQ1G9L9wsUHCcjnnIIjVgig3XmQsRgyT0WJ6oZYUrDhPfWiv14VMX0zABT4Qxko/ZoQa726EAk89LDA=="/>
+    </item>
+    <item>
       <title>Version 0.0.4</title>
       <pubDate>Sat, 24 Oct 2026 23:20:56 +0000</pubDate>
       <sparkle:version>20261024.2315</sparkle:version>
