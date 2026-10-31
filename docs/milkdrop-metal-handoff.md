@@ -1,5 +1,12 @@
 # MilkDrop on Metal: handoff for a new Swift package
 
+**Status (2026-10-30): adopted by Roadie at MilkDropMetalKit `1.0.0`** (`project.yml`: `from: 1.0.0`, product
+`MilkMetal`, #0243). `from` floats to the newest 1.x on every fresh build, because the app's `Package.resolved` lives
+in the gitignored `.xcodeproj` (Sparkle is pinned `exactVersion` for that reason).
+
+**Upgrading:** bump `from:` in `project.yml`, run `xcodegen generate`, read the package's CHANGELOG for rendering
+changes, then run the fast tier and #0258's UI test.
+
 Handoff spec for starting a separate Swift package that renders MilkDrop presets with Metal. Roadie adopts it as a
 dependency when it is ready; until then Roadie keeps its Winamp 2.x visualizer (spectrum, oscilloscope) and plans no
 MilkDrop work of its own beyond a blocked integration issue.
