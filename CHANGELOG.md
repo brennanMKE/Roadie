@@ -6,6 +6,8 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-10-30
+
 ### Added
 
 - MilkDrop presets in the Visualization window: 42 presets from MilkDropMetalKit, and your own folder of .milk files in Settings › Visualization. The classic visualizations stay in the list.
