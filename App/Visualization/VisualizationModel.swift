@@ -1,4 +1,5 @@
 import AppKit
+import Metal
 import AudioCore
 import Foundation
 import MusicBackendKit
@@ -134,6 +135,18 @@ final class VisualizationModel {
     /// Debug `-RoadieVisPresetsFolder` in test mode: Choose…'s answer instead of the panel.
     @ObservationIgnored let presetsFolderStandIn: String?
 
+    /// The preset a fresh install starts on when the renderer can draw it (#0258, design §5.3).
+    static let freshInstallPreset = "bundled:spike-tunnel.milk"
+    /// The bundled presets' folder (#0258): the app's `Contents/Resources/Presets`; nil in unit tests unless a test
+    /// sets one before the first open.
+    @ObservationIgnored var bundledPresetsFolder: URL?
+    @ObservationIgnored private var scannedBundledPresets: [VisualizationPreset]?
+    /// Whether `.milk` presets can draw before the renderer exists (the factory's answer); tests replace it.
+    @ObservationIgnored var canDrawMilkBeforeOpen: () -> Bool
+    /// Debug `-RoadieVisRenderer classic` (the UI tests' default): the classic renderer stands in for MilkDrop, so the
+    /// presets folder setting still shows.
+    @ObservationIgnored private let classicStandsInForMilk: Bool
+
     init(analyzer: AnalyzerTap, configuration: RoadieConfiguration) {
         self.analyzer = analyzer
         reader = StereoFeedReader(tap: analyzer)
@@ -146,6 +159,13 @@ final class VisualizationModel {
             settings.autoAdvanceVaries = false
         }
         presetsFolderStandIn = configuration.visPresetsFolder
+        bundledPresetsFolder = configuration.bundledPresetsFolder
+        classicStandsInForMilk = configuration.visRenderer == "classic"
+        if let renderer = configuration.visRenderer, renderer != "milk" {
+            canDrawMilkBeforeOpen = { false }
+        } else {
+            canDrawMilkBeforeOpen = { MTLCreateSystemDefaultDevice() != nil }
+        }
         if let folder = configuration.visPresetsFolder {
             Self.seedPresets(configuration.visSeedPresets ?? 0, in: folder)
             settings.presetsFolder = folder
@@ -251,9 +271,13 @@ final class VisualizationModel {
         renderer.setColors(colors)
         renderer.setReducedMotion(accessibility.crossfadeOnly)
         self.renderer = renderer
-        let usable = PresetCatalog.ordered(PresetCatalog.classics + userPresets).filter { renderer.canLoad($0) }
+        let usable = PresetCatalog.ordered(PresetCatalog.classics + bundledPresets + userPresets)
+            .filter { renderer.canLoad($0) }
         navigator.replacePresets(usable)
-        if let lastPreset = settings.lastPreset, navigator.current?.id != lastPreset { _ = navigator.select(id: lastPreset) }
+        // A fresh install starts on Spike Tunnel where MilkDrop draws (#0258); a remembered preset that's gone, or no
+        // MilkDrop, falls back to the first classic.
+        let start = settings.lastPreset ?? Self.freshInstallPreset
+        if navigator.current?.id != start { _ = navigator.select(id: start) }
         var candidate = navigator.current
         while let preset = candidate {
             if load(preset, transition: 0, countsAsChange: false) { break }
@@ -437,14 +461,23 @@ final class VisualizationModel {
         settings.overlayIdleSeconds > 0 ? settings.overlayIdleSeconds : nil
     }
 
-    /// The presets folder setting shows only where the renderer can draw `.milk` presets: Debug's classic renderer
-    /// stands in for them; Release after #0243.
+    /// The presets folder setting shows where the renderer can draw `.milk` presets, in Debug and Release (#0258):
+    /// the renderer's answer once it exists, else the factory's. Hidden without a Metal device, where the folder would
+    /// add presets nothing can draw. Debug's `-RoadieVisRenderer classic` stands in for MilkDrop.
     var showsPresetsFolder: Bool {
-        #if DEBUG
-        true
-        #else
-        false
-        #endif
+        if classicStandsInForMilk { return true }
+        guard let renderer else { return canDrawMilkBeforeOpen() }
+        let probe = VisualizationPreset.milk(
+            url: URL(fileURLWithPath: "/probe.milk"), relativePath: "probe.milk", source: .user)
+        return renderer.canLoad(probe)
+    }
+
+    /// The bundled presets (#0258), named by their `gallery.json`; scanned once, on first use (the first open).
+    var bundledPresets: [VisualizationPreset] {
+        if let scannedBundledPresets { return scannedBundledPresets }
+        let presets = bundledPresetsFolder.map { PresetCatalog.bundled(in: $0) } ?? []
+        scannedBundledPresets = presets
+        return presets
     }
 
     /// Rescans the presets folder off the main actor, then lists the classics and its presets in the navigator.
@@ -473,7 +506,7 @@ final class VisualizationModel {
     private func applyCatalogue(_ presets: [VisualizationPreset], status: FolderStatus) {
         userPresets = presets
         if folderStatus != status { folderStatus = status }
-        let all = PresetCatalog.ordered(PresetCatalog.classics + presets)
+        let all = PresetCatalog.ordered(PresetCatalog.classics + bundledPresets + presets)
         navigator.replacePresets(renderer.map { renderer in all.filter { renderer.canLoad($0) } } ?? all)
         // The preset showing went with its folder: show what the navigator moved to.
         if renderer != nil, let current = navigator.current, current.id != currentPreset?.id {

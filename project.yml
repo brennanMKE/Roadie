@@ -30,7 +30,13 @@ targets:
   Roadie:
     type: application
     platform: macOS
-    sources: [App]
+    sources:
+      - path: App
+        excludes: ["Visualization/Presets", "Visualization/Presets/**"]
+      # #0258: MilkDropMetalKit's presets ship as one folder, Contents/Resources/Presets (VisualizationModel.bundledPresetsFolderName).
+      - path: App/Visualization/Presets
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: SkinKit
         product: SkinKit

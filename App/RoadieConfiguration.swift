@@ -65,7 +65,21 @@ struct RoadieConfiguration: @unchecked Sendable {
     /// directory, queued from there and the copy deleted once queued, so playing it fails as a file gone missing would.
     var vanishingOpenFile: Int?
 
-    static let standard = RoadieConfiguration()
+    /// The bundled MilkDrop presets' folder (#0258): the app's `Contents/Resources/Presets` in the real app and UI tests;
+    /// nil in unit tests, which pass their own so the test host's bundle never lists by accident.
+    var bundledPresetsFolder: URL?
+
+    static let bundledPresetsFolderName = "Presets"
+
+    static var appPresetsFolder: URL? {
+        Bundle.main.resourceURL?.appending(path: bundledPresetsFolderName, directoryHint: .isDirectory)
+    }
+
+    static let standard: RoadieConfiguration = {
+        var configuration = RoadieConfiguration()
+        configuration.bundledPresetsFolder = appPresetsFolder
+        return configuration
+    }()
 
     /// UI-test mode's defaults suite, emptied at each launch (`fromProcess`).
     static let uiTestSuite = "co.sstools.roadie.uitest"
@@ -122,6 +136,7 @@ struct RoadieConfiguration: @unchecked Sendable {
         seedSkinsFolder(arguments: arguments)
         var configuration = RoadieConfiguration()
         configuration.isUITest = true
+        configuration.bundledPresetsFolder = appPresetsFolder
         configuration.dataDirectory = data
         // A suite still reads `NSArgumentDomain`, so `-firstRunVersion 1` and friends reach it.
         // `-RoadieKeepDefaults 1` (#0202): a relaunch within one test keeps the suite, to check what persists.

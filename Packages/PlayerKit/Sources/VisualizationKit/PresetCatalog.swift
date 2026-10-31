@@ -34,6 +34,41 @@ public enum PresetCatalog {
         return found
     }
 
+    /// The app's bundled presets (#0258): `scan(folder:source: .bundled)`, named by the folder's `gallery.json`
+    /// (`categories[].presets[]` with `file` and `title`) where it names them, else by file name. A missing or
+    /// unreadable gallery leaves the file names. Call it off the main actor.
+    public static func bundled(in folder: URL, fileManager: FileManager = .default) -> [VisualizationPreset] {
+        let presets = scan(folder: folder, source: .bundled, fileManager: fileManager)
+        let titles = galleryTitles(at: folder.appending(path: "gallery.json"))
+        guard !titles.isEmpty else { return presets }
+        return presets.map { preset in
+            guard let url = preset.url, let title = titles[url.lastPathComponent] else { return preset }
+            var named = preset
+            named.name = title
+            return named
+        }
+    }
+
+    private struct Gallery: Decodable {
+        struct Category: Decodable { var presets: [Entry] }
+        struct Entry: Decodable {
+            var file: String
+            var title: String?
+        }
+        var categories: [Category]
+    }
+
+    /// `file` → `title` from a MilkDropMetalKit `gallery.json`; empty when it's missing or can't be read.
+    private static func galleryTitles(at url: URL) -> [String: String] {
+        guard let data = try? Data(contentsOf: url), let gallery = try? JSONDecoder().decode(Gallery.self, from: data)
+        else { return [:] }
+        var titles: [String: String] = [:]
+        for entry in gallery.categories.flatMap(\.presets) {
+            if let title = entry.title, !title.isEmpty { titles[entry.file] = title }
+        }
+        return titles
+    }
+
     /// Classics first in style order, then by natural name order, ties by id.
     public static func ordered(_ presets: [VisualizationPreset]) -> [VisualizationPreset] {
         func rank(_ preset: VisualizationPreset) -> Int? {

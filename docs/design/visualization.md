@@ -513,10 +513,12 @@ isn't mistaken for remote playback.
 
 1. **Classic** (always): the five `ClassicStyle`s, ids `classic:<style>`, names "Classic Spectrum", "Classic
    Oscilloscope", "Classic Spectrum and Scope", "Classic Mirror", "Classic Stereo Scope".
-2. **Bundled** (#0243): MilkDropMetalKit's own licence-clean presets (MIT, written for the package; `Presets/*.milk`,
-   about 42 feature demos with `spike-tunnel.milk` as the showcase). If 1.0 vends them (a resource bundle or a
-   `MilkPreset.bundled` list), Roadie uses that; otherwise #0243 copies the files at the pinned tag into
-   `App/Visualization/Presets/` and records them in `NOTICE`. Ids `bundled:<file name>`.
+2. **Bundled** (#0258): MilkDropMetalKit's own licence-clean presets (MIT, written for the package): the 42 feature
+   demos in its `Presets/` folder, with `spike-tunnel.milk` as the showcase. 1.0 doesn't vend them, so
+   `scripts/update-milkdrop-presets.sh` copies them at the pinned tag (`1.0.0`) into `App/Visualization/Presets/`
+   (with a `VERSION` file), which ships as one folder, `Contents/Resources/Presets`; `NOTICE` records them. Names come
+   from the folder's `gallery.json` (`PresetCatalog.bundled`, e.g. "Spike Tunnel", "Mode 0: Circle"), else the file
+   name. Ids `bundled:<file name>`.
 3. **User folder** (#0241): any folder of `.milk` files, scanned recursively (hidden files and packages skipped),
    ids `user:<path relative to the folder>`. Rescanned when the folder setting changes and when the window opens
    (cheap: names only, no parsing). A folder that's gone shows "Folder not found" in Settings and contributes nothing.
@@ -541,7 +543,8 @@ the main actor and loads on it. A preset that throws, or whose renderer reports 
   in catalogue order. A preset change by the list or auto-advance truncates forward history, as a browser does.
 - **Lock** (\`): auto-advance stops; keys and the list still change the preset (MilkDrop's rule); persisted.
 - **Last preset:** `visualization.lastPreset` (id) is restored when the window opens; if it's gone, the first
-  classic.
+  classic. A fresh install (no `lastPreset`) starts on `bundled:spike-tunnel.milk` where MilkDrop can draw, else the
+  first classic (#0258).
 
 ---
 
@@ -692,6 +695,7 @@ Each user-facing child also adds a CHANGELOG `[Unreleased]` bullet and, at the e
 | [#0241](../../issues/0241.md) | There are no visualization settings | #0236 | ui |
 | [#0242](../../issues/0242.md) | The visualization ignores Reduce Motion, Dim Flashing Lights and VoiceOver | #0238, #0239, #0241 | ui |
 | [#0243](../../issues/0243.md) | Roadie renders no MilkDrop presets | #0235, MilkDropMetalKit 1.0.0 tag | ui |
+| [#0258](../../issues/0258.md) | Roadie ships no MilkDrop presets, and Release hides the presets folder setting | #0257 | ui |
 
 Order: #0232 and #0233 first (independent: AudioCore and the new VisualizationKit target), then #0234, then the
 window #0235 (it needs the stereo reader and the catalogue), then #0236 → #0237 → #0238 → #0239, with #0240 and #0241
@@ -711,7 +715,8 @@ any time after #0235; ideally after #0242, so the MilkDrop renderer meets the fi
 4. **Ship before MilkDrop?** Default: the window with the five classic visualizations ships in the next release
    even if MilkDropMetalKit 1.0 isn't out; say if it should stay hidden in Release until #0243.
 5. **Bundled presets.** Default: the package's own MIT demo presets (feature demos, not a curated "best of"). A
-   curated pack needs presets whose licences are clear (handoff §9); say if you have one in mind.
+   curated pack needs presets whose licences are clear (handoff §9); say if you have one in mind. **Answered
+   (#0258):** all 42 of MilkDropMetalKit 1.0.0's presets ship.
 6. **Hard cuts on beats.** Default: not in M18 (off by default in MilkDrop 2). A follow-up issue if wanted.
 7. **Start preset.** Default: the last one shown (you asked); MilkDrop started on a random one.
 8. **Skinned frame.** Default: a native window. Winamp 5 drew MilkDrop's window in the skin's `gen.bmp` frame; a

@@ -474,7 +474,12 @@ final class VisualizationUITests: RoadieUITestCase {
     func testPresetsFolderAddsItsPresets() {
         let folder = (paths.data as NSString).appendingPathComponent("vis-presets-\(UUID().uuidString)")
         launchPlain(
-            extra: ["-RoadieVisPresetsFolder", folder, "-RoadieVisSeedPresets", "2", "-RoadieVisSeed", "1"], renderer: "milk")
+            extra: [
+                "-RoadieVisPresetsFolder", folder, "-RoadieVisSeedPresets", "2", "-RoadieVisSeed", "1",
+                // Not a fresh install, which would start on Spike Tunnel (#0258).
+                "-visualization.lastPreset", "classic:spectrum",
+            ],
+            renderer: "milk")
         openVisualizationSettings()
         let count = roadie.element("vis.settings.folderCount")
         XCTAssertTrue(
@@ -513,7 +518,8 @@ final class VisualizationUITests: RoadieUITestCase {
         if vis.preset == "Classic Spectrum" && vis.probe?.renderer == "classic" {
             throw XCTSkip("no Metal device in the guest: no MilkDrop presets listed")
         }
-        expectPreset("Seeded Preset 1")
+        // The first MilkDrop preset by name: a bundled one (#0258), before the folder's Seeded Presets.
+        expectPreset("Bass, Mid, Treble")
         XCTAssertTrue(roadie.wait { self.vis.probe?.renderer == "milk" }, "renderer: \(roadie.probeJSON)")
         let shot = XCTAttachment(screenshot: vis.window.screenshot())
         shot.name = "MilkDrop frame"
@@ -522,6 +528,40 @@ final class VisualizationUITests: RoadieUITestCase {
         roadie.app.typeKey(.leftArrow, modifierFlags: [])
         expectPreset("Classic Stereo Scope")
         XCTAssertTrue(roadie.wait { self.vis.probe?.renderer == "classic" }, "renderer: \(roadie.probeJSON)")
+    }
+
+    /// #0258: the bundled MilkDrop presets, by their gallery titles, start on Spike Tunnel and step with →.
+    func testBundledMilkDropPresetsRender() throws {
+        launchPlain(extra: ["-visualization.lastPreset", "bundled:spike-tunnel.milk"], renderer: "milk")
+        vis.open()
+        XCTAssertTrue(vis.window.waitForExistence(timeout: 5), "vis.window never appeared")
+        XCTAssertTrue(
+            roadie.wait { self.vis.probe?.open == true && self.vis.probe?.rendering == true }, "probe: \(roadie.probeJSON)")
+        if vis.probe?.renderer == "classic" { throw XCTSkip("no Metal device in the guest") }
+        expectPreset("Spike Tunnel")
+        XCTAssertEqual(vis.probe?.preset, "bundled:spike-tunnel.milk")
+        let shot = XCTAttachment(screenshot: vis.window.screenshot())
+        shot.name = "Spike Tunnel"
+        shot.lifetime = .keepAlways
+        add(shot)
+        let changes = vis.probe?.presetChanges ?? 0
+        vis.window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click()
+        roadie.app.typeKey(.rightArrow, modifierFlags: [])
+        expectPreset("Stretch")
+        XCTAssertTrue(roadie.wait { (self.vis.probe?.presetChanges ?? 0) > changes }, "presetChanges: \(roadie.probeJSON)")
+        XCTAssertEqual(vis.probe?.renderer, "milk")
+        roadie.app.typeKey("l", modifierFlags: [])
+        let search = roadie.element(AXID.Vis.browserSearch)
+        XCTAssertTrue(search.waitForExistence(timeout: 5), "no \(AXID.Vis.browserSearch)")
+        // The list scrolls to the current preset, so rows are checked through the search, not by position.
+        search.click()
+        for (query, title) in [("Classic Spec", "Classic Spectrum"), ("Spike", "Spike Tunnel"), ("Mode 0", "Mode 0: Circle")] {
+            roadie.app.typeKey("a", modifierFlags: .command)
+            roadie.app.typeText(query)
+            XCTAssertTrue(
+                roadie.wait { self.row(0).exists && self.row(0).label == title }, "searching \(query) didn't list \(title)")
+        }
+        roadie.app.typeKey(.escape, modifierFlags: [])
     }
 
     func testOpenOnPlayOpensTheWindow() {
