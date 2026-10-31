@@ -138,6 +138,13 @@ final class VisualizationModelTests: PlayerModelTestCase {
         XCTAssertEqual(renderer.barHeights.max(), 0, "\(renderer.barHeights)")
     }
 
+    func testClassicRendererNoLongerLoadsMilkPresets() {
+        let renderer = ClassicVisualizer(colors: VisRenderer.defaultColors)
+        let milk = VisualizationPreset.milk(url: URL(fileURLWithPath: "/tmp/a.milk"), relativePath: "a.milk", source: .user)
+        XCTAssertFalse(renderer.canLoad(milk))
+        XCTAssertTrue(renderer.canLoad(.classic(.spectrum)))
+    }
+
     func testRendererFactoryPicksClassicByDefault() {
         var configuration = RoadieConfiguration()
         XCTAssertEqual(

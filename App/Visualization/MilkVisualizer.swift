@@ -25,6 +25,8 @@ final class MilkVisualizer: VisualizationRenderer {
     var view: NSView { metalView }
     var kindName: String { "milk" }
     var problems: [String] { renderer.presetErrors }
+    /// Frames committed by `draw(at:)`, for tests (a draw that returns early doesn't count).
+    private(set) var framesDrawn = 0
 
     init(device: MTLDevice) throws(MilkRendererError) {
         // Not _srgb: MilkDrop's output is display-referred (api-1.0.md F11).
@@ -75,6 +77,7 @@ final class MilkVisualizer: VisualizationRenderer {
         commandBuffer.present(drawable)
         // Every buffer must be committed: the renderer holds three frames in flight on a semaphore (api-1.0.md F3).
         commandBuffer.commit()
+        framesDrawn += 1
     }
 
     func setReducedMotion(_ on: Bool) {

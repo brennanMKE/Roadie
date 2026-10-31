@@ -381,8 +381,10 @@ then `draw`. That keeps pausing, frame rate and occlusion in Roadie: MilkMetal 1
 display link with no pause, frame-rate cap or shared clock (api-1.0.md F7 not taken), and the shared loop lets both renderers share it. `MilkVisualizer` (#0243) therefore uses a Roadie
 `CAMetalLayer` view and `MilkRenderer.render(to:commandBuffer:time:)`, committing every command buffer (F3).
 
-`VisualizationRendererFactory.make(configuration:skinColors:)` picks: Debug `-RoadieVisRenderer classic|milk`
-wins; otherwise MilkMetal when it's linked and `MTLCreateSystemDefaultDevice()` returns a device, else classic.
+`VisualizationRendererFactory.make(configuration:colors:)` picks: Debug `-RoadieVisRenderer classic` builds
+`ClassicVisualizer` alone (the UI tests' default); otherwise (no hook, `milk`, and always in Release) a
+`MixedVisualizer` (#0257) with a `MilkVisualizer` when `MTLCreateSystemDefaultDevice()` returns a device and the
+renderer initializes, else with classic presets only (logged). An unknown hook value logs and uses classic.
 
 ### 3.3 `ClassicVisualizer`
 
@@ -395,11 +397,17 @@ Transitions: a crossfade of the two bitmaps over the blend time (H cuts).
 
 It is the stand-in that makes the whole milestone testable now and in the VM (no Metal, deterministic for a given
 input), the fallback when Metal is unavailable or a `.milk` preset fails to load (the navigator skips it and the
-overlay says so), and a feature on its own: the classic presets stay in the list after MilkDrop lands. In Debug
-builds `canLoad` also accepts `.milk` presets (drawn as Spectrum with the preset's name), so catalogue, folder and
-browser behaviour can be tested before #0243; Release before #0243 lists classic presets only.
+overlay says so), and a feature on its own: the classic presets stay in the list after MilkDrop lands. `canLoad`
+accepts classic presets only, in every configuration (#0257 removed the Debug `.milk`-as-Spectrum stand-in; unit tests
+use a recording MilkDrop double inside `MixedVisualizer` instead).
 
 ### 3.4 `VisualizationModel` and the render loop (App)
+
+The model holds one renderer. With MilkDrop available that is a `MixedVisualizer` (#0257): it owns the classic and
+MilkDrop renderers, routes each preset to the one whose `canLoad` accepts it, and names the active one in `kindName`
+(the probe's `renderer`). Crossing kinds loads the incoming renderer first (a throw keeps the current one), resets
+MilkDrop when it becomes active (no stale audio), and crossfades the two views over the blend time, driven by
+`draw(at:)` time (0 cuts). Only the visible renderer(s) are fed and drawn.
 
 `VisualizationModel` (`@MainActor @Observable`, owned by `PlayerModel` like `visualizer`): the navigator, clock,
 overlay state, settings, the renderer, the audio feed (§4.2), the readout and help state, and the window's open /

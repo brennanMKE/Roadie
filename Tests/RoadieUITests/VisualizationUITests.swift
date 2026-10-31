@@ -7,8 +7,10 @@ final class VisualizationUITests: RoadieUITestCase {
 
     private var vis: RoadieUIApp.Visualization { roadie.visualization }
 
-    private func launchPlain(extra: [String] = [], noticeShown: Bool = true) {
-        let base = noticeShown ? Self.visArguments : Array(Self.visArguments.dropLast(2))
+    /// `renderer` "milk" gives the window `MixedVisualizer` (classic and MilkDrop presets, #0257).
+    private func launchPlain(extra: [String] = [], noticeShown: Bool = true, renderer: String = "classic") {
+        var base = noticeShown ? Self.visArguments : Array(Self.visArguments.dropLast(2))
+        base[1] = renderer
         launch(windows: [.main], extra: base + extra)
         XCTAssertTrue(roadie.main.play.waitForExistence(timeout: 10), "main.play never appeared")
     }
@@ -471,7 +473,8 @@ final class VisualizationUITests: RoadieUITestCase {
 
     func testPresetsFolderAddsItsPresets() {
         let folder = (paths.data as NSString).appendingPathComponent("vis-presets-\(UUID().uuidString)")
-        launchPlain(extra: ["-RoadieVisPresetsFolder", folder, "-RoadieVisSeedPresets", "2", "-RoadieVisSeed", "1"])
+        launchPlain(
+            extra: ["-RoadieVisPresetsFolder", folder, "-RoadieVisSeedPresets", "2", "-RoadieVisSeed", "1"], renderer: "milk")
         openVisualizationSettings()
         let count = roadie.element("vis.settings.folderCount")
         XCTAssertTrue(
@@ -490,6 +493,35 @@ final class VisualizationUITests: RoadieUITestCase {
             roadie.wait { self.row(0).exists && self.row(0).label == "Seeded Preset 1" && self.row(1).label == "Seeded Preset 2" },
             "the list doesn't have the folder's presets")
         roadie.app.typeKey(.escape, modifierFlags: [])
+    }
+
+    /// #0257: → from the last classic crosses into the first MilkDrop preset, ← back; the probe names the renderer.
+    func testArrowCrossesFromClassicToMilkDrop() throws {
+        let folder = (paths.data as NSString).appendingPathComponent("vis-presets-\(UUID().uuidString)")
+        launchPlain(
+            extra: [
+                "-visualization.lastPreset", "classic:stereoScope", "-RoadieVisPresetsFolder", folder,
+                "-RoadieVisSeedPresets", "2", "-RoadieVisSeed", "1",
+            ],
+            renderer: "milk")
+        vis.open()
+        expectOpen(showing: "Classic Stereo Scope")
+        XCTAssertEqual(vis.probe?.renderer, "classic")
+        vis.window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click()
+        roadie.app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(roadie.wait { self.vis.preset != "Classic Stereo Scope" }, "→ didn't change the preset")
+        if vis.preset == "Classic Spectrum" && vis.probe?.renderer == "classic" {
+            throw XCTSkip("no Metal device in the guest: no MilkDrop presets listed")
+        }
+        expectPreset("Seeded Preset 1")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.renderer == "milk" }, "renderer: \(roadie.probeJSON)")
+        let shot = XCTAttachment(screenshot: vis.window.screenshot())
+        shot.name = "MilkDrop frame"
+        shot.lifetime = .keepAlways
+        add(shot)
+        roadie.app.typeKey(.leftArrow, modifierFlags: [])
+        expectPreset("Classic Stereo Scope")
+        XCTAssertTrue(roadie.wait { self.vis.probe?.renderer == "classic" }, "renderer: \(roadie.probeJSON)")
     }
 
     func testOpenOnPlayOpensTheWindow() {

@@ -71,6 +71,7 @@ final class VisualizationSettingsModelTests: PlayerModelTestCase {
         let folder = try presetsFolder(["Beta.milk", "Alpha.milk"])
         let model = try visModel()
         let vis = model.visualization
+        vis.makeRenderer = { MixedVisualizer(classic: ClassicVisualizer(colors: VisRenderer.defaultColors), milk: StandInMilkRenderer()) }
         vis.open()
         vis.updateSettings { $0.presetsFolder = folder.path }
         await vis.reloadCatalogue().value
@@ -83,6 +84,7 @@ final class VisualizationSettingsModelTests: PlayerModelTestCase {
         let folder = try presetsFolder(["Alpha.milk"])
         let model = try visModel()
         let vis = model.visualization
+        vis.makeRenderer = { MixedVisualizer(classic: ClassicVisualizer(colors: VisRenderer.defaultColors), milk: StandInMilkRenderer()) }
         vis.open()
         vis.updateSettings { $0.presetsFolder = folder.path }
         await vis.reloadCatalogue().value

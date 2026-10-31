@@ -24,23 +24,33 @@ protocol VisualizationRenderer: AnyObject {
     func setColors(_ colors: [SkinKit.RGBColor])
     /// The last load's warnings.
     var problems: [String] { get }
+    /// Drops queued audio and restarts the renderer's clock; `MixedVisualizer` calls it when MilkDrop becomes active.
+    func reset()
+}
+
+extension VisualizationRenderer {
+    func reset() {}
 }
 
 @MainActor
 enum VisualizationRendererFactory {
     private static let log = Logger(subsystem: "co.sstools.roadie", category: "Visualization")
 
-    /// Debug `-RoadieVisRenderer classic|milk` wins (an unknown value logs and uses classic); otherwise classic until
-    /// #0243 adds the MilkMetal branch. `milk` also falls back to classic until then.
+    /// Debug `-RoadieVisRenderer classic` builds `ClassicVisualizer` alone (the UI tests' default). Otherwise (no hook,
+    /// `milk`, and always in Release) `MixedVisualizer` with a `MilkVisualizer` when Metal is available, else classic
+    /// presets only. An unknown value logs and uses classic.
     static func make(configuration: RoadieConfiguration, colors: [SkinKit.RGBColor]) -> any VisualizationRenderer {
         switch configuration.visRenderer {
-        case nil, "classic"?:
+        case "classic"?:
+            return ClassicVisualizer(colors: colors)
+        case nil, "milk"?:
             break
-        case "milk"?:
-            log.notice("MilkMetal isn't linked yet (#0243); using the classic visualizer")
         case let other?:
             log.error("unknown -RoadieVisRenderer \(other, privacy: .public); using the classic visualizer")
+            return ClassicVisualizer(colors: colors)
         }
-        return ClassicVisualizer(colors: colors)
+        let milk = MilkVisualizer.make()
+        if milk == nil { log.notice("MilkDrop unavailable; showing classic presets only") }
+        return MixedVisualizer(classic: ClassicVisualizer(colors: colors), milk: milk)
     }
 }
