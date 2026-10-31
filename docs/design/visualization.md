@@ -377,8 +377,8 @@ protocol VisualizationRenderer: AnyObject {
 ```
 
 Roadie owns the render loop (§3.4), not the renderer: one display link calls feed, then the auto-advance check,
-then `draw`. That keeps pausing, frame rate and occlusion in Roadie, which MilkMetal's `MilkView` doesn't offer yet
-(api-1.0.md F7), and lets both renderers share it. `MilkVisualizer` (#0243) therefore uses a Roadie
+then `draw`. That keeps pausing, frame rate and occlusion in Roadie: MilkMetal 1.0.0's `MilkView` runs its own
+display link with no pause, frame-rate cap or shared clock (api-1.0.md F7 not taken), and the shared loop lets both renderers share it. `MilkVisualizer` (#0243) therefore uses a Roadie
 `CAMetalLayer` view and `MilkRenderer.render(to:commandBuffer:time:)`, committing every command buffer (F3).
 
 `VisualizationRendererFactory.make(configuration:skinColors:)` picks: Debug `-RoadieVisRenderer classic|milk`
@@ -467,7 +467,9 @@ buffer, at most 4,096 frames; a gap longer than that re-lags rather than replayi
 `renderer.feed` on the main actor.
 
 So the package's `feed` is called from one thread only (the main actor), which meets its single-producer contract
-(F4) whether or not the package later moves pacing inside (F5 option b): Roadie already feeds "as it plays".
+(F4). Since 1.0 the renderer paces its own feed (F5 option b): each `render` analyzes the 1,024 frames that should be
+playing at its `time`. Roadie keeps the reader and feeds once per tick on the main actor, so audio plays straight
+through one tick later (#0243).
 
 The reader has its own cursor; the main window's `VisualizerModel` keeps `resetCursor()` on the mono ring, so the
 two consumers never move each other.
@@ -648,9 +650,8 @@ Each user-facing child also adds a CHANGELOG `[Unreleased]` bullet and, at the e
 1. **MilkDropMetalKit's 1.0 API differs from today's.** api-1.0.md proposes changes (errors, `MilkView` options,
    pacing F5, products F1). Mitigation: Roadie depends on four calls (`init`, `load`, `feed`, `render`) behind its
    own seam; #0243 adapts to whatever 1.0 ships and is the only issue that imports the package.
-2. **Pacing twice.** If 1.0 paces `feed` internally (F5 b), Roadie's per-tick feeding still works (it feeds as
-   played), but #0243 checks the picture doesn't lag by a window; if it does, it feeds directly from the reader
-   without the cursor's lag.
+2. **Pacing twice.** 1.0 paces `feed` internally (F5 b). Roadie's per-tick feeding still works (it feeds as played)
+   and adds one tick of delay; #0243's by-hand step 2 checks the picture pulses on the beat.
 3. **Main-actor stalls.** `render` waits on a 3-frame semaphore; a command buffer never committed stalls the main
    thread (F3). #0243 commits every buffer and draws only when a drawable is available.
 4. **Full screen in the headless guest.** Covered by #0237's spike: native full screen works in the guest.
