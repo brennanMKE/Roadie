@@ -52,4 +52,35 @@ struct PresetCatalogTests {
             "user:Äther.milk", "bundled:preset 2.milk", "user:Preset 10.milk", "bundled:Same.milk", "user:Same.milk",
         ])
     }
+
+    private func bundleFolder(gallery: String?) throws -> URL {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("VisKit-bundled-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        for name in ["spike-tunnel.milk", "zoom.milk"] { try Data("x".utf8).write(to: root.appendingPathComponent(name)) }
+        if let gallery { try Data(gallery.utf8).write(to: root.appendingPathComponent("gallery.json")) }
+        return root
+    }
+
+    /// #0258: the gallery names the presets it lists; the rest keep their file names.
+    @Test func testBundledNamesComeFromTheGallery() throws {
+        let root = try bundleFolder(gallery: """
+            {"categories": [{"name": "Showcase", "presets": [{"file": "spike-tunnel.milk", "title": "Spike Tunnel", "summary": "s"}]}]}
+            """)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let found = PresetCatalog.bundled(in: root).sorted { $0.id < $1.id }
+        #expect(found.map(\.id) == ["bundled:spike-tunnel.milk", "bundled:zoom.milk"])
+        #expect(found.map(\.name) == ["Spike Tunnel", "zoom"])
+        #expect(found.allSatisfy { $0.source == .bundled && $0.kind == .milk })
+    }
+
+    @Test func testBundledWithoutAGalleryUsesFileNames() throws {
+        for gallery in [nil, "not json"] as [String?] {
+            let root = try bundleFolder(gallery: gallery)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let found = PresetCatalog.bundled(in: root).sorted { $0.id < $1.id }
+            #expect(found.map(\.name) == ["spike-tunnel", "zoom"])
+            #expect(found.map(\.id) == ["bundled:spike-tunnel.milk", "bundled:zoom.milk"])
+        }
+    }
 }

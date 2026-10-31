@@ -8,6 +8,7 @@ All notable changes to Roadie are recorded here. The format is a strict subset o
 
 ### Added
 
+- MilkDrop presets in the Visualization window: 42 presets from MilkDropMetalKit, and your own folder of .milk files in Settings › Visualization. The classic visualizations stay in the list.
 - Play a Library playlist: double-click it, right-click › Play / Play Next / Add to Queue, or drag it onto the playlist editor.
 - Drag an artist from the Library onto the playlist editor; right-click an artist for Play, Play Next and Add to Queue.
 - LIST › Load in the playlist editor can load a Library playlist while This Mac plays its own queue, and Playback › Load Playlist from Library… does the same from the menu bar.
